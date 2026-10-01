@@ -1132,7 +1132,7 @@ export default function WheelOfNamesPage() {
               >
                 <Trophy className="h-4 w-4 text-amber-600 group-hover:scale-110 transition-transform" />
                 <span>{currentPrize}</span>
-                <span className="text-[10px] text-amber-600 group-hover:text-amber-800 underline">Đổi</span>
+                <span className="text-[10px] text-amber-600 group-hover:text-amber-800 font-semibold transition-colors">Đổi</span>
               </button>
             )}
           </div>
@@ -1409,7 +1409,7 @@ export default function WheelOfNamesPage() {
                 <button
                   type="button"
                   onClick={() => handleToggleSelectAll(true)}
-                  className="text-[#cf142b] hover:underline transition cursor-pointer"
+                  className="text-[#cf142b] hover:text-[#990e1f] transition-colors cursor-pointer"
                 >
                   Chọn tất cả
                 </button>
@@ -1417,7 +1417,7 @@ export default function WheelOfNamesPage() {
                 <button
                   type="button"
                   onClick={() => handleToggleSelectAll(false)}
-                  className="text-slate-500 hover:text-slate-800 transition cursor-pointer"
+                  className="text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
                 >
                   Bỏ chọn tất cả
                 </button>
