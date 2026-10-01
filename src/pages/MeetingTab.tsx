@@ -822,7 +822,7 @@ export default function MeetingTab() {
 
               {/* Sub-tab Switcher & Actions */}
               <div className="flex items-center justify-between sm:justify-end gap-2">
-                <div className="flex overflow-x-auto bg-slate-100 p-1 rounded-xl"><button type="button" onClick={() => setActiveSubTab("slides")} aria-pressed={activeSubTab === "slides"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700">Slide</button><button type="button" onClick={() => setActiveSubTab("checkin")} aria-pressed={activeSubTab === "checkin"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700">Check-in ({activeMeeting.speakers.length})</button>
+                <div className="flex overflow-x-auto bg-slate-100 p-1 rounded-xl"><button type="button" onClick={() => setActiveSubTab("slides")} aria-pressed={activeSubTab === "slides"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700">Thuyết trình</button><button type="button" onClick={() => setActiveSubTab("checkin")} aria-pressed={activeSubTab === "checkin"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700">Check-in ({activeMeeting.speakers.length})</button>
                   <button
                     type="button"
                     onClick={() => setActiveSubTab("speakers")}

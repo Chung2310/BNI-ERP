@@ -207,7 +207,7 @@ it.each([0, 3, 150])("slide delay %s waits until speaking time ends before chang
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
   render(<MeetingTab />);
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
-  fireEvent.click(screen.getByRole("button", { name: "Slide" }));
+  fireEvent.click(screen.getByRole("button", { name: "Thuyết trình" }));
   await screen.findByText("Đầu tiên");
 
   try {
