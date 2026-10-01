@@ -37,7 +37,7 @@ export function MeetingDateTimePicker({
   required,
   disabled,
   className = "",
-  placeholder = "Chọn ngày & giờ (dd/mm/yyyy 24h)...",
+  placeholder = "Chọn ngày & giờ...",
 }: MeetingDateTimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -236,11 +236,8 @@ export function MeetingDateTimePicker({
             <span className="text-slate-400 font-normal">{placeholder}</span>
           )}
         </div>
-        <div className="flex items-center gap-1.5 shrink-0 ml-2">
-          <span className="px-1.5 py-0.5 rounded-md bg-cyan-50 text-[10px] font-bold text-cyan-700 border border-cyan-200/60">
-            24h VN
-          </span>
-          <Clock className="h-3.5 w-3.5 text-slate-400" />
+        <div className="flex items-center shrink-0 ml-2">
+          <Clock className="h-4 w-4 text-slate-400 group-hover:text-cyan-600 transition-colors" />
         </div>
       </button>
 
@@ -334,14 +331,14 @@ export function MeetingDateTimePicker({
             })}
           </div>
 
-          {/* 24-Hour Time Section */}
+          {/* Time Section */}
           <div className="mt-3.5 pt-3 border-t border-slate-100 space-y-2">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700">
               <span className="flex items-center gap-1.5 text-slate-700">
                 <Clock className="h-3.5 w-3.5 text-cyan-600" />
-                Giờ diễn ra (24h)
+                Giờ diễn ra
               </span>
-              <span className="text-[11px] font-mono text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-md border border-cyan-100">
+              <span className="text-[11px] font-mono text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-md border border-cyan-100 font-bold">
                 {selectedHour}:{selectedMinute}
               </span>
             </div>
@@ -349,7 +346,7 @@ export function MeetingDateTimePicker({
             {/* Hour and Minute Selectors */}
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[10px] font-semibold text-slate-500 mb-1">Giờ (00 - 23)</label>
+                <label className="block text-[10px] font-semibold text-slate-500 mb-1">Giờ</label>
                 <select
                   value={selectedHour}
                   onChange={handleHourChange}
@@ -364,7 +361,7 @@ export function MeetingDateTimePicker({
               </div>
 
               <div>
-                <label className="block text-[10px] font-semibold text-slate-500 mb-1">Phút (00 - 55)</label>
+                <label className="block text-[10px] font-semibold text-slate-500 mb-1">Phút</label>
                 <select
                   value={selectedMinute}
                   onChange={handleMinuteChange}
