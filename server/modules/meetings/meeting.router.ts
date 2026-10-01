@@ -19,6 +19,7 @@ import {
   redrawPrizeWinner,
   resetLuckyDrawWinners,
   createCheckInQr,
+  autoStartDueMeetings,
 } from './meeting.service';
 import { checkinInput, controlInput, meetingInput, updateMeetingInput } from './meeting.validation';
 
@@ -36,6 +37,7 @@ const sendError = (res: any, error: any) =>
 
 meetingRouter.get('/', read, async (req: any, res) => {
   try {
+    await autoStartDueMeetings();
     res.json({
       data: await MeetingModel.find({ companyCode: company(req) })
         .sort({ startsAt: -1 })

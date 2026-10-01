@@ -135,8 +135,36 @@ export async function checkIn(item: any, input: any, actorId: string, canManage:
     checkedInAt: new Date(),
     seconds: speakingSeconds(item.speakers.length, item.tiers, item.fallbackSeconds),
   });
+  if (item.status === 'live' && item.currentIndex === -1) {
+    item.currentIndex = 0;
+    item.speakerStartedAt = new Date();
+  }
   await saveMeeting(item);
   return item;
+}
+
+export async function autoStartDueMeetings(now = new Date()) {
+  const dueMeetings = await MeetingModel.find({
+    status: 'scheduled',
+    startsAt: { $lte: now },
+  });
+  for (const item of dueMeetings) {
+    if (item.speakers && item.speakers.length > 0) {
+      item.speakers = allocateSpeakers(
+        item.speakers.map((p: any) => (p.toObject ? p.toObject() : p)),
+        item.tiers,
+        item.fallbackSeconds
+      );
+      item.currentIndex = 0;
+      item.speakerStartedAt = now;
+    } else {
+      item.currentIndex = -1;
+      item.speakerStartedAt = undefined;
+    }
+    item.status = 'live';
+    await saveMeeting(item);
+  }
+  return dueMeetings.length;
 }
 
 export async function notifyNextSpeaker(item: any) {
@@ -159,15 +187,20 @@ export async function notifyNextSpeaker(item: any) {
 
 export async function controlMeeting(item: any, action: string, now = new Date()) {
   const status = item.status;
-  if (action === 'start' && status === 'scheduled' && item.speakers.length) {
-    item.speakers = allocateSpeakers(
-      item.speakers.map((p: any) => p.toObject()),
-      item.tiers,
-      item.fallbackSeconds
-    );
+  if (action === 'start' && status === 'scheduled') {
+    if (item.speakers && item.speakers.length > 0) {
+      item.speakers = allocateSpeakers(
+        item.speakers.map((p: any) => (p.toObject ? p.toObject() : p)),
+        item.tiers,
+        item.fallbackSeconds
+      );
+      item.currentIndex = 0;
+      item.speakerStartedAt = now;
+    } else {
+      item.currentIndex = -1;
+      item.speakerStartedAt = undefined;
+    }
     item.status = 'live';
-    item.currentIndex = 0;
-    item.speakerStartedAt = now;
   } else if (action === 'pause' && status === 'live') {
     item.elapsedSeconds = elapsedSeconds(item, now);
     item.speakerStartedAt = undefined;

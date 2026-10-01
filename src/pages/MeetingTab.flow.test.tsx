@@ -43,3 +43,13 @@ it("disables end meeting button when scheduled and allows ending when live with 
   expect(screen.getByText(/Bạn có chắc chắn muốn kết thúc buổi họp "Buổi họp Live"\?/)).toBeTruthy();
 });
 
+it("allows starting scheduled meeting with confirmation popup", async () => {
+  render(<MeetingTab />);
+  const startButtons = await screen.findAllByRole("button", { name: "Bắt đầu" });
+  expect(startButtons.length).toBeGreaterThan(0);
+  fireEvent.click(startButtons[0]);
+  expect(screen.getByText("Bắt đầu cuộc họp?")).toBeTruthy();
+  expect(screen.getByText(/Cuộc họp "Buổi họp A" hiện chưa có người check-in/)).toBeTruthy();
+});
+
+

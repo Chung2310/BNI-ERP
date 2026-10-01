@@ -168,6 +168,10 @@ export default function MeetingTab() {
   const [endingMeeting, setEndingMeeting] = useState<Meeting | null>(null);
   const [isEnding, setIsEnding] = useState(false);
 
+  // Start Meeting Confirmation Dialog state
+  const [startingMeeting, setStartingMeeting] = useState<Meeting | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
+
   // Guest Checkin state inside detail modal
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
@@ -317,6 +321,21 @@ export default function MeetingTab() {
       toast.error(e.message || "Không thể kết thúc cuộc họp.");
     } finally {
       setIsEnding(false);
+    }
+  };
+
+  const handleStartMeeting = async () => {
+    if (!startingMeeting) return;
+    setIsStarting(true);
+    try {
+      await api(`/${startingMeeting._id}/control`, "POST", { action: "start", version: startingMeeting.__v });
+      toast.success(`Buổi họp "${startingMeeting.title}" đã bắt đầu!`);
+      setStartingMeeting(null);
+      await refresh();
+    } catch (e: any) {
+      toast.error(e.message || "Không thể bắt đầu cuộc họp.");
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -557,9 +576,23 @@ export default function MeetingTab() {
                     </span>
                   </div>
 
-                  {/* Top Action Icons (Kết thúc, Sửa, Xóa) */}
+                  {/* Top Action Icons (Bắt đầu, Kết thúc, Sửa, Xóa) */}
                   {canManage && (
                     <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-90 transition-opacity group-hover:opacity-100">
+                      {m.status === "scheduled" && (
+                        <button
+                          type="button"
+                          title="Bắt đầu cuộc họp"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setStartingMeeting(m);
+                          }}
+                          className="rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-white backdrop-blur-md px-2.5 py-1 text-[11px] font-bold shadow-sm transition cursor-pointer flex items-center gap-1"
+                        >
+                          <Play className="h-3 w-3 fill-current" />
+                          <span>Bắt đầu</span>
+                        </button>
+                      )}
                       {isLive && (
                         <button
                           type="button"
@@ -644,6 +677,21 @@ export default function MeetingTab() {
                     <span>{isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}</span>
                     <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                   </button>
+
+                  {canManage && m.status === "scheduled" && (
+                    <button
+                      type="button"
+                      title="Bắt đầu cuộc họp ngay"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setStartingMeeting(m);
+                      }}
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 shrink-0 cursor-pointer shadow-xs"
+                    >
+                      <Play className="h-3.5 w-3.5 fill-current" />
+                      <span>Bắt đầu</span>
+                    </button>
+                  )}
 
                   {canManage && m.status !== "ended" && m.status !== "cancelled" && (
                     <button
@@ -851,16 +899,16 @@ export default function MeetingTab() {
                       {/* Operation Control Buttons */}
                       <div className="flex flex-wrap items-center gap-2">
                   {canManage && activeMeeting.status === "scheduled" && (
-                          <button
-                            type="button"
-                            onClick={() => control("start")}
-                            disabled={!activeMeeting.speakers.length || saving}
-                            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-bold shadow-sm shadow-emerald-600/20 transition cursor-pointer disabled:opacity-40"
-                          >
-                            <Play className="h-3.5 w-3.5" fill="currentColor" />
-                            Bắt đầu cuộc họp
-                          </button>
-                        )}
+                    <button
+                      type="button"
+                      onClick={() => setStartingMeeting(activeMeeting)}
+                      disabled={saving}
+                      className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-bold shadow-sm shadow-emerald-600/20 transition cursor-pointer"
+                    >
+                      <Play className="h-3.5 w-3.5" fill="currentColor" />
+                      Bắt đầu cuộc họp
+                    </button>
+                  )}
 
                         {canManage && activeMeeting.status === "live" && (
                           <>
@@ -1494,6 +1542,22 @@ export default function MeetingTab() {
       )}
 
       <ConfirmDialog isOpen={finishRequested} title="Kết thúc buổi họp?" description="Sau khi kết thúc, buổi họp ngừng nhận check-in và điều hành phát biểu." confirmLabel="Kết thúc buổi họp" isSubmitting={saving} onClose={() => setFinishRequested(false)} onConfirm={async () => { await control("finish"); setFinishRequested(false); }} />
+      {/* POPUP XÁC NHẬN BẮT ĐẦU CUỘC HỌP */}
+      <ConfirmDialog
+        isOpen={!!startingMeeting}
+        title="Bắt đầu cuộc họp?"
+        description={
+          startingMeeting && startingMeeting.speakers && startingMeeting.speakers.length > 0
+            ? `Bạn có chắc chắn muốn bắt đầu cuộc họp "${startingMeeting?.title}" ngay bây giờ? Trạng thái sẽ được chuyển sang "Đang diễn ra" và kích hoạt bộ đếm thời gian cho diễn giả.`
+            : `Cuộc họp "${startingMeeting?.title}" hiện chưa có người check-in. Bạn có muốn bắt đầu ngay? Trạng thái sẽ chuyển sang "Đang diễn ra" và thành viên/khách mời vẫn có thể tiếp tục check-in trong lúc họp.`
+        }
+        tone="warning"
+        confirmLabel="Bắt đầu cuộc họp"
+        cancelLabel="Hủy"
+        isSubmitting={isStarting}
+        onConfirm={handleStartMeeting}
+        onClose={() => setStartingMeeting(null)}
+      />
       {/* POPUP XÁC NHẬN KẾT THÚC CUỘC HỌP */}
       <ConfirmDialog
         isOpen={!!endingMeeting}
