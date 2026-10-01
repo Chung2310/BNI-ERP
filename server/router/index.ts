@@ -25,7 +25,10 @@ import { webhookRouter } from "./webhook.router";
 import { meetingRouter } from "../modules/meetings/meeting.router";
 import { meetingCheckInRouter } from "../modules/meetings/meeting-checkin.router";
 
+import { memberFeeRouter } from "../modules/member-fees/member-fee.router";
+
 export const apiRouter = Router();
+apiRouter.use("/member-fees", memberFeeRouter);
 
 // Webhooks
 apiRouter.use("/webhook", webhookRouter);

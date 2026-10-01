@@ -18,6 +18,7 @@ const NotificationSchema = new Schema<INotification>(
     action: {
       tab: { type: String },
       subTab: { type: String },
+      feeId: { type: String },
     },
     createdAt: { type: Date, default: Date.now, index: true },
   }

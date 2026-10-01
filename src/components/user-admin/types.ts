@@ -1,4 +1,3 @@
-import { RolePermission } from "../../services/rolePermissionService";
 import { UserProfile } from "../../types";
 
 export type UserAdminTabKey = "users" | "roles";
@@ -23,12 +22,9 @@ export interface UserFormState {
 export interface UserTableProps {
   users: UserProfile[];
   currentUser?: UserProfile | null;
-  rolePermissionsList: RolePermission[];
   userPage: number;
   totalUserPages: number;
   onPageChange: (page: number | ((prev: number) => number)) => void;
-  getAvailableRoles: () => Array<{ role: string; displayName: string; level: number }>;
-  onRoleChange: (uid: string, name: string, role: any) => void;
   openActionMenuId: string | null;
   onToggleActionMenu: (uid: string) => void;
   onEditUser: (user: UserProfile) => void;

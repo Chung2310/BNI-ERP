@@ -745,7 +745,7 @@ export default function ResourceTab() {
 
   // Reset selectedOwnerId to current user if switching to GOOGLE DRIVE and viewing another employee's space
   useEffect(() => {
-    if (subTab === "GOOGLE DRIVE") {
+    if ((subTab as string) === "GOOGLE DRIVE") {
       const myId = userProfileId;
       if (selectedSpace === "personal" && selectedOwnerId !== myId) {
         setSelectedOwnerId(myId);
@@ -764,7 +764,7 @@ export default function ResourceTab() {
 
   // Refetch when folder level changes or space changes
   useEffect(() => {
-    if (subTab === "GOOGLE DRIVE") {
+    if ((subTab as string) === "GOOGLE DRIVE") {
       void fetchResources();
     }
   }, [isConnected, subTab, selectedSpace, selectedOwnerId, currentFolderId, allStaff]);

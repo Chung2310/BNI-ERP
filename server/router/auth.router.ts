@@ -8,7 +8,14 @@ import { UserModel } from "../model/user.model";
 import { isIP } from "node:net";
 import { branchController } from "../controller/branch.controller";
 
+import { importUsers, UserImportError } from "../service/user-import.service";
+
 export const authRouter = Router();
+
+authRouter.post("/users/import", requireAuth as any, requireRole(["admin"]) as any, requirePermission("access:manage") as any, async (req: any, res) => {
+  try { res.json({ data: await importUsers(req.body, req.user) }); }
+  catch (error) { res.status(error instanceof UserImportError ? error.status : 500).json({ message: error instanceof UserImportError ? error.message : "Không thể nhập tài khoản. Vui lòng thử lại." }); }
+});
 
 // Định nghĩa regex cho email và số điện thoại Việt Nam
 const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;

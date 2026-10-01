@@ -1,4 +1,4 @@
-export type HRSubTabType = "SƠ ĐỒ TỔ CHỨC" | "EMAIL CHÚC MỪNG";
+export type HRSubTabType = "SƠ ĐỒ TỔ CHỨC" | "EMAIL CHÚC MỪNG" | "PHÍ THƯỜNG NIÊN";
 
 export interface EmployeeNode {
   id: string;

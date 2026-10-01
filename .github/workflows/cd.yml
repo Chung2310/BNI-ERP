@@ -132,7 +132,7 @@ jobs:
         if: github.ref_name == 'develop'
         uses: appleboy/ssh-action@v1.0.3
         env:
-          ENV_FILE_CONTENT: ${{ secrets.ENV_FILE }}
+          ENV_FILE_CONTENT: ${{ vars.ENV_FILE || secrets.ENV_FILE }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
@@ -148,7 +148,7 @@ jobs:
             mkdir -p "$TARGET_DIR"
             cd "$TARGET_DIR"
 
-            # Tạo/ghi nội dung cấu hình từ GitHub Secrets vào file .env cục bộ
+            # Ưu tiên GitHub Variables, dùng Secrets nếu variable chưa có giá trị
             echo "$ENV_FILE_CONTENT" > .env
 
             # Đăng nhập vào GHCR trên VPS
@@ -181,7 +181,7 @@ jobs:
         if: github.ref_name == 'production'
         uses: appleboy/ssh-action@v1.0.3
         env:
-          ENV_FILE_CONTENT: ${{ secrets.ENV_FILE_PROD }}
+          ENV_FILE_CONTENT: ${{ vars.ENV_FILE_PROD || secrets.ENV_FILE_PROD }}
         with:
           host: ${{ secrets.SSH_HOST_PROD }}
           username: ${{ secrets.SSH_USER_PROD }}
@@ -197,7 +197,7 @@ jobs:
             mkdir -p "$TARGET_DIR"
             cd "$TARGET_DIR"
 
-            # Tạo/ghi nội dung cấu hình từ GitHub Secrets vào file .env cục bộ
+            # Ưu tiên GitHub Variables, dùng Secrets nếu variable chưa có giá trị
             echo "$ENV_FILE_CONTENT" > .env
 
             # Đăng nhập vào GHCR trên VPS

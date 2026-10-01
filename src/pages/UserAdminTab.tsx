@@ -23,8 +23,11 @@ import { getPermissionLabel, getRoleDisplayName } from "../utils/permissionUtils
 import { branchService, BranchRecord } from "../services/branchService";
 import { resolveUserAdminBranchId } from "../components/user-admin/userBranchScope";
 
+const UserImportModal = React.lazy(() => import("../components/user-admin/UserImportModal"));
+
 export default function UserAdminTab() {
   const { userProfile } = useAuth();
+  const [importOpen, setImportOpen] = useState(false);
   const activeBranchId = userProfile?.branchId || "";
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -264,26 +267,10 @@ export default function UserAdminTab() {
     setUserPage(1);
   }, [searchQuery, filterStartDate, filterEndDate, userProfile?.role]);
 
-  const getAvailableRoles = () => {
-    const defaultRoles = [
-      { role: "admin", displayName: getRoleDisplayName("admin"), level: 1 },
-      { role: "branch_owner", displayName: "BRANCH OWNER", level: 2 },
-      { role: "manager", displayName: "MANAGER (Quản lý)", level: 2 },
-      { role: "teacher", displayName: getRoleDisplayName("teacher"), level: 3 },
-      { role: "user", displayName: "USER (Nhân viên)", level: 3 },
-    ];
-
-    // Merge with custom roles
-    const customRoles = rolePermissionsList
-      .filter(rp => !["user", "teacher", "manager", "branch_owner", "admin"].includes(rp.role))
-      .map(rp => ({
-        role: rp.role,
-        displayName: getRoleDisplayName(rp.role, rp.displayName),
-        level: rp.level
-      }));
-
-    return [...defaultRoles, ...customRoles];
-  };
+  const getAvailableRoles = () => [
+    { role: "admin", displayName: "Admin", level: 1 },
+    { role: "user", displayName: "Member", level: 3 },
+  ];
 
   // Filter visible users within company
   const visibleUsers = usersList.filter((usr) => {
@@ -329,32 +316,6 @@ export default function UserAdminTab() {
     safeUserPage * USERS_PER_PAGE
   );
 
-  const handleRoleChange = async (targetUid: string, targetName: string, newRole: "user" | "teacher" | "manager" | "admin") => {
-    if (targetUid === userProfile?.uid) {
-      toast.warning("Bạn không thể tự thay đổi vai trò của chính mình!");
-      return;
-    }
-
-    try {
-      await authService.updateUserRole(targetUid, newRole);
-      toast.success(`Đã cập nhật quyền hạn cho "${targetName}" thành ${newRole.toUpperCase()}!`);
-      setUsersList((prev) =>
-        prev.map((u) => {
-          if (u.uid === targetUid) {
-            const dept = newRole === "admin" ? "Ban Giám đốc" : (newRole === "manager" ? "Quản lý" : (newRole === "teacher" ? "Đào tạo" : "Nhân viên"));
-            const div = newRole === "admin" ? "Ban Giám đốc" : (newRole === "manager" ? "Quản lý" : (newRole === "teacher" ? "Đào tạo" : "Nhân viên"));
-            const title = newRole === "admin" ? "CEO" : (newRole === "manager" ? "Quản lý phòng ban" : (newRole === "teacher" ? "Giảng viên" : "Nhân viên"));
-            return { ...u, role: newRole, department: dept, division: div, jobTitle: title };
-          }
-          return u;
-        })
-      );
-    } catch (error) {
-      console.error("Lỗi cập nhật quyền:", error);
-      toast.error(getApiErrorMessage(error, "Lỗi khi cập nhật quyền hạn người dùng."));
-    }
-  };
-
   const handleRegisterUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userDisplayName.trim() || !userEmail.trim() || !userCompanyCode) {
@@ -384,17 +345,8 @@ export default function UserAdminTab() {
           coverImage: userCoverImage.trim() || undefined,
           email: userEmail.trim() || undefined,
           password: userPassword.trim() ? userPassword.trim() : undefined,
-          role: userRole,
-          companyCode: userCompanyCode,
-          parentId: userParentId || null,
-          level: userRole === "user" && managerProfile?.level ? managerProfile.level + 1 : undefined,
-          department: userDepartment.trim() || "",
-          division: userDepartment.trim() || "",
-          qualification: userQualification.trim(),
-          jobDescriptionLink: userJobDescriptionLink.trim() || "",
-          jobDescriptionUploadToken: userJobDescriptionUploadToken || undefined,
-          monthlySalary: userMonthlySalary === "" ? undefined : Number(userMonthlySalary),
-          branchId: userBranchId || null,
+          ...(userRole !== editingUser.role && userProfile?.role === "admin" && editingUser.uid !== userProfile.uid && editingUser.role !== "admin"
+            ? { role: userRole } : {}),
         });
 
         toast.success(`Đã cập nhật tài khoản "${userDisplayName}".`);
@@ -532,10 +484,12 @@ export default function UserAdminTab() {
       <UserAdminHeader
         userProfile={userProfile}
         onOpenCreateUserModal={openCreateUserModal}
+        onOpenImport={() => setImportOpen(true)}
         onRefresh={fetchUsers}
         loading={loading}
       />
 
+      {importOpen && <React.Suspense fallback={<p className="p-3 text-sm">Đang tải chức năng nhập Excel...</p>}><UserImportModal onClose={() => setImportOpen(false)} onComplete={fetchUsers} /></React.Suspense>}
       <UserAdminTabs activeTab={activeTab} onChange={setActiveTab} userProfile={userProfile} />
       {activeTab === "users" ? (
         <>
@@ -569,12 +523,9 @@ export default function UserAdminTab() {
               <UserListTable
                 users={paginatedVisibleUsers}
                 currentUser={userProfile}
-                rolePermissionsList={rolePermissionsList}
                 userPage={safeUserPage}
                 totalUserPages={totalUserPages}
                 onPageChange={setUserPage}
-                getAvailableRoles={getAvailableRoles}
-                onRoleChange={handleRoleChange}
                 openActionMenuId={openActionMenuId}
                 onToggleActionMenu={(uid) => setOpenActionMenuId(openActionMenuId === uid ? null : uid)}
                 onEditUser={openEditUserModal}
@@ -588,92 +539,25 @@ export default function UserAdminTab() {
             <div>
               <h5 className="font-bold text-slate-800 text-sm">Danh sách vai trò & Cấu hình phân quyền</h5>
             </div>
-            <button
-              disabled={!(userProfile?.role === "admin" || userProfile?.permissions?.includes("*") || userProfile?.permissions?.includes("access:manage"))}
-              onClick={() => {
-                if (!(userProfile?.role === "admin" || userProfile?.permissions?.includes("*") || userProfile?.permissions?.includes("access:manage"))) return;
-                setEditingRole(null);
-                setRoleSlug("");
-                setRoleDisplayName("");
-                setRoleLevel(3);
-                setSelectedPermissions([]);
-                setIsRoleModalOpen(true);
-              }}
-              className="p-2 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold font-sans flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 text-center justify-center"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Thêm vai trò tùy chỉnh
-            </button>
           </div>
 
           {roleLoading ? (
             <div className="h-48 flex flex-col items-center justify-center text-center">
               <RefreshCw className="h-8 w-8 text-indigo-650 animate-spin mb-3" />
-              <span className="text-xs font-bold font-mono text-indigo-800 uppercase tracking-widest">Đang tải danh sách vai trò...</span>
+                <span className="text-xs font-bold font-mono text-indigo-800 uppercase tracking-widest">Đang tải danh sách vai trò...</span>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Render Default roles and Custom roles */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Supported roles: Admin and Member (stored as user). */}
               {(() => {
-                const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
-                  admin: ["*"],
-                  branch_owner: ["access:read", "access:manage", "hr:read", "timekeeping:read", "timekeeping:manage", "people:read", "people:manage", "resource:read", "chat:read", "work:read", "work:manage"],
-                  manager: [
-                    "access:read", "access:manage",
-                    "timekeeping:read", "timekeeping:manage",
-                    "payroll-period:read",
-                    "work:read", "work:manage",
-                    "work:read", "work:manage",
-                    "inventory:read", "inventory:manage",
-                    "people:read", "people:manage",
-                    "resource:read", "resource:manage",
-                    "chat:read", "chat:manage",
-                    "finance-receivable:read"
-                  ],
-                  user: [
-                    "access:read",
-                    "timekeeping:read",
-                    "work:read", "work:manage",
-                    "work:read",
-                    "inventory:read",
-                    "people:read",
-                    "resource:read",
-                    "chat:read",
-                    "finance-receivable:read"
-                  ],
-                  teacher: ["people:read", "people:manage"]
-                };
-
                 const defaultRolesList = [
-                  { role: "admin", displayName: getRoleDisplayName("admin"), level: 2, isDefault: true, permissions: DEFAULT_ROLE_PERMISSIONS.admin },
-                  { role: "manager", displayName: getRoleDisplayName("manager"), level: 3, isDefault: true, permissions: DEFAULT_ROLE_PERMISSIONS.manager },
-                  { role: "branch_owner", displayName: getRoleDisplayName("branch_owner"), level: 2, isDefault: true, permissions: DEFAULT_ROLE_PERMISSIONS.branch_owner },
-                  { role: "teacher", displayName: getRoleDisplayName("teacher"), level: 4, isDefault: true, permissions: DEFAULT_ROLE_PERMISSIONS.teacher },
-                  { role: "user", displayName: getRoleDisplayName("user"), level: 4, isDefault: true, permissions: DEFAULT_ROLE_PERMISSIONS.user }
+                  { role: "admin", displayName: "Admin", level: 1, isDefault: true, permissions: ["dashboard:manage", "people:manage", "relationship:manage", "hr:manage", "timekeeping:manage", "meetings:manage", "resource:manage", "chat:manage", "settings:manage", "access:manage"] },
+                  { role: "user", displayName: "Member", level: 3, isDefault: true, permissions: ["access:read", "hr:read", "people:read", "timekeeping:read", "meetings:read", "chat:read", "resource:read"] },
                 ];
-                
-                const customRolesList = rolePermissionsList.filter(rp => !["admin", "manager", "branch_owner", "teacher", "user"].includes(rp.role));
-                
-                const rolesToDisplay = [
-                  ...defaultRolesList.map(dr => {
-                    const dbRecord = rolePermissionsList.find(rp => rp.role === dr.role);
-                    return {
-                      ...dr,
-                      permissions: dbRecord ? dbRecord.permissions : (DEFAULT_ROLE_PERMISSIONS[dr.role] || []),
-                      displayName: dbRecord?.displayName || dr.displayName,
-                      level: dbRecord?.level || dr.level,
-                      _id: dbRecord?._id
-                    };
-                  }),
-                  ...customRolesList.map(cr => ({
-                    role: cr.role,
-                    displayName: getRoleDisplayName(cr.role, cr.displayName),
-                    level: cr.level,
-                    permissions: cr.permissions,
-                    isDefault: false,
-                    _id: cr._id
-                  }))
-                ];
+                const rolesToDisplay = defaultRolesList.map(role => {
+                  const saved = rolePermissionsList.find(item => item.role === role.role);
+                  return { ...role, permissions: saved?.permissions ?? role.permissions, level: saved?.level ?? role.level, _id: saved?._id };
+                });
 
                 const canEditRole = (roleInfo: { role: string; level: number }) => {
                   const currentRole = userProfile?.role;
@@ -843,7 +727,7 @@ export default function UserAdminTab() {
         onSubmit={async (e) => {
           e.preventDefault();
           if (!roleSlug.trim() || !roleDisplayName.trim()) {
-            toast.warning("Vui lòng nhập đầy đủ thông tin vai trò!");
+      toast.warning("Vui lòng nhập đầy đủ thông tin vai trò!");
             return;
           }
 
@@ -860,12 +744,12 @@ export default function UserAdminTab() {
             };
 
             await rolePermissionService.saveRolePermission(payload);
-            toast.success(editingRole ? "Cập nhật vai trò thành công!" : "Tạo vai trò mới thành công!");
+      toast.success(editingRole ? "Cập nhật vai trò thành công!" : "Tạo vai trò mới thành công!");
             setIsRoleModalOpen(false);
             await fetchRolePermissions();
           } catch (error) {
             console.error(error);
-            toast.error(error.message || "Không thể cập nhật cấu hình vai trò.");
+      toast.error(error.message || "Không thể cập nhật cấu hình vai trò.");
           } finally {
             setSubmittingRole(false);
           }
