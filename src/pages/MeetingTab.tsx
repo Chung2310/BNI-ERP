@@ -1264,7 +1264,6 @@ export default function MeetingTab() {
                             if (target !== index) reorder(index, target - index);
                           }}>Áp dụng thứ tự</button>
                       </div>
-                      <p className="text-xs text-slate-500">Ưu tiên 1 là lượt chờ kế tiếp, rồi 2, 3… Giữ nguyên lượt đang nói, thời lượng và STT check-in.</p>
                     </div>}
                     <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
                       {activeMeeting.speakers.map((p, i) => {
