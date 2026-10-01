@@ -1,6 +1,9 @@
 import { randomBytes, randomInt, randomUUID, createHash } from 'node:crypto';
 import bcrypt from 'bcryptjs';
+import { encryptSecret, decryptSecret } from '../../security/crypto';
 import { MeetingModel } from './meeting.model';
+import { cloudinaryService, type PublicMediaAsset } from '../../service/cloudinary.service';
+import { guestAvatarError, type GuestAvatarFile } from './meeting-guest-avatar';
 import { allocateSpeakers, elapsedSeconds, reminderDueAt, speakingSeconds } from './meeting.rules';
 import { UserModel } from '../../model/user.model';
 import { notificationService } from '../../service/notification.service';
@@ -59,6 +62,7 @@ export async function updateMeeting(companyCode: string, id: string, input: any)
     || (input.gpsRadiusMeters !== undefined && input.gpsRadiusMeters !== item.gpsRadiusMeters);
   if (locationChanged) {
     item.checkInQrTokenHash = undefined;
+    item.checkInQrTokenEncrypted = undefined;
     item.checkInQrExpiresAt = undefined;
   }
   if (input.title !== undefined) item.title = input.title;
@@ -79,7 +83,11 @@ export async function updateMeeting(companyCode: string, id: string, input: any)
   if (input.tiers !== undefined) item.tiers = input.tiers;
   if (input.fallbackSeconds !== undefined) item.fallbackSeconds = input.fallbackSeconds;
   if (item.status === "scheduled" && (input.tiers !== undefined || input.fallbackSeconds !== undefined)) {
-    item.speakers.forEach((person, index) => { person.seconds = speakingSeconds(index, item.tiers as any, item.fallbackSeconds); });
+    item.set('speakers', allocateSpeakers(
+      item.speakers.map(person => person.toObject()),
+      item.tiers.map(tier => ({ count: tier.count ?? 0, seconds: tier.seconds ?? item.fallbackSeconds })),
+      item.fallbackSeconds
+    ));
   }
   return saveMeeting(item);
 }
@@ -135,8 +143,40 @@ export async function checkIn(item: any, input: any, actorId: string, canManage:
     checkedInAt: new Date(),
     seconds: speakingSeconds(item.speakers.length, item.tiers, item.fallbackSeconds),
   });
+  if (['live', 'paused'].includes(item.status) && (item.currentIndex === -1 || item.speechesCompletedAt)) {
+    item.currentIndex = item.speechesCompletedAt ? item.speakers.length - 1 : 0;
+    item.speechesCompletedAt = undefined;
+    item.speakerStartedAt = undefined;
+    item.elapsedSeconds = 0;
+  }
   await saveMeeting(item);
   return item;
+}
+
+export async function autoStartDueMeetings(now = new Date()) {
+  const dueMeetings = await MeetingModel.find({
+    status: 'scheduled',
+    startsAt: { $lte: now },
+  });
+  for (const item of dueMeetings) {
+    if (item.speakers && item.speakers.length > 0) {
+      item.set('speakers', allocateSpeakers(
+        item.speakers.map(p => p.toObject()),
+        item.tiers.map(t => ({ count: t.count ?? 0, seconds: t.seconds ?? item.fallbackSeconds })),
+        item.fallbackSeconds
+      ));
+      item.currentIndex = 0;
+      item.speakerStartedAt = undefined;
+      item.elapsedSeconds = 0;
+    } else {
+      item.currentIndex = -1;
+      item.speakerStartedAt = undefined;
+      item.elapsedSeconds = 0;
+    }
+    item.status = 'live';
+    await saveMeeting(item);
+  }
+  return dueMeetings.length;
 }
 
 export async function notifyNextSpeaker(item: any) {
@@ -157,31 +197,101 @@ export async function notifyNextSpeaker(item: any) {
   }
 }
 
+export async function reorderMeetingSpeakers(item: any, speakerIds: unknown) {
+  if (!['scheduled', 'live', 'paused'].includes(item.status) || !Array.isArray(speakerIds)
+    || speakerIds.length !== item.speakers.length || new Set(speakerIds).size !== item.speakers.length
+    || speakerIds.some(id => !item.speakers.some((speaker: any) => speaker.id === id))) {
+    throw new MeetingError(400, 'Thứ tự người nói không hợp lệ.');
+  }
+  const pendingStart = item.status === 'scheduled' ? 0 : Math.max(0,
+    item.currentIndex + (item.speakerStartedAt || item.elapsedSeconds > 0 ? 1 : 0));
+  if (item.speakers.slice(0, pendingStart).some((speaker: any, index: number) => speaker.id !== speakerIds[index])) {
+    throw new MeetingError(409, 'Chỉ có thể sắp xếp người đang chờ; giữ nguyên người đang nói và các lượt đã hoàn tất.');
+  }
+  const byId = new Map(item.speakers.map((speaker: any) => [speaker.id, speaker]));
+  item.speakers = speakerIds.map(id => byId.get(id));
+  await saveMeeting(item);
+  await notifyNextSpeaker(item);
+  return item;
+}
+
+export async function startMeetingPresentation(item: any, speakerId: string, now = new Date()) {
+  if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp hiện không thể bắt đầu thuyết trình.');
+  const index = item.speakers.findIndex((speaker: any) => speaker.id === speakerId);
+  if (index < 0) throw new MeetingError(400, 'Không tìm thấy người thuyết trình.');
+  const sameSpeaker = item.status !== 'scheduled' && item.currentIndex === index;
+  if (item.status === 'scheduled') {
+    item.speakers = allocateSpeakers(item.speakers.map((person: any) => person.toObject ? person.toObject() : person), item.tiers, item.fallbackSeconds);
+  }
+  if (!sameSpeaker) {
+    if (item.status !== 'scheduled' && item.speakers[item.currentIndex]) item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
+    item.currentIndex = index;
+    item.elapsedSeconds = 0;
+    item.speakers[index].spokenSeconds = undefined;
+    item.speakerStartedAt = now;
+  } else if (item.status === 'paused' || !item.speakerStartedAt) {
+    item.speakerStartedAt = now;
+  }
+  item.status = 'live';
+  item.speechesCompletedAt = undefined;
+  await saveMeeting(item);
+  await notifyNextSpeaker(item);
+  return item;
+}
+
 export async function controlMeeting(item: any, action: string, now = new Date()) {
   const status = item.status;
-  if (action === 'start' && status === 'scheduled' && item.speakers.length) {
-    item.speakers = allocateSpeakers(
-      item.speakers.map((p: any) => p.toObject()),
-      item.tiers,
-      item.fallbackSeconds
-    );
+  if (['start_speaker', 'reset_speaker', 'next'].includes(action) && !item.speakers[item.currentIndex]) {
+    throw new MeetingError(409, 'Không có người đang chờ phát biểu.');
+  }
+  if (action === 'start' && status === 'scheduled') {
+    if (item.speakers && item.speakers.length > 0) {
+      item.speakers = allocateSpeakers(
+        item.speakers.map((p: any) => (p.toObject ? p.toObject() : p)),
+        item.tiers,
+        item.fallbackSeconds
+      );
+      item.currentIndex = 0;
+      item.speakerStartedAt = undefined;
+      item.elapsedSeconds = 0;
+    } else {
+      item.currentIndex = -1;
+      item.speakerStartedAt = undefined;
+      item.elapsedSeconds = 0;
+    }
     item.status = 'live';
-    item.currentIndex = 0;
+    item.speechesCompletedAt = undefined;
+  } else if (action === 'start_speaker' && ['live', 'paused'].includes(status)) {
     item.speakerStartedAt = now;
+    item.elapsedSeconds = 0;
+    item.status = 'live';
+  } else if (action === 'reset_speaker' && ['live', 'paused'].includes(status)) {
+    item.speakerStartedAt = undefined;
+    item.elapsedSeconds = 0;
   } else if (action === 'pause' && status === 'live') {
     item.elapsedSeconds = elapsedSeconds(item, now);
     item.speakerStartedAt = undefined;
     item.status = 'paused';
   } else if (action === 'resume' && status === 'paused') {
     item.status = 'live';
-    item.speakerStartedAt = now;
-  } else if ((action === 'next' || action === 'finish') && ['live', 'paused'].includes(status)) {
+    item.speakerStartedAt = item.speakers[item.currentIndex] && item.elapsedSeconds > 0 ? now : undefined;
+  } else if (action === 'finish' && ['live', 'paused'].includes(status)) {
     if (item.speakers[item.currentIndex]) {
       item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
     }
-    if (action === 'finish' || item.currentIndex + 1 >= item.speakers.length) {
-      item.status = 'ended';
-      item.endedAt = now;
+    item.status = 'ended';
+    item.endedAt = now;
+    item.speakerStartedAt = undefined;
+  } else if (action === 'finish') {
+    throw new MeetingError(409, 'Cuộc họp phải đang diễn ra mới có thể kết thúc.');
+  } else if (action === 'next' && ['live', 'paused'].includes(status)) {
+    if (item.speakers[item.currentIndex]) {
+      item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
+    }
+    if (item.currentIndex + 1 >= item.speakers.length) {
+      item.currentIndex = item.speakers.length;
+      item.speechesCompletedAt = now;
+      item.elapsedSeconds = 0;
       item.speakerStartedAt = undefined;
     } else {
       item.currentIndex++;
@@ -466,10 +576,35 @@ export async function createCheckInQr(companyCode: string, id: string, hours: nu
   if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp hiện không nhận check-in.');
   const token = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+  item.checkInQrTokenEncrypted = encryptSecret(token);
   item.checkInQrTokenHash = createHash('sha256').update(token).digest('hex');
   item.checkInQrExpiresAt = expiresAt;
   await saveMeeting(item);
   return { token, expiresAt, meeting: { id: String(item._id), title: item.title } };
+}
+
+// Only the management endpoint can retrieve the encrypted bearer token.
+export async function getCheckInQr(companyCode: string, id: string, legacyToken?: unknown) {
+  const item = await MeetingModel.findOne({ _id: id, companyCode }).select('+checkInQrTokenEncrypted');
+  if (!item) throw new MeetingError(404, 'Không tìm thấy cuộc họp.');
+  if (!['scheduled', 'live', 'paused'].includes(item.status) || !item.checkInQrTokenHash
+    || !item.checkInQrExpiresAt || item.checkInQrExpiresAt.getTime() <= Date.now()) return null;
+  if (legacyToken !== undefined) {
+    if (typeof legacyToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(legacyToken)
+      || createHash('sha256').update(legacyToken).digest('hex') !== item.checkInQrTokenHash) {
+      throw new MeetingError(409, 'Mã QR đã bị thay thế. Vui lòng tải lại.');
+    }
+    if (!item.checkInQrTokenEncrypted) {
+      item.checkInQrTokenEncrypted = encryptSecret(legacyToken);
+      await saveMeeting(item);
+    }
+  }
+  if (!item.checkInQrTokenEncrypted) return { legacy: true, expiresAt: item.checkInQrExpiresAt };
+  const token = decryptSecret(item.checkInQrTokenEncrypted);
+  if (createHash('sha256').update(token).digest('hex') !== item.checkInQrTokenHash) {
+    throw new MeetingError(409, 'Không thể khôi phục mã QR hiện tại.');
+  }
+  return { checkInUrl: '/meeting-checkin/' + token, expiresAt: item.checkInQrExpiresAt };
 }
 
 function validateQrAndLocation(item: any, input: any) {
@@ -500,11 +635,47 @@ export async function qrCheckInMember(token: string, input: any) {
   return { success: true, name: person.displayName };
 }
 
-export async function qrCheckInGuest(token: string, input: any) {
+export async function qrCheckInGuest(token: string, input: any, avatar?: GuestAvatarFile) {
   const hash = createHash('sha256').update(token).digest('hex');
-  const item: any = await MeetingModel.findOne({ checkInQrTokenHash: hash, checkInQrExpiresAt: { $gt: new Date() } });
+  const query = { checkInQrTokenHash: hash, checkInQrExpiresAt: { $gt: new Date() } };
+  let item: any = await MeetingModel.findOne(query);
   if (!item) throw new MeetingError(410, 'Mã QR đã hết hạn hoặc không còn hiệu lực.');
   validateQrAndLocation(item, input);
-  await checkIn(item, { name: input.name, email: input.email, phone: input.phone, company: input.company }, 'public-qr', true);
-  return { success: true, name: input.name };
+  let uploaded: PublicMediaAsset | undefined;
+  if (avatar) {
+    const error = guestAvatarError(avatar);
+    if (error) throw new MeetingError(400, error);
+    if (item.speakers.length >= 1000) throw new MeetingError(400, 'Tối đa 1.000 người mỗi cuộc họp.');
+    if (input.email && item.speakers.some((p: any) => p.email === input.email.toLowerCase())) {
+      throw new MeetingError(409, 'Email này đã check-in.');
+    }
+    try {
+      uploaded = await cloudinaryService.uploadMediaAsset(
+        `data:${avatar.mimetype};base64,${avatar.buffer.toString('base64')}`,
+        `meetings/${item._id}/guests`
+      );
+    } catch {
+      throw new MeetingError(502, 'Chưa tải được ảnh đại diện. Vui lòng thử lại hoặc bỏ ảnh để check-in.');
+    }
+  }
+  try {
+    if (uploaded) {
+      if (uploaded.resourceType !== 'image') throw new MeetingError(400, 'Tệp tải lên không phải ảnh hợp lệ.');
+      // Upload may take time: recheck QR, location and the latest attendee list before saving.
+      item = await MeetingModel.findOne({ ...query, checkInQrExpiresAt: { $gt: new Date() } });
+      if (!item) throw new MeetingError(410, 'Mã QR đã hết hạn hoặc bị thay thế. Hãy quét mã mới.');
+      validateQrAndLocation(item, input);
+    }
+    await checkIn(item, { name: input.name, email: input.email, phone: input.phone, company: input.company, photoURL: uploaded?.secureUrl }, 'public-qr', true);
+    return { success: true, name: input.name };
+  } catch (error) {
+    if (uploaded) {
+      // Do not delete an image already persisted if a later notification fails.
+      try {
+        const saved = await MeetingModel.exists({ 'speakers.photoURL': uploaded.secureUrl });
+        if (!saved) await cloudinaryService.deletePublicMedia(uploaded.publicId, uploaded.resourceType);
+      } catch { /* Preserve the original check-in error if cleanup is unavailable. */ }
+    }
+    throw error;
+  }
 }

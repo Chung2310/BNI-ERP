@@ -65,3 +65,45 @@ it("an invalid QR displays the server reason without an unusable form", async ()
   expect(await screen.findByText("Mã QR đã hết hạn.")).toBeTruthy();
   expect(screen.queryByLabelText("Email tài khoản")).toBeNull();
 });
+
+it("previews an optional guest avatar and sends it with the check-in fields", async () => {
+  vi.stubGlobal("URL", class extends URL {
+    static createObjectURL = vi.fn(() => "blob:guest-avatar");
+    static revokeObjectURL = vi.fn();
+  });
+  fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: { name: "Khách An" } }) });
+  render(<MeetingCheckInPage />);
+  await screen.findByLabelText("Email tài khoản");
+  fireEvent.click(screen.getByRole("button", { name: "Khách mời" }));
+  fireEvent.change(screen.getByLabelText("Họ và tên *"), { target: { value: "Khách An" } });
+  const file = new File(["image"], "avatar.png", { type: "image/png" });
+  fireEvent.change(screen.getByLabelText("Ảnh đại diện (không bắt buộc)"), { target: { files: [file] } });
+  expect(await screen.findByAltText("Xem trước ảnh đại diện")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+  await screen.findByText("Check-in thành công");
+  const options = fetchMock.mock.calls[1][1];
+  expect(options.body).toBeInstanceOf(FormData);
+  expect(options.body.get("avatar")).toBe(file);
+  expect(options.body.get("name")).toBe("Khách An");
+  expect(options.body.get("latitude")).toBe("10.5");
+  expect(options.headers).not.toHaveProperty("Content-Type");
+  expect(options.body.has("password")).toBe(false);
+});
+
+it("rejects oversized avatar and lets the guest remove a selected image", async () => {
+  vi.stubGlobal("URL", class extends URL {
+    static createObjectURL = vi.fn(() => "blob:guest-avatar");
+    static revokeObjectURL = vi.fn();
+  });
+  render(<MeetingCheckInPage />);
+  await screen.findByLabelText("Email tài khoản");
+  fireEvent.click(screen.getByRole("button", { name: "Khách mời" }));
+  const chooser = screen.getByLabelText("Ảnh đại diện (không bắt buộc)");
+  fireEvent.change(chooser, { target: { files: [new File([new Uint8Array(5 * 1024 * 1024 + 1)], "big.png", { type: "image/png" })] } });
+  expect(await screen.findByRole("alert")).toBeTruthy();
+  expect(screen.queryByAltText("Xem trước ảnh đại diện")).toBeNull();
+  fireEvent.change(chooser, { target: { files: [new File(["image"], "small.png", { type: "image/png" })] } });
+  await screen.findByAltText("Xem trước ảnh đại diện");
+  fireEvent.click(screen.getByText("Bỏ ảnh"));
+  expect(screen.queryByAltText("Xem trước ảnh đại diện")).toBeNull();
+});

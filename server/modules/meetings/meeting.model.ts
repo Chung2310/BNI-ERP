@@ -10,6 +10,13 @@ const speaker = new Schema(
     company: String,
     photoURL: String,
     coverImage: String,
+    slideProfile: {
+      type: new Schema({
+        name: String, company: String, photoURL: String, coverImage: String,
+        phone: String, industry: String, bio: String,
+      }, { _id: false }),
+      default: undefined,
+    },
     checkedInAt: { type: Date, required: true },
     seconds: { type: Number, required: true },
     spokenSeconds: Number,
@@ -74,6 +81,7 @@ const meeting = new Schema(
     longitude: Number,
     gpsRadiusMeters: { type: Number, default: 200 },
     checkInQrTokenHash: String,
+    checkInQrTokenEncrypted: { type: String, select: false },
     checkInQrExpiresAt: Date,
 
     coverImage: String,
@@ -99,6 +107,7 @@ const meeting = new Schema(
     speakers: { type: [speaker], default: [] },
     currentIndex: { type: Number, default: -1 },
     speakerStartedAt: Date,
+    speechesCompletedAt: Date,
     elapsedSeconds: { type: Number, default: 0 },
     endedAt: Date,
     luckyDraw: {
