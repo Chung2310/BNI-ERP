@@ -2168,47 +2168,6 @@ export default function OrgChartTab({
         />
       )}
 
-      {/* Job description preview modal */}
-      {showJobDescriptionPreview && editJobDescriptionLink && (
-        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4" onClick={() => setShowJobDescriptionPreview(false)}>
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-3 border-b shrink-0">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">Xem trước mô tả công việc</span>
-              <div className="flex items-center gap-2">
-                <a
-                  href={editJobDescriptionLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[11px] font-bold text-indigo-650 hover:underline px-2"
-                >
-                  Mở trong tab mới
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setShowJobDescriptionPreview(false)}
-                  className="p-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"
-                >
-                  <X className="h-4 w-4 text-gray-500" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 bg-gray-50">
-              <iframe
-                src={
-                  editJobDescriptionLink.includes("drive.google.com")
-                    ? editJobDescriptionLink.replace(/\/(edit|view)(\?.*)?$/, "/preview")
-                    : editJobDescriptionLink
-                }
-                className="w-full h-full border-0"
-                title="Xem trước mô tả công việc"
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
