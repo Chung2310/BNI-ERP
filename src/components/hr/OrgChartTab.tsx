@@ -458,12 +458,8 @@ export default function OrgChartTab({
 
     setUploadingAvatar(true);
     try {
-      const compCode = selectedCompanyCode || userProfile?.companyCode;
-      const res = await authService.uploadManagedFile(
-        file,
-        "profile.avatar",
-        compCode === "SYSTEM" ? undefined : compCode
-      );
+      const targetUid = selectedEmp?.id || userProfile?.uid || "";
+      const res = await authService.uploadAvatar(targetUid, file);
       setEditPhotoURL(res.url);
       toast.success("Đã tải lên ảnh đại diện.");
     } catch (err: any) {
@@ -472,73 +468,6 @@ export default function OrgChartTab({
       setUploadingAvatar(false);
     }
   };
-
-  const handleEditCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
-    setUploadingEditCover(true);
-    try {
-      const compCode = selectedCompanyCode || userProfile?.companyCode;
-      const res = await authService.uploadManagedFile(
-        file,
-        "profile.cover",
-        compCode === "SYSTEM" ? undefined : compCode
-      );
-      setEditCoverImage(res.url);
-      toast.success("Đã tải lên ảnh bìa thành công.");
-    } catch (err: any) {
-      toast.error(err?.message || "Không thể tải lên ảnh bìa.");
-    } finally {
-      setUploadingEditCover(false);
-    }
-  };
-
-  const handleAddAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
-    setUploadingAddAvatar(true);
-    try {
-      const compCode = selectedCompanyCode || userProfile?.companyCode;
-      const res = await authService.uploadManagedFile(
-        file,
-        "profile.avatar",
-        compCode === "SYSTEM" ? undefined : compCode
-      );
-      setAddPhotoURL(res.url);
-      toast.success("Đã tải lên ảnh đại diện.");
-    } catch (err: any) {
-      toast.error(err?.message || "Không thể tải lên ảnh đại diện.");
-    } finally {
-      setUploadingAddAvatar(false);
-    }
-  };
-
-  const handleAddCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
-    setUploadingAddCover(true);
-    try {
-      const compCode = selectedCompanyCode || userProfile?.companyCode;
-      const res = await authService.uploadManagedFile(
-        file,
-        "profile.cover",
-        compCode === "SYSTEM" ? undefined : compCode
-      );
-      setAddCoverImage(res.url);
-      toast.success("Đã tải lên ảnh bìa thành công.");
-    } catch (err: any) {
-      toast.error(err?.message || "Không thể tải lên ảnh bìa.");
-    } finally {
-      setUploadingAddCover(false);
-    }
-  };
-
 
   const handleToggleLeader = async () => {
     if (!selectedEmp) return;
@@ -792,8 +721,6 @@ export default function OrgChartTab({
   useEffect(() => {
     if (!isAddModalOpen) {
       setAddDepartment("Phòng Kỹ Thuật");
-      setAddPhotoURL("");
-      setAddCoverImage("");
     }
   }, [isAddModalOpen]);
 

@@ -24,6 +24,7 @@ import {
   Layers,
   ChevronRight,
   PartyPopper,
+  ExternalLink,
 } from "lucide-react";
 import {
   Meeting,
@@ -498,6 +499,18 @@ export function LuckyDrawTab({
           </div>
 
           <div className="flex items-center gap-2">
+            <a
+              href="/wheel-of-names"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Mở Vòng quay tên ngẫu nhiên toàn màn hình (Tab riêng biệt)"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 text-xs font-bold transition cursor-pointer"
+            >
+              <Sparkles className="h-4 w-4 text-amber-400" />
+              <span className="hidden sm:inline">Mở Wheel of Names</span>
+              <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+            </a>
+
             <button
               type="button"
               onClick={() => setSoundEnabled(!soundEnabled)}

@@ -31,7 +31,7 @@ async function getDriveClientAndRoot(companyCode: string, userId: string) {
       const { googleDriveService } = await import("../service/google-drive.service");
       const folder = await googleDriveService.createFolder(
         accessToken,
-        `iGen ERP - Tài liệu ${company.name || company.code}`
+        `iGen Connect - Tài liệu ${company.name || company.code}`
       );
       company.driveFolderId = folder.id;
       company.driveFolderLink = folder.webViewLink || "";
@@ -93,7 +93,7 @@ async function getAdminDriveClient(companyCode: string, loggedInUserId?: string)
       const { googleDriveService } = await import("../service/google-drive.service");
       const folder = await googleDriveService.createFolder(
         accessToken,
-        `iGen ERP - Tài liệu ${company.name || company.code}`
+        `iGen Connect - Tài liệu ${company.name || company.code}`
       );
       company.driveFolderId = folder.id;
       company.driveFolderLink = folder.webViewLink || "";
@@ -238,7 +238,7 @@ export const googleDriveController = {
       );
       oauth2Client.setCredentials(tokens);
 
-      const folderId = await GoogleDriveService.createFolder(oauth2Client, "iGen ERP Resources");
+      const folderId = await GoogleDriveService.createFolder(oauth2Client, "iGen Connect Resources");
 
       // Cập nhật thông tin vào DB
       user.googleDriveIntegration = {
@@ -253,7 +253,7 @@ export const googleDriveController = {
 
       await user.save();
 
-      return sendHtmlResponse("success", `Tài khoản ${driveEmail} đã được liên kết thành công với iGen ERP. Cửa sổ này sẽ tự đóng sau giây lát.`, { driveEmail });
+      return sendHtmlResponse("success", `Tài khoản ${driveEmail} đã được liên kết thành công với iGen Connect. Cửa sổ này sẽ tự đóng sau giây lát.`, { driveEmail });
     } catch (err: any) {
       console.error("[googleDriveController.oauthCallback] Error:", err);
       return sendHtmlResponse("error", err.message || "Lỗi xử lý luồng Callback OAuth Google.");

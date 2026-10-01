@@ -1,7 +1,7 @@
 /**
  * Chatbot Service
  * ───────────────
- * Trợ lý ảo AI cho hệ thống iGen ERP. Truy vấn dữ liệu thời gian thực thuộc
+ * Trợ lý ảo AI cho hệ thống iGen Connect. Truy vấn dữ liệu thời gian thực thuộc
  * doanh nghiệp của người dùng (theo companyCode) rồi dựng system prompt giàu
  * ngữ cảnh, gọi OpenRouter (có fallback 3 tầng) để sinh câu trả lời.
  */
@@ -31,7 +31,7 @@ export class ChatbotService {
       const generalPrompt: OpenRouterMessage = {
         role: "system",
         content:
-          "Bạn là trợ lý ảo AI của hệ thống iGen ERP. Tài khoản hiện tại chưa được gắn với doanh nghiệp nào " +
+          "Bạn là trợ lý ảo AI của hệ thống iGen Connect. Tài khoản hiện tại chưa được gắn với doanh nghiệp nào " +
           "nên bạn không truy cập được dữ liệu nội bộ. Hãy hỗ trợ người dùng bằng kiến thức chung về vận hành, " +
           "quản lý nhân sự... Trả lời bằng tiếng Việt lịch sự, dễ hiểu, thuần văn bản (PLAIN TEXT), " +
           "TUYỆT ĐỐI KHÔNG dùng các ký tự định dạng Markdown như dấu thăng #, dấu sao **, *, gạch chân __, gạch ngược ` hay link [text](url).",
@@ -48,7 +48,7 @@ export class ChatbotService {
     // Dựng System Prompt giàu ngữ cảnh
     const systemPrompt: OpenRouterMessage = {
       role: "system",
-      content: `Bạn là trợ lý ảo AI của hệ thống iGen ERP, hỗ trợ trực tiếp cho nhân sự của doanh nghiệp (mã: ${companyCode}).
+      content: `Bạn là trợ lý ảo AI của hệ thống iGen Connect, hỗ trợ trực tiếp cho nhân sự của doanh nghiệp (mã: ${companyCode}).
 Bạn có quyền truy cập dữ liệu thời gian thực dưới đây. Hãy trả lời câu hỏi dựa trên dữ liệu này:
 - Tổng số lượng nhân sự đang hoạt động: ${userCount} nhân sự
 
