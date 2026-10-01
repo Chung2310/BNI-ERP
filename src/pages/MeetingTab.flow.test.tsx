@@ -123,7 +123,7 @@ it("automatic mode completes the final speaker instead of ending the meeting", a
 });
 
 
-it("launches the first profile from MC controls and explains the post-speech delay", async () => {
+it("launches the current profile from MC controls and explains the post-speech delay", async () => {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
   localStorage.setItem("bni_auto_advance_speaker", "true");
   localStorage.setItem("bni_auto_advance_delay", "3");
@@ -132,7 +132,7 @@ it("launches the first profile from MC controls and explains the post-speech del
     { id: "second", kind: "guest", name: "Khách thứ hai", company: "", seconds: 30 },
   ];
   const live = { ...meeting, status: "live", currentIndex: 1, speakers: people };
-  const fetchMock = vi.fn(async (url) => ({ ok: true, json: async () => ({ data: String(url).endsWith("/slides") ? { slides: people, version: 0 } : [live] }) }));
+  const fetchMock = vi.fn(async (url) => ({ ok: true, json: async () => ({ data: String(url).endsWith("/slides") ? { slides: people, version: 0 } : String(url).endsWith("/presentation") ? { ...live, speakerStartedAt: new Date().toISOString(), __v: 1 } : [live] }) }));
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
@@ -146,7 +146,7 @@ it("launches the first profile from MC controls and explains the post-speech del
   await waitFor(() => {
     const canvases = screen.getAllByRole("img").filter(element => element.tagName === "CANVAS");
     expect(canvases.length).toBeGreaterThan(0);
-    expect(canvases.every(element => element.getAttribute("aria-label")?.includes("Người đầu tiên"))).toBe(true);
+    expect(canvases.every(element => element.getAttribute("aria-label")?.includes("Khách thứ hai"))).toBe(true);
   });
   delete (document.documentElement as any).requestFullscreen;
   expect(fetchMock.mock.calls.every(([url]) => !String(url).endsWith("/control"))).toBe(true);
@@ -229,4 +229,32 @@ it.each([0, 3, 150])("slide delay %s waits until speaking time ends before chang
   } finally {
     vi.useRealTimers(); vi.restoreAllMocks();
   }
+});
+
+it("opening a paused presentation resumes the countdown from its remaining time", async () => {
+  vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+  let item = { ...meeting, status: "paused", currentIndex: 0, elapsedSeconds: 11, speakerStartedAt: undefined as string | undefined,
+    speakers: [{ id: "guest", kind: "guest", name: "Khách đang nói", company: "", seconds: 30 }] };
+  const fetchMock = vi.fn(async (url, options) => {
+    if (String(url).endsWith("/presentation")) {
+      expect(JSON.parse(options.body).speakerId).toBe("guest");
+      item = { ...item, status: "live", speakerStartedAt: new Date().toISOString(), __v: 1 };
+    }
+    return { ok: true, json: async () => ({ data: String(url).endsWith("/slides") ? { slides: item.speakers, version: item.__v } : options?.method === "POST" ? item : [item] }) };
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
+  try {
+    render(<MeetingTab />);
+    fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+    fireEvent.click(screen.getByRole("button", { name: "Thuyết trình" }));
+    await screen.findByText("Khách đang nói");
+    fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
+    await waitFor(() => expect(item.status).toBe("live"));
+    await waitFor(() => expect(screen.getAllByRole("timer").some(node => node.textContent?.includes("00:19"))).toBe(true));
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(screen.getAllByRole("timer").some(node => node.textContent?.includes("00:18"))).toBe(true);
+    await act(async () => { vi.advanceTimersByTime(18000); });
+    expect(screen.getAllByRole("timer").every(node => node.textContent?.includes("Hết giờ"))).toBe(true);
+  } finally { vi.useRealTimers(); vi.restoreAllMocks(); }
 });

@@ -12,6 +12,7 @@ type Props = {
   canManage: boolean;
   startFromFirst?: boolean;
   autoAdvance?: boolean;
+  onStartPresentation?: (speakerId: string) => Promise<void>;
   autoAdvanceDelay?: number;
   onAutoAdvanceChange?: (enabled: boolean) => void;
   onAutoAdvanceDelayChange?: (seconds: number) => void;
@@ -22,7 +23,7 @@ type Props = {
 const button = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40";
 const fieldClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
 
-export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest }: Props) {
+export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -54,6 +55,8 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   const [controls, setControls] = useState(true);
   const [draft, setDraft] = useState<ProfileSlide | null>(null);
   const [saving, setSaving] = useState(false);
+  const [startingSpeech, setStartingSpeech] = useState(false);
+  const speechRequest = useRef(false);
   const [drawing, setDrawing] = useState(true);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [drawError, setDrawError] = useState("");
@@ -233,18 +236,27 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     }
   }, [showControls, fullscreenRequest, startFromFirst]);
 
-  const beginPresentation = useCallback((slide: ProfileSlide) => {
+  const beginPresentation = useCallback((slide: ProfileSlide, clean = true) => {
+    if (speechRequest.current) return;
     setOpeningSlide({ slideId: slide.id, speakerId: currentSpeakerId });
     setSelectedId(slide.id);
     setMode(autoAdvance ? "auto" : "manual");
-    present(true);
-  }, [currentSpeakerId, present, autoAdvance]);
+    present(clean);
+    if (onStartPresentation) {
+      speechRequest.current = true;
+      setStartingSpeech(true); setError("");
+      void onStartPresentation(slide.id).catch(error => {
+        closePresentation();
+        setError(error instanceof Error ? error.message : "Không bắt đầu được bộ đếm. Vui lòng thử lại.");
+      }).finally(() => { speechRequest.current = false; if (mounted.current) setStartingSpeech(false); });
+    }
+  }, [currentSpeakerId, present, autoAdvance, onStartPresentation, closePresentation]);
 
   useEffect(() => {
     if (!startFromFirst || loading || error || !deck.slides.length) return;
-    beginPresentation(deck.slides[0]);
+    beginPresentation(deck.slides.find(slide => slide.id === currentSpeakerId) || deck.slides[0]);
     onPresentationStarted?.();
-  }, [startFromFirst, loading, error, deck.slides, beginPresentation, onPresentationStarted]);
+  }, [startFromFirst, loading, error, deck.slides, currentSpeakerId, beginPresentation, onPresentationStarted]);
 
   async function save(reset = false) {
     if (!active || saving) return;
@@ -292,8 +304,8 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       {mode === "auto" && <label className="flex items-center gap-2 text-sm">Chờ sau khi hết giờ <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={value => onAutoAdvanceDelayChange?.(value)} disabled={!canManage} /> giây rồi chuyển slide</label>}
       <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={16} /> Làm mới hồ sơ</button>
       <button className={button} disabled={!ready} onClick={download}><Download size={16} /> Tải PNG</button>
-      <button className={button} disabled={loading || !!error || !selected || !!draft} onClick={() => { if (selected) beginPresentation(selected); }}><Play size={16} /> Bắt đầu thuyết trình</button>
-      <button ref={launchButton} className={button} disabled={!ready || !!draft} onClick={() => present()}><Maximize size={16} /> Trình chiếu</button>
+      <button className={button} disabled={startingSpeech || loading || !!error || !selected || !!draft} onClick={() => { if (selected) beginPresentation(selected); }}><Play size={16} /> Bắt đầu thuyết trình</button>
+      <button ref={launchButton} className={button} disabled={startingSpeech || !ready || !!draft} onClick={() => { if (selected) beginPresentation(selected, false); }}><Maximize size={16} /> Trình chiếu</button>
     </div>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error} <button className="underline" onClick={() => setRevision(v => v + 1)}>Tải lại dữ liệu</button></p>}
     <div className="grid gap-4 lg:grid-cols-[240px_1fr]">

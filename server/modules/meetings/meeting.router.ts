@@ -7,6 +7,7 @@ import {
   assertVersion,
   checkIn,
   controlMeeting,
+  startMeetingPresentation,
   reorderMeetingSpeakers,
   createMeeting,
   updateMeeting,
@@ -124,6 +125,15 @@ meetingRouter.post('/:id/checkin', requirePermission(['meetings:read', 'meetings
   } catch (e) {
     sendError(res, e);
   }
+});
+
+meetingRouter.post('/:id/presentation', manage, async (req: any, res) => {
+  if (typeof req.body?.speakerId !== 'string' || !req.body.speakerId) return res.status(400).json({ message: 'Chọn người thuyết trình.' });
+  try {
+    const item = await getMeeting(company(req), req.params.id);
+    assertVersion(item, req.body.version);
+    res.json({ data: await startMeetingPresentation(item, req.body.speakerId) });
+  } catch (e) { sendError(res, e); }
 });
 
 meetingRouter.post('/:id/control', manage, async (req: any, res) => {

@@ -430,6 +430,12 @@ export default function MeetingTab() {
     );
   };
 
+  const startPresentationTimer = useCallback(async (speakerId: string) => {
+    if (!activeMeeting || !canManage) return;
+    const updated: Meeting = await api('/' + activeMeeting._id + '/presentation', 'POST', { speakerId, version: activeMeeting.__v });
+    setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
+  }, [activeMeeting, canManage]);
+
   const current = activeMeeting && ["live", "paused"].includes(activeMeeting.status) ? activeMeeting.speakers[activeMeeting.currentIndex] : undefined;
   const upcoming = activeMeeting && !["ended", "cancelled"].includes(activeMeeting.status) ? activeMeeting.speakers[activeMeeting.status === "scheduled" ? 0 : activeMeeting.currentIndex + 1] : undefined;
   const elapsed = activeMeeting
@@ -877,7 +883,7 @@ export default function MeetingTab() {
 
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} autoAdvance={autoAdvance} autoAdvanceDelay={autoAdvanceDelay} onAutoAdvanceChange={updateAutoAdvance} onAutoAdvanceDelayChange={updateAutoAdvanceDelay} fullscreenRequest={presentationFullscreen.current} />}
+              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} onStartPresentation={canManage ? startPresentationTimer : undefined} autoAdvance={autoAdvance} autoAdvanceDelay={autoAdvanceDelay} onAutoAdvanceChange={updateAutoAdvance} onAutoAdvanceDelayChange={updateAutoAdvanceDelay} fullscreenRequest={presentationFullscreen.current} />}
               {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
               {(activeSubTab === "speakers" || activeSubTab === "checkin") && (
                 <div className="space-y-4">

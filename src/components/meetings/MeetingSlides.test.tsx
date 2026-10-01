@@ -94,13 +94,13 @@ it("starts at the previewed speaker and follows subsequent speaker changes", asy
   expect(screen.queryByRole("dialog", { name: "Trình chiếu hồ sơ" })).toBeNull();
 });
 
-it("opens the first slide after data loads when launched from operation controls", async () => {
+it("opens the current slide after data loads when launched from operation controls", async () => {
   const api = vi.fn().mockResolvedValue({ slides, version: 1 });
   const onPresentationStarted = vi.fn();
   render(<MeetingSlides meeting={meeting} canManage api={api} startFromFirst onPresentationStarted={onPresentationStarted} />);
   await screen.findByRole("dialog", { name: "Trình chiếu hồ sơ" });
   await waitFor(() => expect(onPresentationStarted).toHaveBeenCalledTimes(1));
-  expect(screen.getAllByRole("img").every(canvas => canvas.getAttribute("aria-label")?.includes("Nguyễn An"))).toBe(true);
+  expect(screen.getAllByRole("img").every(canvas => canvas.getAttribute("aria-label")?.includes("Trần Bình"))).toBe(true);
 });
 
 
@@ -142,7 +142,7 @@ it("StrictMode does not exit an incoming fullscreen request; real unmount still 
   const api = vi.fn().mockResolvedValue({ slides, version: 1 });
   const view = render(<React.StrictMode><MeetingSlides meeting={meeting} canManage api={api} startFromFirst fullscreenRequest={Promise.resolve(true)} onPresentationStarted={vi.fn()} /></React.StrictMode>);
   try {
-    await waitFor(() => expect(within(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).getByRole("img").getAttribute("aria-label")).toContain("Nguyễn An"));
+    await waitFor(() => expect(within(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).getByRole("img").getAttribute("aria-label")).toContain("Trần Bình"));
     expect(exitFullscreen).not.toHaveBeenCalled();
     view.unmount();
     await waitFor(() => expect(exitFullscreen).toHaveBeenCalledTimes(1));

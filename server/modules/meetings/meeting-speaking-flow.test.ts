@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { setRateLimitRedisClientForTesting } from "../../infrastructure/rate-limit-redis";
 setRateLimitRedisClientForTesting({ eval: async () => [1, 1000], decr: async () => 0, del: async () => 0 });
-const { reorderMeetingSpeakers, controlMeeting, checkIn } = await import("./meeting.service");
+const { reorderMeetingSpeakers, controlMeeting, checkIn, startMeetingPresentation } = await import("./meeting.service");
 import { allocateSpeakers } from "./meeting.rules";
 
 const now = new Date("2026-10-01T08:00:30Z");
@@ -82,4 +82,29 @@ test("pausing and resuming a completed queue does not create a phantom timer", a
   await controlMeeting(item, "resume", now);
   assert.equal(item.speakerStartedAt, undefined);
   assert.equal(item.status, "live");
+});
+
+test("presentation resumes a paused speaker without resetting remaining time", async () => {
+  const item = meeting(); item.status = "paused"; item.elapsedSeconds = 41; item.speakerStartedAt = undefined;
+  await startMeetingPresentation(item, "early", now);
+  assert.equal(item.status, "live"); assert.equal(item.elapsedSeconds, 41); assert.equal(item.speakerStartedAt, now);
+});
+test("reopening an already running speaker preserves the clock", async () => {
+  const item = meeting(); const started = item.speakerStartedAt;
+  await startMeetingPresentation(item, "early", now);
+  assert.equal(item.speakerStartedAt, started); assert.equal(item.elapsedSeconds, 0);
+});
+test("presentation starts the selected guest with their allocated time", async () => {
+  const item = meeting();
+  await startMeetingPresentation(item, "chair", now);
+  assert.equal(item.currentIndex, 2); assert.equal(item.speakerStartedAt, now); assert.equal(item.elapsedSeconds, 0);
+  assert.equal(item.speakers[2].seconds, 20); assert.equal(item.speakers[0].spokenSeconds, 30);
+});
+test("scheduled presentation starts selected person and rejects invalid or ended selections", async () => {
+  const item = meeting(); item.status = "scheduled"; item.currentIndex = -1;
+  await startMeetingPresentation(item, "chair", now);
+  assert.equal(item.status, "live"); assert.equal(item.currentIndex, 2); assert.equal(item.speakers[2].seconds, 20);
+  await assert.rejects(startMeetingPresentation(item, "missing", now), { status: 400 });
+  item.status = "ended";
+  await assert.rejects(startMeetingPresentation(item, "chair", now), { status: 409 });
 });

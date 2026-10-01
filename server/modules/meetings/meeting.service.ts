@@ -215,6 +215,30 @@ export async function reorderMeetingSpeakers(item: any, speakerIds: unknown) {
   return item;
 }
 
+export async function startMeetingPresentation(item: any, speakerId: string, now = new Date()) {
+  if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp hiện không thể bắt đầu thuyết trình.');
+  const index = item.speakers.findIndex((speaker: any) => speaker.id === speakerId);
+  if (index < 0) throw new MeetingError(400, 'Không tìm thấy người thuyết trình.');
+  const sameSpeaker = item.status !== 'scheduled' && item.currentIndex === index;
+  if (item.status === 'scheduled') {
+    item.speakers = allocateSpeakers(item.speakers.map((person: any) => person.toObject ? person.toObject() : person), item.tiers, item.fallbackSeconds);
+  }
+  if (!sameSpeaker) {
+    if (item.status !== 'scheduled' && item.speakers[item.currentIndex]) item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
+    item.currentIndex = index;
+    item.elapsedSeconds = 0;
+    item.speakers[index].spokenSeconds = undefined;
+    item.speakerStartedAt = now;
+  } else if (item.status === 'paused' || !item.speakerStartedAt) {
+    item.speakerStartedAt = now;
+  }
+  item.status = 'live';
+  item.speechesCompletedAt = undefined;
+  await saveMeeting(item);
+  await notifyNextSpeaker(item);
+  return item;
+}
+
 export async function controlMeeting(item: any, action: string, now = new Date()) {
   const status = item.status;
   if (['start_speaker', 'reset_speaker', 'next'].includes(action) && !item.speakers[item.currentIndex]) {
