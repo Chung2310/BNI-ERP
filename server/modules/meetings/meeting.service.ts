@@ -137,7 +137,8 @@ export async function checkIn(item: any, input: any, actorId: string, canManage:
   });
   if (item.status === 'live' && item.currentIndex === -1) {
     item.currentIndex = 0;
-    item.speakerStartedAt = new Date();
+    item.speakerStartedAt = undefined;
+    item.elapsedSeconds = 0;
   }
   await saveMeeting(item);
   return item;
@@ -156,10 +157,12 @@ export async function autoStartDueMeetings(now = new Date()) {
         item.fallbackSeconds
       );
       item.currentIndex = 0;
-      item.speakerStartedAt = now;
+      item.speakerStartedAt = undefined;
+      item.elapsedSeconds = 0;
     } else {
       item.currentIndex = -1;
       item.speakerStartedAt = undefined;
+      item.elapsedSeconds = 0;
     }
     item.status = 'live';
     await saveMeeting(item);
@@ -195,12 +198,21 @@ export async function controlMeeting(item: any, action: string, now = new Date()
         item.fallbackSeconds
       );
       item.currentIndex = 0;
-      item.speakerStartedAt = now;
+      item.speakerStartedAt = undefined;
+      item.elapsedSeconds = 0;
     } else {
       item.currentIndex = -1;
       item.speakerStartedAt = undefined;
+      item.elapsedSeconds = 0;
     }
     item.status = 'live';
+  } else if (action === 'start_speaker' && ['live', 'paused'].includes(status)) {
+    item.speakerStartedAt = now;
+    item.elapsedSeconds = 0;
+    item.status = 'live';
+  } else if (action === 'reset_speaker' && ['live', 'paused'].includes(status)) {
+    item.speakerStartedAt = undefined;
+    item.elapsedSeconds = 0;
   } else if (action === 'pause' && status === 'live') {
     item.elapsedSeconds = elapsedSeconds(item, now);
     item.speakerStartedAt = undefined;

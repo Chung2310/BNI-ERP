@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { MeetingSlides } from "../components/meetings/MeetingSlides";
 import { MeetingCheckInPanel } from "../components/meetings/MeetingCheckInPanel";
 import { MeetingLocationFields } from "../components/meetings/MeetingLocationFields";
 import { MeetingCoverImageField } from "../components/meetings/MeetingCoverImageField";
@@ -24,6 +25,7 @@ import {
   Sparkles,
   Trophy,
   Filter,
+  RotateCcw,
 } from "lucide-react";
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
@@ -135,7 +137,7 @@ export default function MeetingTab() {
 
   const [items, setItems] = useState<Meeting[]>([]);
   const [detailMeetingId, setDetailMeetingId] = useState<string | null>(null);
-  const [activeSubTab, setActiveSubTab] = useState<"checkin" | "speakers" | "luckyDraw">("checkin");
+  const [activeSubTab, setActiveSubTab] = useState<"checkin" | "speakers" | "luckyDraw" | "slides">("checkin");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "scheduled" | "live" | "ended">("all");
   const [tick, setTick] = useState(Date.now());
@@ -363,6 +365,8 @@ export default function MeetingTab() {
     if (!activeMeeting) return;
     const actionLabels: Record<string, string> = {
       start: "Bắt đầu cuộc họp",
+      start_speaker: "Bắt đầu tính giờ phát biểu",
+      reset_speaker: "Đã đặt lại thời gian phát biểu",
       pause: "Tạm dừng cuộc họp",
       resume: "Tiếp tục cuộc họp",
       next: "Chuyển người tiếp theo",
@@ -762,7 +766,7 @@ export default function MeetingTab() {
 
               {/* Sub-tab Switcher & Actions */}
               <div className="flex items-center justify-between sm:justify-end gap-2">
-                <div className="flex overflow-x-auto bg-slate-100 p-1 rounded-xl"><button type="button" onClick={() => setActiveSubTab("checkin")} aria-pressed={activeSubTab === "checkin"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700">Check-in ({activeMeeting.speakers.length})</button>
+                <div className="flex overflow-x-auto bg-slate-100 p-1 rounded-xl"><button type="button" onClick={() => setActiveSubTab("slides")} aria-pressed={activeSubTab === "slides"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700">Slide</button><button type="button" onClick={() => setActiveSubTab("checkin")} aria-pressed={activeSubTab === "checkin"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700">Check-in ({activeMeeting.speakers.length})</button>
                   <button
                     type="button"
                     onClick={() => setActiveSubTab("speakers")}
@@ -817,6 +821,7 @@ export default function MeetingTab() {
 
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} />}
               {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
               {(activeSubTab === "speakers" || activeSubTab === "checkin") && (
                 <div className="space-y-4">
@@ -997,18 +1002,88 @@ export default function MeetingTab() {
                       )}
 
                       {/* Timer Display */}
-                      <div className="rounded-xl bg-slate-50 p-3.5 flex items-center justify-between">
-                        <span className="text-xs text-slate-600 font-medium">Thời gian còn lại:</span>
-                        <span
-                          className={`font-mono text-2xl font-black ${remaining < 0
-                            ? "text-rose-600 animate-pulse"
-                            : remaining < 10
-                              ? "text-amber-500"
-                              : "text-slate-800"
-                            }`}
+                      <div className="space-y-2.5 mt-2">
+                        <div
+                          className={`rounded-xl p-3.5 flex items-center justify-between transition-colors ${
+                            remaining < 0 && activeMeeting.status === "live" && activeMeeting.speakerStartedAt
+                              ? "bg-rose-50 border border-rose-200"
+                              : !activeMeeting.speakerStartedAt && (activeMeeting.elapsedSeconds || 0) === 0
+                                ? "bg-cyan-50/70 border border-cyan-100"
+                                : "bg-slate-50 border border-slate-100"
+                          }`}
                         >
-                          {remaining < 0 ? `-${fmt(Math.abs(remaining))}` : fmt(remaining)}
-                        </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-600 font-semibold">
+                              {remaining < 0 && activeMeeting.status === "live" && activeMeeting.speakerStartedAt
+                                ? "Đã quá thời gian:"
+                                : !activeMeeting.speakerStartedAt && (activeMeeting.elapsedSeconds || 0) === 0
+                                  ? "Thời lượng phát biểu:"
+                                  : "Thời gian còn lại:"}
+                            </span>
+                            {remaining < 0 && activeMeeting.status === "live" && activeMeeting.speakerStartedAt && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white animate-pulse">
+                                Hết giờ
+                              </span>
+                            )}
+                            {!activeMeeting.speakerStartedAt && (activeMeeting.elapsedSeconds || 0) === 0 && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-cyan-100 text-cyan-800">
+                                Sẵn sàng
+                              </span>
+                            )}
+                          </div>
+
+                          <span
+                            className={`font-mono text-2xl font-black ${
+                              remaining < 0 && activeMeeting.status === "live" && activeMeeting.speakerStartedAt
+                                ? "text-rose-600 animate-pulse"
+                                : remaining < 10 && activeMeeting.status === "live" && activeMeeting.speakerStartedAt
+                                  ? "text-amber-500"
+                                  : "text-slate-800"
+                            }`}
+                          >
+                            {!activeMeeting.speakerStartedAt && (activeMeeting.elapsedSeconds || 0) === 0 && current
+                              ? fmt(current.seconds)
+                              : remaining < 0
+                                ? `+${fmt(Math.abs(remaining))}`
+                                : fmt(remaining)}
+                          </span>
+                        </div>
+
+                        {/* Speaker Timer Actions */}
+                        {canManage && current && ["live", "paused"].includes(activeMeeting.status) && (
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100/80">
+                            <span className="text-[11px] text-slate-400">
+                              {!activeMeeting.speakerStartedAt && (activeMeeting.elapsedSeconds || 0) === 0
+                                ? "Bấm để bắt đầu đếm ngược"
+                                : `Mục tiêu: ${current.seconds} giây`}
+                            </span>
+
+                            <div className="flex items-center gap-2">
+                              {!activeMeeting.speakerStartedAt && (activeMeeting.elapsedSeconds || 0) === 0 ? (
+                                <button
+                                  type="button"
+                                  disabled={saving}
+                                  onClick={() => control("start_speaker")}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                                >
+                                  <Play className="h-3.5 w-3.5" fill="currentColor" />
+                                  <span>Bắt đầu tính giờ ({current.seconds}s)</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={saving}
+                                  onClick={() => control("start_speaker")}
+                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                                  title="Bấm giờ lại từ đầu cho diễn giả này"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                  <span>Bấm giờ lại ({current.seconds}s)</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
