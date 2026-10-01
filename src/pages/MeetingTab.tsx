@@ -23,7 +23,6 @@ import {
   Sparkles,
   Trophy,
   Filter,
-  PowerOff,
 } from "lucide-react";
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
@@ -305,14 +304,13 @@ export default function MeetingTab() {
 
   const handleEndMeeting = async () => {
     if (!endingMeeting) return;
-    if (endingMeeting.status !== "live" && endingMeeting.status !== "paused") {
-      toast.error("Chỉ có thể kết thúc khi cuộc họp đang diễn ra.");
-      return;
-    }
     setIsEnding(true);
     try {
       await api(`/${endingMeeting._id}/control`, "POST", { action: "finish", version: endingMeeting.__v });
-      toast.success(`Đã kết thúc buổi họp "${endingMeeting.title}"`);
+      toast.success(`Buổi họp "${endingMeeting.title}" đã kết thúc!`);
+      if (detailMeetingId === endingMeeting._id) {
+        setDetailMeetingId(null);
+      }
       setEndingMeeting(null);
       await refresh();
     } catch (e: any) {
@@ -565,14 +563,15 @@ export default function MeetingTab() {
                       {isLive && (
                         <button
                           type="button"
-                          title="Kết thúc cuộc họp"
+                          title="Kết thúc buổi họp"
                           onClick={(e) => {
                             e.stopPropagation();
                             setEndingMeeting(m);
                           }}
-                          className="rounded-xl bg-white/80 backdrop-blur-md p-1.5 text-slate-700 hover:bg-rose-50 hover:text-rose-600 shadow-sm transition cursor-pointer"
+                          className="rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white backdrop-blur-md px-2.5 py-1 text-[11px] font-bold shadow-sm transition cursor-pointer flex items-center gap-1"
                         >
-                          <PowerOff className="h-3.5 w-3.5" />
+                          <Square className="h-3 w-3 fill-current" />
+                          <span>Kết thúc</span>
                         </button>
                       )}
                       <button
@@ -645,17 +644,27 @@ export default function MeetingTab() {
                     <span>{isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}</span>
                     <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                   </button>
-                  {canManage && isLive && (
+
+                  {canManage && m.status !== "ended" && m.status !== "cancelled" && (
                     <button
                       type="button"
-                      title="Kết thúc buổi họp"
-                      onClick={(event) => {
-                        event.stopPropagation();
+                      disabled={!isLive}
+                      title={isLive ? "Kết thúc buổi họp" : "Chỉ có thể kết thúc khi buổi họp đang diễn ra"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isLive) {
+                          toast.info("Chỉ có thể kết thúc khi buổi họp đang diễn ra.");
+                          return;
+                        }
                         setEndingMeeting(m);
                       }}
-                      className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-600 text-rose-700 hover:text-white px-3 py-2 text-xs font-bold transition-all duration-150 cursor-pointer shrink-0 shadow-2xs"
+                      className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-all duration-200 shrink-0 ${
+                        isLive
+                          ? "border border-rose-200 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white cursor-pointer shadow-xs"
+                          : "border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-60"
+                      }`}
                     >
-                      <PowerOff className="h-3.5 w-3.5" />
+                      <Square className="h-3.5 w-3.5 fill-current" />
                       <span>Kết thúc</span>
                     </button>
                   )}
@@ -1489,8 +1498,8 @@ export default function MeetingTab() {
       <ConfirmDialog
         isOpen={!!endingMeeting}
         title="Kết thúc buổi họp?"
-        description={`Bạn có chắc chắn muốn kết thúc buổi họp "${endingMeeting?.title}"? Trạng thái cuộc họp sẽ được chuyển sang "Đã kết thúc" và ngừng nhận check-in.`}
-        tone="warning"
+        description={`Bạn có chắc chắn muốn kết thúc buổi họp "${endingMeeting?.title}"? Sau khi kết thúc, trạng thái sẽ đổi sang "Đã kết thúc", buổi họp ngừng nhận check-in và điều hành phát biểu.`}
+        tone="danger"
         confirmLabel="Kết thúc buổi họp"
         cancelLabel="Hủy"
         isSubmitting={isEnding}

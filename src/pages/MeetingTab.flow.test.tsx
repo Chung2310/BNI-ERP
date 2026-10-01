@@ -31,3 +31,15 @@ it("preserves zero-day reminders when editing a meeting", async () => {
   const values = screen.getAllByRole("spinbutton").map(element => (element as HTMLInputElement).value);
   expect(values).toContain("0");
 });
+
+it("disables end meeting button when scheduled and allows ending when live with confirmation popup", async () => {
+  const liveMeeting = { ...meeting, _id: "b", title: "Buổi họp Live", status: "live" };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [liveMeeting] }) }));
+  render(<MeetingTab />);
+  const endButtons = await screen.findAllByRole("button", { name: "Kết thúc" });
+  expect(endButtons.length).toBeGreaterThan(0);
+  fireEvent.click(endButtons[0]);
+  expect(screen.getByText("Kết thúc buổi họp?")).toBeTruthy();
+  expect(screen.getByText(/Bạn có chắc chắn muốn kết thúc buổi họp "Buổi họp Live"\?/)).toBeTruthy();
+});
+
