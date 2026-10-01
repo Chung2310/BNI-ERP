@@ -174,3 +174,20 @@ it("reorders from meeting settings without opening MC and refreshes order versio
   fireEvent.click(screen.getByText("Áp dụng thứ tự"));
   await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/v1/meetings/a/order", expect.objectContaining({ method: "PUT", body: JSON.stringify({ version: 1, speakerIds: ["a", "b"] }) })));
 });
+
+
+it("settings place priority last and list all checked-in people including locked turns", async () => {
+  const item = { ...meeting, status: "paused", currentIndex: 1, elapsedSeconds: 12,
+    speakers: [{ id: "a", name: "An", seconds: 30 }, { id: "b", name: "Bình", seconds: 30 }, { id: "c", name: "Cường", seconds: 30 }] };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [item] }) }));
+  render(<MeetingTab />);
+  fireEvent.click((await screen.findAllByTitle("Sửa cuộc họp"))[0]);
+  const select = screen.getByLabelText("Chọn người để sắp xếp") as HTMLSelectElement;
+  expect(Array.from(select.options).map(option => option.value)).toEqual(["a", "b", "c"]);
+  expect(Array.from(select.options).map(option => option.disabled)).toEqual([true, true, false]);
+  expect(select.options[0].textContent).toContain("Đã phát biểu");
+  expect(select.options[1].textContent).toContain("Đang phát biểu");
+  const section = screen.getByText("Sắp xếp thứ tự thuyết trình").parentElement!;
+  expect(section.nextElementSibling?.textContent).toContain("Lưu thay đổi");
+  expect(section.previousElementSibling?.textContent).toContain("Cấu hình theo toàn bộ thứ tự check-in");
+});
