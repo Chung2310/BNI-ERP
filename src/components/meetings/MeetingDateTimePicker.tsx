@@ -40,7 +40,7 @@ export function MeetingDateTimePicker({
   required,
   disabled,
   className = "",
-  placeholder = "dd/mm/yyyy HH:mm (nhập nhanh hoặc chọn lịch)...",
+  placeholder = "Chọn ngày...",
 }: MeetingDateTimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
