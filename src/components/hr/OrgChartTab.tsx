@@ -78,7 +78,7 @@ const renderAvatar = (avatar: string, sizeClasses: string = "w-8 h-8", textClass
   if (isUrl(avatar)) {
     return (
       <div className={`${sizeClasses} rounded-full overflow-hidden shrink-0 flex items-center justify-center border border-gray-150`}>
-        <img src={avatar} className="w-full h-full object-cover" alt="Avatar nhân sự" />
+        <img src={avatar} className="w-full h-full object-cover" alt="Avatar thành viên" />
       </div>
     );
   }
@@ -495,7 +495,7 @@ export default function OrgChartTab({
       const phoneNormalized = editPhone.trim().replace(/\s+/g, "");
       const duplicatePhone = usersList.find(u => u.uid !== selectedEmp.id && u.phone && u.phone.replace(/\s+/g, "") === phoneNormalized);
       if (duplicatePhone) {
-        toast.error(`❌ Số điện thoại "${editPhone.trim()}" đã được sử dụng bởi nhân sự khác!`);
+        toast.error(`❌ Số điện thoại "${editPhone.trim()}" đã được sử dụng bởi thành viên khác!`);
         return;
       }
     }
@@ -516,7 +516,7 @@ export default function OrgChartTab({
       };
 
       await authService.updateUser(selectedEmp.id, updateData);
-      toast.success("Cập nhật thông tin nhân sự thành công!");
+      toast.success("Cập nhật thông tin thành viên thành công!");
       setIsEditing(false);
       await fetchUsers();
 
@@ -535,7 +535,7 @@ export default function OrgChartTab({
       setSelectedEmp(updatedNode);
     } catch (err) {
       console.error(err);
-      toast.error(getApiErrorMessage(err, "Lỗi khi cập nhật thông tin nhân sự."));
+      toast.error(getApiErrorMessage(err, "Lỗi khi cập nhật thông tin thành viên."));
     } finally {
       setIsSaving(false);
     }
@@ -607,12 +607,12 @@ export default function OrgChartTab({
   const deleteEmployeeConfirmed = async (empId: string) => {
     try {
       await authService.deleteUser(empId);
-      toast.success("Đã xóa nhân sự thành công!");
+      toast.success("Đã xóa thành viên thành công!");
       setSelectedEmp(null);
       await fetchUsers();
     } catch (error) {
-      console.error("Lỗi khi xóa nhân sự:", error);
-      toast.error(getApiErrorMessage(error, "Không thể xóa nhân sự. Vui lòng kiểm tra quyền hạn."));
+      console.error("Lỗi khi xóa thành viên:", error);
+      toast.error(getApiErrorMessage(error, "Không thể xóa thành viên. Vui lòng kiểm tra quyền hạn."));
     }
   };
 
@@ -621,12 +621,13 @@ export default function OrgChartTab({
     if (!targetEmp) return;
 
     askConfirm(
-      "Xóa nhân sự này?",
-      `Bạn có chắc chắn muốn xóa nhân sự "${targetEmp.name}" khỏi hệ thống? Sơ đồ sẽ tự động chuyển cấp dưới trực thuộc của nhân sự này báo cáo lên quản lý cấp trên.`,
+      "Xóa thành viên này?",
+      `Bạn có chắc chắn muốn xóa thành viên "${targetEmp.name}" khỏi hệ thống? Sơ đồ sẽ tự động chuyển cấp dưới trực thuộc của thành viên này báo cáo lên quản lý cấp trên.`,
       () => deleteEmployeeConfirmed(empId),
-      "Xóa nhân sự",
+      "Xóa thành viên",
       "Hủy"
     );
+
   };
 
   useEffect(() => {
@@ -794,7 +795,7 @@ export default function OrgChartTab({
     const emailNormalized = addEmail.trim().toLowerCase();
     const duplicateEmail = usersList.find(u => u.email?.toLowerCase() === emailNormalized);
     if (duplicateEmail) {
-      toast.error(`❌ Email "${addEmail.trim()}" đã được sử dụng bởi nhân sự "${duplicateEmail.displayName || duplicateEmail.email}". Vui lòng dùng email khác!`);
+      toast.error(`❌ Email "${addEmail.trim()}" đã được sử dụng bởi thành viên "${duplicateEmail.displayName || duplicateEmail.email}". Vui lòng dùng email khác!`);
       return;
     }
 
@@ -803,7 +804,7 @@ export default function OrgChartTab({
       const phoneNormalized = addPhone.trim().replace(/\s+/g, "");
       const duplicatePhone = usersList.find(u => u.phone && u.phone.replace(/\s+/g, "") === phoneNormalized);
       if (duplicatePhone) {
-        toast.error(`❌ Số điện thoại "${addPhone.trim()}" đã được sử dụng bởi nhân sự "${duplicatePhone.displayName || duplicatePhone.email}". Vui lòng dùng số khác!`);
+        toast.error(`❌ Số điện thoại "${addPhone.trim()}" đã được sử dụng bởi thành viên "${duplicatePhone.displayName || duplicatePhone.email}". Vui lòng dùng số khác!`);
         return;
       }
     }
@@ -839,7 +840,7 @@ export default function OrgChartTab({
         addJobDescriptionUploadToken || undefined,
       );
 
-      toast.success(`Đã thêm nhân sự "${addName}" thành công!`);
+      toast.success(`Đã thêm thành viên "${addName}" thành công!`);
 
       // Tự động gán khóa học Onboarding + tạo Kanban task
       await autoAssignCourseOnNewEmployee(newUid, addName.trim(), compCode);
@@ -897,7 +898,7 @@ export default function OrgChartTab({
       };
 
       if (!checkIsDescendant(userProfile.uid, id)) {
-        toast.warning("Bạn chỉ có quyền thuyên chuyển nhân viên thuộc nhánh do mình quản lý!");
+        toast.warning("Bạn chỉ có quyền thuyên chuyển thành viên thuộc nhánh do mình quản lý!");
         e.preventDefault();
         return;
       }
@@ -918,7 +919,7 @@ export default function OrgChartTab({
     const isRoleManager = userProfile?.role === "manager";
 
     if (!isAdmin && !isRoleManager) {
-      toast.warning("Bạn không có quyền thuyên chuyển nhân sự!");
+      toast.warning("Bạn không có quyền thuyên chuyển thành viên!");
       return;
     }
 
@@ -939,7 +940,7 @@ export default function OrgChartTab({
       const isDraggedValid = checkIsDescendant(userProfile.uid, draggedId);
 
       if (!isDraggedValid) {
-        toast.error("Không thể thuyên chuyển: Nhân sự được chọn không nằm trong nhánh quản lý của bạn!");
+        toast.error("Không thể thuyên chuyển: Thành viên được chọn không nằm trong nhánh quản lý của bạn!");
         return;
       }
       if (!isTargetValid) {
@@ -949,7 +950,7 @@ export default function OrgChartTab({
     }
 
     if (checkIsDescendant(draggedId, targetId)) {
-      toast.error("Không thể điều chuyển: Người quản lý mới không được là cấp dưới của nhân sự này!");
+      toast.error("Không thể điều chuyển: Người quản lý mới không được là cấp dưới của thành viên này!");
       return;
     }
 
@@ -1016,7 +1017,7 @@ export default function OrgChartTab({
       await fetchUsers();
     } catch (err) {
       console.error("Lỗi cập nhật cơ cấu:", err);
-      toast.error(getApiErrorMessage(err, "Không thể lưu cập nhật cơ cấu nhân sự."));
+      toast.error(getApiErrorMessage(err, "Không thể lưu cập nhật cơ cấu thành viên."));
     }
   };
 
@@ -1206,7 +1207,7 @@ export default function OrgChartTab({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); toggleCollapse(node.id); }}
-              title={isCollapsed ? `Mở rộng ${directReportsCount} nhân viên cấp dưới` : `Thu gọn ${directReportsCount} nhân viên cấp dưới`}
+              title={isCollapsed ? `Mở rộng ${directReportsCount} thành viên cấp dưới` : `Thu gọn ${directReportsCount} thành viên cấp dưới`}
               className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 text-white text-[9px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-xs border-2 border-white select-none transition-all cursor-pointer ${isCollapsed ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white"
                 }`}
             >
@@ -1311,7 +1312,7 @@ export default function OrgChartTab({
                 className="col-span-full flex w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-650 px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-indigo-700 active:scale-95 cursor-pointer min-[768px]:col-span-1 min-[1200px]:w-auto"
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>Thêm Nhân Sự hoặc Phòng ban</span>
+                <span>Thêm thành viên</span>
               </button>
             </>
           )}
@@ -1361,7 +1362,7 @@ export default function OrgChartTab({
                     );
                   })}
                   {visibleEmployees.length === 0 && (
-                    <div className="py-16 text-center text-sm text-slate-400">Không tìm thấy nhân viên</div>
+                    <div className="py-16 text-center text-sm text-slate-400">Không tìm thấy thành viên</div>
                   )}
                 </div>
               ) : (
@@ -1369,7 +1370,7 @@ export default function OrgChartTab({
                   <table className="w-full min-w-[980px] text-left text-xs">
                     <thead className="bg-slate-50 border-b border-gray-200 text-[10px] uppercase tracking-wide text-slate-500">
                       <tr>
-                        <th className="px-4 py-3">Nhân viên</th>
+                        <th className="px-4 py-3">Thành viên</th>
                         <th className="px-4 py-3">Chức danh</th>
                         <th className="px-4 py-3">Phòng ban</th>
                         <th className="px-4 py-3">Khối</th>
@@ -1421,7 +1422,7 @@ export default function OrgChartTab({
                     </tbody>
                   </table>
                   {visibleEmployees.length === 0 && (
-                    <div className="py-16 text-center text-sm text-slate-400">Không tìm thấy nhân viên</div>
+                    <div className="py-16 text-center text-sm text-slate-400">Không tìm thấy thành viên</div>
                   )}
                 </div>
               )}
@@ -1450,7 +1451,7 @@ export default function OrgChartTab({
                       <p className="text-xs text-slate-700">
                         Hiển thị từ <span className="font-medium">{(listPage - 1) * listLimit + 1}</span> đến{" "}
                         <span className="font-medium">{Math.min(listPage * listLimit, visibleEmployees.length)}</span> trong tổng số{" "}
-                        <span className="font-medium">{visibleEmployees.length}</span> nhân viên
+                        <span className="font-medium">{visibleEmployees.length}</span> thành viên
                       </p>
                     </div>
                     <div>
@@ -1550,7 +1551,7 @@ export default function OrgChartTab({
                 {employees.length === 0 ? (
                   <div className="text-center py-20 text-gray-400">
                     <Users className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-sm font-bold">Chưa có cơ cấu nhân sự</p>
+                    <p className="text-sm font-bold">Chưa có cơ cấu thành viên</p>
                     <p className="text-xs mt-1">Vui lòng thêm thành viên mới đầu tiên</p>
                   </div>
                 ) : (
@@ -1571,7 +1572,7 @@ export default function OrgChartTab({
           {isEditing ? (
             <div className="bg-white border border-slate-100 rounded-2xl shadow-xl w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 relative text-left space-y-4 animate-in fade-in zoom-in-95 duration-200">
               <div className="flex justify-between items-center pb-2 border-b">
-                <h4 className="font-bold text-slate-800 text-sm font-sans uppercase">Chỉnh Sửa Nhân Sự</h4>
+                <h4 className="font-bold text-slate-800 text-sm font-sans uppercase">Chỉnh Sửa Thành Viên</h4>
                 <button type="button" onClick={() => setIsEditing(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
                   <X className="h-4 w-4" />
                 </button>
@@ -1768,7 +1769,7 @@ export default function OrgChartTab({
           ) : (
             <div className="bg-white border border-slate-100 rounded-2xl shadow-xl w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 relative text-left space-y-4 animate-in fade-in zoom-in-95 duration-200 animate-out duration-150">
               <div className="flex justify-between items-center pb-2 border-b">
-                <h4 className="font-extrabold text-slate-850 text-sm font-sans uppercase tracking-wide">Chi Tiết Nhân Sự</h4>
+                <h4 className="font-extrabold text-slate-850 text-sm font-sans uppercase tracking-wide">Chi Tiết Thành Viên</h4>
                 <button type="button" onClick={closeDetailModal} className="text-gray-400 hover:text-gray-650 cursor-pointer">
                   <X className="h-4.5 w-4.5" />
                 </button>
@@ -1796,7 +1797,7 @@ export default function OrgChartTab({
               )}
 
               <div className="space-y-4 text-xs text-slate-655 text-slate-600">
-                <div className="grid grid-cols-2 gap-3"><div><span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">Trạng thái</span><strong>{selectedEmp.status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}</strong></div><div><span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">Cấp nhân sự</span><strong>Cấp {selectedEmp.level || missingValue}</strong></div></div>
+                <div className="grid grid-cols-2 gap-3"><div><span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">Trạng thái</span><strong>{selectedEmp.status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}</strong></div><div><span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">Cấp thành viên</span><strong>Cấp {selectedEmp.level || missingValue}</strong></div></div>
                 <div><span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">Lương tháng</span><strong>{selectedEmp.monthlySalary != null ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(Number(selectedEmp.monthlySalary)) : missingValue}</strong></div>
                 <div className="flex items-center gap-3">
                   <Building2 className="w-4.5 h-4.5 text-gray-400 shrink-0" />
@@ -1864,7 +1865,7 @@ export default function OrgChartTab({
                           <Users className="w-4.5 h-4.5 text-gray-400 shrink-0 mt-0.5" />
                           <div className="flex-1 min-w-0">
                             <span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">
-                              Nhân sự cấp dưới trực tiếp ({directSubs.length})
+                              Thành viên cấp dưới trực tiếp ({directSubs.length})
                             </span>
                             <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pb-1 pt-1 pr-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
                               {directSubs.map((sub) => (
@@ -1897,9 +1898,9 @@ export default function OrgChartTab({
                         <Users className="w-4.5 h-4.5 text-gray-400 shrink-0" />
                         <div>
                           <span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">
-                            Nhân sự cấp dưới trực tiếp
+                            Thành viên cấp dưới trực tiếp
                           </span>
-                          <span className="text-[11px] text-gray-400 italic font-medium">Không có nhân sự cấp dưới trực tiếp</span>
+                          <span className="text-[11px] text-gray-400 italic font-medium">Không có thành viên cấp dưới trực tiếp</span>
                         </div>
                       </div>
                     );
@@ -1962,7 +1963,7 @@ export default function OrgChartTab({
         <div className="fixed inset-0 bg-black/50 backdrop-blur-2xs flex items-center justify-center z-50 p-4">
           <form onSubmit={handleAddEmployee} className="bg-white border rounded-2xl shadow-xl w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 relative text-left space-y-4">
             <div className="flex justify-between items-center pb-2 border-b">
-              <h4 className="font-bold text-slate-800 text-sm font-sans uppercase">Thêm Nhân Sự Mới</h4>
+              <h4 className="font-bold text-slate-800 text-sm font-sans uppercase">Thêm Thành Viên Mới</h4>
               <button type="button" onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-650 cursor-pointer">
                 <X className="h-4 w-4" />
               </button>
@@ -2038,7 +2039,7 @@ export default function OrgChartTab({
                   onChange={(e) => setAddRole(e.target.value as any)}
                   className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white cursor-pointer"
                 >
-                  <option value="user">USER (Nhân viên)</option>
+                  <option value="user">USER (Thành viên)</option>
                   <option value="manager">MANAGER (Quản lý)</option>
                   <option value="branch_owner">BRANCH OWNER (Chủ chi nhánh)</option>
                 </select>
@@ -2166,8 +2167,9 @@ export default function OrgChartTab({
                     Đang tạo tài khoản...
                   </>
                 ) : (
-                  "Lưu nhân sự"
+                  "Lưu thành viên"
                 )}
+
               </button>
             </div>
           </form>
