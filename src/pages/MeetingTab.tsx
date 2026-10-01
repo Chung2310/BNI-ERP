@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { MeetingSlides } from "../components/meetings/MeetingSlides";
 import { MeetingCheckInPanel } from "../components/meetings/MeetingCheckInPanel";
 import { MeetingLocationFields } from "../components/meetings/MeetingLocationFields";
@@ -187,6 +187,16 @@ export default function MeetingTab() {
   // Guest Checkin state inside detail modal
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
+
+  // Auto-advance speaker and slide when time runs out
+  const [autoAdvance, setAutoAdvance] = useState(() => {
+    return localStorage.getItem("bni_auto_advance_speaker") === "true";
+  });
+  const [autoAdvanceDelay, setAutoAdvanceDelay] = useState(() => {
+    const saved = localStorage.getItem("bni_auto_advance_delay");
+    return saved !== null ? Math.max(0, parseInt(saved, 10) || 0) : 3;
+  });
+  const autoAdvancedSpeakerRef = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -399,6 +409,27 @@ export default function MeetingTab() {
       : 0)
     : 0;
   const remaining = current ? current.seconds - elapsed : 0;
+
+  // Auto-advance to next speaker and slide when time expires + delay
+  useEffect(() => {
+    if (!autoAdvance || !canManage || saving) return;
+    if (!activeMeeting || activeMeeting.status !== "live" || !activeMeeting.speakerStartedAt) return;
+    if (!current || !upcoming) return;
+
+    if (remaining < 0) {
+      const overtime = Math.abs(remaining);
+      if (overtime >= autoAdvanceDelay) {
+        const speakerKey = `${activeMeeting._id}_${activeMeeting.currentIndex}_${current.id}`;
+        if (autoAdvancedSpeakerRef.current !== speakerKey) {
+          autoAdvancedSpeakerRef.current = speakerKey;
+          void run(async () => {
+            await api(`/${activeMeeting._id}/control`, "POST", { action: "next", version: activeMeeting.__v });
+            toast.info(`Hết giờ! Đã tự động chuyển sang: ${upcoming.name}`);
+          });
+        }
+      }
+    }
+  }, [tick, autoAdvance, autoAdvanceDelay, canManage, saving, activeMeeting, current, upcoming, remaining]);
 
   const statusMap: Record<string, { label: string; badge: string; dot: string; border: string }> = {
     scheduled: {
@@ -929,6 +960,13 @@ export default function MeetingTab() {
                               Người tiếp theo ❯
                             </button>
 
+                            {autoAdvance && (
+                              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-cyan-50 border border-cyan-200/80 text-[11px] font-bold text-cyan-800">
+                                <Sparkles className="h-3 w-3 text-cyan-600" />
+                                Tự chuyển ({autoAdvanceDelay}s)
+                              </span>
+                            )}
+
                             <button
                               type="button"
                               onClick={() => setFinishRequested(true)}
@@ -1033,9 +1071,16 @@ export default function MeetingTab() {
                                   : "Thời gian còn lại:"}
                             </span>
                             {remaining < 0 && activeMeeting.status === "live" && activeMeeting.speakerStartedAt && (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white animate-pulse">
-                                Hết giờ
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white animate-pulse">
+                                  Hết giờ
+                                </span>
+                                {autoAdvance && upcoming && (
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+                                    Chuyển sau {Math.max(0, Math.ceil(autoAdvanceDelay - Math.abs(remaining)))}s
+                                  </span>
+                                )}
+                              </div>
                             )}
                             {!activeMeeting.speakerStartedAt && (activeMeeting.elapsedSeconds || 0) === 0 && (
                               <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-cyan-100 text-cyan-800">
@@ -1094,6 +1139,46 @@ export default function MeetingTab() {
                                 </button>
                               )}
                             </div>
+                          </div>
+                        )}
+
+                        {/* Auto-Advance Setting Box */}
+                        {canManage && activeMeeting.status === "live" && (
+                          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50/90 border border-slate-200/80 text-xs">
+                            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 select-none">
+                              <input
+                                type="checkbox"
+                                checked={autoAdvance}
+                                onChange={(e) => {
+                                  setAutoAdvance(e.target.checked);
+                                  localStorage.setItem("bni_auto_advance_speaker", String(e.target.checked));
+                                }}
+                                className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 cursor-pointer"
+                              />
+                              <span className="flex items-center gap-1.5">
+                                <Sparkles className="h-3.5 w-3.5 text-cyan-600" />
+                                Tự động chuyển người & slide khi hết giờ
+                              </span>
+                            </label>
+
+                            {autoAdvance && (
+                              <div className="flex items-center gap-1.5 ml-auto">
+                                <span className="text-slate-500 font-medium">Chờ:</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={60}
+                                  value={autoAdvanceDelay}
+                                  onChange={(e) => {
+                                    const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                    setAutoAdvanceDelay(val);
+                                    localStorage.setItem("bni_auto_advance_delay", String(val));
+                                  }}
+                                  className="w-12 text-center rounded-lg border border-slate-200 bg-white py-1 px-1 text-xs font-bold text-cyan-700 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                                />
+                                <span className="text-slate-600 font-semibold">giây</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

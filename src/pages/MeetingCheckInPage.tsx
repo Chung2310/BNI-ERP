@@ -20,6 +20,14 @@ export default function MeetingCheckInPage() {
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<Mode>("member");
   const [form, setForm] = useState({ email: "", password: "", name: "", phone: "", company: "" });
+  const [avatar, setAvatar] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
+  useEffect(() => {
+    if (!avatar) { setAvatarPreview(""); return; }
+    const url = URL.createObjectURL(avatar);
+    setAvatarPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [avatar]);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [phase, setPhase] = useState<"idle" | "locating" | "submitting">("idle");
@@ -47,11 +55,21 @@ export default function MeetingCheckInPage() {
       const identity = mode === "member"
         ? { email: form.email.trim(), password: form.password }
         : { name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim(), company: form.company.trim() };
+      let body: string | FormData = JSON.stringify({ ...identity, ...position });
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (mode === "guest" && avatar) {
+        const multipart = new FormData();
+        for (const [key, value] of Object.entries({ ...identity, ...position })) multipart.append(key, String(value));
+        multipart.append("avatar", avatar);
+        body = multipart;
+        delete headers["Content-Type"];
+      }
       const response = await fetch("/api/v1/meeting-checkin/" + encodeURIComponent(token) + "/" + mode, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...identity, ...position })
+        method: "POST", headers, body
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Không thể check-in. Vui lòng thử lại.");
+      setAvatar(null);
       setSuccess(data.data?.name || (mode === "guest" ? form.name : "Bạn"));
       setForm(old => ({ ...old, password: "" }));
     } catch (e: any) { setError(e.message); } finally { setPhase("idle"); }
@@ -83,6 +101,29 @@ export default function MeetingCheckInPage() {
                 <label className="block text-sm">Email<input type="email" autoComplete="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={fieldClass} /></label>
                 <label className="block text-sm">Số điện thoại<input type="tel" maxLength={40} autoComplete="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className={fieldClass} /></label>
                 <label className="block text-sm">Công ty<input maxLength={150} autoComplete="organization" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} className={fieldClass} /></label>
+                <div className="space-y-2">
+                  <label className="block text-sm">Ảnh đại diện (không bắt buộc)
+                    <input type="file" accept="image/jpeg,image/png,image/webp" className={fieldClass}
+                      onChange={event => {
+                        const file = event.target.files?.[0];
+                        event.target.value = "";
+                        if (!file) return;
+                        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+                          setError("Vui lòng chọn ảnh JPG, PNG hoặc WebP."); return;
+                        }
+                        if (!file.size || file.size > 5 * 1024 * 1024) {
+                          setError("Ảnh đại diện phải có dung lượng từ 1 byte đến 5 MB."); return;
+                        }
+                        setAvatar(file); setError("");
+                      }} />
+                  </label>
+                  <p className="text-xs text-slate-500">JPG, PNG hoặc WebP, tối đa 5 MB. Ảnh sẽ hiển thị trên slide giới thiệu của bạn.</p>
+                  {avatarPreview && <div className="flex items-center gap-3">
+                    <img src={avatarPreview} alt="Xem trước ảnh đại diện" className="h-20 w-20 rounded-full border object-cover" />
+                    <span className="min-w-0 flex-1 truncate text-sm">{avatar?.name}</span>
+                    <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => setAvatar(null)}>Bỏ ảnh</button>
+                  </div>}
+                </div>
               </>}
             </fieldset>
             <div className="rounded-xl bg-slate-50 p-4"><h2 className="flex items-center gap-2 text-sm font-semibold"><MapPin size={18} />2. Xác nhận tại địa điểm họp</h2><p className="mt-2 text-sm text-slate-600">Khi bấm Check-in, hãy cho phép truy cập vị trí để xác nhận bạn đang ở gần địa điểm.</p></div>
