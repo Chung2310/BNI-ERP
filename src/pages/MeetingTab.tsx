@@ -997,7 +997,7 @@ export default function MeetingTab() {
 
                             <button
                               type="button"
-                              disabled={saving}
+                              disabled={saving || !current}
                               onClick={() => control("next")}
                               className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3.5 py-2 text-xs font-bold transition cursor-pointer"
                             >
