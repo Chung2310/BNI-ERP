@@ -28,6 +28,9 @@ const MONTH_NAMES = [
   "Tháng 12",
 ];
 
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: 15 }, (_, i) => CURRENT_YEAR - 2 + i);
+
 const HOURS_24 = Array.from({ length: 24 }, (_, i) => pad2(i));
 const MINUTES_5 = Array.from({ length: 12 }, (_, i) => pad2(i * 5));
 
@@ -37,7 +40,7 @@ export function MeetingDateTimePicker({
   required,
   disabled,
   className = "",
-  placeholder = "Chọn ngày & giờ...",
+  placeholder = "dd/mm/yyyy HH:mm (nhập nhanh hoặc chọn lịch)...",
 }: MeetingDateTimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -80,6 +83,15 @@ export function MeetingDateTimePicker({
   const [selectedHour, setSelectedHour] = useState(parsed ? parsed.hour : "07");
   const [selectedMinute, setSelectedMinute] = useState(parsed ? parsed.minute : "00");
 
+  const formatDisplay = (y: number, m: number, d: number, h: string, min: string) => {
+    return `${pad2(d)}/${pad2(m + 1)}/${y} ${h}:${min}`;
+  };
+
+  // Input text field value for direct typing
+  const [inputValue, setInputValue] = useState(
+    parsed ? formatDisplay(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute) : ""
+  );
+
   // Keep internal state synced when value prop updates
   useEffect(() => {
     if (value) {
@@ -92,7 +104,10 @@ export function MeetingDateTimePicker({
         setSelectedMinute(p.minute);
         setViewYear(p.year);
         setViewMonth(p.month);
+        setInputValue(formatDisplay(p.year, p.month, p.day, p.hour, p.minute));
       }
+    } else {
+      setInputValue("");
     }
   }, [value]);
 
@@ -114,6 +129,44 @@ export function MeetingDateTimePicker({
   const emitChange = (y: number, m: number, d: number, h: string, min: string) => {
     const formatted = `${y}-${pad2(m + 1)}-${pad2(d)}T${h}:${min}`;
     onChange(formatted);
+  };
+
+  // Direct keyboard input handling (dd/mm/yyyy HH:mm)
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const text = e.target.value;
+    setInputValue(text);
+
+    // Support formats: dd/mm/yyyy HH:mm or dd/mm/yyyy
+    const match = text.trim().match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})(?:\s+(\d{1,2}):(\d{1,2}))?$/);
+    if (match) {
+      const d = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10) - 1;
+      const y = parseInt(match[3], 10);
+      const h = match[4] !== undefined ? pad2(parseInt(match[4], 10)) : selectedHour;
+      const min = match[5] !== undefined ? pad2(parseInt(match[5], 10)) : selectedMinute;
+
+      if (d >= 1 && d <= 31 && m >= 0 && m <= 11 && y >= 2020 && y <= 2100) {
+        setSelectedDay(d);
+        setSelectedMonth(m);
+        setSelectedYear(y);
+        setSelectedHour(h);
+        setSelectedMinute(min);
+        setViewYear(y);
+        setViewMonth(m);
+        emitChange(y, m, d, h, min);
+      }
+    }
+  };
+
+  const handleInputBlur = () => {
+    if (value) {
+      const p = parseValue(value);
+      if (p) {
+        setInputValue(formatDisplay(p.year, p.month, p.day, p.hour, p.minute));
+      }
+    } else {
+      setInputValue("");
+    }
   };
 
   const handlePrevMonth = (e: React.MouseEvent) => {
@@ -182,6 +235,28 @@ export function MeetingDateTimePicker({
     emitChange(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), selectedHour, selectedMinute);
   };
 
+  const handleNextWeek = () => {
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    setViewYear(nextWeek.getFullYear());
+    setViewMonth(nextWeek.getMonth());
+    setSelectedYear(nextWeek.getFullYear());
+    setSelectedMonth(nextWeek.getMonth());
+    setSelectedDay(nextWeek.getDate());
+    emitChange(nextWeek.getFullYear(), nextWeek.getMonth(), nextWeek.getDate(), selectedHour, selectedMinute);
+  };
+
+  const handleNextMonthQuick = () => {
+    const nextM = new Date();
+    nextM.setMonth(nextM.getMonth() + 1);
+    setViewYear(nextM.getFullYear());
+    setViewMonth(nextM.getMonth());
+    setSelectedYear(nextM.getFullYear());
+    setSelectedMonth(nextM.getMonth());
+    setSelectedDay(nextM.getDate());
+    emitChange(nextM.getFullYear(), nextM.getMonth(), nextM.getDate(), selectedHour, selectedMinute);
+  };
+
   // Build calendar matrix
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const firstDayIndex = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7; // Monday = 0
@@ -199,11 +274,6 @@ export function MeetingDateTimePicker({
     calendarDays.push({ day: i, isCurrentMonth: false });
   }
 
-  // Display text formatted as: dd/mm/yyyy HH:mm
-  const displayText = value && parsed
-    ? `${pad2(selectedDay)}/${pad2(selectedMonth + 1)}/${selectedYear} ${selectedHour}:${selectedMinute}`
-    : "";
-
   const handleConfirm = () => {
     emitChange(selectedYear, selectedMonth, selectedDay, selectedHour, selectedMinute);
     setIsOpen(false);
@@ -211,7 +281,7 @@ export function MeetingDateTimePicker({
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
-      {/* Hidden input to satisfy HTML form validations if required */}
+      {/* Hidden input for HTML form validations if required */}
       <input
         tabIndex={-1}
         required={required}
@@ -221,35 +291,87 @@ export function MeetingDateTimePicker({
         aria-hidden="true"
       />
 
-      {/* Trigger Button Field */}
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white focus:border-cyan-500 focus:outline-none p-2.5 text-xs text-slate-800 transition shadow-2xs cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <CalendarDays className="h-4 w-4 text-cyan-600 shrink-0 group-hover:scale-105 transition-transform" />
-          {displayText ? (
-            <span className="font-bold text-slate-900 tracking-wide">{displayText}</span>
-          ) : (
-            <span className="text-slate-400 font-normal">{placeholder}</span>
-          )}
-        </div>
-        <div className="flex items-center shrink-0 ml-2">
-          <Clock className="h-4 w-4 text-slate-400 group-hover:text-cyan-600 transition-colors" />
-        </div>
-      </button>
+      {/* Main Input Field: Direct typing + Click to open picker */}
+      <div className="relative flex items-center w-full rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus-within:bg-white focus-within:border-cyan-500 focus-within:ring-2 focus-within:ring-cyan-500/20 transition shadow-2xs">
+        <button
+          type="button"
+          tabIndex={-1}
+          disabled={disabled}
+          onClick={() => setIsOpen(!isOpen)}
+          className="pl-3 pr-2 py-2.5 text-cyan-600 hover:text-cyan-700 transition cursor-pointer shrink-0"
+          title="Mở lịch chọn nhanh ngày & giờ"
+        >
+          <CalendarDays className="h-4 w-4" />
+        </button>
+
+        <input
+          type="text"
+          disabled={disabled}
+          required={required}
+          value={inputValue}
+          placeholder={placeholder}
+          onClick={() => setIsOpen(true)}
+          onChange={handleInputChange}
+          onBlur={handleInputBlur}
+          className="w-full bg-transparent py-2.5 pr-2 text-xs font-bold text-slate-900 placeholder-slate-400 focus:outline-none tracking-wide"
+        />
+
+        <button
+          type="button"
+          tabIndex={-1}
+          disabled={disabled}
+          onClick={() => setIsOpen(!isOpen)}
+          className="pr-3 pl-2 py-2.5 text-slate-400 hover:text-cyan-600 transition cursor-pointer shrink-0"
+          title="Chọn giờ"
+        >
+          <Clock className="h-4 w-4" />
+        </button>
+      </div>
 
       {/* Popover Date & Time Picker */}
       {isOpen && (
-        <div className="absolute left-0 mt-1.5 z-50 w-[320px] sm:w-[340px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150 select-none">
-          {/* Calendar Month & Navigation */}
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <span className="font-extrabold text-sm text-slate-900">
-              {MONTH_NAMES[viewMonth]}, {viewYear}
-            </span>
-            <div className="flex items-center gap-1">
+        <div className="absolute left-0 mt-1.5 z-50 w-[330px] sm:w-[360px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150 select-none">
+          {/* Calendar Month & Year Fast Selector + Navigation */}
+          <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 gap-2">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              {/* Quick Month Dropdown */}
+              <select
+                value={viewMonth}
+                onChange={(e) => {
+                  const m = parseInt(e.target.value, 10);
+                  setViewMonth(m);
+                  setSelectedMonth(m);
+                  emitChange(viewYear, m, selectedDay, selectedHour, selectedMinute);
+                }}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-extrabold text-slate-800 hover:bg-white focus:bg-white focus:border-cyan-500 focus:outline-none cursor-pointer"
+              >
+                {MONTH_NAMES.map((name, index) => (
+                  <option key={name} value={index}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+
+              {/* Quick Year Dropdown */}
+              <select
+                value={viewYear}
+                onChange={(e) => {
+                  const y = parseInt(e.target.value, 10);
+                  setViewYear(y);
+                  setSelectedYear(y);
+                  emitChange(y, viewMonth, selectedDay, selectedHour, selectedMinute);
+                }}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-extrabold text-slate-800 hover:bg-white focus:bg-white focus:border-cyan-500 focus:outline-none cursor-pointer"
+              >
+                {YEARS.map((y) => (
+                  <option key={y} value={y}>
+                    Năm {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-0.5 shrink-0">
               <button
                 type="button"
                 onClick={handlePrevMonth}
@@ -269,22 +391,94 @@ export function MeetingDateTimePicker({
             </div>
           </div>
 
-          {/* Quick Shortcuts */}
-          <div className="flex items-center gap-2 pt-2.5 pb-2">
+          {/* Quick Date Shortcuts (Hôm nay, Ngày mai, Tuần sau, Tháng sau) */}
+          <div className="flex items-center gap-1.5 pt-2.5 pb-2 overflow-x-auto">
             <button
               type="button"
               onClick={handleToday}
-              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 hover:bg-cyan-50 hover:text-cyan-700 text-slate-600 transition cursor-pointer"
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 hover:bg-cyan-50 hover:text-cyan-700 text-slate-600 transition cursor-pointer shrink-0"
             >
               Hôm nay
             </button>
             <button
               type="button"
               onClick={handleTomorrow}
-              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 hover:bg-cyan-50 hover:text-cyan-700 text-slate-600 transition cursor-pointer"
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 hover:bg-cyan-50 hover:text-cyan-700 text-slate-600 transition cursor-pointer shrink-0"
             >
               Ngày mai
             </button>
+            <button
+              type="button"
+              onClick={handleNextWeek}
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 hover:bg-cyan-50 hover:text-cyan-700 text-slate-600 transition cursor-pointer shrink-0"
+            >
+              Tuần sau
+            </button>
+            <button
+              type="button"
+              onClick={handleNextMonthQuick}
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-100 hover:bg-cyan-50 hover:text-cyan-700 text-slate-600 transition cursor-pointer shrink-0"
+            >
+              Tháng sau
+            </button>
+          </div>
+
+          {/* Quick Manual Date Inputs Row (Nhập nhanh Ngày - Tháng - Năm) */}
+          <div className="grid grid-cols-3 gap-2 pb-2.5 border-b border-slate-100 text-xs">
+            <div>
+              <label className="block text-[10px] font-medium text-slate-400 mb-0.5">Ngày (1-31)</label>
+              <input
+                type="number"
+                min={1}
+                max={31}
+                value={selectedDay}
+                onChange={(e) => {
+                  const d = parseInt(e.target.value, 10);
+                  if (!isNaN(d) && d >= 1 && d <= 31) {
+                    setSelectedDay(d);
+                    emitChange(selectedYear, selectedMonth, d, selectedHour, selectedMinute);
+                  }
+                }}
+                className="w-full text-center rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-xs font-bold text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-medium text-slate-400 mb-0.5">Tháng (1-12)</label>
+              <select
+                value={selectedMonth}
+                onChange={(e) => {
+                  const m = parseInt(e.target.value, 10);
+                  setSelectedMonth(m);
+                  setViewMonth(m);
+                  emitChange(selectedYear, m, selectedDay, selectedHour, selectedMinute);
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-xs font-bold text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none cursor-pointer"
+              >
+                {MONTH_NAMES.map((name, index) => (
+                  <option key={name} value={index}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-medium text-slate-400 mb-0.5">Năm</label>
+              <input
+                type="number"
+                min={2020}
+                max={2099}
+                value={selectedYear}
+                onChange={(e) => {
+                  const y = parseInt(e.target.value, 10);
+                  if (!isNaN(y) && y >= 2020 && y <= 2099) {
+                    setSelectedYear(y);
+                    setViewYear(y);
+                    emitChange(y, selectedMonth, selectedDay, selectedHour, selectedMinute);
+                  }
+                }}
+                className="w-full text-center rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-xs font-bold text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
           </div>
 
           {/* Weekday Labels (T2 - CN) */}
@@ -332,7 +526,7 @@ export function MeetingDateTimePicker({
           </div>
 
           {/* Time Section */}
-          <div className="mt-3.5 pt-3 border-t border-slate-100 space-y-2">
+          <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700">
               <span className="flex items-center gap-1.5 text-slate-700">
                 <Clock className="h-3.5 w-3.5 text-cyan-600" />
@@ -403,14 +597,14 @@ export function MeetingDateTimePicker({
           </div>
 
           {/* Footer Action */}
-          <div className="mt-4 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+          <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between">
             <span className="text-[11px] font-medium text-slate-500">
               {pad2(selectedDay)}/{pad2(selectedMonth + 1)}/{selectedYear} • {selectedHour}:{selectedMinute}
             </span>
             <button
               type="button"
               onClick={handleConfirm}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
             >
               <Check className="h-3.5 w-3.5" />
               <span>Xong</span>
