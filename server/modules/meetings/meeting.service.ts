@@ -1,5 +1,6 @@
 import { randomBytes, randomInt, randomUUID, createHash } from 'node:crypto';
 import bcrypt from 'bcryptjs';
+import { encryptSecret, decryptSecret } from '../../security/crypto';
 import { MeetingModel } from './meeting.model';
 import { cloudinaryService, type PublicMediaAsset } from '../../service/cloudinary.service';
 import { guestAvatarError, type GuestAvatarFile } from './meeting-guest-avatar';
@@ -61,6 +62,7 @@ export async function updateMeeting(companyCode: string, id: string, input: any)
     || (input.gpsRadiusMeters !== undefined && input.gpsRadiusMeters !== item.gpsRadiusMeters);
   if (locationChanged) {
     item.checkInQrTokenHash = undefined;
+    item.checkInQrTokenEncrypted = undefined;
     item.checkInQrExpiresAt = undefined;
   }
   if (input.title !== undefined) item.title = input.title;
@@ -550,10 +552,35 @@ export async function createCheckInQr(companyCode: string, id: string, hours: nu
   if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp hiện không nhận check-in.');
   const token = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+  item.checkInQrTokenEncrypted = encryptSecret(token);
   item.checkInQrTokenHash = createHash('sha256').update(token).digest('hex');
   item.checkInQrExpiresAt = expiresAt;
   await saveMeeting(item);
   return { token, expiresAt, meeting: { id: String(item._id), title: item.title } };
+}
+
+// Only the management endpoint can retrieve the encrypted bearer token.
+export async function getCheckInQr(companyCode: string, id: string, legacyToken?: unknown) {
+  const item = await MeetingModel.findOne({ _id: id, companyCode }).select('+checkInQrTokenEncrypted');
+  if (!item) throw new MeetingError(404, 'Không tìm thấy cuộc họp.');
+  if (!['scheduled', 'live', 'paused'].includes(item.status) || !item.checkInQrTokenHash
+    || !item.checkInQrExpiresAt || item.checkInQrExpiresAt.getTime() <= Date.now()) return null;
+  if (legacyToken !== undefined) {
+    if (typeof legacyToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(legacyToken)
+      || createHash('sha256').update(legacyToken).digest('hex') !== item.checkInQrTokenHash) {
+      throw new MeetingError(409, 'Mã QR đã bị thay thế. Vui lòng tải lại.');
+    }
+    if (!item.checkInQrTokenEncrypted) {
+      item.checkInQrTokenEncrypted = encryptSecret(legacyToken);
+      await saveMeeting(item);
+    }
+  }
+  if (!item.checkInQrTokenEncrypted) return { legacy: true, expiresAt: item.checkInQrExpiresAt };
+  const token = decryptSecret(item.checkInQrTokenEncrypted);
+  if (createHash('sha256').update(token).digest('hex') !== item.checkInQrTokenHash) {
+    throw new MeetingError(409, 'Không thể khôi phục mã QR hiện tại.');
+  }
+  return { checkInUrl: '/meeting-checkin/' + token, expiresAt: item.checkInQrExpiresAt };
 }
 
 function validateQrAndLocation(item: any, input: any) {

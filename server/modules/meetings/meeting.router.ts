@@ -20,6 +20,7 @@ import {
   redrawPrizeWinner,
   resetLuckyDrawWinners,
   createCheckInQr,
+  getCheckInQr,
   autoStartDueMeetings,
 } from './meeting.service';
 import { checkinInput, controlInput, meetingInput, updateMeetingInput, slideProfileInput } from './meeting.validation';
@@ -245,6 +246,21 @@ meetingRouter.post('/:id/lucky-draw/reset', manage, async (req: any, res) => {
   } catch (e) {
     sendError(res, e);
   }
+});
+
+meetingRouter.get('/:id/checkin-qr', manage, async (req: any, res) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.json({ data: await getCheckInQr(company(req), req.params.id) });
+  } catch (e) { sendError(res, e); }
+});
+
+meetingRouter.put('/:id/checkin-qr', manage, async (req: any, res) => {
+  try {
+    if (typeof req.body?.token !== 'string') throw new MeetingError(400, 'Thiếu mã QR cần khôi phục.');
+    res.set('Cache-Control', 'no-store');
+    res.json({ data: await getCheckInQr(company(req), req.params.id, req.body.token) });
+  } catch (e) { sendError(res, e); }
 });
 
 meetingRouter.post('/:id/checkin-qr', manage, async (req: any, res) => {

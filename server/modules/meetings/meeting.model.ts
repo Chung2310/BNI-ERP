@@ -81,6 +81,7 @@ const meeting = new Schema(
     longitude: Number,
     gpsRadiusMeters: { type: Number, default: 200 },
     checkInQrTokenHash: String,
+    checkInQrTokenEncrypted: { type: String, select: false },
     checkInQrExpiresAt: Date,
 
     coverImage: String,
