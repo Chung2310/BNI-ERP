@@ -233,21 +233,18 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     }
   }, [showControls, fullscreenRequest, startFromFirst]);
 
-  const presentFromFirst = useCallback(() => {
-    const first = deck.slides[0];
-    if (!first) return;
-    setOpeningSlide({ slideId: first.id, speakerId: currentSpeakerId });
-    setExcluded(new Set());
-    setSelectedId(first.id);
+  const beginPresentation = useCallback((slide: ProfileSlide) => {
+    setOpeningSlide({ slideId: slide.id, speakerId: currentSpeakerId });
+    setSelectedId(slide.id);
     setMode(autoAdvance ? "auto" : "manual");
     present(true);
-  }, [deck.slides, currentSpeakerId, present, autoAdvance]);
+  }, [currentSpeakerId, present, autoAdvance]);
 
   useEffect(() => {
     if (!startFromFirst || loading || error || !deck.slides.length) return;
-    presentFromFirst();
+    beginPresentation(deck.slides[0]);
     onPresentationStarted?.();
-  }, [startFromFirst, loading, error, deck.slides.length, presentFromFirst, onPresentationStarted]);
+  }, [startFromFirst, loading, error, deck.slides, beginPresentation, onPresentationStarted]);
 
   async function save(reset = false) {
     if (!active || saving) return;
@@ -295,7 +292,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       {mode === "auto" && <label className="flex items-center gap-2 text-sm">Chờ sau khi hết giờ <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={value => onAutoAdvanceDelayChange?.(value)} disabled={!canManage} /> giây rồi chuyển slide</label>}
       <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={16} /> Làm mới hồ sơ</button>
       <button className={button} disabled={!ready} onClick={download}><Download size={16} /> Tải PNG</button>
-      <button className={button} disabled={loading || !!error || !deck.slides.length || !!draft} onClick={presentFromFirst}><Play size={16} /> Bắt đầu thuyết trình</button>
+      <button className={button} disabled={loading || !!error || !selected || !!draft} onClick={() => { if (selected) beginPresentation(selected); }}><Play size={16} /> Bắt đầu thuyết trình</button>
       <button ref={launchButton} className={button} disabled={!ready || !!draft} onClick={() => present()}><Maximize size={16} /> Trình chiếu</button>
     </div>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error} <button className="underline" onClick={() => setRevision(v => v + 1)}>Tải lại dữ liệu</button></p>}

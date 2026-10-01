@@ -77,7 +77,7 @@ it("does not keep showing the last speaker after the meeting ends", async () => 
 });
 
 
-it("starts at the first slide and follows subsequent speaker changes", async () => {
+it("starts at the previewed speaker and follows subsequent speaker changes", async () => {
   const deck = [...slides, { ...slides[1], id: "c", name: "Người thứ ba" }];
   const api = vi.fn().mockResolvedValue({ slides: deck, version: 1 });
   const view = render(<MeetingSlides meeting={{ ...meeting, speakers: deck }} canManage api={api} autoAdvance />);
@@ -86,7 +86,7 @@ it("starts at the first slide and follows subsequent speaker changes", async () 
   expect((await screen.findByRole("img")).getAttribute("aria-label")).toContain("Trần Bình");
   fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
   expect(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).toBeTruthy();
-  await waitFor(() => expect(screen.getAllByRole("img").every(canvas => canvas.getAttribute("aria-label")?.includes("Nguyễn An"))).toBe(true));
+  await waitFor(() => expect(screen.getAllByRole("img").every(canvas => canvas.getAttribute("aria-label")?.includes("Trần Bình"))).toBe(true));
   view.rerender(<MeetingSlides meeting={{ ...meeting, currentIndex: 2, speakers: deck }} canManage api={api} autoAdvance />);
   await waitFor(() => expect(screen.getAllByRole("img").every(canvas => canvas.getAttribute("aria-label")?.includes("Người thứ ba"))).toBe(true));
   expect(within(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).queryAllByRole("button")).toHaveLength(0);
@@ -130,7 +130,7 @@ it("clean automatic presentation ignores arrow and space keys", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
   fireEvent.keyDown(document, { key: "ArrowRight" });
   fireEvent.keyDown(document, { code: "Space" });
-  await waitFor(() => expect(within(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).getByRole("img").getAttribute("aria-label")).toContain("Nguyễn An"));
+  await waitFor(() => expect(within(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).getByRole("img").getAttribute("aria-label")).toContain("Trần Bình"));
   expect((screen.getByLabelText("Chế độ trình chiếu") as HTMLSelectElement).value).toBe("auto");
 });
 
@@ -151,4 +151,19 @@ it("StrictMode does not exit an incoming fullscreen request; real unmount still 
     delete (document as any).fullscreenElement;
     delete (document as any).exitFullscreen;
   }
+});
+
+
+it.each(["Nguyễn An", "Trần Bình"])("starts the selected member or guest %s without returning to the first profile", async name => {
+  const api = vi.fn().mockResolvedValue({ slides, version: 1 });
+  render(<MeetingSlides meeting={meeting} canManage api={api} />);
+  await screen.findByText("Nguyễn An");
+  fireEvent.click(screen.getByText(name));
+  await waitFor(() => expect(screen.getByRole("img").getAttribute("aria-label")).toContain(name));
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
+  const dialog = screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" });
+  await waitFor(() => expect(within(dialog).getByRole("img").getAttribute("aria-label")).toContain(name));
+  expect(within(dialog).queryAllByRole("button")).toHaveLength(0);
+  fireEvent.keyDown(document, { key: "ArrowRight" });
+  await waitFor(() => expect(within(dialog).getByRole("img").getAttribute("aria-label")).toContain(name === "Nguyễn An" ? "Trần Bình" : "Nguyễn An"));
 });
