@@ -8,8 +8,7 @@ import type {
 export type SettingsSubTabType =
   | "profile"
   | "security"
-  | "erp"
-  | "face-recognition";
+  | "erp";
 
 export const HR_SUB_TAB_ROUTES: SubTabRouteMap<HRSubTabType> = [
   { slug: "so-do", value: "SƠ ĐỒ TỔ CHỨC" },
@@ -25,7 +24,6 @@ export const SETTINGS_SUB_TAB_ROUTES: SubTabRouteMap<SettingsSubTabType> = [
   { slug: "ho-so", value: "profile" },
   { slug: "bao-mat", value: "security" },
   { slug: "cau-hinh", value: "erp" },
-  { slug: "nhan-dien-khuon-mat", value: "face-recognition" },
 ];
 
 const SUB_TAB_ROUTES_BY_TAB: Partial<Record<TabType, SubTabRouteMap<string>>> = {
