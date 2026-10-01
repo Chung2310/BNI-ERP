@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { MeetingCheckInPanel } from "../components/meetings/MeetingCheckInPanel";
 import { MeetingLocationFields } from "../components/meetings/MeetingLocationFields";
+import { MeetingCoverImageField } from "../components/meetings/MeetingCoverImageField";
 import {
   CalendarDays,
   Clock3,
@@ -1163,38 +1164,17 @@ export default function MeetingTab() {
 
               <MeetingLocationFields value={gpsPoint} onChange={setGpsPoint} radius={gpsRadiusMeters} onRadiusChange={setGpsRadiusMeters} />
 
+              <MeetingCoverImageField value={coverImage} onChange={setCoverImage} />
+
               <div>
-                <label className="block font-bold text-slate-700 mb-1">URL ảnh bìa sự kiện</label>
+                <label className="block font-bold text-slate-700 mb-1">Nhắc hẹn trước (ngày)</label>
                 <input
-                  value={coverImage}
-                  onChange={(e) => setCoverImage(e.target.value)}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                  type="number"
+                  min="0"
+                  value={reminderDays}
+                  onChange={(e) => setReminderDays(+e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Nhắc hẹn trước (ngày)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={reminderDays}
-                    onChange={(e) => setReminderDays(+e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Mặc định (giây/người)</label>
-                  <input
-                    type="number"
-                    min="5"
-                    value={fallbackSeconds}
-                    onChange={(e) => setFallbackSeconds(+e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none"
-                  />
-                </div>
               </div>
 
               {/* Tiers duration config */}
@@ -1348,38 +1328,17 @@ export default function MeetingTab() {
 
               <MeetingLocationFields value={editGpsPoint} onChange={setEditGpsPoint} radius={editGpsRadiusMeters} onRadiusChange={setEditGpsRadiusMeters} />
 
+              <MeetingCoverImageField value={editCoverImage} onChange={setEditCoverImage} />
+
               <div>
-                <label className="block font-bold text-slate-700 mb-1">URL ảnh bìa sự kiện</label>
+                <label className="block font-bold text-slate-700 mb-1">Nhắc hẹn trước (ngày)</label>
                 <input
-                  value={editCoverImage}
-                  onChange={(e) => setEditCoverImage(e.target.value)}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                  type="number"
+                  min="0"
+                  value={editReminderDays}
+                  onChange={(e) => setEditReminderDays(+e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Nhắc hẹn trước (ngày)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editReminderDays}
-                    onChange={(e) => setEditReminderDays(+e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Mặc định (giây/người)</label>
-                  <input
-                    type="number"
-                    min="5"
-                    value={editFallbackSeconds}
-                    onChange={(e) => setEditFallbackSeconds(+e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none"
-                  />
-                </div>
               </div>
 
               {/* Tiers duration config */}
