@@ -15,7 +15,7 @@ export default defineConfig(() => {
       },
     },
     test: {
-      include: ['src/**/*.test.{ts,tsx}'],
+      include: ['src/**/*.test.{ts,tsx}', 'server/**/*.test.ts'],
       exclude: [
         ...configDefaults.exclude,
         '**/.worktrees/**',
