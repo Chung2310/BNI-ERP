@@ -70,6 +70,9 @@ it("inserting priority one shifts the existing waiting speaker down", async () =
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  expect(screen.queryByLabelText("Chọn người để sắp xếp")).toBeNull();
+  expect(screen.queryByLabelText("Thứ tự ưu tiên")).toBeNull();
+  fireEvent.click(screen.getAllByTitle("Sửa cuộc họp").at(-1)!);
   fireEvent.change(screen.getByLabelText("Chọn người để sắp xếp"), { target: { value: "c" } });
   fireEvent.change(screen.getByLabelText("Thứ tự ưu tiên"), { target: { value: "1" } });
   fireEvent.click(screen.getByText("Áp dụng thứ tự"));
@@ -140,4 +143,26 @@ it("launches the first profile from MC controls and explains the post-speech del
   expect(screen.getAllByRole("img").filter(element => element.tagName === "CANVAS").every(element => element.getAttribute("aria-label")?.includes("Người đầu tiên"))).toBe(true);
   expect(fetchMock.mock.calls.every(([url]) => !String(url).endsWith("/control"))).toBe(true);
   vi.restoreAllMocks();
+});
+
+
+it("reorders from meeting settings without opening MC and refreshes order versions", async () => {
+  let item = { ...meeting, speakers: [{ id: "a", name: "An", seconds: 30 }, { id: "b", name: "Bình", seconds: 30 }] };
+  const fetchMock = vi.fn(async (url, options) => {
+    if (String(url).endsWith("/order")) {
+      const body = JSON.parse(options.body);
+      item = { ...item, __v: item.__v + 1, speakers: body.speakerIds.map((id: string) => item.speakers.find(person => person.id === id)) };
+      return { ok: true, json: async () => ({ data: item }) };
+    }
+    return { ok: true, json: async () => ({ data: [item] }) };
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MeetingTab />);
+  fireEvent.click((await screen.findAllByTitle("Sửa cuộc họp"))[0]);
+  fireEvent.change(screen.getByLabelText("Chọn người để sắp xếp"), { target: { value: "b" } });
+  fireEvent.click(screen.getByText("Áp dụng thứ tự"));
+  await waitFor(() => expect(Array.from(screen.getByText("Sắp xếp thứ tự thuyết trình").parentElement!.querySelectorAll("li")).map(li => li.textContent)).toEqual(["Bình", "An"]));
+  fireEvent.change(screen.getByLabelText("Chọn người để sắp xếp"), { target: { value: "a" } });
+  fireEvent.click(screen.getByText("Áp dụng thứ tự"));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/v1/meetings/a/order", expect.objectContaining({ method: "PUT", body: JSON.stringify({ version: 1, speakerIds: ["a", "b"] }) })));
 });

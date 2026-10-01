@@ -273,6 +273,8 @@ export default function MeetingTab() {
   const openEditModal = (m: Meeting, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setEditingMeeting(m);
+    setPrioritySpeakerId("");
+    setPriorityPosition(1);
     setEditTitle(m.title);
     setEditLocation(m.location || "");
     setEditGpsPoint(typeof m.latitude === "number" && typeof m.longitude === "number" ? { latitude: m.latitude, longitude: m.longitude } : null);
@@ -400,18 +402,19 @@ export default function MeetingTab() {
     });
   };
 
-  const pendingStart = !activeMeeting || activeMeeting.status === "scheduled" ? 0 : Math.max(0,
-    activeMeeting.currentIndex + (activeMeeting.speakerStartedAt || activeMeeting.elapsedSeconds > 0 ? 1 : 0));
+  const orderingMeeting = editingMeeting ? items.find(m => m._id === editingMeeting._id) || editingMeeting : null;
+  const pendingStart = !orderingMeeting || orderingMeeting.status === "scheduled" ? 0 : Math.max(0,
+    orderingMeeting.currentIndex + (orderingMeeting.speakerStartedAt || orderingMeeting.elapsedSeconds > 0 ? 1 : 0));
 
   const reorder = (index: number, delta: number) => {
-    if (!activeMeeting) return;
-    const copy = [...activeMeeting.speakers];
+    if (!orderingMeeting) return;
+    const copy = [...orderingMeeting.speakers];
     const next = index + delta;
     if (saving || index < pendingStart || next < pendingStart || next >= copy.length) return;
     const [person] = copy.splice(index, 1);
     copy.splice(next, 0, person);
     void run(() =>
-      api(`/${activeMeeting._id}/order`, "PUT", { version: activeMeeting.__v, speakerIds: copy.map((s) => s.id) })
+      api(`/${orderingMeeting._id}/order`, "PUT", { version: orderingMeeting.__v, speakerIds: copy.map((s) => s.id) })
     );
   };
 
@@ -1248,32 +1251,9 @@ export default function MeetingTab() {
                   <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
                     <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
                       <Users className="h-4 w-4 text-cyan-600" />
-                      {activeSubTab === "checkin" ? "Người đã check-in · thứ tự phát biểu" : "Danh sách thứ tự phát biểu"} ({activeMeeting.speakers.length})
+                      {activeSubTab === "checkin" ? "Người đã check-in · thứ tự phát biểu" : "Danh sách thuyết trình"} ({activeMeeting.speakers.length})
                     </h3>
 
-                    {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && activeMeeting.speakers.length > pendingStart && <div className="mb-4 space-y-2 rounded-xl border border-cyan-100 bg-cyan-50/40 p-3">
-                      <div className="flex flex-wrap items-end gap-3">
-                        <label className="min-w-48 flex-1 text-xs font-semibold">Chọn người phát biểu
-                          <select aria-label="Chọn người để sắp xếp" disabled={saving} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm"
-                            value={activeMeeting.speakers.slice(pendingStart).some(person => person.id === prioritySpeakerId) ? prioritySpeakerId : activeMeeting.speakers[pendingStart]?.id || ""}
-                            onChange={event => setPrioritySpeakerId(event.target.value)}>
-                            {activeMeeting.speakers.slice(pendingStart).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}
-                          </select>
-                        </label>
-                        <label className="text-xs font-semibold">Thứ tự ưu tiên
-                          <input aria-label="Thứ tự ưu tiên" type="number" inputMode="numeric" min={1} max={activeMeeting.speakers.length - pendingStart} disabled={saving}
-                            value={Math.min(priorityPosition, activeMeeting.speakers.length - pendingStart)} className="mt-1 block w-24 rounded-lg border bg-white p-2 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                            onChange={event => setPriorityPosition(Math.max(1, Math.min(activeMeeting.speakers.length - pendingStart, Math.floor(Number(event.target.value) || 1))))} />
-                        </label>
-                        <button type="button" disabled={saving} className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
-                          onClick={() => {
-                            const selected = activeMeeting.speakers.findIndex((person, index) => index >= pendingStart && person.id === prioritySpeakerId);
-                            const index = selected >= 0 ? selected : pendingStart;
-                            const target = pendingStart + Math.min(priorityPosition, activeMeeting.speakers.length - pendingStart) - 1;
-                            if (target !== index) reorder(index, target - index);
-                          }}>Áp dụng thứ tự</button>
-                      </div>
-                    </div>}
                     <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
                       {activeMeeting.speakers.map((p, i) => {
                         const isSpeaking = i === activeMeeting.currentIndex && ["live", "paused"].includes(activeMeeting.status);
@@ -1524,6 +1504,34 @@ export default function MeetingTab() {
             </div>
 
             <form onSubmit={update} className="space-y-4 pt-4 text-xs">
+              {canManage && orderingMeeting && ["scheduled", "live", "paused"].includes(orderingMeeting.status) && orderingMeeting.speakers.length > pendingStart && <div className="mb-4 space-y-2 rounded-xl border border-cyan-100 bg-cyan-50/40 p-3">
+                <h4 className="font-bold text-slate-800">Sắp xếp thứ tự thuyết trình</h4>
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="min-w-48 flex-1 text-xs font-semibold">Chọn người phát biểu
+                    <select aria-label="Chọn người để sắp xếp" disabled={saving} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm"
+                      value={orderingMeeting.speakers.slice(pendingStart).some(person => person.id === prioritySpeakerId) ? prioritySpeakerId : orderingMeeting.speakers[pendingStart]?.id || ""}
+                      onChange={event => setPrioritySpeakerId(event.target.value)}>
+                      {orderingMeeting.speakers.slice(pendingStart).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="text-xs font-semibold">Thứ tự ưu tiên
+                    <input aria-label="Thứ tự ưu tiên" type="number" inputMode="numeric" min={1} max={orderingMeeting.speakers.length - pendingStart} disabled={saving}
+                      value={Math.min(priorityPosition, orderingMeeting.speakers.length - pendingStart)} className="mt-1 block w-24 rounded-lg border bg-white p-2 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      onChange={event => setPriorityPosition(Math.max(1, Math.min(orderingMeeting.speakers.length - pendingStart, Math.floor(Number(event.target.value) || 1))))} />
+                  </label>
+                  <button type="button" disabled={saving} className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
+                    onClick={() => {
+                      const selected = orderingMeeting.speakers.findIndex((person, index) => index >= pendingStart && person.id === prioritySpeakerId);
+                      const index = selected >= 0 ? selected : pendingStart;
+                      const target = pendingStart + Math.min(priorityPosition, orderingMeeting.speakers.length - pendingStart) - 1;
+                      if (target !== index) reorder(index, target - index);
+                    }}>Áp dụng thứ tự</button>
+                </div>
+                <ol className="list-inside list-decimal space-y-1 text-xs text-slate-600">
+                  {orderingMeeting.speakers.map(person => <li key={person.id}>{person.name}</li>)}
+                </ol>
+              </div>}
+
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   Tên cuộc họp <span className="text-rose-500">*</span>
