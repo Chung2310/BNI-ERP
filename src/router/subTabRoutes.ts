@@ -9,24 +9,22 @@ export type SettingsSubTabType =
   | "profile"
   | "security"
   | "erp"
-  | "google-drive"
   | "face-recognition";
 
 export const HR_SUB_TAB_ROUTES: SubTabRouteMap<HRSubTabType> = [
   { slug: "so-do", value: "SƠ ĐỒ TỔ CHỨC" },
+  { slug: "phi-thuong-nien", value: "PHÍ THƯỜNG NIÊN" },
   { slug: "email-chuc-mung", value: "EMAIL CHÚC MỪNG" as HRSubTabType },
 ];
 
 export const RESOURCE_SUB_TAB_ROUTES: SubTabRouteMap<ResourceSubTabType> = [
   { slug: "tai-lieu", value: "TÀI LIỆU KHÁC" },
-  { slug: "google-drive", value: "GOOGLE DRIVE" },
 ];
 
 export const SETTINGS_SUB_TAB_ROUTES: SubTabRouteMap<SettingsSubTabType> = [
   { slug: "ho-so", value: "profile" },
   { slug: "bao-mat", value: "security" },
   { slug: "cau-hinh", value: "erp" },
-  { slug: "google-drive", value: "google-drive" },
   { slug: "nhan-dien-khuon-mat", value: "face-recognition" },
 ];
 

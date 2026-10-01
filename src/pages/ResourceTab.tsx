@@ -33,11 +33,10 @@ interface Resource {
   uploadedBy?: string;
 }
 
-type ResourceSubTabType = "TÀI LIỆU KHÁC" | "GOOGLE DRIVE";
+type ResourceSubTabType = "TÀI LIỆU KHÁC";
 
 const SUB_TABS: Array<{ value: ResourceSubTabType; label: string; icon: React.ElementType }> = [
   { value: "TÀI LIỆU KHÁC", label: "Tài liệu khác", icon: FileText },
-  { value: "GOOGLE DRIVE", label: "Google Drive", icon: HardDrive },
 ];
 
 const GoogleDriveLogo = ({ className = "h-6 w-6" }) => (
@@ -1845,51 +1844,49 @@ export default function ResourceTab() {
       }}
     >
       {/* Horizontal Sub-tab Switcher */}
-      <div className="flex shrink-0 items-center gap-1 border-b border-slate-200 bg-white px-3 pt-2 pb-0 text-xs select-none sm:px-5" id="resource_sub_tabs_bar">
-        <div className="flex min-w-0 max-w-full flex-1 gap-1 overflow-x-auto select-none scrollbar-none -mb-px">
-          {SUB_TABS.map((tab) => {
-            const Icon = tab.icon;
-            const active = subTab === tab.value;
-            return (
-              <button
-                key={tab.value}
-                onClick={() => {
-                  setCurrentPill("KHO_LUU_TRU");
-                  setViewingTrash(false);
-                  setSearchQuery("");
-                  setShowFilters(false);
-                  setFilterStartDate("");
-                  setFilterEndDate("");
-                  setFilterType("");
-                  if (tab.value === "TÀI LIỆU KHÁC") {
-                    setLocalFolderId(null);
-                    setExplorerKey((k) => k + 1);
-                  } else if (active && currentFolderId === "root") {
-                    void fetchResources();
-                  } else {
-                    setCurrentFolderId("root");
-                    setBreadcrumbs([]);
-                  }
-                  if (!active) setSubTab(tab.value);
-                }}
-                className={`flex items-center gap-2 px-4 py-2.5 font-bold text-xs transition-all duration-200 cursor-pointer shrink-0 rounded-xl ${
-                  active 
-                    ? "bg-cyan-600 text-white font-bold shadow-sm" 
-                    : "text-slate-650 hover:text-cyan-600 hover:bg-cyan-50 font-semibold"
-                }`}
-                title={tab.label}
-              >
-                {tab.value === "GOOGLE DRIVE" ? (
-                  <GoogleDriveLogo className={`h-4.5 w-4.5 shrink-0 ${active ? "" : "opacity-60"}`} />
-                ) : (
+      {SUB_TABS.length > 1 && (
+        <div className="flex shrink-0 items-center gap-1 border-b border-slate-200 bg-white px-3 pt-2 pb-0 text-xs select-none sm:px-5" id="resource_sub_tabs_bar">
+          <div className="flex min-w-0 max-w-full flex-1 gap-1 overflow-x-auto select-none scrollbar-none -mb-px">
+            {SUB_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const active = subTab === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => {
+                    setCurrentPill("KHO_LUU_TRU");
+                    setViewingTrash(false);
+                    setSearchQuery("");
+                    setShowFilters(false);
+                    setFilterStartDate("");
+                    setFilterEndDate("");
+                    setFilterType("");
+                    if (tab.value === "TÀI LIỆU KHÁC") {
+                      setLocalFolderId(null);
+                      setExplorerKey((k) => k + 1);
+                    } else if (active && currentFolderId === "root") {
+                      void fetchResources();
+                    } else {
+                      setCurrentFolderId("root");
+                      setBreadcrumbs([]);
+                    }
+                    if (!active) setSubTab(tab.value);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2.5 font-bold text-xs transition-all duration-200 cursor-pointer shrink-0 rounded-xl ${
+                    active 
+                      ? "bg-cyan-600 text-white font-bold shadow-sm" 
+                      : "text-slate-650 hover:text-cyan-600 hover:bg-cyan-50 font-semibold"
+                  }`}
+                  title={tab.label}
+                >
                   <Icon className={`h-4.5 w-4.5 shrink-0 ${active ? "text-white" : "text-slate-400"}`} strokeWidth={2} />
-                )}
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#f8f9fa] overflow-hidden">
@@ -2017,7 +2014,7 @@ export default function ResourceTab() {
                       </button>
 
                       {/* Admin: List all employees */}
-                      {allStaff.length > 0 && subTab !== "GOOGLE DRIVE" && (
+                      {allStaff.length > 0 && (
                         <>
                           <div className="border-t border-slate-100 my-1"></div>
                           <div className="text-[9px] text-slate-400 font-bold px-2.5 py-1 uppercase tracking-wider text-left">Không gian nhân sự</div>

@@ -11,7 +11,6 @@ vi.mock("../context/AuthContext", () => ({ useAuth: () => authState }));
 vi.mock("../components/settings/ProfileTab", () => ({ default: () => <div>PROFILE_TAB</div> }));
 vi.mock("../components/settings/SecurityTab", () => ({ default: () => <div /> }));
 vi.mock("../components/settings/ErpConfigTab", () => ({ default: () => <div /> }));
-vi.mock("../components/settings/GoogleDriveTab", () => ({ default: () => <div /> }));
 vi.mock("../components/settings/FaceRecognitionSettingsTab", () => ({
   default: () => <div>FACE_TAB</div>,
 }));
