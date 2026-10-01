@@ -20,12 +20,9 @@ describe("UserListTable activity action", () => {
     render(<UserListTable
       users={[user]}
       currentUser={{ uid: "admin-1", role: "admin" } as any}
-      rolePermissionsList={[]}
       userPage={1}
       totalUserPages={1}
       onPageChange={vi.fn()}
-      getAvailableRoles={() => [{ role: "user", displayName: "Người dùng", level: 1 }]}
-      onRoleChange={vi.fn()}
       openActionMenuId="user-1"
       onToggleActionMenu={vi.fn()}
       onEditUser={vi.fn()}
