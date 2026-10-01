@@ -46,7 +46,10 @@ function AppContent() {
     currentPath === "/wheel-of-names" ||
     currentPath === "/wheel-of-names.html" ||
     currentPath === "/vong-quay" ||
-    currentPath === "/vong-quay-may-man";
+    currentPath === "/vong-quay-may-man" ||
+    currentPath === "/quay-thuong" ||
+    currentPath === "/quay-thuong.html" ||
+    currentPath === "/bingo";
   const isLegalPublicPage = isPrivacyPage || isTermsPage || isDeletionPage;
   const isPublicPage =
     isLandingGuestPage ||

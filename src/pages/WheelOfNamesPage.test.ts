@@ -47,3 +47,27 @@ describe("WheelOfNamesPage participant filtering logic", () => {
     expect(matchesFilterCategory(guestAttendee, "guests")).toBe(true);
   });
 });
+
+describe("Bingo Cage initialization logic", () => {
+  it("initializes balls with correct numbering and physics constraints", async () => {
+    const { initBingoBalls } = await import("./WheelOfNamesPage");
+    const testParticipants = [
+      { id: "p1", name: "Nguyễn Văn A", selected: true, type: "member_present" as const },
+      { id: "p2", name: "Trần Thị B", selected: true, type: "member_absent" as const },
+      { id: "p3", name: "Khách C", selected: true, type: "guest" as const },
+    ];
+
+    const balls = initBingoBalls(testParticipants, 150);
+    expect(balls.length).toBe(3);
+    expect(balls[0].ballNumber).toBe(1);
+    expect(balls[0].participant.name).toBe("Nguyễn Văn A");
+    expect(balls[1].ballNumber).toBe(2);
+    expect(balls[2].ballNumber).toBe(3);
+    expect(balls[0].radius).toBeGreaterThan(0);
+  });
+
+  it("returns empty array when participant list is empty", async () => {
+    const { initBingoBalls } = await import("./WheelOfNamesPage");
+    expect(initBingoBalls([], 150)).toEqual([]);
+  });
+});

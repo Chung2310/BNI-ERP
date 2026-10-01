@@ -25,6 +25,8 @@ import {
   ArrowLeft,
   RefreshCw,
   Clock,
+  Dices,
+  Disc,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { authService } from "../services/authService";
@@ -87,6 +89,83 @@ const LUXURY_PALETTE: LuxuryColor[] = [
   { start: "#e879f9", mid: "#c026d3", end: "#701a75", text: "#ffffff" }, // Neon Orchid
 ];
 
+// Luxury 3D Lottery Ball Palette for Bingo Cage
+export const LOTTERY_BALL_PALETTE = [
+  { start: "#ff6b81", mid: "#cf142b", end: "#800a18", text: "#ffffff" }, // BNI Crimson Red
+  { start: "#fef08a", mid: "#f59e0b", end: "#b45309", text: "#1e1b4b" }, // Imperial Gold
+  { start: "#6ee7b7", mid: "#059669", end: "#064e3b", text: "#ffffff" }, // Emerald Jade
+  { start: "#93c5fd", mid: "#2563eb", end: "#1e3a8a", text: "#ffffff" }, // Royal Sapphire
+  { start: "#fdba74", mid: "#ea580c", end: "#7c2d12", text: "#ffffff" }, // Sunset Orange
+  { start: "#d8b4fe", mid: "#9333ea", end: "#581c87", text: "#ffffff" }, // Amethyst Purple
+  { start: "#7dd3fc", mid: "#0284c7", end: "#075985", text: "#ffffff" }, // Bright Cyan
+  { start: "#f9a8d4", mid: "#db2777", end: "#831843", text: "#ffffff" }, // Hot Cerise Pink
+  { start: "#bef264", mid: "#65a30d", end: "#365314", text: "#1a2e05" }, // Electric Lime
+  { start: "#5eead4", mid: "#0d9488", end: "#134e4a", text: "#ffffff" }, // Tropical Teal
+];
+
+export interface BingoBallPhysics {
+  participant: Participant;
+  ballNumber: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  colorIdx: number;
+  rotation: number;
+}
+
+export const initBingoBalls = (active: Participant[], cageRadius: number): BingoBallPhysics[] => {
+  const count = active.length;
+  if (count === 0) return [];
+  const maxDisplay = Math.min(count, 50);
+  const r = Math.max(14, Math.min(22, (cageRadius * 0.48) / Math.sqrt(maxDisplay + 4)));
+
+  return active.slice(0, maxDisplay).map((p, i) => {
+    const phi = Math.PI * 0.2 + Math.random() * (Math.PI * 0.6);
+    const dist = (0.2 + Math.random() * 0.65) * (cageRadius - r - 6);
+    const x = Math.cos(phi) * dist;
+    const y = Math.sin(phi) * dist;
+
+    return {
+      participant: p,
+      ballNumber: i + 1,
+      x,
+      y,
+      vx: (Math.random() - 0.5) * 1.5,
+      vy: (Math.random() - 0.5) * 1.5,
+      radius: r,
+      colorIdx: i % LOTTERY_BALL_PALETTE.length,
+      rotation: Math.random() * Math.PI * 2,
+    };
+  });
+};
+
+export const drawCanvasRoundRect = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+) => {
+  ctx.beginPath();
+  if (typeof (ctx as any).roundRect === "function") {
+    (ctx as any).roundRect(x, y, w, h, r);
+  } else {
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+};
+
 export interface DisplaySlice {
   participant: Participant;
   displayName: string;
@@ -94,7 +173,7 @@ export interface DisplaySlice {
 }
 
 // Exactly 1 slice per active participant (1:1 mapping, no duplicate names, no icons)
-const getDisplaySlices = (active: Participant[]): DisplaySlice[] => {
+export const getDisplaySlices = (active: Participant[]): DisplaySlice[] => {
   return active.map((p, i) => ({
     participant: p,
     displayName: p.name,
@@ -140,6 +219,7 @@ export default function WheelOfNamesPage() {
   const { userProfile, loading: authLoading } = useAuth();
 
   // State
+  const [selectedGame, setSelectedGame] = useState<"wheel" | "bingo">("wheel");
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [winners, setWinners] = useState<WinnerRecord[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -162,6 +242,7 @@ export default function WheelOfNamesPage() {
   const [winnerModal, setWinnerModal] = useState<{
     winner: Participant;
     prize: string;
+    ballNumber?: number;
   } | null>(null);
 
   // Canvas & Physics Refs
@@ -172,6 +253,14 @@ export default function WheelOfNamesPage() {
   const pointerBounceRef = useRef(0);
   const lightPhaseRef = useRef(0);
   const pulseAnimRef = useRef(0);
+
+  // Bingo Cage Refs
+  const bingoBallsRef = useRef<BingoBallPhysics[]>([]);
+  const cageAngleRef = useRef(0);
+  const winningBallDropRef = useRef<{
+    ball: BingoBallPhysics;
+    progress: number;
+  } | null>(null);
 
   // Filtered by Category
   const categoryParticipants = participants.filter((p) => matchesFilterCategory(p, filterCategory));
@@ -355,6 +444,359 @@ export default function WheelOfNamesPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isSpinning, winnerModal, activeParticipants.length]);
 
+  // Synchronize Bingo balls with active participants
+  useEffect(() => {
+    if (selectedGame === "bingo") {
+      const canvas = canvasRef.current;
+      const size = canvas ? canvas.width / (window.devicePixelRatio || 1) : 500;
+      const cageRadius = size * 0.28;
+      bingoBallsRef.current = initBingoBalls(activeParticipants, cageRadius);
+      winningBallDropRef.current = null;
+    }
+  }, [activeParticipants, selectedGame]);
+
+  // Render 3D Bingo Tumbler Cage with Wire Mesh, Physics & Rolling Balls
+  const drawBingoContent = useCallback((ctx: CanvasRenderingContext2D, size: number) => {
+    const cx = size / 2;
+    const cy = size * 0.40;
+    const cageRadius = size * 0.28;
+    const angle = cageAngleRef.current;
+
+    // 1. Heavy Wooden Plinth Base with Brass Inlay
+    const baseY = size * 0.80;
+    const baseW = size * 0.72;
+    const baseH = size * 0.10;
+    const baseLeft = cx - baseW / 2;
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.18)";
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 10;
+
+    // Walnut wood gradient
+    const woodGrad = ctx.createLinearGradient(baseLeft, baseY, baseLeft, baseY + baseH);
+    woodGrad.addColorStop(0, "#451a03");
+    woodGrad.addColorStop(0.3, "#78350f");
+    woodGrad.addColorStop(0.7, "#451a03");
+    woodGrad.addColorStop(1, "#270f03");
+
+    ctx.fillStyle = woodGrad;
+    drawCanvasRoundRect(ctx, baseLeft, baseY, baseW, baseH, 14);
+    ctx.fill();
+
+    // Polished gold top trim on base
+    const goldTrim = ctx.createLinearGradient(baseLeft, baseY, baseLeft + baseW, baseY);
+    goldTrim.addColorStop(0, "#d97706");
+    goldTrim.addColorStop(0.5, "#fef08a");
+    goldTrim.addColorStop(1, "#d97706");
+    ctx.fillStyle = goldTrim;
+    ctx.fillRect(baseLeft + 6, baseY, baseW - 12, 3);
+
+    // Plaque in the center
+    const plaqueW = Math.min(220, baseW * 0.55);
+    const plaqueH = 24;
+    const plaqueLeft = cx - plaqueW / 2;
+    const plaqueTop = baseY + baseH * 0.32;
+    ctx.fillStyle = "#1e293b";
+    drawCanvasRoundRect(ctx, plaqueLeft, plaqueTop, plaqueW, plaqueH, 6);
+    ctx.fill();
+    ctx.strokeStyle = "#f59e0b";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = "#fef08a";
+    ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("LỒNG CẦU BINGO • QUAY XỔ SỐ", cx, plaqueTop + plaqueH / 2);
+    ctx.restore();
+
+    // 2. Brass A-Frame Upright Supports (Left & Right)
+    const drawUpright = (isLeft: boolean) => {
+      const sign = isLeft ? -1 : 1;
+      const topX = cx + sign * (cageRadius + 14);
+      const topY = cy;
+      const botX = cx + sign * (cageRadius + 44);
+      const botY = baseY;
+
+      ctx.save();
+      const uprightGrad = ctx.createLinearGradient(topX, topY, botX, botY);
+      uprightGrad.addColorStop(0, "#fde047");
+      uprightGrad.addColorStop(0.5, "#b45309");
+      uprightGrad.addColorStop(1, "#d97706");
+      ctx.strokeStyle = uprightGrad;
+      ctx.lineWidth = 10;
+      ctx.lineCap = "round";
+
+      ctx.beginPath();
+      ctx.moveTo(topX, topY);
+      ctx.lineTo(botX, botY);
+      ctx.stroke();
+
+      // Secondary leg for A-frame
+      ctx.beginPath();
+      ctx.moveTo(topX, topY);
+      ctx.lineTo(botX - sign * 26, botY);
+      ctx.lineWidth = 7;
+      ctx.stroke();
+
+      // Mechanical pivot bolt / bearing
+      ctx.beginPath();
+      ctx.arc(topX, topY, 12, 0, 2 * Math.PI);
+      ctx.fillStyle = "#92400e";
+      ctx.fill();
+      ctx.strokeStyle = "#fef08a";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    drawUpright(true);
+    drawUpright(false);
+
+    // 3. Crank Handle on Right
+    const crankX = cx + cageRadius + 22;
+    const crankY = cy;
+    const crankLen = 30;
+    const crankAngle = angle * 1.5;
+    const knobX = crankX + Math.cos(crankAngle) * crankLen;
+    const knobY = crankY + Math.sin(crankAngle) * crankLen;
+
+    ctx.save();
+    ctx.strokeStyle = "#f59e0b";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(crankX, crankY);
+    ctx.lineTo(knobX, knobY);
+    ctx.stroke();
+
+    // Wooden Red Knob
+    ctx.beginPath();
+    ctx.arc(knobX, knobY, 8, 0, 2 * Math.PI);
+    ctx.fillStyle = "#cf142b";
+    ctx.fill();
+    ctx.strokeStyle = "#fef08a";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    // 4. Curved Exit Chute from Bottom of Cage to Catcher Cup
+    const chuteStartY = cy + cageRadius - 4;
+    const chuteEndY = size * 0.74;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx - 16, chuteStartY);
+    ctx.quadraticCurveTo(cx - 24, (chuteStartY + chuteEndY) / 2, cx - 18, chuteEndY);
+    ctx.lineTo(cx + 18, chuteEndY);
+    ctx.quadraticCurveTo(cx + 24, (chuteStartY + chuteEndY) / 2, cx + 16, chuteStartY);
+    ctx.strokeStyle = "rgba(217, 119, 6, 0.75)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Velvet Catcher Cup at the bottom of the chute
+    ctx.beginPath();
+    ctx.arc(cx, chuteEndY + 6, 22, 0, Math.PI);
+    ctx.fillStyle = "#991b1b";
+    ctx.fill();
+    ctx.strokeStyle = "#f59e0b";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.restore();
+
+    // Empty state check
+    if (activeParticipants.length === 0) {
+      ctx.save();
+      ctx.fillStyle = "#991b1b";
+      ctx.font = "bold 15px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Vui lòng chọn hoặc thêm thành viên để quay số", cx, cy);
+      ctx.restore();
+      return;
+    }
+
+    // 5. BACK WIRES OF SPHERICAL CAGE (Drawn BEFORE balls)
+    ctx.save();
+    const ribCount = 14;
+    for (let i = 0; i < ribCount; i++) {
+      const ribAngle = angle + (i * Math.PI * 2) / ribCount;
+      const cosA = Math.cos(ribAngle);
+      if (cosA < 0) {
+        ctx.beginPath();
+        const radiusX = Math.abs(cosA) * cageRadius;
+        ctx.ellipse(cx, cy, radiusX, cageRadius, 0, 0, 2 * Math.PI);
+        ctx.strokeStyle = "rgba(180, 83, 9, 0.28)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+
+    // Back latitude wire rings
+    const latRatios = [-0.65, -0.35, 0, 0.35, 0.65];
+    for (const ratio of latRatios) {
+      const latY = cy + cageRadius * ratio;
+      const latRx = cageRadius * Math.sqrt(Math.max(0, 1 - ratio * ratio));
+      ctx.beginPath();
+      ctx.ellipse(cx, latY, latRx, latRx * 0.28, 0, 0, 2 * Math.PI);
+      ctx.strokeStyle = "rgba(180, 83, 9, 0.25)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+
+    // Central horizontal axle bar through the sphere
+    const axleGrad = ctx.createLinearGradient(cx - cageRadius, cy, cx + cageRadius, cy);
+    axleGrad.addColorStop(0, "#92400e");
+    axleGrad.addColorStop(0.5, "#fde047");
+    axleGrad.addColorStop(1, "#92400e");
+    ctx.strokeStyle = axleGrad;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(cx - cageRadius - 4, cy);
+    ctx.lineTo(cx + cageRadius + 4, cy);
+    ctx.stroke();
+    ctx.restore();
+
+    // 6. TUMBLING LOTTERY BALLS INSIDE THE CAGE
+    if (bingoBallsRef.current.length === 0 && activeParticipants.length > 0) {
+      bingoBallsRef.current = initBingoBalls(activeParticipants, cageRadius);
+    }
+
+    for (let i = 0; i < bingoBallsRef.current.length; i++) {
+      const b = bingoBallsRef.current[i];
+      if (winningBallDropRef.current && winningBallDropRef.current.ball.ballNumber === b.ballNumber) {
+        continue;
+      }
+
+      const bx = cx + b.x;
+      const by = cy + b.y;
+      const r = b.radius;
+      const pal = LOTTERY_BALL_PALETTE[b.colorIdx % LOTTERY_BALL_PALETTE.length];
+
+      ctx.save();
+      const ballGrad = ctx.createRadialGradient(bx - r * 0.35, by - r * 0.35, r * 0.1, bx, by, r);
+      ballGrad.addColorStop(0, pal.start);
+      ballGrad.addColorStop(0.4, pal.mid);
+      ballGrad.addColorStop(1, pal.end);
+
+      ctx.fillStyle = ballGrad;
+      ctx.beginPath();
+      ctx.arc(bx, by, r, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Circular white number plate
+      const plateR = r * 0.52;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(bx, by, plateR, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = `bold ${Math.round(r * 0.72)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(b.ballNumber), bx, by);
+
+      // Specular highlight sheen
+      ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
+      ctx.beginPath();
+      ctx.arc(bx - r * 0.35, by - r * 0.35, r * 0.22, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 7. FRONT WIRES OF SPHERICAL CAGE (Drawn AFTER balls for 3D depth)
+    ctx.save();
+    for (let i = 0; i < ribCount; i++) {
+      const ribAngle = angle + (i * Math.PI * 2) / ribCount;
+      const cosA = Math.cos(ribAngle);
+      if (cosA >= 0) {
+        ctx.beginPath();
+        const radiusX = Math.abs(cosA) * cageRadius;
+        ctx.ellipse(cx, cy, radiusX, cageRadius, 0, 0, 2 * Math.PI);
+
+        const ribGrad = ctx.createLinearGradient(cx - radiusX, cy - cageRadius, cx + radiusX, cy + cageRadius);
+        ribGrad.addColorStop(0, "#fde047");
+        ribGrad.addColorStop(0.5, "#d97706");
+        ribGrad.addColorStop(1, "#b45309");
+
+        ctx.strokeStyle = ribGrad;
+        ctx.lineWidth = 2.2;
+        ctx.stroke();
+      }
+    }
+
+    // Front latitude wire rings
+    for (const ratio of latRatios) {
+      const latY = cy + cageRadius * ratio;
+      const latRx = cageRadius * Math.sqrt(Math.max(0, 1 - ratio * ratio));
+      ctx.beginPath();
+      ctx.ellipse(cx, latY, latRx, latRx * 0.28, 0, 0, 2 * Math.PI);
+      ctx.strokeStyle = "rgba(251, 191, 36, 0.45)";
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+    }
+
+    // Main Outer Equator Rim Ring
+    const outerRim = ctx.createLinearGradient(cx - cageRadius, cy - cageRadius, cx + cageRadius, cy + cageRadius);
+    outerRim.addColorStop(0, "#fef08a");
+    outerRim.addColorStop(0.3, "#f59e0b");
+    outerRim.addColorStop(0.7, "#b45309");
+    outerRim.addColorStop(1, "#fef08a");
+    ctx.strokeStyle = outerRim;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cageRadius, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.restore();
+
+    // 8. WINNING BALL DROPPING DOWN THE CHUTE
+    if (winningBallDropRef.current) {
+      const { ball, progress } = winningBallDropRef.current;
+      const startY = chuteStartY;
+      const targetY = chuteEndY - 4;
+      const curY = startY + (targetY - startY) * progress;
+      const curX = cx;
+      const r = ball.radius * 1.15;
+      const pal = LOTTERY_BALL_PALETTE[ball.colorIdx % LOTTERY_BALL_PALETTE.length];
+
+      ctx.save();
+      if (progress > 0.8) {
+        ctx.shadowColor = "#f59e0b";
+        ctx.shadowBlur = 24;
+      }
+
+      const ballGrad = ctx.createRadialGradient(curX - r * 0.35, curY - r * 0.35, r * 0.1, curX, curY, r);
+      ballGrad.addColorStop(0, pal.start);
+      ballGrad.addColorStop(0.4, pal.mid);
+      ballGrad.addColorStop(1, pal.end);
+      ctx.fillStyle = ballGrad;
+      ctx.beginPath();
+      ctx.arc(curX, curY, r, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Number plate
+      const plateR = r * 0.52;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(curX, curY, plateR, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = `bold ${Math.round(r * 0.72)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(ball.ballNumber), curX, curY);
+
+      // Specular highlight
+      ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+      ctx.beginPath();
+      ctx.arc(curX - r * 0.35, curY - r * 0.35, r * 0.22, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.restore();
+    }
+  }, [activeParticipants]);
+
   // 3. Render Wheel onto Canvas with High-End Game Show Visuals
   const drawWheel = useCallback(() => {
     const canvas = canvasRef.current;
@@ -379,13 +821,18 @@ export default function WheelOfNamesPage() {
     canvas.height = Math.round(size * dpr);
     ctx.scale(dpr, dpr);
 
+    ctx.clearRect(0, 0, size, size);
+
+    if (selectedGame === "bingo") {
+      drawBingoContent(ctx, size);
+      return;
+    }
+
     const cx = size / 2;
     const cy = size / 2;
     const rimWidth = Math.max(20, Math.round(size * 0.038));
     const radius = size / 2 - rimWidth - 14;
     const outerBezelRadius = radius + rimWidth;
-
-    ctx.clearRect(0, 0, size, size);
 
     const slices = getDisplaySlices(activeParticipants);
     const sliceCount = slices.length;
@@ -809,14 +1256,14 @@ export default function WheelOfNamesPage() {
     ctx.stroke();
 
     ctx.restore();
-  }, [activeParticipants, isSpinning, isDrawerOpen]);
+  }, [activeParticipants, isSpinning, isDrawerOpen, selectedGame, drawBingoContent]);
 
   // Keep wheel rendered on state changes
   useEffect(() => {
     drawWheel();
   }, [drawWheel]);
 
-  // Idle animation for chasing marquee lights & glowing center button
+  // Idle animation for chasing marquee lights & glowing center button or rotating bingo cage
   useEffect(() => {
     let animId: number;
     let lastTime = performance.now();
@@ -824,11 +1271,16 @@ export default function WheelOfNamesPage() {
     const loop = (time: number) => {
       if (!isSpinning && !document.hidden) {
         const delta = time - lastTime;
-        if (delta >= 40) { // ~25fps throttle for smooth, low-CPU animation
+        if (delta >= 40) {
           lastTime = time;
-          lightPhaseRef.current = (lightPhaseRef.current + 0.1) % 28;
-          pulseAnimRef.current = (pulseAnimRef.current + 0.06) % (2 * Math.PI);
-          drawWheel();
+          if (selectedGame === "wheel") {
+            lightPhaseRef.current = (lightPhaseRef.current + 0.1) % 28;
+            pulseAnimRef.current = (pulseAnimRef.current + 0.06) % (2 * Math.PI);
+            drawWheel();
+          } else {
+            cageAngleRef.current = (cageAngleRef.current + 0.003) % (2 * Math.PI);
+            drawWheel();
+          }
         }
       }
       animId = requestAnimationFrame(loop);
@@ -836,7 +1288,7 @@ export default function WheelOfNamesPage() {
 
     animId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animId);
-  }, [isSpinning, drawWheel]);
+  }, [isSpinning, drawWheel, selectedGame]);
 
   // Resize handler for responsive canvas
   useEffect(() => {
@@ -854,8 +1306,8 @@ export default function WheelOfNamesPage() {
     return () => clearTimeout(timer);
   }, [isDrawerOpen, drawWheel]);
 
-  // 4. Spin Execution with Smooth Deceleration & Authentic Physics
-  const handleStartSpin = () => {
+  // 4A. Wheel Spin Mechanics
+  const handleStartSpinWheel = () => {
     if (isSpinning || activeParticipants.length === 0) return;
 
     setIsSpinning(true);
@@ -872,24 +1324,20 @@ export default function WheelOfNamesPage() {
     const winningIndex = Math.floor(Math.random() * count);
     const winner = slices[winningIndex].participant;
 
-    // The pointer needle is at 0 rad (3 o'clock position / right side).
-    // A slice at index i spans angle [angle + i*arc, angle + (i+1)*arc].
-    // To have slice i intersect 0 rad, we want (angle + i*arc + arc/2) = 2*PI*k.
-    // Hence targetAngle % 2*PI = 2*PI - (i * arc + arc/2).
     const currentAngle = currentAngleRef.current % (2 * Math.PI);
     const targetSliceCenter = 2 * Math.PI - (winningIndex * arc + arc / 2);
 
-    // Number of full rotations for suspense (minimum 6 full turns)
     const extraRotations = 6 + Math.floor(Math.random() * 3);
-    const totalAngleDelta = extraRotations * 2 * Math.PI + (targetSliceCenter - currentAngle) + (currentAngle > targetSliceCenter ? 2 * Math.PI : 0);
+    const totalAngleDelta =
+      extraRotations * 2 * Math.PI +
+      (targetSliceCenter - currentAngle) +
+      (currentAngle > targetSliceCenter ? 2 * Math.PI : 0);
 
     const startTime = performance.now();
     const durationMs = spinDuration * 1000;
     const startAngle = currentAngleRef.current;
 
-    // Quartic ease-out function
     const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
-
     lastTickIndexRef.current = -1;
 
     const animateSpin = (now: number) => {
@@ -899,23 +1347,19 @@ export default function WheelOfNamesPage() {
       const easedProgress = easeOutQuart(progress);
       currentAngleRef.current = startAngle + totalAngleDelta * easedProgress;
 
-      // Speed up marquee lights during spin
       lightPhaseRef.current = (lightPhaseRef.current + (1 - progress * 0.6) * 1.4) % 28;
 
-      // Calculate which slice is currently passing under the pointer (at 0 rad / right edge)
       const normalizedAngle = (2 * Math.PI - (currentAngleRef.current % (2 * Math.PI))) % (2 * Math.PI);
       const currentPassingSlice = Math.floor(normalizedAngle / arc);
 
       if (currentPassingSlice !== lastTickIndexRef.current) {
         lastTickIndexRef.current = currentPassingSlice;
-        // Mechanical tick sound & needle spring vibration
         if (soundEnabled) {
-          const speedFactor = 1 - progress; // pitch varies with speed
+          const speedFactor = 1 - progress;
           playTickSound(650 + speedFactor * 300);
         }
-        pointerBounceRef.current = -0.32; // bounce up
+        pointerBounceRef.current = -0.32;
       } else {
-        // Damping spring back to 0
         pointerBounceRef.current *= 0.82;
       }
 
@@ -924,7 +1368,6 @@ export default function WheelOfNamesPage() {
       if (progress < 1) {
         animationFrameIdRef.current = requestAnimationFrame(animateSpin);
       } else {
-        // Finish Spin!
         pointerBounceRef.current = 0;
         drawWheel();
         setIsSpinning(false);
@@ -935,12 +1378,15 @@ export default function WheelOfNamesPage() {
           prizeName: currentPrize,
           avatar: winner.avatar,
           department: winner.department,
-          wonAt: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+          wonAt: new Date().toLocaleTimeString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }),
         };
 
         setWinners((prev) => [record, ...prev]);
 
-        // Celebration
         if (soundEnabled) {
           playWinFanfare();
         }
@@ -954,6 +1400,156 @@ export default function WheelOfNamesPage() {
     };
 
     animationFrameIdRef.current = requestAnimationFrame(animateSpin);
+  };
+
+  // 4B. Bingo Cage Spin Mechanics with 3D Tumbling & Dropping Ball
+  const handleStartSpinBingo = () => {
+    if (isSpinning || activeParticipants.length === 0) return;
+    setIsSpinning(true);
+    winningBallDropRef.current = null;
+    if (soundEnabled) {
+      playSuspenseSound();
+    }
+
+    const winningIndex = Math.floor(Math.random() * activeParticipants.length);
+    const winningParticipant = activeParticipants[winningIndex];
+    const winningBallNumber = winningIndex + 1;
+
+    const startTime = performance.now();
+    const durationMs = spinDuration * 1000;
+    const tumbleDurationMs = Math.max(2500, durationMs - 1400);
+    let lastAudioTick = 0;
+
+    const canvas = canvasRef.current;
+    const size = canvas ? canvas.width / (window.devicePixelRatio || 1) : 500;
+    const cageRadius = size * 0.28;
+
+    if (bingoBallsRef.current.length === 0) {
+      bingoBallsRef.current = initBingoBalls(activeParticipants, cageRadius);
+    }
+
+    const animateBingo = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / durationMs);
+
+      if (elapsed < tumbleDurationMs) {
+        // Tumbling phase
+        const tumbleProgress = elapsed / tumbleDurationMs;
+        const speed = Math.max(0.04, (1 - Math.pow(tumbleProgress, 2.5)) * 0.35);
+
+        cageAngleRef.current += speed;
+
+        if (soundEnabled && now - lastAudioTick > 65) {
+          lastAudioTick = now;
+          playTickSound(350 + Math.random() * 450);
+        }
+
+        const balls = bingoBallsRef.current;
+        const maxR = cageRadius - (balls[0]?.radius || 18) - 4;
+
+        for (let i = 0; i < balls.length; i++) {
+          const b = balls[i];
+          b.vx += (Math.random() - 0.5) * speed * 26 + Math.cos(cageAngleRef.current) * speed * 8;
+          b.vy += -speed * 18 + (Math.random() - 0.5) * speed * 22 + 0.35;
+          b.rotation += (Math.random() - 0.5) * 0.3;
+
+          b.vx *= 0.94;
+          b.vy *= 0.94;
+
+          b.x += b.vx;
+          b.y += b.vy;
+
+          const d = Math.hypot(b.x, b.y);
+          if (d > maxR) {
+            const nx = b.x / d;
+            const ny = b.y / d;
+            b.x = nx * maxR;
+            b.y = ny * maxR;
+            const dot = b.vx * nx + b.vy * ny;
+            b.vx = b.vx - 1.65 * dot * nx + (Math.random() - 0.5) * 2;
+            b.vy = b.vy - 1.65 * dot * ny + (Math.random() - 0.5) * 2;
+          }
+        }
+      } else {
+        // Drop phase: winning ball rolls down chute
+        const dropElapsed = elapsed - tumbleDurationMs;
+        const dropProgress = Math.min(1, dropElapsed / 1400);
+
+        cageAngleRef.current += Math.max(0, 0.04 * (1 - dropProgress));
+
+        const balls = bingoBallsRef.current;
+        const maxR = cageRadius - (balls[0]?.radius || 18) - 4;
+        for (let i = 0; i < balls.length; i++) {
+          const b = balls[i];
+          b.vy += 0.45;
+          b.vx *= 0.88;
+          b.vy *= 0.88;
+          b.x += b.vx;
+          b.y += b.vy;
+          const d = Math.hypot(b.x, b.y);
+          if (d > maxR) {
+            b.x = (b.x / d) * maxR;
+            b.y = (b.y / d) * maxR;
+            b.vx = 0;
+            b.vy = 0;
+          }
+        }
+
+        const winningBallObj = balls[winningIndex] || balls[0];
+        if (winningBallObj) {
+          winningBallDropRef.current = {
+            ball: winningBallObj,
+            progress: dropProgress,
+          };
+        }
+      }
+
+      drawWheel();
+
+      if (progress < 1) {
+        animationFrameIdRef.current = requestAnimationFrame(animateBingo);
+      } else {
+        setIsSpinning(false);
+
+        const record: WinnerRecord = {
+          id: `win-${Date.now()}`,
+          name: winningParticipant.name,
+          prizeName: currentPrize,
+          avatar: winningParticipant.avatar,
+          department: winningParticipant.department,
+          wonAt: new Date().toLocaleTimeString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }),
+        };
+
+        setWinners((prev) => [record, ...prev]);
+
+        if (soundEnabled) {
+          playWinFanfare();
+        }
+        launchConfetti(4500);
+
+        setWinnerModal({
+          winner: winningParticipant,
+          prize: currentPrize,
+          ballNumber: winningBallNumber,
+        });
+      }
+    };
+
+    animationFrameIdRef.current = requestAnimationFrame(animateBingo);
+  };
+
+  // Unified start spin action
+  const handleStartSpin = () => {
+    if (isSpinning || activeParticipants.length === 0) return;
+    if (selectedGame === "wheel") {
+      handleStartSpinWheel();
+    } else {
+      handleStartSpinBingo();
+    }
   };
 
   // Remove winner from wheel (action in modal)
@@ -1084,12 +1680,50 @@ export default function WheelOfNamesPage() {
               />
               <div>
                 <h1 className="flex items-center gap-2 text-sm font-black tracking-tight text-slate-900 sm:text-base">
-                  <span>VÒNG QUAY MAY MẮN</span>
+                  <span>{selectedGame === "wheel" ? "VÒNG QUAY MAY MẮN" : "LỒNG CẦU BINGO (QUAY XỔ SỐ)"}</span>
                   <span className="rounded-full bg-[#cf142b] px-2.5 py-0.5 text-[10px] font-bold text-white shadow-2xs uppercase tracking-wider">
                     {userProfile?.companyName || userProfile?.companyCode || "BNI CHAPTER"}
                   </span>
                 </h1>
               </div>
+            </div>
+
+            {/* Game Mode Switcher: Wheel vs Bingo */}
+            <div className="hidden lg:flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200 shadow-2xs ml-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isSpinning) {
+                    setSelectedGame("wheel");
+                  }
+                }}
+                disabled={isSpinning}
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition cursor-pointer disabled:opacity-50 ${
+                  selectedGame === "wheel"
+                    ? "bg-[#cf142b] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
+                }`}
+              >
+                <Disc className="h-3.5 w-3.5" />
+                <span>Vòng quay</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isSpinning) {
+                    setSelectedGame("bingo");
+                  }
+                }}
+                disabled={isSpinning}
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition cursor-pointer disabled:opacity-50 ${
+                  selectedGame === "bingo"
+                    ? "bg-[#cf142b] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
+                }`}
+              >
+                <Dices className="h-3.5 w-3.5" />
+                <span>Lồng cầu Bingo</span>
+              </button>
             </div>
           </div>
 
@@ -1203,16 +1837,37 @@ export default function WheelOfNamesPage() {
             style={{ animationDuration: "5s" }}
           />
 
-          {/* Main Wheel Canvas Container */}
-          <div className="relative flex items-center justify-center max-h-full max-w-full drop-shadow-[0_16px_40px_rgba(207,20,43,0.18)]">
+          {/* Main Wheel / Bingo Canvas Container */}
+          <div className="relative flex flex-col items-center justify-center max-h-full max-w-full drop-shadow-[0_16px_40px_rgba(207,20,43,0.18)]">
             <canvas
               ref={canvasRef}
               onClick={handleStartSpin}
-              title={isSpinning ? "Đang quay..." : "Nhấn nút QUAY ở giữa để bắt đầu"}
+              title={
+                isSpinning
+                  ? "Đang quay..."
+                  : selectedGame === "wheel"
+                  ? "Nhấn nút QUAY ở giữa để bắt đầu"
+                  : "Nhấn để QUAY SỐ BINGO"
+              }
               className={`select-none transition-transform duration-300 block ${
                 isSpinning ? "cursor-not-allowed scale-[1.008]" : "cursor-pointer hover:scale-[1.012]"
               }`}
             />
+
+            {/* Prominent Bingo Spin Button */}
+            {selectedGame === "bingo" && (
+              <div className="absolute -bottom-1 sm:bottom-2 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+                <button
+                  type="button"
+                  onClick={handleStartSpin}
+                  disabled={isSpinning || activeParticipants.length === 0}
+                  className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#cf142b] via-[#e11d48] to-[#cf142b] hover:from-[#b00f24] hover:to-[#990e1f] px-7 py-3 text-xs sm:text-sm font-black tracking-wide text-white shadow-xl shadow-red-700/30 border border-amber-300/40 hover:scale-105 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Dices className={`h-4.5 w-4.5 ${isSpinning ? "animate-spin" : ""}`} />
+                  <span>{isSpinning ? "ĐANG QUAY SỐ..." : "BẮT ĐẦU QUAY SỐ"}</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1444,76 +2099,97 @@ export default function WheelOfNamesPage() {
                     : "Không tìm thấy người phù hợp"}
                 </div>
               ) : (
-                filteredParticipants.map((p, idx) => (
-                  <div
-                    key={p.id}
-                    className={`flex items-center justify-between rounded-xl p-2.5 transition border ${
-                      p.selected
-                        ? "bg-white border-slate-200 text-slate-900 shadow-2xs hover:border-slate-300"
-                        : "bg-slate-50/60 border-transparent text-slate-400 opacity-60"
-                    }`}
-                  >
-                    <label className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={p.selected}
-                        onChange={() => handleToggleParticipant(p.id)}
-                        className="h-4 w-4 rounded accent-[#cf142b] cursor-pointer"
-                      />
+                filteredParticipants.map((p, idx) => {
+                  const ballNum =
+                    selectedGame === "bingo" && p.selected
+                      ? activeParticipants.findIndex((ap) => ap.id === p.id) + 1
+                      : 0;
 
-                      {/* Avatar or Initial */}
-                      {p.avatar ? (
-                        <img
-                          src={p.avatar}
-                          alt={p.name}
-                          className="h-7 w-7 rounded-full object-cover border border-slate-200 shrink-0"
+                  return (
+                    <div
+                      key={p.id}
+                      className={`flex items-center justify-between rounded-xl p-2.5 transition border ${
+                        p.selected
+                          ? "bg-white border-slate-200 text-slate-900 shadow-2xs hover:border-slate-300"
+                          : "bg-slate-50/60 border-transparent text-slate-400 opacity-60"
+                      }`}
+                    >
+                      <label className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={p.selected}
+                          onChange={() => handleToggleParticipant(p.id)}
+                          className="h-4 w-4 rounded accent-[#cf142b] cursor-pointer"
                         />
-                      ) : (
-                        <div
-                          className="h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-2xs"
-                          style={{ backgroundColor: WHEEL_PALETTE[idx % WHEEL_PALETTE.length] }}
-                        >
-                          {p.name.slice(0, 1).toUpperCase()}
-                        </div>
-                      )}
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="truncate text-xs font-bold text-slate-800">{p.name}</span>
-                          {/* Presence / Type Badge */}
-                          {p.type === "member_present" && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleTogglePresence(p.id, e)}
-                              title="Bấm để chuyển sang Vắng mặt"
-                              className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer shrink-0"
-                            >
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              Có mặt
-                            </button>
-                          )}
-                          {p.type === "member_absent" && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleTogglePresence(p.id, e)}
-                              title="Bấm để chuyển sang Có mặt"
-                              className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-500 border border-slate-200 hover:bg-slate-200 transition cursor-pointer shrink-0"
-                            >
-                              Vắng
-                            </button>
-                          )}
-                          {p.type === "guest" && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-800 border border-amber-300 shrink-0">
-                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                              Khách
-                            </span>
+                        {/* Avatar or Initial */}
+                        {p.avatar ? (
+                          <img
+                            src={p.avatar}
+                            alt={p.name}
+                            className="h-7 w-7 rounded-full object-cover border border-slate-200 shrink-0"
+                          />
+                        ) : (
+                          <div
+                            className="h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-2xs"
+                            style={{ backgroundColor: WHEEL_PALETTE[idx % WHEEL_PALETTE.length] }}
+                          >
+                            {p.name.slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="truncate text-xs font-bold text-slate-800">{p.name}</span>
+
+                            {/* Bingo Ball Number Badge */}
+                            {selectedGame === "bingo" && ballNum > 0 && (
+                              <span
+                                className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[9px] font-black text-white shrink-0 shadow-2xs"
+                                style={{
+                                  backgroundColor:
+                                    LOTTERY_BALL_PALETTE[(ballNum - 1) % LOTTERY_BALL_PALETTE.length].mid,
+                                }}
+                                title={`Bóng số #${ballNum}`}
+                              >
+                                #{ballNum}
+                              </span>
+                            )}
+
+                            {/* Presence / Type Badge */}
+                            {p.type === "member_present" && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleTogglePresence(p.id, e)}
+                                title="Bấm để chuyển sang Vắng mặt"
+                                className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer shrink-0"
+                              >
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Có mặt
+                              </button>
+                            )}
+                            {p.type === "member_absent" && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleTogglePresence(p.id, e)}
+                                title="Bấm để chuyển sang Có mặt"
+                                className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-500 border border-slate-200 hover:bg-slate-200 transition cursor-pointer shrink-0"
+                              >
+                                Vắng
+                              </button>
+                            )}
+                            {p.type === "guest" && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-800 border border-amber-300 shrink-0">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                Khách
+                              </span>
+                            )}
+                          </div>
+                          {p.department && (
+                            <div className="truncate text-[10px] text-slate-500">{p.department}</div>
                           )}
                         </div>
-                        {p.department && (
-                          <div className="truncate text-[10px] text-slate-500">{p.department}</div>
-                        )}
-                      </div>
-                    </label>
+                      </label>
 
                     {/* Delete action */}
                     <button
@@ -1525,8 +2201,9 @@ export default function WheelOfNamesPage() {
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                ))
-              )}
+                );
+              })
+            )}
             </div>
           </div>
         )}
@@ -1612,12 +2289,23 @@ export default function WheelOfNamesPage() {
 
             {/* Trophy & Badge */}
             <div className="relative mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-amber-500 to-yellow-400 p-4 shadow-xl shadow-amber-500/20">
-              <Trophy className="h-10 w-10 text-white animate-bounce" />
+              {winnerModal.ballNumber ? (
+                <div className="flex flex-col items-center justify-center text-amber-950">
+                  <span className="text-[10px] font-black uppercase tracking-wider">BÓNG SỐ</span>
+                  <span className="text-2xl font-black">#{winnerModal.ballNumber}</span>
+                </div>
+              ) : (
+                <Trophy className="h-10 w-10 text-white animate-bounce" />
+              )}
             </div>
 
             <div className="inline-flex items-center gap-2 rounded-full bg-red-50 px-3.5 py-1 text-xs font-black uppercase tracking-widest text-[#cf142b] border border-red-200 mb-3">
               <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-              <span>CHÚC MỪNG CHIẾN THẮNG</span>
+              <span>
+                {winnerModal.ballNumber
+                  ? `LỒNG CẦU BINGO • BÓNG SỐ #${winnerModal.ballNumber}`
+                  : "CHÚC MỪNG CHIẾN THẮNG"}
+              </span>
             </div>
 
             {/* Prize Label */}
@@ -1646,16 +2334,16 @@ export default function WheelOfNamesPage() {
               )}
             </div>
 
-            {/* Actions for Wheel of Names */}
+            {/* Actions for Wheel of Names / Bingo */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              {/* Option 1: Remove from wheel so they don't win again */}
+              {/* Option 1: Remove from wheel/cage so they don't win again */}
               <button
                 type="button"
                 onClick={() => handleRemoveWinnerFromWheel(winnerModal.winner.id)}
                 className="flex items-center justify-center gap-2 rounded-2xl bg-rose-600 hover:bg-rose-700 px-5 py-3.5 text-xs font-bold text-white shadow-md transition active:scale-95 cursor-pointer"
               >
                 <UserMinus className="h-4 w-4" />
-                <span>Loại khỏi vòng quay</span>
+                <span>{selectedGame === "bingo" ? "Loại khỏi lồng quay" : "Loại khỏi vòng quay"}</span>
               </button>
 
               {/* Option 2: Keep in wheel & Close */}
