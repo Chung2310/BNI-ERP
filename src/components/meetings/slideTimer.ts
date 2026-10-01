@@ -7,7 +7,7 @@ export interface SlideTimerMeeting {
   speakers: { id: string; seconds?: number; spokenSeconds?: number; checkedInAt?: string }[];
 }
 
-export function getSlideTimer(meeting: SlideTimerMeeting, speakerId: string | undefined, now: number, allowOvertime = false) {
+export function getSlideTimer(meeting: SlideTimerMeeting, speakerId: string | undefined, now: number) {
   const speaker = meeting.speakers.find(s => s.id === speakerId);
   if (!speaker || !Number.isFinite(speaker.seconds)) return null;
   const arrivalOrder = meeting.speakers
@@ -25,12 +25,11 @@ export function getSlideTimer(meeting: SlideTimerMeeting, speakerId: string | un
     ? Math.max(0, meeting.elapsedSeconds || 0) + (running ? Math.max(0, (now - start) / 1000) : 0)
     : Math.max(0, speaker.spokenSeconds || 0);
   const remaining = speaker.seconds! - elapsed;
-  const overtime = remaining < 0;
   const expired = remaining <= 0;
-  const whole = Math.floor(allowOvertime ? Math.abs(remaining) : Math.max(0, remaining));
-  const time = `${overtime && allowOvertime ? "+" : ""}${Math.floor(whole / 60).toString().padStart(2, "0")}:${(whole % 60).toString().padStart(2, "0")}`;
+  const whole = Math.floor(Math.max(0, remaining));
+  const time = expired ? "Hết giờ" : `${Math.floor(whole / 60).toString().padStart(2, "0")}:${(whole % 60).toString().padStart(2, "0")}`;
   const label = current
-    ? expired && !allowOvertime ? "Hết giờ" : meeting.status === "paused" ? "Tạm dừng" : running ? overtime ? "Quá giờ" : "Đang phát biểu" : "Chờ bắt đầu"
+    ? expired ? "Hết giờ" : meeting.status === "paused" ? "Tạm dừng" : running ? "Đang phát biểu" : "Chờ bắt đầu"
     : speaker.spokenSeconds != null ? "Đã phát biểu" : "";
   return { time, label, arrivalOrder, seconds: speaker.seconds!, urgent: remaining < 10 && (running || elapsed > 0), overtime: expired };
 }
@@ -44,9 +43,9 @@ export function drawSlideTimer(ctx: CanvasRenderingContext2D, timer: ReturnType<
   ctx.fillStyle = "#666"; ctx.font = '700 21px "Noto Sans", sans-serif';
   ctx.fillText(`#${timer.arrivalOrder}`, 240, 798);
   ctx.fillStyle = timer.urgent || timer.overtime ? "#d70b2d" : "#252525";
-  ctx.font = '800 65px "Noto Sans", sans-serif';
+  ctx.font = timer.overtime ? '800 54px "Noto Sans", sans-serif' : '800 65px "Noto Sans", sans-serif';
   ctx.fillText(timer.time, 240, 830);
   ctx.fillStyle = "#777"; ctx.font = '400 21px "Noto Sans", sans-serif';
-  if (timer.label) ctx.fillText(timer.label, 240, 921);
+  if (timer.label && timer.label !== timer.time) ctx.fillText(timer.label, 240, 921);
   ctx.restore();
 }

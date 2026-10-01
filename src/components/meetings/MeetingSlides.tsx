@@ -9,7 +9,6 @@ import type { ProfileSlide, SlideDeck } from "./slideTypes";
 type Props = {
   meeting: SlideTimerMeeting & { _id: string; __v: number };
   canManage: boolean;
-  allowOvertime?: boolean;
   startFromFirst?: boolean;
   autoAdvance?: boolean;
   fullscreenRequest?: Promise<boolean> | null;
@@ -19,7 +18,7 @@ type Props = {
 const button = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40";
 const fieldClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
 
-export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, startFromFirst = false, onPresentationStarted, autoAdvance = false, fullscreenRequest }: Props) {
+export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, autoAdvance = false, fullscreenRequest }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -92,7 +91,7 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, 
   }, [currentSpeakerId, openingSlide]);
   const active = draft || selected;
   const speechesComplete = !!meeting.speechesCompletedAt && ["live", "paused"].includes(meeting.status);
-  const timer = useMemo(() => getSlideTimer(meeting, active?.id, now, allowOvertime), [meeting, active?.id, now, allowOvertime]);
+  const timer = useMemo(() => getSlideTimer(meeting, active?.id, now), [meeting, active?.id, now]);
   const index = queue.findIndex(s => s.id === selected?.id);
 
   const move = useCallback((direction: number) => {

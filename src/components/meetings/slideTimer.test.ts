@@ -13,8 +13,8 @@ it("freezes on pause and restores the allocation when the speaker timer resets",
   expect(getSlideTimer({ ...meeting, status: "paused", elapsedSeconds: 25 }, "early", now + 90000)?.time).toBe("00:35");
   expect(getSlideTimer({ ...meeting, speakerStartedAt: undefined, elapsedSeconds: 0 }, "early", now)).toMatchObject({ time: "01:00", label: "Chờ bắt đầu" });
 });
-it("shows overtime and preserves completed speaker time", () => {
-  expect(getSlideTimer(meeting, "early", now + 40000, true)).toMatchObject({ time: "+00:05", overtime: true, urgent: true });
+it("shows expiration text and preserves completed speaker time", () => {
+  expect(getSlideTimer(meeting, "early", now + 40000)).toMatchObject({ time: "Hết giờ", overtime: true, urgent: true });
   expect(getSlideTimer({ ...meeting, currentIndex: 1, speakers: [{ id: "early", seconds: 60, spokenSeconds: 45 }, { id: "late", seconds: 20 }] }, "early", now)).toMatchObject({ time: "00:15", label: "Đã phát biểu" });
 });
 it("ignores invalid timestamps and missing allocations", () => {
@@ -32,7 +32,8 @@ it("ranks check-in time rather than the reordered speaking queue", () => {
   expect(reordered.speakers[0].id).toBe("late");
 });
 
-it("manual countdown stays at zero and shows Hết giờ instead of counting overtime", () => {
-  expect(getSlideTimer(meeting, "early", now + 40000)).toMatchObject({ time: "00:00", label: "Hết giờ" });
-  expect(getSlideTimer(meeting, "early", now + 100000)).toMatchObject({ time: "00:00", label: "Hết giờ" });
+it("countdown shows Hết giờ at expiration and never counts overtime", () => {
+  expect(getSlideTimer(meeting, "early", now + 35000)).toMatchObject({ time: "Hết giờ", label: "Hết giờ" });
+  expect(getSlideTimer(meeting, "early", now + 40000)).toMatchObject({ time: "Hết giờ", label: "Hết giờ" });
+  expect(getSlideTimer(meeting, "early", now + 100000)).toMatchObject({ time: "Hết giờ", label: "Hết giờ" });
 });

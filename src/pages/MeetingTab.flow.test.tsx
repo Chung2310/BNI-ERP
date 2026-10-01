@@ -93,7 +93,7 @@ it("manual overtime stops at zero; completing the last speaker opens BNI notice 
   render(<MeetingTab />);
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
   expect(screen.getByText("Hết giờ")).toBeTruthy();
-  expect(screen.getByText("00:00")).toBeTruthy();
+  expect(screen.queryByText("00:00")).toBeNull();
   expect(screen.queryByText("+00:05")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Hoàn tất phát biểu" }));
   expect(await screen.findByRole("dialog", { name: "Hoàn tất phần phát biểu" })).toBeTruthy();

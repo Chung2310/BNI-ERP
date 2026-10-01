@@ -516,16 +516,7 @@ export default function MeetingTab() {
           </div>
 
           <div className="flex items-center gap-2">
-            <a
-              href="/wheel-of-names"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-xl bg-[#cf142b] hover:bg-[#b00f24] text-white px-4 py-2.5 text-xs font-bold shadow-sm shadow-red-700/20 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-            >
-              <Gift className="h-4 w-4" />
-              <span>Quay thưởng</span>
-              <ExternalLink className="h-3.5 w-3.5 opacity-80" />
-            </a>
+
 
             {canManage && (
               <button
@@ -875,7 +866,7 @@ export default function MeetingTab() {
 
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} allowOvertime={autoAdvance} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} autoAdvance={autoAdvance} fullscreenRequest={presentationFullscreen.current} />}
+              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} autoAdvance={autoAdvance} fullscreenRequest={presentationFullscreen.current} />}
               {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
               {(activeSubTab === "speakers" || activeSubTab === "checkin") && (
                 <div className="space-y-4">
@@ -1077,14 +1068,14 @@ export default function MeetingTab() {
                         {current && <div className={`rounded-xl border p-3.5 flex items-center justify-between gap-3 ${remaining <= 0 ? "bg-rose-50 border-rose-200" : "bg-cyan-50/70 border-cyan-100"}`}>
                           <div className="space-y-1">
                             <span className="text-xs font-semibold text-slate-600">
-                              {remaining <= 0 ? "Hết giờ" : !activeMeeting.speakerStartedAt && !activeMeeting.elapsedSeconds ? "Sẵn sàng" : activeMeeting.status === "paused" ? "Tạm dừng" : "Thời gian còn lại"}
+                              {remaining <= 0 ? "Thời lượng phát biểu" : !activeMeeting.speakerStartedAt && !activeMeeting.elapsedSeconds ? "Sẵn sàng" : activeMeeting.status === "paused" ? "Tạm dừng" : "Thời gian còn lại"}
                             </span>
                             {autoAdvance && remaining <= 0 && <p className="text-xs text-amber-800">
                               {upcoming ? "Chuyển người tiếp theo" : "Hoàn tất phát biểu"} sau {Math.max(0, Math.ceil(autoAdvanceDelay - Math.abs(remaining)))}s
                             </p>}
                           </div>
                           <span className={`font-mono text-2xl font-black ${remaining <= 0 ? "text-rose-600" : "text-slate-800"}`}>
-                            {remaining < 0 && autoAdvance ? `+${fmt(Math.abs(remaining))}` : fmt(Math.max(0, remaining))}
+                            {remaining <= 0 ? "Hết giờ" : fmt(remaining)}
                           </span>
                         </div>}
 
