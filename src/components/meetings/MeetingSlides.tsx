@@ -10,12 +10,14 @@ type Props = {
   meeting: SlideTimerMeeting & { _id: string; __v: number };
   canManage: boolean;
   allowOvertime?: boolean;
+  startFromFirst?: boolean;
+  onPresentationStarted?: () => void;
   api: (path: string, method?: string, body?: unknown) => Promise<SlideDeck>;
 };
 const button = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40";
 const fieldClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
 
-export function MeetingSlides({ meeting, canManage, api, allowOvertime = false }: Props) {
+export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, startFromFirst = false, onPresentationStarted }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -32,6 +34,7 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false }
   const [mode, setMode] = useState<"manual" | "auto" | "live">("manual");
   const [seconds, setSeconds] = useState(8);
   const [presenting, setPresenting] = useState(false);
+  const [openingSlide, setOpeningSlide] = useState<{ slideId: string; speakerId: string | undefined } | null>(null);
   const [controls, setControls] = useState(true);
   const [draft, setDraft] = useState<ProfileSlide | null>(null);
   const [saving, setSaving] = useState(false);
@@ -59,9 +62,14 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false }
 
   const queue = useMemo(() => deck.slides.filter(s => !excluded.has(s.id)), [deck.slides, excluded]);
   const currentSpeakerId = ["live", "paused"].includes(meeting.status) ? meeting.speakers[meeting.currentIndex]?.id : undefined;
+  // Preview the first profile on launch, then follow the next MC speaker change.
+  const liveSlideId = openingSlide && openingSlide.speakerId === currentSpeakerId ? openingSlide.slideId : currentSpeakerId;
   const selected = mode === "live"
-    ? deck.slides.find(s => s.id === currentSpeakerId)
+    ? deck.slides.find(s => s.id === liveSlideId)
     : queue.find(s => s.id === selectedId) || queue[0];
+  useEffect(() => {
+    if (openingSlide && openingSlide.speakerId !== currentSpeakerId) setOpeningSlide(null);
+  }, [currentSpeakerId, openingSlide]);
   const active = draft || selected;
   const speechesComplete = !!meeting.speechesCompletedAt && ["live", "paused"].includes(meeting.status);
   const timer = useMemo(() => getSlideTimer(meeting, active?.id, now, allowOvertime), [meeting, active?.id, now, allowOvertime]);
@@ -116,7 +124,7 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false }
   }, [queue, index]);
 
   const closePresentation = useCallback(() => {
-    setPresenting(false); setMode("manual");
+    setPresenting(false); setMode("manual"); setOpeningSlide(null);
     if (fullScreenOwned.current && document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     fullScreenOwned.current = false;
     window.setTimeout(() => launchButton.current?.focus(), 0);
@@ -160,17 +168,33 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false }
 
   useEffect(() => { if (presenting) exitButton.current?.focus(); }, [presenting]);
 
-  function showControls() {
+  const showControls = useCallback(() => {
     setControls(true); window.clearTimeout(hideTimer.current);
     hideTimer.current = window.setTimeout(() => setControls(false), 2500);
-  }
+  }, []);
 
-  function present() {
+  const present = useCallback(() => {
     setDraft(null); setPresenting(true); showControls();
     if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
       void document.documentElement.requestFullscreen().then(() => { fullScreenOwned.current = true; }).catch(() => {});
     }
-  }
+  }, [showControls]);
+
+  const presentFromFirst = useCallback(() => {
+    const first = deck.slides[0];
+    if (!first) return;
+    setOpeningSlide({ slideId: first.id, speakerId: currentSpeakerId });
+    setExcluded(new Set());
+    setSelectedId(first.id);
+    setMode("live");
+    present();
+  }, [deck.slides, currentSpeakerId, present]);
+
+  useEffect(() => {
+    if (!startFromFirst || loading || error || !deck.slides.length) return;
+    presentFromFirst();
+    onPresentationStarted?.();
+  }, [startFromFirst, loading, error, deck.slides.length, presentFromFirst, onPresentationStarted]);
 
   async function save(reset = false) {
     if (!active || saving) return;
@@ -218,6 +242,7 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false }
       {mode === "auto" && <label className="text-sm">Mỗi <input aria-label="Số giây mỗi slide" type="number" min={3} max={120} value={seconds} className="w-16 rounded border p-2" onChange={e => setSeconds(Math.min(120, Math.max(3, Number(e.target.value) || 3)))} /> giây</label>}
       <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={16} /> Làm mới hồ sơ</button>
       <button className={button} disabled={!ready} onClick={download}><Download size={16} /> Tải PNG</button>
+      <button className={button} disabled={loading || !!error || !deck.slides.length || !!draft} onClick={presentFromFirst}><Play size={16} /> Bắt đầu thuyết trình</button>
       <button ref={launchButton} className={button} disabled={!ready || !!draft} onClick={present}><Maximize size={16} /> Trình chiếu</button>
     </div>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error} <button className="underline" onClick={() => setRevision(v => v + 1)}>Tải lại dữ liệu</button></p>}

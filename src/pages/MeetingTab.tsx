@@ -147,6 +147,8 @@ export default function MeetingTab() {
   const [saving, setSaving] = useState(false);
   const [finishRequested, setFinishRequested] = useState(false);
   const [dismissedCompletion, setDismissedCompletion] = useState("");
+  const [startPresentation, setStartPresentation] = useState(false);
+  const presentationStarted = useCallback(() => setStartPresentation(false), []);
   const [prioritySpeakerId, setPrioritySpeakerId] = useState("");
   const [priorityPosition, setPriorityPosition] = useState(1);
 
@@ -869,7 +871,7 @@ export default function MeetingTab() {
 
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} allowOvertime={autoAdvance} />}
+              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} allowOvertime={autoAdvance} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} />}
               {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
               {(activeSubTab === "speakers" || activeSubTab === "checkin") && (
                 <div className="space-y-4">
@@ -932,6 +934,11 @@ export default function MeetingTab() {
 
                       {/* Operation Control Buttons */}
                       <div className="flex flex-wrap items-center gap-2">
+                        <button type="button" disabled={!activeMeeting.speakers.length}
+                          onClick={() => { setStartPresentation(true); setActiveSubTab("slides"); }}
+                          className="flex items-center gap-1.5 rounded-xl bg-cyan-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-40">
+                          <Play className="h-3.5 w-3.5" /> Bắt đầu thuyết trình
+                        </button>
                   {canManage && activeMeeting.status === "scheduled" && (
                     <button
                       type="button"
@@ -968,7 +975,7 @@ export default function MeetingTab() {
                             {autoAdvance && (
                               <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-cyan-50 border border-cyan-200/80 text-[11px] font-bold text-cyan-800">
                                 <Sparkles className="h-3 w-3 text-cyan-600" />
-                                Tự chuyển ({autoAdvanceDelay}s)
+                                Hết giờ → chờ {autoAdvanceDelay}s → chuyển người & slide
                               </span>
                             )}
 
@@ -1123,15 +1130,16 @@ export default function MeetingTab() {
                               />
                               <span className="flex items-center gap-1.5">
                                 <Sparkles className="h-3.5 w-3.5 text-cyan-600" />
-                                Tự động chuyển người & slide khi hết giờ
+                                Tự động chuyển slide và người phát biểu tiếp theo
                               </span>
                             </label>
 
                             {autoAdvance && (
                               <div className="flex items-center gap-1.5 ml-auto">
-                                <span className="text-slate-500 font-medium">Chờ:</span>
+                                <span className="text-slate-500 font-medium">Chờ sau khi hết giờ:</span>
                                 <input
                                   type="number"
+                                  aria-label="Số giây chờ chuyển slide sau khi hết giờ"
                                   min={0}
                                   max={60}
                                   value={autoAdvanceDelay}
@@ -1145,6 +1153,7 @@ export default function MeetingTab() {
                                 <span className="text-slate-600 font-semibold">giây</span>
                               </div>
                             )}
+                            <p className="w-full text-xs text-slate-500">Khi hết thời gian phát biểu, chờ {autoAdvanceDelay} giây rồi chuyển sang slide của thành viên hoặc khách mời tiếp theo. Đây là thời gian chờ chuyển lượt, không phải thời lượng phát biểu.</p>
                           </div>
                         )}
                       </div>

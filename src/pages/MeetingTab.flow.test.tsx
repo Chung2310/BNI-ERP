@@ -3,6 +3,10 @@ import React from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import MeetingTab from "./MeetingTab";
+vi.mock("../components/meetings/profileSlideRenderer", () => ({
+  SLIDE_WIDTH: 1920, SLIDE_HEIGHT: 1080, loadSlideImage: vi.fn().mockResolvedValue(null),
+  renderProfileSlide: vi.fn(async () => ({ canvas: document.createElement("canvas"), warnings: [] })),
+}));
 vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ hasPermission: () => true }) }));
 vi.mock("../services/socketService", () => ({ socketService: { on: () => () => {} } }));
 vi.mock("../components/meetings/LuckyDrawTab", () => ({ LuckyDrawTab: () => <div>Quay thưởng đang mở</div> }));
@@ -113,4 +117,27 @@ it("automatic mode completes the final speaker instead of ending the meeting", a
   await screen.findByRole("dialog", { name: "Hoàn tất phần phát biểu" });
   expect(item.status).toBe("live");
   expect(fetchMock.mock.calls.some(([, options]) => options?.method === "POST" && JSON.parse(options.body).action === "finish")).toBe(false);
+});
+
+
+it("launches the first profile from MC controls and explains the post-speech delay", async () => {
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
+  localStorage.setItem("bni_auto_advance_speaker", "true");
+  localStorage.setItem("bni_auto_advance_delay", "3");
+  const people = [
+    { id: "first", kind: "member", name: "Người đầu tiên", company: "", seconds: 30 },
+    { id: "second", kind: "guest", name: "Khách thứ hai", company: "", seconds: 30 },
+  ];
+  const live = { ...meeting, status: "live", currentIndex: 1, speakers: people };
+  const fetchMock = vi.fn(async (url) => ({ ok: true, json: async () => ({ data: String(url).endsWith("/slides") ? { slides: people, version: 0 } : [live] }) }));
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MeetingTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  expect(screen.getByText(/Đây là thời gian chờ chuyển lượt/)).toBeTruthy();
+  expect((screen.getByLabelText("Số giây chờ chuyển slide sau khi hết giờ") as HTMLInputElement).value).toBe("3");
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
+  await screen.findByRole("dialog", { name: "Trình chiếu hồ sơ" });
+  expect(screen.getAllByRole("img").filter(element => element.tagName === "CANVAS").every(element => element.getAttribute("aria-label")?.includes("Người đầu tiên"))).toBe(true);
+  expect(fetchMock.mock.calls.every(([url]) => !String(url).endsWith("/control"))).toBe(true);
+  vi.restoreAllMocks();
 });

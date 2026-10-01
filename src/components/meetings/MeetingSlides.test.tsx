@@ -75,3 +75,29 @@ it("does not keep showing the last speaker after the meeting ends", async () => 
   fireEvent.change(screen.getByLabelText("Chế độ trình chiếu"), { target: { value: "live" } });
   expect(screen.getByText("Chưa có người đang phát biểu.")).toBeTruthy();
 });
+
+
+it("starts at the first slide and follows subsequent speaker changes", async () => {
+  const deck = [...slides, { ...slides[1], id: "c", name: "Người thứ ba" }];
+  const api = vi.fn().mockResolvedValue({ slides: deck, version: 1 });
+  const view = render(<MeetingSlides meeting={{ ...meeting, speakers: deck }} canManage api={api} />);
+  await screen.findByText("Nguyễn An");
+  fireEvent.change(screen.getByLabelText("Chế độ trình chiếu"), { target: { value: "live" } });
+  expect((await screen.findByRole("img")).getAttribute("aria-label")).toContain("Trần Bình");
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
+  expect(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).toBeTruthy();
+  await waitFor(() => expect(screen.getAllByRole("img").every(canvas => canvas.getAttribute("aria-label")?.includes("Nguyễn An"))).toBe(true));
+  view.rerender(<MeetingSlides meeting={{ ...meeting, currentIndex: 2, speakers: deck }} canManage api={api} />);
+  await waitFor(() => expect(screen.getAllByRole("img").every(canvas => canvas.getAttribute("aria-label")?.includes("Người thứ ba"))).toBe(true));
+  fireEvent.click(screen.getByRole("button", { name: "Thoát trình chiếu" }));
+  expect(screen.queryByRole("dialog", { name: "Trình chiếu hồ sơ" })).toBeNull();
+});
+
+it("opens the first slide after data loads when launched from operation controls", async () => {
+  const api = vi.fn().mockResolvedValue({ slides, version: 1 });
+  const onPresentationStarted = vi.fn();
+  render(<MeetingSlides meeting={meeting} canManage api={api} startFromFirst onPresentationStarted={onPresentationStarted} />);
+  await screen.findByRole("dialog", { name: "Trình chiếu hồ sơ" });
+  expect(onPresentationStarted).toHaveBeenCalledTimes(1);
+  expect(screen.getAllByRole("img").every(canvas => canvas.getAttribute("aria-label")?.includes("Nguyễn An"))).toBe(true);
+});
