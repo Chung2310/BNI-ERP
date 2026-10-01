@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SocketProtection, type SocketProtectionCounter } from "./socket-protection";
+import {
+  SocketProtection,
+  type SocketProtectionCounter,
+  MemorySocketProtectionCounter,
+  FallbackSocketProtectionCounter,
+} from "./socket-protection";
 
 class FakeCounter implements SocketProtectionCounter {
   counts = new Map<string, number>();
@@ -97,3 +102,45 @@ test("shares the event quota across sockets owned by one user", async () => {
   assert.equal((await protection.consumeEvent("user-1", "socket-2")).allowed, true);
   assert.equal((await protection.consumeEvent("user-1", "socket-3")).allowed, false);
 });
+
+test("MemorySocketProtectionCounter increments window and enforces acquire/release", async () => {
+  const mem = new MemorySocketProtectionCounter();
+
+  const r1 = await mem.incrementWindow("test:key", 10_000);
+  assert.equal(r1.count, 1);
+  assert.ok(r1.retryAfterMs > 0 && r1.retryAfterMs <= 10_000);
+
+  const r2 = await mem.incrementWindow("test:key", 10_000);
+  assert.equal(r2.count, 2);
+
+  assert.equal(await mem.acquire("conn:1", 2), true);
+  assert.equal(await mem.acquire("conn:1", 2), true);
+  assert.equal(await mem.acquire("conn:1", 2), false);
+
+  await mem.release("conn:1");
+  assert.equal(await mem.acquire("conn:1", 2), true);
+});
+
+test("FallbackSocketProtectionCounter uses primary when ready and falls back to memory when not ready or throwing", async () => {
+  let isReady = true;
+  const primary = new FakeCounter();
+  const fallback = new FallbackSocketProtectionCounter(primary, () => isReady);
+
+  // When ready, uses primary
+  const res1 = await fallback.incrementWindow("handshake:ip1", 1000);
+  assert.equal(res1.count, 1);
+  assert.equal(primary.counts.get("handshake:ip1"), 1);
+
+  // When not ready, uses memory counter without touching primary
+  isReady = false;
+  const res2 = await fallback.incrementWindow("handshake:ip1", 1000);
+  assert.equal(res2.count, 1); // memory counter starts at 1
+  assert.equal(primary.counts.get("handshake:ip1"), 1); // primary untouched
+
+  // When ready but primary throws, transparently falls back to memory
+  isReady = true;
+  primary.failAcquireKey = "conn:fail";
+  const acquired = await fallback.acquire("conn:fail", 2);
+  assert.equal(acquired, true); // acquired via fallback memory counter
+});
+

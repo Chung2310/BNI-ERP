@@ -2,6 +2,7 @@ import Redis from "ioredis";
 import type { Options, Store } from "express-rate-limit";
 
 export interface RateLimitRedisClient {
+  status?: string;
   eval(script: string, keyCount: number, ...args: string[]): Promise<unknown>;
   decr(key: string): Promise<number>;
   del(key: string): Promise<number>;
@@ -42,6 +43,15 @@ export function getRateLimitRedisClient(): Redis {
   return sharedClient;
 }
 
+export function isRateLimitRedisReady(client?: RateLimitRedisClient | Redis): boolean {
+  const target = (client as any) || sharedClient;
+  if (!target) return false;
+  if (typeof target.status === "string") {
+    return target.status === "ready";
+  }
+  return true;
+}
+
 export function setRateLimitRedisClientForTesting(client: any) {
   sharedClient = client;
 }
@@ -63,29 +73,49 @@ export class RedisRateLimitStore implements Store {
   }
 
   async increment(key: string) {
-    const result = await this.client.eval(
-      INCREMENT_SCRIPT,
-      1,
-      this.prefixed(key),
-      String(this.windowMs),
-    );
-    if (!Array.isArray(result) || result.length < 2) {
-      throw new Error("Invalid Redis rate-limit response");
+    if (!isRateLimitRedisReady(this.client)) {
+      return { totalHits: 0, resetTime: new Date(Date.now() + this.windowMs) };
     }
-    const totalHits = Number(result[0]);
-    const ttl = Math.max(0, Number(result[1]));
-    if (!Number.isInteger(totalHits) || totalHits < 1) {
-      throw new Error("Invalid Redis rate-limit hit count");
+    try {
+      const result = await this.client.eval(
+        INCREMENT_SCRIPT,
+        1,
+        this.prefixed(key),
+        String(this.windowMs),
+      );
+      if (!Array.isArray(result) || result.length < 2) {
+        throw new Error("Invalid Redis rate-limit response");
+      }
+      const totalHits = Number(result[0]);
+      const ttl = Math.max(0, Number(result[1]));
+      if (!Number.isInteger(totalHits) || totalHits < 1) {
+        throw new Error("Invalid Redis rate-limit hit count");
+      }
+      return { totalHits, resetTime: new Date(Date.now() + ttl) };
+    } catch (err) {
+      if (!isRateLimitRedisReady(this.client)) {
+        return { totalHits: 0, resetTime: new Date(Date.now() + this.windowMs) };
+      }
+      throw err;
     }
-    return { totalHits, resetTime: new Date(Date.now() + ttl) };
   }
 
   async decrement(key: string): Promise<void> {
-    await this.client.decr(this.prefixed(key));
+    if (!isRateLimitRedisReady(this.client)) return;
+    try {
+      await this.client.decr(this.prefixed(key));
+    } catch {
+      // Redis unavailable; fail open
+    }
   }
 
   async resetKey(key: string): Promise<void> {
-    await this.client.del(this.prefixed(key));
+    if (!isRateLimitRedisReady(this.client)) return;
+    try {
+      await this.client.del(this.prefixed(key));
+    } catch {
+      // Redis unavailable; fail open
+    }
   }
 
   private prefixed(key: string): string {
