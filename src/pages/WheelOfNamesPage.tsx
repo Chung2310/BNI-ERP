@@ -28,10 +28,14 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { authService } from "../services/authService";
+import { meetingService, Meeting, Speaker } from "../services/meetingService";
 import { UserProfile } from "../types";
 import { playTickSound, playWinFanfare, playSuspenseSound } from "../utils/soundEffects";
 import { launchConfetti } from "../utils/confetti";
 import { BRAND_NAME, BRAND_LOGO_PATH } from "../config/brand";
+
+export type ParticipantType = "member_present" | "member_absent" | "guest";
+export type ParticipantFilterCategory = "all" | "all_members" | "present_members" | "guests";
 
 interface Participant {
   id: string;
@@ -41,6 +45,8 @@ interface Participant {
   role?: string;
   selected: boolean;
   isCustom?: boolean;
+  type?: ParticipantType;
+  checkedInAt?: string;
 }
 
 interface WinnerRecord {
@@ -98,15 +104,37 @@ const getDisplaySlices = (active: Participant[]): DisplaySlice[] => {
 
 // Fallback sample participants for demo / unauthenticated state
 const DEFAULT_PARTICIPANTS: Participant[] = [
-  { id: "sample-1", name: "Nguyễn Văn An", department: "Ban Điều Hành", role: "Chủ tịch", selected: true },
-  { id: "sample-2", name: "Trần Thị Mai", department: "Ban Khách Mời", role: "Phó Chủ tịch", selected: true },
-  { id: "sample-3", name: "Lê Hoàng Long", department: "Ban Sự Kiện", role: "Trưởng ban", selected: true },
-  { id: "sample-4", name: "Phạm Hồng Ngọc", department: "Ban Hội Viên", role: "Thành viên", selected: true },
-  { id: "sample-5", name: "Đỗ Minh Quân", department: "Ban Đào Tạo", role: "Điều phối viên", selected: true },
-  { id: "sample-6", name: "Vũ Phương Thảo", department: "Ban Truyền Thông", role: "Thành viên", selected: true },
-  { id: "sample-7", name: "Bùi Tuấn Anh", department: "Ban Công Nghệ", role: "Thành viên", selected: true },
-  { id: "sample-8", name: "Hoàng Gia Bảo", department: "Ban Tài Chính", role: "Thủ quỹ", selected: true },
+  { id: "sample-1", name: "Nguyễn Văn An", department: "Ban Điều Hành", role: "Chủ tịch", selected: true, type: "member_present" },
+  { id: "sample-2", name: "Trần Thị Mai", department: "Ban Khách Mời", role: "Phó Chủ tịch", selected: true, type: "member_present" },
+  { id: "sample-3", name: "Lê Hoàng Long", department: "Ban Sự Kiện", role: "Trưởng ban", selected: true, type: "member_present" },
+  { id: "sample-4", name: "Phạm Hồng Ngọc", department: "Ban Hội Viên", role: "Thành viên", selected: true, type: "member_present" },
+  { id: "sample-5", name: "Đỗ Minh Quân", department: "Ban Đào Tạo", role: "Điều phối viên", selected: true, type: "member_present" },
+  { id: "sample-6", name: "Vũ Phương Thảo", department: "Ban Truyền Thông", role: "Thành viên", selected: true, type: "member_absent" },
+  { id: "sample-7", name: "Bùi Tuấn Anh", department: "Ban Công Nghệ", role: "Thành viên", selected: true, type: "member_absent" },
+  { id: "sample-8", name: "Hoàng Gia Bảo", department: "Ban Tài Chính", role: "Thủ quỹ", selected: true, type: "member_absent" },
+  { id: "sample-guest-1", name: "Lê Thị Thúy Hằng (Khách)", department: "Công ty BDS Vạn Phát", role: "Khách mời", selected: true, type: "guest" },
+  { id: "sample-guest-2", name: "Trần Đình Trọng (Khách)", department: "Nội Thất Sen Vàng", role: "Khách mời", selected: true, type: "guest" },
 ];
+
+export const matchesFilterCategory = (p: Participant, category: ParticipantFilterCategory): boolean => {
+  const pType = p.type || "member_present";
+  switch (category) {
+    case "all":
+      // Tất cả thành viên (bao gồm cả vắng mặt) + khách tham dự hôm nay
+      return true;
+    case "all_members":
+      // Tất cả thành viên chapter (cả có mặt và vắng mặt)
+      return pType === "member_present" || pType === "member_absent";
+    case "present_members":
+      // Chỉ thành viên có mặt
+      return pType === "member_present";
+    case "guests":
+      // Chỉ khách mời
+      return pType === "guest";
+    default:
+      return true;
+  }
+};
 
 export default function WheelOfNamesPage() {
   const { userProfile, loading: authLoading } = useAuth();
@@ -117,6 +145,7 @@ export default function WheelOfNamesPage() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [newGuestName, setNewGuestName] = useState("");
+  const [filterCategory, setFilterCategory] = useState<ParticipantFilterCategory>("all");
   const [currentPrize, setCurrentPrize] = useState("Giải Thưởng May Mắn");
   const [isEditingPrize, setIsEditingPrize] = useState(false);
   const [prizeInput, setPrizeInput] = useState(currentPrize);
@@ -144,10 +173,21 @@ export default function WheelOfNamesPage() {
   const lightPhaseRef = useRef(0);
   const pulseAnimRef = useRef(0);
 
-  // Active selected participants on the wheel
-  const activeParticipants = participants.filter((p) => p.selected);
+  // Filtered by Category
+  const categoryParticipants = participants.filter((p) => matchesFilterCategory(p, filterCategory));
 
-  // 1. Fetch Users directly from system
+  // Active selected participants on the wheel
+  const activeParticipants = categoryParticipants.filter((p) => p.selected);
+
+  // Participant counts by category
+  const countAll = participants.length;
+  const countAllMembers = participants.filter(
+    (p) => p.type === "member_present" || p.type === "member_absent"
+  ).length;
+  const countPresent = participants.filter((p) => p.type === "member_present").length;
+  const countGuests = participants.filter((p) => p.type === "guest").length;
+
+  // 1. Fetch Users & Today's Meeting Check-in status directly from system
   const loadSystemUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
@@ -166,16 +206,97 @@ export default function WheelOfNamesPage() {
         }
       }
 
+      // Fetch meetings to get check-in attendees (speakers & guests)
+      let meetings: Meeting[] = [];
+      try {
+        meetings = await meetingService.listMeetings();
+      } catch (e) {
+        console.warn("Không thể tải danh sách cuộc họp cho vòng quay:", e);
+      }
+
+      // Find the active/today meeting
+      const now = new Date();
+      const isSameDate = (d1: Date, d2: Date) =>
+        d1.getFullYear() === d2.getFullYear() &&
+        d1.getMonth() === d2.getMonth() &&
+        d1.getDate() === d2.getDate();
+
+      let targetMeeting: Meeting | undefined = meetings.find(
+        (m) => m.status === "live" || m.status === "paused"
+      );
+
+      if (!targetMeeting) {
+        targetMeeting = meetings.find((m) => {
+          if (!m.startsAt) return false;
+          return isSameDate(new Date(m.startsAt), now);
+        });
+      }
+
+      if (!targetMeeting && meetings.length > 0) {
+        // Fallback to latest meeting
+        const sorted = [...meetings].sort(
+          (a, b) => new Date(b.startsAt || 0).getTime() - new Date(a.startsAt || 0).getTime()
+        );
+        targetMeeting = sorted[0];
+      }
+
+      const speakers: Speaker[] = targetMeeting?.speakers || [];
+
+      // Match speakers to members
+      const matchedSpeakerIds = new Set<string>();
+
+      const isSpeakerMatch = (s: Speaker, u: UserProfile): boolean => {
+        const uid = String(u.uid || (u as any).id || (u as any)._id || "").trim();
+        const uEmail = (u.email || "").trim().toLowerCase();
+        const uName = (u.displayName || "").trim().toLowerCase();
+
+        const sUserId = String(s.userId || "").trim();
+        const sEmail = (s.email || "").trim().toLowerCase();
+        const sName = (s.name || "").trim().toLowerCase();
+
+        if (sUserId && uid && sUserId === uid) return true;
+        if (sEmail && uEmail && sEmail === uEmail) return true;
+        if (sName && uName && sName === uName) return true;
+        return false;
+      };
+
       if (users && users.length > 0) {
-        const loaded: Participant[] = users.map((u) => ({
-          id: u.uid || u.email,
-          name: (u.displayName || u.email.split("@")[0]).trim(),
-          avatar: u.photoURL,
-          department: u.department || u.branchName || "Thành viên",
-          role: u.role,
-          selected: true,
-        }));
-        setParticipants(loaded);
+        // 1. Map all registered chapter members (present or absent)
+        const loadedMembers: Participant[] = users.map((u) => {
+          const uid = String(u.uid || (u as any).id || (u as any)._id || u.email || "").trim();
+          const matchedSpeaker = speakers.find((s) => isSpeakerMatch(s, u));
+          const isPresent = Boolean(matchedSpeaker);
+
+          if (matchedSpeaker) {
+            matchedSpeakerIds.add(matchedSpeaker.id);
+          }
+
+          return {
+            id: uid || `user-${Math.random()}`,
+            name: (u.displayName || u.email?.split("@")[0] || "Thành viên").trim(),
+            avatar: u.photoURL,
+            department: u.department || u.branchName || "Thành viên",
+            role: u.role,
+            selected: true,
+            type: isPresent ? "member_present" : "member_absent",
+          };
+        });
+
+        // 2. Identify guests who checked in for today's meeting (speakers not matching members)
+        const guestSpeakers: Participant[] = speakers
+          .filter((s) => !matchedSpeakerIds.has(s.id))
+          .map((s) => ({
+            id: `guest-speaker-${s.id}`,
+            name: s.name.trim(),
+            avatar: s.photoURL,
+            department: "Khách tham dự",
+            role: "Khách mời",
+            selected: true,
+            type: "guest" as const,
+            checkedInAt: s.checkedInAt,
+          }));
+
+        setParticipants([...loadedMembers, ...guestSpeakers]);
       } else {
         setParticipants(DEFAULT_PARTICIPANTS);
       }
@@ -851,12 +972,28 @@ export default function WheelOfNamesPage() {
       id: `guest-${Date.now()}`,
       name: trimmed,
       department: "Khách mời",
-      role: "Khách",
+      role: "Khách tham dự",
       selected: true,
       isCustom: true,
+      type: "guest",
     };
     setParticipants((prev) => [newParticipant, ...prev]);
     setNewGuestName("");
+  };
+
+  // Toggle presence for chapter member
+  const handleTogglePresence = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSpinning) return;
+    setParticipants((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        if (p.type === "guest") return p;
+        const nextType: ParticipantType =
+          p.type === "member_present" ? "member_absent" : "member_present";
+        return { ...p, type: nextType };
+      })
+    );
   };
 
   // Shuffle active participants
@@ -872,10 +1009,13 @@ export default function WheelOfNamesPage() {
     });
   };
 
-  // Select / Deselect all
+  // Select / Deselect all in CURRENT category
   const handleToggleSelectAll = (select: boolean) => {
     if (isSpinning) return;
-    setParticipants((prev) => prev.map((p) => ({ ...p, selected: select })));
+    const currentCategoryIds = new Set(categoryParticipants.map((p) => p.id));
+    setParticipants((prev) =>
+      prev.map((p) => (currentCategoryIds.has(p.id) ? { ...p, selected: select } : p))
+    );
   };
 
   // Toggle single participant
@@ -909,10 +1049,11 @@ export default function WheelOfNamesPage() {
     document.body.removeChild(link);
   };
 
-  // Filtered participants list for sidebar
-  const filteredParticipants = participants.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.department && p.department.toLowerCase().includes(searchQuery.toLowerCase()))
+  // Filtered participants list for sidebar (category + search query)
+  const filteredParticipants = categoryParticipants.filter(
+    (p) =>
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.department && p.department.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -1094,7 +1235,7 @@ export default function WheelOfNamesPage() {
             }`}
           >
             <Users className="h-4 w-4" />
-            <span>Thành viên ({activeParticipants.length}/{participants.length})</span>
+            <span>Thành viên ({activeParticipants.length})</span>
           </button>
 
           <button
@@ -1122,7 +1263,7 @@ export default function WheelOfNamesPage() {
 
         {/* Tab 1: Participants List */}
         {activeDrawerTab === "participants" && (
-          <div className="flex flex-1 flex-col overflow-hidden p-4 space-y-3.5 bg-white">
+          <div className="flex flex-1 flex-col overflow-hidden p-3.5 space-y-3 bg-white">
             {/* Quick Add Guest Form */}
             <form onSubmit={handleAddGuest} className="relative">
               <input
@@ -1130,16 +1271,103 @@ export default function WheelOfNamesPage() {
                 placeholder="+ Thêm khách mời / người mới..."
                 value={newGuestName}
                 onChange={(e) => setNewGuestName(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-[#cf142b] focus:bg-white focus:ring-1 focus:ring-[#cf142b]/30 shadow-2xs"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-[#cf142b] focus:bg-white focus:ring-1 focus:ring-[#cf142b]/30 shadow-2xs"
               />
               <button
                 type="submit"
                 disabled={!newGuestName.trim()}
-                className="absolute right-1.5 top-1.5 rounded-lg bg-[#cf142b] p-1.5 text-white disabled:opacity-40 hover:bg-[#b00f24] transition cursor-pointer shadow-xs"
+                className="absolute right-1.5 top-1.5 rounded-lg bg-[#cf142b] p-1 text-white disabled:opacity-40 hover:bg-[#b00f24] transition cursor-pointer shadow-xs"
               >
                 <UserPlus className="h-3.5 w-3.5" />
               </button>
             </form>
+
+            {/* 4-Category Filter Bar */}
+            <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100/90 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setFilterCategory("all")}
+                disabled={isSpinning}
+                title="Tất cả thành viên (cả vắng mặt) + Khách tham dự hôm nay"
+                className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-lg text-center transition cursor-pointer disabled:opacity-50 ${
+                  filterCategory === "all"
+                    ? "bg-[#cf142b] text-white font-bold shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/80 font-medium"
+                }`}
+              >
+                <span className="text-[11px] leading-tight">Tất cả</span>
+                <span
+                  className={`text-[10px] leading-tight mt-0.5 ${
+                    filterCategory === "all" ? "text-amber-200 font-bold" : "text-slate-400"
+                  }`}
+                >
+                  ({countAll})
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilterCategory("all_members")}
+                disabled={isSpinning}
+                title="Tất cả thành viên Chapter (cả có mặt và vắng mặt)"
+                className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-lg text-center transition cursor-pointer disabled:opacity-50 ${
+                  filterCategory === "all_members"
+                    ? "bg-[#cf142b] text-white font-bold shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/80 font-medium"
+                }`}
+              >
+                <span className="text-[11px] leading-tight">Tất cả TV</span>
+                <span
+                  className={`text-[10px] leading-tight mt-0.5 ${
+                    filterCategory === "all_members" ? "text-amber-200 font-bold" : "text-slate-400"
+                  }`}
+                >
+                  ({countAllMembers})
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilterCategory("present_members")}
+                disabled={isSpinning}
+                title="Chỉ thành viên Chapter có mặt (đã check-in)"
+                className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-lg text-center transition cursor-pointer disabled:opacity-50 ${
+                  filterCategory === "present_members"
+                    ? "bg-[#cf142b] text-white font-bold shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/80 font-medium"
+                }`}
+              >
+                <span className="text-[11px] leading-tight">Có mặt</span>
+                <span
+                  className={`text-[10px] leading-tight mt-0.5 ${
+                    filterCategory === "present_members" ? "text-amber-200 font-bold" : "text-slate-400"
+                  }`}
+                >
+                  ({countPresent})
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilterCategory("guests")}
+                disabled={isSpinning}
+                title="Chỉ khách mời tham dự"
+                className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-lg text-center transition cursor-pointer disabled:opacity-50 ${
+                  filterCategory === "guests"
+                    ? "bg-[#cf142b] text-white font-bold shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/80 font-medium"
+                }`}
+              >
+                <span className="text-[11px] leading-tight">Khách mời</span>
+                <span
+                  className={`text-[10px] leading-tight mt-0.5 ${
+                    filterCategory === "guests" ? "text-amber-200 font-bold" : "text-slate-400"
+                  }`}
+                >
+                  ({countGuests})
+                </span>
+              </button>
+            </div>
 
             {/* Search & Actions Bar */}
             <div className="flex items-center gap-2">
@@ -1195,8 +1423,8 @@ export default function WheelOfNamesPage() {
                 </button>
               </div>
 
-              <span className="font-mono text-slate-400">
-                {activeParticipants.length}/{participants.length}
+              <span className="font-mono text-slate-500 text-[11px]">
+                Đang chọn: <strong className="text-[#cf142b]">{activeParticipants.length}</strong>/{categoryParticipants.length}
               </span>
             </div>
 
@@ -1209,7 +1437,11 @@ export default function WheelOfNamesPage() {
                 </div>
               ) : filteredParticipants.length === 0 ? (
                 <div className="py-12 text-center text-xs text-slate-400">
-                  Không tìm thấy thành viên phù hợp
+                  {filterCategory === "present_members"
+                    ? "Chưa có thành viên nào check-in hôm nay"
+                    : filterCategory === "guests"
+                    ? "Chưa có khách mời nào tham dự hôm nay"
+                    : "Không tìm thấy người phù hợp"}
                 </div>
               ) : (
                 filteredParticipants.map((p, idx) => (
@@ -1246,7 +1478,37 @@ export default function WheelOfNamesPage() {
                       )}
 
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-xs font-bold text-slate-800">{p.name}</div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="truncate text-xs font-bold text-slate-800">{p.name}</span>
+                          {/* Presence / Type Badge */}
+                          {p.type === "member_present" && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleTogglePresence(p.id, e)}
+                              title="Bấm để chuyển sang Vắng mặt"
+                              className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer shrink-0"
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Có mặt
+                            </button>
+                          )}
+                          {p.type === "member_absent" && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleTogglePresence(p.id, e)}
+                              title="Bấm để chuyển sang Có mặt"
+                              className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-500 border border-slate-200 hover:bg-slate-200 transition cursor-pointer shrink-0"
+                            >
+                              Vắng
+                            </button>
+                          )}
+                          {p.type === "guest" && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-800 border border-amber-300 shrink-0">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              Khách
+                            </span>
+                          )}
+                        </div>
                         {p.department && (
                           <div className="truncate text-[10px] text-slate-500">{p.department}</div>
                         )}
@@ -1258,7 +1520,7 @@ export default function WheelOfNamesPage() {
                       type="button"
                       onClick={() => handleDeleteParticipant(p.id)}
                       title="Xóa khỏi danh sách quay"
-                      className="p-1 text-slate-400 hover:text-rose-600 transition rounded cursor-pointer"
+                      className="p-1 text-slate-400 hover:text-rose-600 transition rounded cursor-pointer ml-1"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
