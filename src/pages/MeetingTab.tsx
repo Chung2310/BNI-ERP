@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { MeetingCheckInPanel } from "../components/meetings/MeetingCheckInPanel";
+import { MeetingLocationFields } from "../components/meetings/MeetingLocationFields";
 import {
   CalendarDays,
   Clock3,
@@ -66,6 +68,10 @@ type Meeting = {
   title: string;
   description?: string;
   location?: string;
+  latitude?: number;
+  longitude?: number;
+  gpsRadiusMeters?: number;
+  checkInQrExpiresAt?: string;
   coverImage?: string;
   startsAt: string;
   reminderDays: number;
@@ -114,22 +120,25 @@ const dateText = (s: string) =>
   new Date(s).toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" });
 
 export default function MeetingTab() {
-  const { userProfile, hasPermission } = useAuth();
-  const canManage = hasPermission("meetings:manage");
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("meetings:manage") || hasPermission("access:manage");
 
   const [items, setItems] = useState<Meeting[]>([]);
   const [detailMeetingId, setDetailMeetingId] = useState<string | null>(null);
-  const [activeSubTab, setActiveSubTab] = useState<"speakers" | "luckyDraw">("speakers");
+  const [activeSubTab, setActiveSubTab] = useState<"checkin" | "speakers" | "luckyDraw">("checkin");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "scheduled" | "live" | "ended">("all");
   const [tick, setTick] = useState(Date.now());
   const [saving, setSaving] = useState(false);
+  const [finishRequested, setFinishRequested] = useState(false);
 
   // Create Meeting Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [title, setTitle] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [location, setLocation] = useState("");
+  const [gpsPoint, setGpsPoint] = useState<{latitude:number;longitude:number}|null>(null);
+  const [gpsRadiusMeters, setGpsRadiusMeters] = useState(200);
   const [coverImage, setCoverImage] = useState("");
   const [reminderDays, setReminderDays] = useState(1);
   const [tiers, setTiers] = useState([
@@ -143,6 +152,8 @@ export default function MeetingTab() {
   const [editTitle, setEditTitle] = useState("");
   const [editStartsAt, setEditStartsAt] = useState("");
   const [editLocation, setEditLocation] = useState("");
+  const [editGpsPoint, setEditGpsPoint] = useState<{latitude:number;longitude:number}|null>(null);
+  const [editGpsRadiusMeters, setEditGpsRadiusMeters] = useState(200);
   const [editCoverImage, setEditCoverImage] = useState("");
   const [editReminderDays, setEditReminderDays] = useState(1);
   const [editTiers, setEditTiers] = useState<Array<{ count: number; seconds: number }>>([]);
@@ -198,6 +209,8 @@ export default function MeetingTab() {
         title,
         startsAt: new Date(startsAt).toISOString(),
         location,
+        ...(gpsPoint || {}),
+        gpsRadiusMeters,
         coverImage,
         reminderDays,
         tiers,
@@ -206,11 +219,12 @@ export default function MeetingTab() {
       setTitle("");
       setStartsAt("");
       setLocation("");
+      setGpsPoint(null);
       setCoverImage("");
       setShowCreateModal(false);
       toast.success("Tạo cuộc họp mới thành công!");
       setDetailMeetingId(result._id);
-      setActiveSubTab("speakers");
+      setActiveSubTab("checkin");
     });
   };
 
@@ -219,8 +233,10 @@ export default function MeetingTab() {
     setEditingMeeting(m);
     setEditTitle(m.title);
     setEditLocation(m.location || "");
+    setEditGpsPoint(typeof m.latitude === "number" && typeof m.longitude === "number" ? { latitude: m.latitude, longitude: m.longitude } : null);
+    setEditGpsRadiusMeters(m.gpsRadiusMeters || 200);
     setEditCoverImage(m.coverImage || "");
-    setEditReminderDays(m.reminderDays || 1);
+    setEditReminderDays(m.reminderDays ?? 1);
     setEditTiers(
       m.tiers?.length
         ? m.tiers.map((t) => ({ ...t }))
@@ -250,6 +266,9 @@ export default function MeetingTab() {
         title: editTitle,
         startsAt: new Date(editStartsAt).toISOString(),
         location: editLocation,
+        latitude: editGpsPoint?.latitude ?? null,
+        longitude: editGpsPoint?.longitude ?? null,
+        gpsRadiusMeters: editGpsRadiusMeters,
         coverImage: editCoverImage,
         reminderDays: editReminderDays,
         tiers: editTiers,
@@ -277,14 +296,6 @@ export default function MeetingTab() {
       setIsDeleting(false);
     }
   };
-
-  const checkMember = () =>
-    activeMeeting &&
-    userProfile &&
-    void run(async () => {
-      await api(`/${activeMeeting._id}/checkin`, "POST", {});
-      toast.success("Check-in vào cuộc họp thành công!");
-    });
 
   const addGuest = (e: React.FormEvent) => {
     e.preventDefault();
@@ -323,8 +334,8 @@ export default function MeetingTab() {
     );
   };
 
-  const current = activeMeeting?.speakers[activeMeeting.currentIndex];
-  const upcoming = activeMeeting?.speakers[activeMeeting.status === "scheduled" ? 0 : activeMeeting.currentIndex + 1];
+  const current = activeMeeting && ["live", "paused"].includes(activeMeeting.status) ? activeMeeting.speakers[activeMeeting.currentIndex] : undefined;
+  const upcoming = activeMeeting && !["ended", "cancelled"].includes(activeMeeting.status) ? activeMeeting.speakers[activeMeeting.status === "scheduled" ? 0 : activeMeeting.currentIndex + 1] : undefined;
   const elapsed = activeMeeting
     ? activeMeeting.elapsedSeconds +
     (activeMeeting.status === "live" && activeMeeting.speakerStartedAt
@@ -390,10 +401,10 @@ export default function MeetingTab() {
             </div>
             <div>
               <h1 className="font-extrabold text-slate-900 text-xl md:text-2xl tracking-tight">
-                Lịch họp & Quay thưởng BNI
+                Quản lý buổi họp
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                Quản lý lịch họp, điều phối diễn giả phát biểu và quay thưởng ngẫu nhiên Random.org
+                Lên lịch → Đón tiếp & check-in → Điều hành phát biểu → Quay thưởng
               </p>
             </div>
           </div>
@@ -485,14 +496,14 @@ export default function MeetingTab() {
             };
             const prizeCount = m.luckyDraw?.prizes?.length || 0;
             const winnerCount = m.luckyDraw?.winners?.length || 0;
-            const isLive = m.status === "live";
+            const isLive = m.status === "live" || m.status === "paused";
 
             return (
               <div
                 key={m._id}
                 onClick={() => {
                   setDetailMeetingId(m._id);
-                  setActiveSubTab("speakers");
+                  setActiveSubTab(m.status === "scheduled" ? "checkin" : "speakers");
                 }}
                 className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-white shadow-2xs transition-all duration-200 hover:shadow-md cursor-pointer ${s.border}`}
               >
@@ -590,10 +601,10 @@ export default function MeetingTab() {
                 <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-0">
                   <button
                     type="button"
-                    onClick={(event) => { event.stopPropagation(); setDetailMeetingId(m._id); setActiveSubTab(isLive ? "speakers" : "luckyDraw"); }}
+                    onClick={(event) => { event.stopPropagation(); setDetailMeetingId(m._id); setActiveSubTab(m.status === "scheduled" ? "checkin" : "speakers"); }}
                     className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-50 group-hover:bg-cyan-600 text-slate-700 group-hover:text-white py-2 text-xs font-bold transition-all duration-200 cursor-pointer"
                   >
-                    <span>{isLive ? "Vào phòng họp trực tiếp" : "Xem chi tiết & Quay thưởng"}</span>
+                    <span>{isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}</span>
                     <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                   </button>
                 </div>
@@ -661,7 +672,7 @@ export default function MeetingTab() {
 
               {/* Sub-tab Switcher & Actions */}
               <div className="flex items-center justify-between sm:justify-end gap-2">
-                <div className="flex bg-slate-100 p-1 rounded-xl">
+                <div className="flex overflow-x-auto bg-slate-100 p-1 rounded-xl"><button type="button" onClick={() => setActiveSubTab("checkin")} aria-pressed={activeSubTab === "checkin"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700">Check-in ({activeMeeting.speakers.length})</button>
                   <button
                     type="button"
                     onClick={() => setActiveSubTab("speakers")}
@@ -671,7 +682,7 @@ export default function MeetingTab() {
                       }`}
                   >
                     <Users className="h-3.5 w-3.5" />
-                    <span>Buổi họp ({activeMeeting.speakers.length})</span>
+                    <span>Điều hành</span>
                   </button>
 
                   <button
@@ -683,7 +694,7 @@ export default function MeetingTab() {
                       }`}
                   >
                     <Gift className="h-3.5 w-3.5" />
-                    <span>Vòng quay may mắn</span>
+                    <span>Quay thưởng</span>
                     {activeMeeting.luckyDraw?.winners?.length ? (
                       <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-400 text-slate-900 font-extrabold">
                         {activeMeeting.luckyDraw.winners.length}
@@ -717,8 +728,9 @@ export default function MeetingTab() {
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
               {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
-              {activeSubTab === "speakers" && (
+              {(activeSubTab === "speakers" || activeSubTab === "checkin") && (
                 <div className="space-y-4">
+                  {activeSubTab === "speakers" && (<>
                   {/* Meeting Hero Banner Card */}
                   <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
                     {activeMeeting.coverImage ? (
@@ -777,18 +789,7 @@ export default function MeetingTab() {
 
                       {/* Operation Control Buttons */}
                       <div className="flex flex-wrap items-center gap-2">
-                        {activeMeeting.status === "scheduled" && (
-                          <button
-                            type="button"
-                            onClick={checkMember}
-                            disabled={saving}
-                            className="rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs transition cursor-pointer"
-                          >
-                            Check-in của tôi
-                          </button>
-                        )}
-
-                        {canManage && activeMeeting.status === "scheduled" && (
+                  {canManage && activeMeeting.status === "scheduled" && (
                           <button
                             type="button"
                             onClick={() => control("start")}
@@ -804,6 +805,7 @@ export default function MeetingTab() {
                           <>
                             <button
                               type="button"
+                              disabled={saving}
                               onClick={() => control("pause")}
                               className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 px-3.5 py-2 text-xs font-bold transition cursor-pointer"
                             >
@@ -813,6 +815,7 @@ export default function MeetingTab() {
 
                             <button
                               type="button"
+                              disabled={saving}
                               onClick={() => control("next")}
                               className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm shadow-cyan-600/20 transition cursor-pointer"
                             >
@@ -821,7 +824,7 @@ export default function MeetingTab() {
 
                             <button
                               type="button"
-                              onClick={() => control("finish")}
+                              onClick={() => setFinishRequested(true)}
                               className="flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 text-xs font-bold transition cursor-pointer"
                             >
                               <Square className="h-3 w-3" fill="currentColor" />
@@ -834,6 +837,7 @@ export default function MeetingTab() {
                           <>
                             <button
                               type="button"
+                              disabled={saving}
                               onClick={() => control("resume")}
                               className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm transition cursor-pointer"
                             >
@@ -843,19 +847,23 @@ export default function MeetingTab() {
 
                             <button
                               type="button"
+                              disabled={saving}
                               onClick={() => control("next")}
                               className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3.5 py-2 text-xs font-bold transition cursor-pointer"
                             >
                               Người tiếp theo ❯
                             </button>
+                            <button type="button" disabled={saving} onClick={() => setFinishRequested(true)} className="rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-white">Kết thúc</button>
                           </>
                         )}
                       </div>
                     </div>
                   </div>
 
+                  {activeMeeting.status === "scheduled" && <p className="rounded-xl bg-cyan-50 p-4 text-sm text-cyan-900">Kiểm tra danh sách và thứ tự bên dưới, sau đó bấm Bắt đầu cuộc họp. Có thể tiếp tục nhận check-in khi đang họp.</p>}
+                  {["ended", "cancelled"].includes(activeMeeting.status) && <p className="rounded-xl bg-slate-100 p-4 text-sm">Buổi họp đã đóng. Danh sách tham dự được giữ lại bên dưới.</p>}
                   {/* Current & Upcoming Speakers side by side */}
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  {!["ended", "cancelled"].includes(activeMeeting.status) && <div className="grid gap-4 sm:grid-cols-2">
                     {/* Current Speaker Card */}
                     <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs flex flex-col justify-between">
                       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -963,15 +971,17 @@ export default function MeetingTab() {
                         <span className="font-bold text-slate-700">{activeMeeting.speakers.length} người</span>
                       </div>
                     </div>
-                  </div>
+                  </div>}
 
+                  </>)}
+                  {activeSubTab === "checkin" && <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} onRefresh={refresh} onConfigure={() => openEditModal(activeMeeting)} onOperate={() => setActiveSubTab("speakers")} />}
                   {/* Guest Checkin Form (MC / Admin) */}
-                  {canManage && (
+                  {canManage && activeSubTab === "checkin" && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
                     <form
                       onSubmit={addGuest}
                       className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs flex flex-wrap items-center gap-3"
                     >
-                      <span className="font-bold text-xs text-slate-700 shrink-0">Check-in khách mời:</span>
+                      <span className="font-bold text-xs text-slate-700 shrink-0">MC ghi nhận khách tại chỗ:</span>
                       <input
                         required
                         value={guestName}
@@ -1001,7 +1011,7 @@ export default function MeetingTab() {
                   <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
                     <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
                       <Users className="h-4 w-4 text-cyan-600" />
-                      Danh sách thứ tự phát biểu ({activeMeeting.speakers.length})
+                      {activeSubTab === "checkin" ? "Người đã check-in · thứ tự phát biểu" : "Danh sách thứ tự phát biểu"} ({activeMeeting.speakers.length})
                     </h3>
 
                     <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
@@ -1097,7 +1107,7 @@ export default function MeetingTab() {
       {/* POPUP TẠO CUỘC HỌP MỚI */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-2xl rounded-2xl bg-white p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
                 <CalendarDays className="h-5 w-5 text-cyan-600" />
@@ -1150,6 +1160,8 @@ export default function MeetingTab() {
                   />
                 </div>
               </div>
+
+              <MeetingLocationFields value={gpsPoint} onChange={setGpsPoint} radius={gpsRadiusMeters} onRadiusChange={setGpsRadiusMeters} />
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">URL ảnh bìa sự kiện</label>
@@ -1280,7 +1292,7 @@ export default function MeetingTab() {
       {/* POPUP SỬA CUỘC HỌP */}
       {editingMeeting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-2xl rounded-2xl bg-white p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
                 <Pencil className="h-4 w-4 text-cyan-600" />
@@ -1333,6 +1345,8 @@ export default function MeetingTab() {
                   />
                 </div>
               </div>
+
+              <MeetingLocationFields value={editGpsPoint} onChange={setEditGpsPoint} radius={editGpsRadiusMeters} onRadiusChange={setEditGpsRadiusMeters} />
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">URL ảnh bìa sự kiện</label>
@@ -1460,6 +1474,7 @@ export default function MeetingTab() {
         </div>
       )}
 
+      <ConfirmDialog isOpen={finishRequested} title="Kết thúc buổi họp?" description="Sau khi kết thúc, buổi họp ngừng nhận check-in và điều hành phát biểu." confirmLabel="Kết thúc buổi họp" isSubmitting={saving} onClose={() => setFinishRequested(false)} onConfirm={async () => { await control("finish"); setFinishRequested(false); }} />
       {/* POPUP XÁC NHẬN XÓA CUỘC HỌP */}
       <ConfirmDialog
         isOpen={!!deletingMeeting}

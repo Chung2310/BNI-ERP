@@ -23,6 +23,7 @@ import { companyEmailRouter } from "./company-email.router";
 import { companyPaymentRouter } from "./company-payment.router";
 import { webhookRouter } from "./webhook.router";
 import { meetingRouter } from "../modules/meetings/meeting.router";
+import { meetingCheckInRouter } from "../modules/meetings/meeting-checkin.router";
 
 export const apiRouter = Router();
 
@@ -65,6 +66,7 @@ apiRouter.use("/face-management", faceManagementRouter);
 apiRouter.use("/crud", crudRouter);
 
 apiRouter.use("/meetings", meetingRouter);
+apiRouter.use("/meeting-checkin", meetingCheckInRouter);
 
 // Gắn kết router chấm công (GPS Timekeeping)
 apiRouter.use("/timekeeping", requireAuth as any, requireModule("hr"), timekeepingRouter);

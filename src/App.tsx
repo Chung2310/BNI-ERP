@@ -27,6 +27,7 @@ const UserDataDeletion = lazy(() => import("./pages/UserDataDeletion"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const SubmitProofPage = lazy(() => import("./pages/SubmitProofPage"));
 const PublicRegisterPage = lazy(() => import("./pages/PublicRegisterPage"));
+const MeetingCheckInPage = lazy(() => import("./pages/MeetingCheckInPage"));
 
 function AppContent() {
   const { user, userProfile, loading } = useAuth();
@@ -39,8 +40,9 @@ function AppContent() {
   const isDeletionPage = currentPath === "/user-data-deletion" || currentPath === "/user-data-deletion.html";
   const isSubmitProofPage = currentPath.startsWith("/public/submit-proof");
   const isPublicRegisterPage = currentPath.startsWith("/public/dang-ky");
+  const isMeetingCheckInPage = currentPath.startsWith("/meeting-checkin/");
   const isLegalPublicPage = isPrivacyPage || isTermsPage || isDeletionPage;
-  const isPublicPage = isLandingGuestPage || isLegalPublicPage || isSubmitProofPage || isPublicRegisterPage;
+  const isPublicPage = isLandingGuestPage || isLegalPublicPage || isSubmitProofPage || isPublicRegisterPage || isMeetingCheckInPage;
 
   const { activeTab, setActiveTab } = useTabRouter({
     enabled: !isPublicPage && !loading && Boolean(user && userProfile),
@@ -141,6 +143,10 @@ function AppContent() {
         <SubmitProofPage />
       </Suspense>
     );
+  }
+
+  if (isMeetingCheckInPage) {
+    return (<Suspense fallback={<AuthLoader />}><MeetingCheckInPage /></Suspense>);
   }
 
   if (isPublicRegisterPage) {
