@@ -23,6 +23,7 @@ import {
   Sparkles,
   Trophy,
   Filter,
+  PowerOff,
 } from "lucide-react";
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
@@ -164,6 +165,10 @@ export default function MeetingTab() {
   const [deletingMeeting, setDeletingMeeting] = useState<Meeting | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // End Meeting Confirmation Dialog state
+  const [endingMeeting, setEndingMeeting] = useState<Meeting | null>(null);
+  const [isEnding, setIsEnding] = useState(false);
+
   // Guest Checkin state inside detail modal
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
@@ -295,6 +300,21 @@ export default function MeetingTab() {
       toast.error(e.message || "Không thể xóa cuộc họp.");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleEndMeeting = async () => {
+    if (!endingMeeting) return;
+    setIsEnding(true);
+    try {
+      await api(`/${endingMeeting._id}/control`, "POST", { action: "finish", version: endingMeeting.__v });
+      toast.success(`Đã kết thúc buổi họp "${endingMeeting.title}"`);
+      setEndingMeeting(null);
+      await refresh();
+    } catch (e: any) {
+      toast.error(e.message || "Không thể kết thúc cuộc họp.");
+    } finally {
+      setIsEnding(false);
     }
   };
 
@@ -535,9 +555,22 @@ export default function MeetingTab() {
                     </span>
                   </div>
 
-                  {/* Top Action Icons (Sửa, Xóa) */}
+                  {/* Top Action Icons (Kết thúc, Sửa, Xóa) */}
                   {canManage && (
                     <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-90 transition-opacity group-hover:opacity-100">
+                      {m.status !== "ended" && m.status !== "cancelled" && (
+                        <button
+                          type="button"
+                          title="Kết thúc cuộc họp"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEndingMeeting(m);
+                          }}
+                          className="rounded-xl bg-white/80 backdrop-blur-md p-1.5 text-slate-700 hover:bg-rose-50 hover:text-rose-600 shadow-sm transition cursor-pointer"
+                        >
+                          <PowerOff className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         title="Sửa cuộc họp"
@@ -599,15 +632,29 @@ export default function MeetingTab() {
                 </div>
 
                 {/* Card Footer: Action Button */}
-                <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-0">
+                <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-0 flex items-center gap-2">
                   <button
                     type="button"
                     onClick={(event) => { event.stopPropagation(); setDetailMeetingId(m._id); setActiveSubTab(m.status === "scheduled" ? "checkin" : "speakers"); }}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-50 group-hover:bg-cyan-600 text-slate-700 group-hover:text-white py-2 text-xs font-bold transition-all duration-200 cursor-pointer"
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-slate-50 group-hover:bg-cyan-600 text-slate-700 group-hover:text-white py-2 text-xs font-bold transition-all duration-200 cursor-pointer"
                   >
                     <span>{isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}</span>
                     <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                   </button>
+                  {canManage && m.status !== "ended" && m.status !== "cancelled" && (
+                    <button
+                      type="button"
+                      title="Kết thúc buổi họp"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setEndingMeeting(m);
+                      }}
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-600 text-rose-700 hover:text-white px-3 py-2 text-xs font-bold transition-all duration-150 cursor-pointer shrink-0 shadow-2xs"
+                    >
+                      <PowerOff className="h-3.5 w-3.5" />
+                      <span>Kết thúc</span>
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -1434,6 +1481,18 @@ export default function MeetingTab() {
       )}
 
       <ConfirmDialog isOpen={finishRequested} title="Kết thúc buổi họp?" description="Sau khi kết thúc, buổi họp ngừng nhận check-in và điều hành phát biểu." confirmLabel="Kết thúc buổi họp" isSubmitting={saving} onClose={() => setFinishRequested(false)} onConfirm={async () => { await control("finish"); setFinishRequested(false); }} />
+      {/* POPUP XÁC NHẬN KẾT THÚC CUỘC HỌP */}
+      <ConfirmDialog
+        isOpen={!!endingMeeting}
+        title="Kết thúc buổi họp?"
+        description={`Bạn có chắc chắn muốn kết thúc buổi họp "${endingMeeting?.title}"? Trạng thái cuộc họp sẽ được chuyển sang "Đã kết thúc" và ngừng nhận check-in.`}
+        tone="warning"
+        confirmLabel="Kết thúc buổi họp"
+        cancelLabel="Hủy"
+        isSubmitting={isEnding}
+        onConfirm={handleEndMeeting}
+        onClose={() => setEndingMeeting(null)}
+      />
       {/* POPUP XÁC NHẬN XÓA CUỘC HỌP */}
       <ConfirmDialog
         isOpen={!!deletingMeeting}
