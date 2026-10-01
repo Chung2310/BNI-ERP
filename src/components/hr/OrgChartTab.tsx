@@ -378,6 +378,8 @@ export default function OrgChartTab({
   const [addEmail, setAddEmail] = useState("");
   const [addPassword, setAddPassword] = useState("");
   const [addPhone, setAddPhone] = useState("");
+  const [addCompanyName, setAddCompanyName] = useState("");
+  const [addIndustry, setAddIndustry] = useState("");
   const [addDepartment, setAddDepartment] = useState("Phòng Kỹ Thuật");
   const [addParentId, setAddParentId] = useState("");
   const [addRole, setAddRole] = useState<"user" | "manager" | "branch_owner" | "admin">("user");
@@ -392,6 +394,8 @@ export default function OrgChartTab({
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editRoleText, setEditRoleText] = useState("");
+  const [editCompanyName, setEditCompanyName] = useState("");
+  const [editIndustry, setEditIndustry] = useState("");
   const [editQualification, setEditQualification] = useState("");
   const [editDivision, setEditDivision] = useState("");
   const [editDepartment, setEditDepartment] = useState("");
@@ -417,6 +421,8 @@ export default function OrgChartTab({
     if (!selectedEmp) return;
     setEditName(selectedEmp.name || "");
     setEditRoleText(selectedEmp.role || "");
+    setEditCompanyName(selectedEmp.companyName || "");
+    setEditIndustry(selectedEmp.industry || "");
     setEditQualification(selectedEmp.qualification || "");
     setEditDivision(selectedEmp.division || "Khối Vận Hành");
     setEditDepartment(selectedEmp.department || "");

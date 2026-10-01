@@ -77,7 +77,12 @@ export default function HRTab() {
     isLeader: usr.isLeader,
     jobDescriptionLink: usr.jobDescriptionLink || "",
     monthlySalary: usr.monthlySalary,
+    companyName: usr.companyName,
+    industry: usr.industry,
+    birthDate: usr.birthDate,
+    coverImage: usr.coverImage,
   }));
+
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-white max-h-[85vh] overflow-hidden" id="hr_tab_wrapper">

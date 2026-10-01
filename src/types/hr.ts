@@ -16,7 +16,12 @@ export interface EmployeeNode {
   jobDescriptionLink?: string;
   qualification?: string;
   monthlySalary?: number;
+  companyName?: string;
+  industry?: string;
+  birthDate?: string;
+  coverImage?: string;
 }
+
 
 export interface TrainingCourse {
   id: string;
