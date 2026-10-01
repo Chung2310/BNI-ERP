@@ -479,28 +479,6 @@ export default function OrgChartTab({
     }
   };
 
-  const handleJobDescriptionFileChange = async (e: React.ChangeEvent<HTMLInputElement>, target: "add" | "edit") => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
-    const setUploading = target === "add" ? setUploadingAddJobDescription : setUploadingEditJobDescription;
-    const setLink = target === "add" ? setAddJobDescriptionLink : setEditJobDescriptionLink;
-    const setToken = target === "add" ? setAddJobDescriptionUploadToken : setEditJobDescriptionUploadToken;
-
-    setUploading(true);
-    try {
-      const uploaded = await authService.uploadManagedFile(file, "hr.org-chart", selectedCompanyCode || userProfile?.companyCode);
-      setLink(uploaded.url);
-      setToken(uploaded.uploadToken);
-      toast.success("Đã tải lên mô tả công việc.");
-    } catch (error: any) {
-      toast.error(error?.message || "Tải file mô tả công việc lên Cloudinary thất bại.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const handleEditEmployeeSave = async () => {
     if (!selectedEmp) return;
 
@@ -730,8 +708,6 @@ export default function OrgChartTab({
   useEffect(() => {
     if (!isAddModalOpen) {
       setAddDepartment("Phòng Kỹ Thuật");
-      setAddJobDescriptionLink("");
-      setAddJobDescriptionUploadToken("");
     }
   }, [isAddModalOpen]);
 
