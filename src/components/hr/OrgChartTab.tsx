@@ -22,7 +22,9 @@ import {
   Eye,
   CalendarDays,
   List,
-  Network
+  Network,
+  Camera,
+  Image as ImageIcon
 } from "lucide-react";
 import { EmployeeNode, UserProfile, TrainingCourse } from "../../types";
 import { authService, getAccessToken } from "../../services/authService";
@@ -397,6 +399,11 @@ export default function OrgChartTab({
   const [addParentId, setAddParentId] = useState("");
   const [addRole, setAddRole] = useState<"user" | "manager" | "branch_owner" | "admin">("user");
   const [addPhotoURL, setAddPhotoURL] = useState("");
+  const [addCoverImage, setAddCoverImage] = useState("");
+  const [uploadingAddAvatar, setUploadingAddAvatar] = useState(false);
+  const [uploadingAddCover, setUploadingAddCover] = useState(false);
+  const addAvatarFileInputRef = useRef<HTMLInputElement>(null);
+  const addCoverFileInputRef = useRef<HTMLInputElement>(null);
 
   // Edit Member States
   const [isEditing, setIsEditing] = useState(false);
@@ -409,9 +416,12 @@ export default function OrgChartTab({
   const [editPhone, setEditPhone] = useState("");
   const [editBirthDate, setEditBirthDate] = useState("");
   const [editPhotoURL, setEditPhotoURL] = useState("");
+  const [editCoverImage, setEditCoverImage] = useState("");
   const [editParentId, setEditParentId] = useState("");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingEditCover, setUploadingEditCover] = useState(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
+  const editCoverFileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingLeader, setIsSavingLeader] = useState(false);
 
@@ -432,6 +442,7 @@ export default function OrgChartTab({
     setEditPhone(raw?.phone && raw.phone !== "Chưa cập nhật" ? raw.phone : (selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : ""));
     setEditParentId(raw?.parentId || selectedEmp.parentId || "");
     setEditPhotoURL(raw?.photoURL || selectedEmp.avatar || "");
+    setEditCoverImage(raw?.coverImage || selectedEmp.coverImage || "");
     setEditBirthDate(
       raw?.birthDate
         ? (typeof raw.birthDate === "string" ? raw.birthDate.split("T")[0] : new Date(raw.birthDate).toISOString().split("T")[0])
@@ -447,13 +458,84 @@ export default function OrgChartTab({
 
     setUploadingAvatar(true);
     try {
-      const res = await authService.uploadAvatar(file);
+      const compCode = selectedCompanyCode || userProfile?.companyCode;
+      const res = await authService.uploadManagedFile(
+        file,
+        "profile.avatar",
+        compCode === "SYSTEM" ? undefined : compCode
+      );
       setEditPhotoURL(res.url);
       toast.success("Đã tải lên ảnh đại diện.");
     } catch (err: any) {
       toast.error(err?.message || "Không thể tải lên ảnh đại diện.");
     } finally {
       setUploadingAvatar(false);
+    }
+  };
+
+  const handleEditCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setUploadingEditCover(true);
+    try {
+      const compCode = selectedCompanyCode || userProfile?.companyCode;
+      const res = await authService.uploadManagedFile(
+        file,
+        "profile.cover",
+        compCode === "SYSTEM" ? undefined : compCode
+      );
+      setEditCoverImage(res.url);
+      toast.success("Đã tải lên ảnh bìa thành công.");
+    } catch (err: any) {
+      toast.error(err?.message || "Không thể tải lên ảnh bìa.");
+    } finally {
+      setUploadingEditCover(false);
+    }
+  };
+
+  const handleAddAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setUploadingAddAvatar(true);
+    try {
+      const compCode = selectedCompanyCode || userProfile?.companyCode;
+      const res = await authService.uploadManagedFile(
+        file,
+        "profile.avatar",
+        compCode === "SYSTEM" ? undefined : compCode
+      );
+      setAddPhotoURL(res.url);
+      toast.success("Đã tải lên ảnh đại diện.");
+    } catch (err: any) {
+      toast.error(err?.message || "Không thể tải lên ảnh đại diện.");
+    } finally {
+      setUploadingAddAvatar(false);
+    }
+  };
+
+  const handleAddCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setUploadingAddCover(true);
+    try {
+      const compCode = selectedCompanyCode || userProfile?.companyCode;
+      const res = await authService.uploadManagedFile(
+        file,
+        "profile.cover",
+        compCode === "SYSTEM" ? undefined : compCode
+      );
+      setAddCoverImage(res.url);
+      toast.success("Đã tải lên ảnh bìa thành công.");
+    } catch (err: any) {
+      toast.error(err?.message || "Không thể tải lên ảnh bìa.");
+    } finally {
+      setUploadingAddCover(false);
     }
   };
 
@@ -506,7 +588,8 @@ export default function OrgChartTab({
         department: editDepartment.trim(),
         phone: editPhone.trim() || "",
         parentId: editParentId || null,
-        photoURL: editPhotoURL.trim() || undefined,
+        photoURL: editPhotoURL.trim() || "",
+        coverImage: editCoverImage.trim() || "",
         birthDate: editBirthDate || undefined,
       };
 
@@ -526,6 +609,7 @@ export default function OrgChartTab({
         phone: updateData.phone || "Chưa cập nhật",
         parentId: updateData.parentId || undefined,
         avatar: updateData.photoURL || prev.avatar,
+        coverImage: updateData.coverImage || prev.coverImage,
         birthDate: updateData.birthDate,
       } : null);
     } catch (err) {
@@ -704,10 +788,12 @@ export default function OrgChartTab({
     }
   }, [addRole, addParentId, usersList, isAddModalOpen]);
 
-  // Reset addDepartment when modal closes
+  // Reset add form when modal closes
   useEffect(() => {
     if (!isAddModalOpen) {
       setAddDepartment("Phòng Kỹ Thuật");
+      setAddPhotoURL("");
+      setAddCoverImage("");
     }
   }, [isAddModalOpen]);
 
@@ -836,6 +922,7 @@ export default function OrgChartTab({
         {
           industry: addIndustry.trim() || undefined,
           photoURL: addPhotoURL.trim() || undefined,
+          coverImage: addCoverImage.trim() || undefined,
         }
       );
 
@@ -854,6 +941,7 @@ export default function OrgChartTab({
       setAddCompanyName("");
       setAddIndustry("");
       setAddPhotoURL("");
+      setAddCoverImage("");
       setAddParentId("");
       setAddRole("user");
       setAddDepartment("Ban Thành viên");
@@ -1591,13 +1679,83 @@ export default function OrgChartTab({
                 </div>
 
                 <div className="space-y-3.5 text-xs text-left">
-                  {/* Avatar Upload / Preview */}
-                  <div className="flex items-center gap-4 p-3 bg-slate-50 rounded-2xl border border-slate-150">
-                    <div className="relative shrink-0">
-                      {renderAvatar(editPhotoURL || selectedEmp.avatar, "w-16 h-16", "text-2xl", editName || selectedEmp.name)}
+                  {/* Visual Cover Image & Avatar Preview Section */}
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden shadow-xs">
+                    {/* Cover Banner */}
+                    <div className="relative h-28 sm:h-32 w-full bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 overflow-hidden">
+                      {editCoverImage ? (
+                        <img
+                          src={editCoverImage}
+                          alt="Ảnh bìa"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-1 opacity-40 text-white">
+                          <ImageIcon className="h-7 w-7" />
+                          <span className="text-[10px] font-medium tracking-wide">Chưa có ảnh bìa</span>
+                        </div>
+                      )}
+                      {/* Cover Image Action Buttons */}
+                      <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                        <input
+                          ref={editCoverFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleEditCoverFileChange}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => editCoverFileInputRef.current?.click()}
+                          disabled={uploadingEditCover}
+                          className="px-2.5 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-md text-white rounded-xl text-[11px] font-medium flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50"
+                        >
+                          {uploadingEditCover ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Camera className="h-3.5 w-3.5" />
+                          )}
+                          <span>{uploadingEditCover ? "Đang tải..." : (editCoverImage ? "Đổi ảnh bìa" : "Tải ảnh bìa")}</span>
+                        </button>
+                        {editCoverImage && (
+                          <button
+                            type="button"
+                            onClick={() => setEditCoverImage("")}
+                            title="Xóa ảnh bìa"
+                            className="p-1.5 bg-black/60 hover:bg-red-600 backdrop-blur-md text-white rounded-xl transition cursor-pointer"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <label className="block font-bold text-slate-700 mb-1">Ảnh đại diện</label>
+
+                    {/* Avatar & Upload Bar */}
+                    <div className="px-4 pb-3.5 pt-2 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                      <div className="flex items-center gap-3.5 -mt-10 sm:-mt-12">
+                        <div className="relative group shrink-0">
+                          <div className="h-18 w-18 sm:h-20 sm:w-20 rounded-2xl border-4 border-white bg-white shadow-md overflow-hidden flex items-center justify-center">
+                            {renderAvatar(editPhotoURL || selectedEmp.avatar, "w-full h-full", "text-xl", editName || selectedEmp.name)}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => avatarFileInputRef.current?.click()}
+                            disabled={uploadingAvatar}
+                            title="Tải ảnh đại diện"
+                            className="absolute inset-0 bg-black/45 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"
+                          >
+                            {uploadingAvatar ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-800 text-sm block">{editName || selectedEmp.name}</span>
+                          <span className="text-[11px] text-gray-500 font-medium">{editRoleText || selectedEmp.role || "Thành viên"}</span>
+                        </div>
+                      </div>
+
                       <div className="flex items-center gap-2">
                         <input
                           type="file"
@@ -1610,23 +1768,46 @@ export default function OrgChartTab({
                           type="button"
                           onClick={() => avatarFileInputRef.current?.click()}
                           disabled={uploadingAvatar}
-                          className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-700 font-bold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                          className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 font-bold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50 text-[11px]"
                         >
-                          {uploadingAvatar ? (
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Upload className="w-3.5 h-3.5" />
-                          )}
-                          {uploadingAvatar ? "Đang tải ảnh..." : "Tải ảnh từ máy"}
+                          {uploadingAvatar ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                          <span>{uploadingAvatar ? "Đang tải..." : (editPhotoURL ? "Đổi avatar" : "Tải avatar")}</span>
                         </button>
+                        {editPhotoURL && (
+                          <button
+                            type="button"
+                            onClick={() => setEditPhotoURL("")}
+                            title="Xóa avatar"
+                            className="p-1.5 border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl transition cursor-pointer"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
-                      <input
-                        type="url"
-                        placeholder="Hoặc dán URL ảnh trực tiếp"
-                        value={editPhotoURL}
-                        onChange={(e) => setEditPhotoURL(e.target.value)}
-                        className="mt-2 w-full px-3 py-1.5 border border-gray-200 rounded-lg outline-none bg-white text-[11px]"
-                      />
+                    </div>
+
+                    {/* Direct Image URL Inputs */}
+                    <div className="px-4 pb-3 pt-1 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <label className="text-gray-400 block mb-0.5">Hoặc URL Avatar:</label>
+                        <input
+                          type="url"
+                          placeholder="https://..."
+                          value={editPhotoURL}
+                          onChange={(e) => setEditPhotoURL(e.target.value)}
+                          className="w-full px-2.5 py-1 border border-gray-200 rounded-lg outline-none bg-white text-slate-700"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-gray-400 block mb-0.5">Hoặc URL Ảnh bìa:</label>
+                        <input
+                          type="url"
+                          placeholder="https://..."
+                          value={editCoverImage}
+                          onChange={(e) => setEditCoverImage(e.target.value)}
+                          className="w-full px-2.5 py-1 border border-gray-200 rounded-lg outline-none bg-white text-slate-700"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1984,6 +2165,138 @@ export default function OrgChartTab({
             </div>
 
             <div className="space-y-3 text-xs">
+              {/* Visual Cover Image & Avatar Preview Section */}
+              <div className="relative rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden shadow-xs">
+                {/* Cover Banner */}
+                <div className="relative h-28 sm:h-32 w-full bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 overflow-hidden">
+                  {addCoverImage ? (
+                    <img
+                      src={addCoverImage}
+                      alt="Ảnh bìa"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-1 opacity-40 text-white">
+                      <ImageIcon className="h-7 w-7" />
+                      <span className="text-[10px] font-medium tracking-wide">Ảnh bìa thành viên</span>
+                    </div>
+                  )}
+                  {/* Cover Image Action Buttons */}
+                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                    <input
+                      ref={addCoverFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAddCoverFileChange}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addCoverFileInputRef.current?.click()}
+                      disabled={uploadingAddCover}
+                      className="px-2.5 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-md text-white rounded-xl text-[11px] font-medium flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50"
+                    >
+                      {uploadingAddCover ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Camera className="h-3.5 w-3.5" />
+                      )}
+                      <span>{uploadingAddCover ? "Đang tải..." : (addCoverImage ? "Đổi ảnh bìa" : "Tải ảnh bìa")}</span>
+                    </button>
+                    {addCoverImage && (
+                      <button
+                        type="button"
+                        onClick={() => setAddCoverImage("")}
+                        title="Xóa ảnh bìa"
+                        className="p-1.5 bg-black/60 hover:bg-red-600 backdrop-blur-md text-white rounded-xl transition cursor-pointer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Avatar & Upload Bar */}
+                <div className="px-4 pb-3.5 pt-2 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                  <div className="flex items-center gap-3.5 -mt-10 sm:-mt-12">
+                    <div className="relative group shrink-0">
+                      <div className="h-18 w-18 sm:h-20 sm:w-20 rounded-2xl border-4 border-white bg-white shadow-md overflow-hidden flex items-center justify-center">
+                        {renderAvatar(addPhotoURL, "w-full h-full", "text-xl", addName || "Thành viên")}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => addAvatarFileInputRef.current?.click()}
+                        disabled={uploadingAddAvatar}
+                        title="Tải ảnh đại diện"
+                        className="absolute inset-0 bg-black/45 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"
+                      >
+                        {uploadingAddAvatar ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-800 text-sm block">{addName || "Thành viên mới"}</span>
+                      <span className="text-[11px] text-gray-500 font-medium">{addCompanyName || "Công ty thành viên"}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      ref={addAvatarFileInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAddAvatarFileChange}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addAvatarFileInputRef.current?.click()}
+                      disabled={uploadingAddAvatar}
+                      className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 font-bold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50 text-[11px]"
+                    >
+                      {uploadingAddAvatar ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                      <span>{uploadingAddAvatar ? "Đang tải..." : (addPhotoURL ? "Đổi avatar" : "Tải avatar")}</span>
+                    </button>
+                    {addPhotoURL && (
+                      <button
+                        type="button"
+                        onClick={() => setAddPhotoURL("")}
+                        title="Xóa avatar"
+                        className="p-1.5 border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl transition cursor-pointer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Direct Image URL Inputs */}
+                <div className="px-4 pb-3 pt-1 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                  <div>
+                    <label className="text-gray-400 block mb-0.5">Hoặc URL Avatar:</label>
+                    <input
+                      type="url"
+                      placeholder="https://..."
+                      value={addPhotoURL}
+                      onChange={(e) => setAddPhotoURL(e.target.value)}
+                      className="w-full px-2.5 py-1 border border-gray-200 rounded-lg outline-none bg-white text-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-gray-400 block mb-0.5">Hoặc URL Ảnh bìa:</label>
+                    <input
+                      type="url"
+                      placeholder="https://..."
+                      value={addCoverImage}
+                      onChange={(e) => setAddCoverImage(e.target.value)}
+                      className="w-full px-2.5 py-1 border border-gray-200 rounded-lg outline-none bg-white text-slate-700"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block font-bold text-gray-500 mb-1">Họ tên thành viên *</label>
                 <input
