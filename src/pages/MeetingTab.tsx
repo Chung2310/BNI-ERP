@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { MeetingCheckInPanel } from "../components/meetings/MeetingCheckInPanel";
 import { MeetingLocationFields } from "../components/meetings/MeetingLocationFields";
 import { MeetingCoverImageField } from "../components/meetings/MeetingCoverImageField";
+import { MeetingDateTimePicker } from "../components/meetings/MeetingDateTimePicker";
 import {
   CalendarDays,
   Clock3,
@@ -117,8 +118,16 @@ const fmt = (s: number) =>
       .toString()
       .padStart(2, "0")}`;
 
-const dateText = (s: string) =>
-  new Date(s).toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" });
+const dateText = (s: string) => {
+  try {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  } catch {
+    return s;
+  }
+};
 
 export default function MeetingTab() {
   const { hasPermission } = useAuth();
@@ -1222,12 +1231,10 @@ export default function MeetingTab() {
                   <label className="block font-bold text-slate-700 mb-1">
                     Thời gian diễn ra <span className="text-rose-500">*</span>
                   </label>
-                  <input
+                  <MeetingDateTimePicker
                     required
-                    type="datetime-local"
                     value={startsAt}
-                    onChange={(e) => setStartsAt(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                    onChange={setStartsAt}
                   />
                 </div>
 
@@ -1386,12 +1393,10 @@ export default function MeetingTab() {
                   <label className="block font-bold text-slate-700 mb-1">
                     Thời gian diễn ra <span className="text-rose-500">*</span>
                   </label>
-                  <input
+                  <MeetingDateTimePicker
                     required
-                    type="datetime-local"
                     value={editStartsAt}
-                    onChange={(e) => setEditStartsAt(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                    onChange={setEditStartsAt}
                   />
                 </div>
 
