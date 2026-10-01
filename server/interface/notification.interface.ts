@@ -13,6 +13,7 @@ export interface INotification extends Document {
   action?: {
     tab: string;
     subTab?: string;
+    feeId?: string;
   };
   createdAt: Date;
 }

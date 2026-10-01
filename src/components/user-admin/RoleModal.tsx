@@ -47,16 +47,16 @@ export function RoleModal({
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-5xl w-full overflow-hidden transform transition-all scale-100 flex flex-col max-h-[92vh]">
         {/* Modal Header */}
-        <div className="bg-slate-900 text-white p-6 flex justify-between items-center shrink-0">
+        <div className="bg-cyan-600 text-white p-6 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-indigo-650 rounded-xl">
+            <div className="p-2 bg-cyan-750 rounded-xl">
               <Shield className="h-5 w-5 text-white" />
             </div>
             <div>
               <h3 className="font-bold text-sm uppercase tracking-wider font-sans">
                 {editingRole ? "Cấu hình vai trò & Phân quyền" : "Tạo vai trò tùy chỉnh mới"}
               </h3>
-              <p className="text-[10px] text-slate-300 font-mono mt-0.5">
+              <p className="text-[10px] text-cyan-100 font-mono mt-0.5">
                 {editingRole ? `Vai trò: ${roleSlug}` : "Thiết lập vai trò dành cho doanh nghiệp"}
               </p>
             </div>
@@ -64,7 +64,7 @@ export function RoleModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer"
+            className="p-1.5 hover:bg-cyan-700 rounded-lg text-cyan-100 hover:text-white transition-all cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
@@ -96,6 +96,7 @@ export function RoleModal({
                   required
                   placeholder="Ví dụ: Trưởng phòng nhân sự"
                   value={roleDisplayName}
+                  disabled={editingRole?.role === "admin" || editingRole?.role === "user"}
                   onChange={(e) => setRoleDisplayName(e.target.value)}
                   className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 />

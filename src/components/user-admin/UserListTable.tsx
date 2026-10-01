@@ -1,16 +1,12 @@
 import { Activity, Building2, Calendar, MoreVertical, Pencil, Phone, Shield, Trash2 } from "lucide-react";
 import { UserTableProps } from "./types";
-import { getRoleDisplayName } from "../../utils/permissionUtils";
 
 export function UserListTable({
   users,
   currentUser,
-  rolePermissionsList,
   userPage: _userPage,
   totalUserPages: _totalUserPages,
   onPageChange: _onPageChange,
-  getAvailableRoles,
-  onRoleChange,
   openActionMenuId,
   onToggleActionMenu,
   onEditUser,
@@ -31,14 +27,13 @@ export function UserListTable({
   return (
     <div className="max-w-full rounded-2xl border border-slate-200 bg-white shadow-xs" style={{ overflow: "clip" }}>
       <div className="max-w-full overflow-x-auto overscroll-x-contain">
-        <table className="w-full min-w-[980px] border-collapse text-left font-sans text-xs sm:min-w-[1240px]">
+        <table className="w-full min-w-[850px] border-collapse text-left font-sans text-xs sm:min-w-[1000px]">
           <thead>
             <tr className="border-b border-slate-150 bg-slate-50/80 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
               <th className="p-4 pl-6">Thành viên</th>
               <th className="p-4">Doanh nghiệp & Lĩnh vực</th>
               <th className="p-4">Địa chỉ Email</th>
               <th className="p-4">Ngày sinh & Điện thoại</th>
-              <th className="p-4">Ngày tạo / Ngày sửa</th>
               <th className="p-4">Quyền hạn (Role)</th>
               <th className="p-4 pr-6 text-right">Thao tác</th>
             </tr>
@@ -71,7 +66,7 @@ export function UserListTable({
                             title="Có ảnh bìa"
                             className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-indigo-600 text-[8px] text-white ring-2 ring-white"
                           >
-                            ★
+                            ✓
                           </span>
                         )}
                       </div>
@@ -85,7 +80,7 @@ export function UserListTable({
                           )}
                         </span>
                         <span className="mt-0.5 block font-mono text-[10px] text-slate-400">
-                          UID: {usr.uid.slice(0, 8)}...
+                          {usr.email}
                         </span>
                       </div>
                     </div>
@@ -127,60 +122,23 @@ export function UserListTable({
                     </div>
                   </td>
 
-                  {/* Ngày tạo / Ngày sửa */}
-                  <td className="p-4 font-mono text-[11px]">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-slate-600" title="Ngày tạo tài khoản">
-                        Tạo: {formatDate(usr.createdAt)}
-                      </span>
-                      <span className="text-[10px] text-slate-400" title="Lần chỉnh sửa gần nhất">
-                        Sửa: {formatDate(usr.updatedAt || usr.createdAt)}
-                      </span>
-                    </div>
-                  </td>
-
                   {/* Quyền hạn (role) */}
                   <td className="p-4">
                     <span
                       className={`flex w-max items-center gap-1.5 rounded-full px-2.5 py-0.75 font-mono text-[9px] font-bold uppercase tracking-wider ${
                         usr.role === "admin"
                           ? "border border-amber-200 bg-amber-50 text-amber-800"
-                          : usr.role === "manager"
-                            ? "border border-blue-200 bg-blue-50 text-blue-800"
-                            : usr.role === "user"
-                              ? "border border-slate-200 bg-slate-50 text-slate-600"
-                              : "border border-indigo-200 bg-indigo-50 text-indigo-700"
+                          : "border border-slate-200 bg-slate-50 text-slate-600"
                       }`}
                     >
                       <Shield className="h-3 w-3" />
-                      {getRoleDisplayName(usr.role, rolePermissionsList.find((rp) => rp.role === usr.role)?.displayName)}
+                      {usr.role === "admin" ? "Admin" : "Member"}
                     </span>
                   </td>
 
-                  {/* Hành động */}
+                  {/* Thao tác */}
                   <td className="p-4 pr-6">
                     <div className="flex items-center justify-end gap-2.5">
-                      <select
-                        aria-label="Thay đổi vai trò"
-                        disabled={isSelf || (usr.role === "admin" && currentUser?.role === "admin")}
-                        value={usr.role}
-                        onChange={(e) => onRoleChange(usr.uid, usr.displayName, e.target.value as any)}
-                        className={`cursor-pointer rounded-lg border px-2.5 py-1.5 text-xs font-semibold outline-none transition focus:ring-2 focus:ring-indigo-500 ${
-                          isSelf || (usr.role === "admin" && currentUser?.role === "admin")
-                            ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400 opacity-50"
-                            : "border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-indigo-300"
-                        }`}
-                      >
-                        {[
-                          ...getAvailableRoles(),
-                          ...(!getAvailableRoles().some((r) => r.role === usr.role) ? [{ role: usr.role, displayName: usr.role.toUpperCase(), level: 99 }] : []),
-                        ].map((r, index) => (
-                          <option key={`${usr.uid}-${r.role}-${index}`} value={r.role}>
-                            {r.displayName}
-                          </option>
-                        ))}
-                      </select>
-
                       <div className="relative" data-action-menu>
                         <button
                           type="button"

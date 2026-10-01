@@ -395,6 +395,7 @@ export default function OrgChartTab({
   const [addPhone, setAddPhone] = useState("");
   const [addCompanyName, setAddCompanyName] = useState("");
   const [addIndustry, setAddIndustry] = useState("");
+  const [addBirthDate, setAddBirthDate] = useState("");
   const [addDepartment, setAddDepartment] = useState("Ban Thành viên");
   const [addParentId, setAddParentId] = useState("");
   const [addRole, setAddRole] = useState<"user" | "manager" | "branch_owner" | "admin">("user");
@@ -729,10 +730,7 @@ export default function OrgChartTab({
         const firstBranchOwner = usersList.find(
           (u) => u.companyCode === compCode && u.role === "branch_owner"
         );
-        const firstAdmin = usersList.find(
-          (u) => u.companyCode === compCode && u.role === "admin"
-        );
-        setAddParentId(firstCompanyManager?.uid || firstBranchOwner?.uid || firstAdmin?.uid || "");
+        setAddParentId(firstCompanyManager?.uid || firstBranchOwner?.uid || "");
       }
     }
   }, [isAddModalOpen, userProfile, selectedCompanyCode, usersList]);
@@ -744,18 +742,12 @@ export default function OrgChartTab({
       if (addRole === "admin") {
         setAddParentId("");
       } else if (addRole === "branch_owner") {
-        const companyAdmin = usersList.find(
-          (u) => u.companyCode === compCode && u.role === "admin"
-        );
-        setAddParentId(companyAdmin?.uid || "");
+        setAddParentId("");
       } else if (addRole === "manager") {
         const branchOwner = usersList.find(
           (u) => u.companyCode === compCode && u.role === "branch_owner"
         );
-        const companyAdmin = usersList.find(
-          (u) => u.companyCode === compCode && u.role === "admin"
-        );
-        setAddParentId(branchOwner?.uid || companyAdmin?.uid || "");
+        setAddParentId(branchOwner?.uid || "");
       } else { // addRole === "user"
         if (userProfile?.role === "manager") {
           setAddParentId(userProfile.uid);
@@ -766,10 +758,7 @@ export default function OrgChartTab({
           const branchOwner = usersList.find(
             (u) => u.companyCode === compCode && u.role === "branch_owner"
           );
-          const companyAdmin = usersList.find(
-            (u) => u.companyCode === compCode && u.role === "admin"
-          );
-          setAddParentId(firstCompanyManager?.uid || branchOwner?.uid || companyAdmin?.uid || "");
+          setAddParentId(firstCompanyManager?.uid || branchOwner?.uid || "");
         }
       }
     }
@@ -914,7 +903,7 @@ export default function OrgChartTab({
         undefined,
         undefined,
         activeBranchId || undefined,
-        undefined,
+        addBirthDate ? addBirthDate : undefined,
         undefined,
         undefined,
         undefined,
@@ -939,6 +928,7 @@ export default function OrgChartTab({
       setAddPhone("");
       setAddCompanyName("");
       setAddIndustry("");
+      setAddBirthDate("");
       setAddPhotoURL("");
       setAddCoverImage("");
       setAddParentId("");
@@ -1153,25 +1143,29 @@ export default function OrgChartTab({
   // Auto-arrange employees without parentId into the correct hierarchy based on role
   const arrangedEmployees = (() => {
     const ROLE_LEVEL: Record<string, number> = {
-      admin: 1,
-      branch_owner: 2,
-      manager: 3,
-      user: 4,
+      branch_owner: 1,
+      manager: 2,
+      user: 3,
     };
 
-    // Build a mutable copy with virtual parentId for rendering
-    const list = employees.map(e => ({ ...e }));
+    // Build a mutable copy with virtual parentId for rendering (excluding admin)
+    const list = employees
+      .filter(e => {
+        const u = usersList.find(usr => usr.uid === e.id);
+        return u ? u.role !== "admin" : true;
+      })
+      .map(e => ({ ...e }));
 
     list.forEach(emp => {
       // If already has a valid parentId that exists, skip
       if (emp.parentId && list.some(p => p.id === emp.parentId)) return;
 
-      const myLevel = ROLE_LEVEL[usersList.find(u => u.uid === emp.id)?.role ?? "user"] ?? 4;
+      const myLevel = ROLE_LEVEL[usersList.find(u => u.uid === emp.id)?.role ?? "user"] ?? 3;
 
       // Find the best parent: highest-level employee that is strictly above this one
       let bestParent: typeof list[0] | undefined;
 
-      for (let targetLevel = myLevel - 1; targetLevel >= 0; targetLevel--) {
+      for (let targetLevel = myLevel - 1; targetLevel >= 1; targetLevel--) {
         const candidates = list.filter(p => {
           const pRole = usersList.find(u => u.uid === p.id)?.role ?? "user";
           return ROLE_LEVEL[pRole] === targetLevel && p.id !== emp.id;
@@ -1223,16 +1217,9 @@ export default function OrgChartTab({
       }
     };
 
-    const renderCardIcon = (role: string) => {
-      const rLower = (role || "").toLowerCase();
-      if (rLower.includes("ceo") || rLower.includes("chủ tịch") || rLower.includes("coo") || rLower.includes("cfo") || rLower.includes("cmo") || rLower.includes("cso") || rLower.includes("director") || rLower.includes("giám đốc")) {
-        return "👑";
-      }
-      if (rLower.includes("trưởng phòng") || rLower.includes("manager") || rLower.includes("leader") || rLower.includes("trưởng nhóm")) {
-        return "💼";
-      }
-      return "👤";
-    };
+    const rawUser = usersList.find((u) => u.uid === node.id);
+    const nodeCompanyName = node.companyName || rawUser?.companyName;
+    const nodeIndustry = node.industry || rawUser?.industry;
 
     return (
       <div className="flex flex-col items-center" key={node.id}>
@@ -1245,13 +1232,13 @@ export default function OrgChartTab({
           onClick={() => setSelectedEmp(node)}
           onMouseLeave={() => setActiveDropdownCardId(null)}
           className={`p-3 bg-white text-gray-800 rounded-2xl shadow-xs text-left cursor-pointer relative hover:scale-104 active:scale-95 transition-all duration-300 border border-gray-200 ${category.border} ${isSelected
-            ? "ring-4 ring-indigo-500 shadow-indigo-100 border-transparent z-10"
-            : "hover:border-indigo-300 hover:shadow-md"
+            ? "ring-4 ring-blue-500 shadow-blue-100 border-transparent z-10"
+            : "hover:border-blue-300 hover:shadow-md"
             } ${isFilteredOut ? "opacity-30 blur-[0.5px] scale-98" : "opacity-100"} w-48 sm:w-56`}
           id={`org_node_${node.id}`}
         >
           {/* Online/Offline Dot */}
-          <div className="absolute top-2 right-2 z-10 flex items-center justify-center">
+          <div className="absolute top-2.5 right-2.5 z-10 flex items-center justify-center">
             {node.status === "online" ? (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 block border border-white animate-pulse" title="Đang hoạt động" />
             ) : (
@@ -1260,29 +1247,35 @@ export default function OrgChartTab({
           </div>
 
           <div className="space-y-2">
-
-
-            {/* Middle row: Department (Main Title) */}
-            <div className="min-h-[32px] flex items-center flex-wrap gap-1.5">
-              <h4 className="font-bold text-xs text-slate-800 leading-snug font-sans line-clamp-2">
-                {node.department}
-              </h4>
-              {node.isLeader && (
-                <span className="bg-amber-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider font-mono shadow-sm flex items-center gap-0.5 shrink-0">
-                  👑 Leader
-                </span>
-              )}
+            {/* Top row: Avatar & Member Name */}
+            <div className="flex items-center gap-2.5 pr-4">
+              {renderAvatar(node.avatar, "w-8 h-8", "text-xs", node.name)}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1">
+                  <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate" title={node.name}>
+                    {node.name}
+                  </h4>
+                  {node.isLeader && (
+                    <span className="bg-amber-500 text-white text-[8px] font-extrabold px-1 py-0.2 rounded uppercase tracking-wider font-mono shadow-xs shrink-0" title="Leader">
+                      👑
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Bottom row: Manager Info */}
-            <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
-              {renderAvatar(node.avatar, "w-6 h-6", "text-xs")}
-              <div className="min-w-0 flex-1">
-                <span className="block text-[8px] font-bold text-gray-400 uppercase tracking-wider truncate font-mono">
-                  {renderCardIcon(node.role)} {node.role}
+            {/* Bottom row: Company & Industry */}
+            <div className="pt-2 border-t border-slate-100 space-y-1">
+              <div className="flex items-center gap-1.5 text-slate-600">
+                <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span className="text-[11px] font-medium text-slate-700 truncate" title={nodeCompanyName || "Chưa cập nhật công ty"}>
+                  {nodeCompanyName || "Chưa cập nhật công ty"}
                 </span>
-                <span className="block text-[10px] font-bold text-indigo-950 truncate">
-                  {node.name}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Briefcase className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <span className="text-[10.5px] font-medium text-blue-600 truncate" title={nodeIndustry || "Chưa cập nhật lĩnh vực"}>
+                  {nodeIndustry || "Chưa cập nhật lĩnh vực"}
                 </span>
               </div>
             </div>
@@ -1294,7 +1287,7 @@ export default function OrgChartTab({
               type="button"
               onClick={(e) => { e.stopPropagation(); toggleCollapse(node.id); }}
               title={isCollapsed ? `Mở rộng ${directReportsCount} thành viên cấp dưới` : `Thu gọn ${directReportsCount} thành viên cấp dưới`}
-              className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 text-white text-[9px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-xs border-2 border-white select-none transition-all cursor-pointer ${isCollapsed ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+              className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 text-white text-[9px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-xs border-2 border-white select-none transition-all cursor-pointer ${isCollapsed ? "bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white"
                 }`}
             >
               {isCollapsed ? `+${directReportsCount}` : "^"}
@@ -1349,19 +1342,7 @@ export default function OrgChartTab({
               className="w-full pl-9 pr-4 py-2 border border-gray-200 bg-white rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
             />
           </div>
-          <div data-testid="org-chart-department-filter" className="flex w-full items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2.5 py-1.5">
-            <Filter className="h-3.5 w-3.5 text-gray-400" />
-            <select
-              value={filterDepartment}
-              onChange={(e) => setFilterDepartment(e.target.value)}
-              className="bg-transparent text-xs outline-none cursor-pointer font-medium w-full"
-            >
-              <option value="Tất cả">Tất cả Phòng ban</option>
-              {uniqueDepartments.map(dept => (
-                <option key={dept} value={dept}>{dept}</option>
-              ))}
-            </select>
-          </div>
+
         </div>
 
         <div data-testid="org-chart-actions" className="grid w-full grid-cols-1 items-center gap-2 min-[420px]:grid-cols-2 min-[768px]:grid-cols-3 min-[1200px]:flex min-[1200px]:w-auto">
@@ -1426,7 +1407,7 @@ export default function OrgChartTab({
                           <div className="min-w-0">
                             <div className="font-bold text-slate-800 truncate">{employee.name || missingValue}</div>
                             <div className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
-                              {employee.role || missingValue} • {employee.department || missingValue}
+                              {employee.companyName ? `${employee.companyName} • ` : ""}{employee.department || missingValue}
                             </div>
                             {manager && (
                               <div className="text-[9px] text-slate-400 mt-0.5">
@@ -1436,11 +1417,10 @@ export default function OrgChartTab({
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-bold ${
-                            employee.status === "online"
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-bold ${employee.status === "online"
                               ? "bg-emerald-50 text-emerald-700 border border-emerald-250 animate-pulse"
                               : "bg-slate-50 text-slate-500 border border-slate-200"
-                          }`}>
+                            }`}>
                             {employee.status === "online" ? "Online" : "Offline"}
                           </span>
                         </div>
@@ -1493,11 +1473,10 @@ export default function OrgChartTab({
                             </td>
                             <td className="px-4 py-3">
                               <span
-                                className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                                  employee.status === "online"
+                                className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${employee.status === "online"
                                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                     : "bg-slate-50 text-slate-500 border border-slate-200"
-                                }`}
+                                  }`}
                               >
                                 {employee.status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
                               </span>
@@ -1563,11 +1542,10 @@ export default function OrgChartTab({
                             <button
                               key={pageNum}
                               onClick={() => setListPage(pageNum)}
-                              className={`relative inline-flex items-center px-4 py-2 text-xs font-semibold focus:z-20 ${
-                                listPage === pageNum
+                              className={`relative inline-flex items-center px-4 py-2 text-xs font-semibold focus:z-20 ${listPage === pageNum
                                   ? "z-10 bg-indigo-650 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-650"
                                   : "text-slate-900 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:outline-offset-0"
-                              }`}
+                                }`}
                             >
                               {pageNum}
                             </button>
@@ -1614,9 +1592,8 @@ export default function OrgChartTab({
               onMouseLeave={isMobile ? undefined : handleMouseLeaveOrUp}
               onMouseUp={isMobile ? undefined : handleMouseLeaveOrUp}
               onMouseMove={isMobile ? undefined : handleMouseMove}
-              className={`flex-1 overflow-auto flex items-start justify-start min-h-[440px] select-none overscroll-none p-4 sm:p-12 ${
-                isMobile ? "" : "cursor-grab"
-              } ${isDragging && !isMobile ? "cursor-grabbing" : ""}`}
+              className={`flex-1 overflow-auto flex items-start justify-start min-h-[440px] select-none overscroll-none p-4 sm:p-12 ${isMobile ? "" : "cursor-grab"
+                } ${isDragging && !isMobile ? "cursor-grabbing" : ""}`}
               id="interactive_org_chart"
             >
               <div
@@ -1936,9 +1913,8 @@ export default function OrgChartTab({
                     <div className="relative">
                       {renderAvatar(memberAvatar, "w-24 h-24", "text-3xl", memberName)}
                       <span
-                        className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white ${
-                          selectedEmp.status === "online" ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
-                        }`}
+                        className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white ${selectedEmp.status === "online" ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
+                          }`}
                         title={selectedEmp.status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
                       />
                     </div>
@@ -2073,11 +2049,10 @@ export default function OrgChartTab({
                         type="button"
                         onClick={handleToggleLeader}
                         disabled={isSavingLeader}
-                        className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-95 disabled:opacity-50 ${
-                          selectedEmp.isLeader
+                        className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-95 disabled:opacity-50 ${selectedEmp.isLeader
                             ? "bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-800"
                             : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"
-                        }`}
+                          }`}
                       >
                         {isSavingLeader ? (
                           <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -2292,6 +2267,15 @@ export default function OrgChartTab({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
+                  <label className="block font-bold text-gray-500 mb-1">Ngày sinh</label>
+                  <input
+                    type="date"
+                    value={addBirthDate}
+                    onChange={(e) => setAddBirthDate(e.target.value)}
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+                  />
+                </div>
+                <div>
                   <label className="block font-bold text-gray-500 mb-1">Mật khẩu khởi tạo *</label>
                   <input
                     type="password"
@@ -2302,21 +2286,22 @@ export default function OrgChartTab({
                     className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-gray-500 mb-1">Người kết nối / Phụ trách</label>
-                  <select
-                    value={addParentId}
-                    onChange={(e) => setAddParentId(e.target.value)}
-                    className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer text-slate-800"
-                  >
-                    <option value="">Không phân công</option>
-                    {employees.map(emp => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.role}{emp.companyName ? ` · ${emp.companyName}` : ""})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-500 mb-1">Người kết nối / Phụ trách</label>
+                <select
+                  value={addParentId}
+                  onChange={(e) => setAddParentId(e.target.value)}
+                  className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer text-slate-800"
+                >
+                  <option value="">Không phân công</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} ({emp.role}{emp.companyName ? ` · ${emp.companyName}` : ""})
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

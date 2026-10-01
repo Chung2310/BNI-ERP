@@ -9,6 +9,7 @@ export interface PermissionRouteRecord { sourceFile: string; line: number; metho
 export interface PublicRouteException { sourceFile: string; router: string; mount: string; method: string; path: string; reason: string; }
 /** Reviewed protocol exceptions. Keep each endpoint explicit and auditable. */
 export const PUBLIC_ROUTE_EXCEPTIONS: readonly PublicRouteException[] = [
+  { sourceFile: "server/router/webhook.router.ts", router: "webhookRouter", mount: "/webhook", method: "POST", path: "/sepay/:companyCode", reason: "SePay webhook authenticated with a tenant-specific API key" },
   { sourceFile: "server/router/google-drive.router.ts", router: "googleDriveRouter", mount: "/integrations/google-drive", method: "GET", path: "/callback", reason: "signed, expiring Google Drive OAuth callback state" },
   { sourceFile: "server/router/webhook.router.ts", router: "webhookRouter", mount: "/webhook", method: "POST", path: "/payment", reason: "signed payment-provider webhook" },
 ] as const;

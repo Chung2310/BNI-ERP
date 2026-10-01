@@ -234,11 +234,13 @@ function AppContent() {
     );
   }
 
-  const handleSearchNavigation = (tab: TabType, subTab?: string) => {
+  const handleSearchNavigation = (tab: TabType, subTab?: string, feeId?: string) => {
     // Cập nhật URL (path của tab đích + ?sub=) TRƯỚC khi phát popstate — nếu phát
     // popstate khi pathname còn là tab cũ, useTabRouter sẽ resolve ngược về tab cũ.
     const url = new URL(window.location.href);
     url.pathname = tabToPath(tab);
+    if (feeId && tab === "NHÂN SỰ" && subTab === "PHÍ THƯỜNG NIÊN") url.searchParams.set("fee", feeId);
+    else url.searchParams.delete("fee");
     const slug = subTab ? subTabToSlug(tab, subTab) : "";
     if (slug) {
       url.searchParams.set("sub", slug);
