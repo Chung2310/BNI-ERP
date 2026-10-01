@@ -67,17 +67,17 @@ interface LuxuryColor {
 }
 
 const LUXURY_PALETTE: LuxuryColor[] = [
-  { start: "#f43f5e", mid: "#e11d48", end: "#881337", text: "#ffffff" }, // Crimson Ruby
-  { start: "#fbbf24", mid: "#f59e0b", end: "#b45309", text: "#0f172a" }, // Imperial Amber Gold
-  { start: "#10b981", mid: "#059669", end: "#064e3b", text: "#ffffff" }, // Jade Emerald
-  { start: "#38bdf8", mid: "#0284c7", end: "#075985", text: "#ffffff" }, // Topaz Cyan
-  { start: "#818cf8", mid: "#4f46e5", end: "#312e81", text: "#ffffff" }, // Royal Indigo
-  { start: "#c084fc", mid: "#9333ea", end: "#581c87", text: "#ffffff" }, // Amethyst Purple
-  { start: "#f472b6", mid: "#db2777", end: "#831843", text: "#ffffff" }, // Hot Magenta
+  { start: "#ff4d6d", mid: "#cf142b", end: "#800a18", text: "#ffffff" }, // BNI Crimson Red
+  { start: "#fde047", mid: "#f59e0b", end: "#b45309", text: "#1e1b4b" }, // BNI Imperial Gold
+  { start: "#34d399", mid: "#059669", end: "#064e3b", text: "#ffffff" }, // Emerald Jade
+  { start: "#60a5fa", mid: "#2563eb", end: "#1e3a8a", text: "#ffffff" }, // Royal Sapphire Blue
   { start: "#fb923c", mid: "#ea580c", end: "#7c2d12", text: "#ffffff" }, // Sunset Tangerine
-  { start: "#2dd4bf", mid: "#0d9488", end: "#134e4a", text: "#ffffff" }, // Ocean Teal
-  { start: "#a3e635", mid: "#65a30d", end: "#365314", text: "#0f172a" }, // Electric Lime
-  { start: "#60a5fa", mid: "#2563eb", end: "#1e3a8a", text: "#ffffff" }, // Sapphire Blue
+  { start: "#c084fc", mid: "#9333ea", end: "#581c87", text: "#ffffff" }, // Amethyst Purple
+  { start: "#38bdf8", mid: "#0284c7", end: "#075985", text: "#ffffff" }, // Bright Topaz Cyan
+  { start: "#f472b6", mid: "#db2777", end: "#831843", text: "#ffffff" }, // Hot Cerise Magenta
+  { start: "#a3e635", mid: "#65a30d", end: "#365314", text: "#1a2e05" }, // Electric Lime
+  { start: "#2dd4bf", mid: "#0d9488", end: "#134e4a", text: "#ffffff" }, // Tropical Teal
+  { start: "#818cf8", mid: "#4f46e5", end: "#312e81", text: "#ffffff" }, // Royal Indigo
   { start: "#e879f9", mid: "#c026d3", end: "#701a75", text: "#ffffff" }, // Neon Orchid
 ];
 
@@ -243,17 +243,24 @@ export default function WheelOfNamesPage() {
 
     // Retina DPI scale
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    const size = Math.min(rect.width, rect.height);
+
+    // Calculate available dimensions in parent stage container precisely
+    const stage = canvas.parentElement?.parentElement;
+    const stageWidth = stage ? stage.clientWidth - 32 : window.innerWidth - (isDrawerOpen ? 384 : 0) - 32;
+    const stageHeight = stage ? stage.clientHeight - 32 : window.innerHeight - 80;
+    const size = Math.max(260, Math.floor(Math.min(stageWidth, stageHeight, 880)));
     if (size <= 0) return;
 
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
+    // Set matching CSS display size in pixels to prevent ANY non-square distortion
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
+    canvas.width = Math.round(size * dpr);
+    canvas.height = Math.round(size * dpr);
     ctx.scale(dpr, dpr);
 
     const cx = size / 2;
     const cy = size / 2;
-    const rimWidth = 28;
+    const rimWidth = Math.max(20, Math.round(size * 0.038));
     const radius = size / 2 - rimWidth - 14;
     const outerBezelRadius = radius + rimWidth;
 
@@ -267,21 +274,21 @@ export default function WheelOfNamesPage() {
       ctx.save();
       ctx.beginPath();
       ctx.arc(cx, cy, outerBezelRadius, 0, 2 * Math.PI);
-      ctx.fillStyle = "#090d16";
-      ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowColor = "rgba(207, 20, 43, 0.15)";
       ctx.shadowBlur = 30;
       ctx.fill();
 
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
-      ctx.fillStyle = "#0f172a";
-      ctx.strokeStyle = "#f59e0b";
+      ctx.fillStyle = "#fff5f5";
+      ctx.strokeStyle = "#cf142b";
       ctx.lineWidth = 4;
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = "#fef08a";
-      ctx.font = "bold 18px sans-serif";
+      ctx.fillStyle = "#991b1b";
+      ctx.font = "bold 16px sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("Vui lòng chọn hoặc thêm thành viên để quay", cx, cy);
@@ -300,10 +307,10 @@ export default function WheelOfNamesPage() {
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, outerBezelRadius + 2, 0, 2 * Math.PI);
-    ctx.fillStyle = "#030712";
-    ctx.shadowColor = "rgba(0, 0, 0, 0.85)";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+    ctx.shadowColor = "rgba(180, 20, 40, 0.22)";
     ctx.shadowBlur = 36;
-    ctx.shadowOffsetY = 8;
+    ctx.shadowOffsetY = 10;
     ctx.fill();
     ctx.restore();
 
@@ -330,7 +337,7 @@ export default function WheelOfNamesPage() {
     // Recessed Dark Marquee Channel for Bulbs
     ctx.beginPath();
     ctx.arc(cx, cy, outerBezelRadius - 4, 0, 2 * Math.PI);
-    ctx.fillStyle = "#090d16";
+    ctx.fillStyle = "#1e0b10";
     ctx.fill();
 
     // Inner Gold Track Border
@@ -436,6 +443,13 @@ export default function WheelOfNamesPage() {
         ctx.shadowColor = "#000000";
         ctx.shadowBlur = 3;
         ctx.fill();
+      } else {
+        // Decorative inner gold ring when only 1 participant
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius - 8, 0, 2 * Math.PI);
+        ctx.strokeStyle = "rgba(254, 240, 138, 0.5)";
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
       }
 
       // Text along Radial Ray
@@ -447,11 +461,11 @@ export default function WheelOfNamesPage() {
         ctx.rotate(currentAngle);
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.font = "bold 24px sans-serif";
-        ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
-        ctx.shadowBlur = 6;
+        ctx.font = "900 24px sans-serif";
+        ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
+        ctx.shadowBlur = 8;
         ctx.shadowOffsetX = 1;
-        ctx.shadowOffsetY = 1;
+        ctx.shadowOffsetY = 2;
         ctx.fillStyle = palette.text;
         ctx.fillText(slice.displayName, 0, -(radius * 0.48));
       } else {
@@ -533,9 +547,9 @@ export default function WheelOfNamesPage() {
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, hubRadius + 8, 0, 2 * Math.PI);
-    ctx.fillStyle = "#030712";
-    ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
-    ctx.shadowBlur = 24;
+    ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+    ctx.shadowBlur = 18;
     ctx.shadowOffsetY = 4;
     ctx.fill();
     ctx.restore();
@@ -562,7 +576,7 @@ export default function WheelOfNamesPage() {
     // Dark Inset Groove
     ctx.beginPath();
     ctx.arc(cx, cy, hubRadius + 1.5, 0, 2 * Math.PI);
-    ctx.fillStyle = "#0f172a";
+    ctx.fillStyle = "#450a0a";
     ctx.fill();
 
     // Master Button Face Radial Sunburst Gradient
@@ -574,11 +588,11 @@ export default function WheelOfNamesPage() {
       cy,
       hubRadius
     );
-    hubGrad.addColorStop(0, "#fffbeb");
-    hubGrad.addColorStop(0.2, "#fde68a");
-    hubGrad.addColorStop(0.5, "#f59e0b");
-    hubGrad.addColorStop(0.85, "#b45309");
-    hubGrad.addColorStop(1, "#78350f");
+    hubGrad.addColorStop(0, "#fee2e2");
+    hubGrad.addColorStop(0.2, "#f87171");
+    hubGrad.addColorStop(0.55, "#cf142b");
+    hubGrad.addColorStop(0.85, "#991b1b");
+    hubGrad.addColorStop(1, "#5f0f18");
 
     ctx.beginPath();
     ctx.arc(cx, cy, hubRadius, 0, 2 * Math.PI);
@@ -674,7 +688,7 @@ export default function WheelOfNamesPage() {
     ctx.stroke();
 
     ctx.restore();
-  }, [activeParticipants, isSpinning]);
+  }, [activeParticipants, isSpinning, isDrawerOpen]);
 
   // Keep wheel rendered on state changes
   useEffect(() => {
@@ -711,6 +725,13 @@ export default function WheelOfNamesPage() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [drawWheel]);
+
+  // Redraw when drawer toggles to adjust available size smoothly
+  useEffect(() => {
+    drawWheel();
+    const timer = setTimeout(drawWheel, 320);
+    return () => clearTimeout(timer);
+  }, [isDrawerOpen, drawWheel]);
 
   // 4. Spin Execution with Smooth Deceleration & Authentic Physics
   const handleStartSpin = () => {
@@ -895,21 +916,21 @@ export default function WheelOfNamesPage() {
   );
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-slate-950 font-sans text-white select-none">
-      {/* Background Ambient Glows */}
-      <div className="pointer-events-none absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full bg-blue-600/10 blur-[140px]" />
-      <div className="pointer-events-none absolute -bottom-40 -right-40 h-[600px] w-[600px] rounded-full bg-amber-500/10 blur-[140px]" />
-      <div className="pointer-events-none absolute top-1/2 left-1/3 -translate-y-1/2 h-[500px] w-[500px] rounded-full bg-purple-600/10 blur-[160px]" />
+    <div className="relative flex h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-100 via-[#fff9f9] to-[#fff4eb] font-sans text-slate-800 select-none">
+      {/* Background Ambient Glows & Celebration Rays */}
+      <div className="pointer-events-none absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full bg-red-500/12 blur-[140px]" />
+      <div className="pointer-events-none absolute -bottom-40 -right-40 h-[600px] w-[600px] rounded-full bg-amber-500/15 blur-[140px]" />
+      <div className="pointer-events-none absolute top-1/2 left-1/3 -translate-y-1/2 h-[500px] w-[500px] rounded-full bg-yellow-400/15 blur-[160px]" />
 
       {/* Main Wheel Area */}
       <div className="flex flex-1 flex-col h-full overflow-hidden">
         {/* Top Header Bar */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-slate-900/60 px-4 backdrop-blur-xl sm:px-6">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur-xl sm:px-6 shadow-2xs z-20">
           <div className="flex items-center gap-3">
             <a
               href="/"
               title="Quay lại hệ thống"
-              className="flex items-center gap-2 rounded-xl p-2 text-slate-400 hover:bg-white/10 hover:text-white transition"
+              className="flex items-center gap-2 rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition cursor-pointer"
             >
               <ArrowLeft className="h-5 w-5" />
             </a>
@@ -918,13 +939,13 @@ export default function WheelOfNamesPage() {
               <img
                 src={BRAND_LOGO_PATH}
                 alt={BRAND_NAME}
-                className="h-8 w-8 rounded-lg border border-white/20 object-cover shadow-sm"
+                className="h-8 w-8 rounded-lg border border-slate-200 object-cover shadow-2xs"
               />
               <div>
-                <h1 className="flex items-center gap-2 text-sm font-black tracking-tight text-white sm:text-base">
+                <h1 className="flex items-center gap-2 text-sm font-black tracking-tight text-slate-900 sm:text-base">
                   <span>VÒNG QUAY MAY MẮN</span>
-                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/30 uppercase tracking-widest">
-                    {userProfile?.companyName || userProfile?.companyCode || "iGen Connect"}
+                  <span className="rounded-full bg-[#cf142b] px-2.5 py-0.5 text-[10px] font-bold text-white shadow-2xs uppercase tracking-wider">
+                    {userProfile?.companyName || userProfile?.companyCode || "BNI CHAPTER"}
                   </span>
                 </h1>
               </div>
@@ -934,7 +955,7 @@ export default function WheelOfNamesPage() {
           {/* Center Prize Display / Edit */}
           <div className="hidden md:flex items-center gap-2">
             {isEditingPrize ? (
-              <div className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 border border-amber-400/40">
+              <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1 border border-amber-400 shadow-xs">
                 <input
                   type="text"
                   value={prizeInput}
@@ -946,7 +967,7 @@ export default function WheelOfNamesPage() {
                     }
                   }}
                   autoFocus
-                  className="bg-transparent text-xs font-bold text-amber-300 outline-none w-48 text-center"
+                  className="bg-transparent text-xs font-bold text-amber-900 outline-none w-48 text-center"
                 />
                 <button
                   type="button"
@@ -954,7 +975,7 @@ export default function WheelOfNamesPage() {
                     setCurrentPrize(prizeInput.trim() || "Giải Thưởng May Mắn");
                     setIsEditingPrize(false);
                   }}
-                  className="text-emerald-400 hover:text-emerald-300 p-1"
+                  className="text-emerald-600 hover:text-emerald-700 p-1 cursor-pointer"
                 >
                   <Check className="h-3.5 w-3.5" />
                 </button>
@@ -966,11 +987,11 @@ export default function WheelOfNamesPage() {
                   setPrizeInput(currentPrize);
                   setIsEditingPrize(true);
                 }}
-                className="group flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-4 py-1.5 text-xs font-bold text-amber-300 transition hover:bg-amber-500/20 hover:border-amber-400/60 cursor-pointer shadow-sm"
+                className="group flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-4 py-1.5 text-xs font-bold text-amber-900 transition hover:bg-amber-100 hover:border-amber-400 cursor-pointer shadow-2xs"
               >
-                <Trophy className="h-4 w-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                <Trophy className="h-4 w-4 text-amber-600 group-hover:scale-110 transition-transform" />
                 <span>{currentPrize}</span>
-                <span className="text-[10px] text-amber-400/60 group-hover:text-amber-300 underline">Đổi</span>
+                <span className="text-[10px] text-amber-600 group-hover:text-amber-800 underline">Đổi</span>
               </button>
             )}
           </div>
@@ -978,18 +999,18 @@ export default function WheelOfNamesPage() {
           {/* Right Action Icons */}
           <div className="flex items-center gap-2">
             {/* Spin Duration Selector */}
-            <div className="hidden sm:flex items-center rounded-xl bg-white/5 p-1 border border-white/10">
-              <Clock className="h-3.5 w-3.5 text-slate-400 ml-1.5 mr-1" />
+            <div className="hidden sm:flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200">
+              <Clock className="h-3.5 w-3.5 text-slate-500 ml-1.5 mr-1" />
               {[5, 8, 12].map((dur) => (
                 <button
                   key={dur}
                   type="button"
                   onClick={() => setSpinDuration(dur)}
                   disabled={isSpinning}
-                  className={`rounded-lg px-2 py-0.5 text-[10px] font-bold transition ${
+                  className={`rounded-lg px-2 py-0.5 text-[10px] font-bold transition cursor-pointer ${
                     spinDuration === dur
-                      ? "bg-amber-500 text-slate-950 shadow-sm"
-                      : "text-slate-400 hover:text-white"
+                      ? "bg-[#cf142b] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   {dur}s
@@ -1002,9 +1023,9 @@ export default function WheelOfNamesPage() {
               type="button"
               onClick={() => setSoundEnabled(!soundEnabled)}
               title={soundEnabled ? "Tắt âm thanh" : "Bật âm thanh"}
-              className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white transition cursor-pointer"
+              className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
             >
-              {soundEnabled ? <Volume2 className="h-4 w-4 text-emerald-400" /> : <VolumeX className="h-4 w-4 text-rose-400" />}
+              {soundEnabled ? <Volume2 className="h-4 w-4 text-emerald-600" /> : <VolumeX className="h-4 w-4 text-rose-500" />}
             </button>
 
             {/* Fullscreen Toggle */}
@@ -1012,7 +1033,7 @@ export default function WheelOfNamesPage() {
               type="button"
               onClick={toggleFullscreen}
               title={isFullscreen ? "Thu nhỏ (F)" : "Toàn màn hình (F)"}
-              className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white transition cursor-pointer"
+              className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
             >
               {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </button>
@@ -1021,10 +1042,10 @@ export default function WheelOfNamesPage() {
             <button
               type="button"
               onClick={() => setIsDrawerOpen(!isDrawerOpen)}
-              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition cursor-pointer ${
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition cursor-pointer shadow-2xs ${
                 isDrawerOpen
-                  ? "border-amber-400/40 bg-amber-500/20 text-amber-300"
-                  : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+                  ? "border-[#cf142b]/40 bg-[#cf142b]/10 text-[#cf142b]"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
               }`}
             >
               <Users className="h-4 w-4" />
@@ -1034,21 +1055,21 @@ export default function WheelOfNamesPage() {
         </header>
 
         {/* Stage Content */}
-        <div className="relative flex flex-1 items-center justify-center p-4 overflow-hidden">
+        <div className="relative flex flex-1 h-full w-full items-center justify-center p-3 sm:p-6 overflow-hidden">
           {/* Ambient Stage Spotlight Glow */}
           <div
-            className="pointer-events-none absolute h-[650px] w-[650px] rounded-full bg-gradient-to-tr from-amber-500/20 via-yellow-400/10 to-transparent blur-[130px] animate-pulse"
+            className="pointer-events-none absolute h-[560px] w-[560px] rounded-full bg-gradient-to-tr from-red-500/15 via-amber-400/20 to-transparent blur-[120px] animate-pulse"
             style={{ animationDuration: "5s" }}
           />
 
           {/* Main Wheel Canvas Container */}
-          <div className="relative flex aspect-square h-[90vh] max-h-[900px] w-full max-w-[900px] items-center justify-center drop-shadow-[0_0_50px_rgba(245,158,11,0.2)]">
+          <div className="relative flex items-center justify-center max-h-full max-w-full drop-shadow-[0_16px_40px_rgba(207,20,43,0.18)]">
             <canvas
               ref={canvasRef}
               onClick={handleStartSpin}
               title={isSpinning ? "Đang quay..." : "Nhấn nút QUAY ở giữa để bắt đầu"}
-              className={`h-full w-full select-none transition-transform duration-300 ${
-                isSpinning ? "cursor-not-allowed scale-[1.01]" : "cursor-pointer hover:scale-[1.015]"
+              className={`select-none transition-transform duration-300 block ${
+                isSpinning ? "cursor-not-allowed scale-[1.008]" : "cursor-pointer hover:scale-[1.012]"
               }`}
             />
           </div>
@@ -1057,19 +1078,19 @@ export default function WheelOfNamesPage() {
 
       {/* Right Collapsible Participants & Winners Drawer */}
       <div
-        className={`flex flex-col border-l border-white/10 bg-slate-900/80 backdrop-blur-2xl transition-all duration-300 z-30 ${
+        className={`flex flex-col border-l border-slate-200/90 bg-white/95 backdrop-blur-2xl transition-all duration-300 z-30 shadow-xl ${
           isDrawerOpen ? "w-80 sm:w-96" : "w-0 opacity-0 overflow-hidden pointer-events-none"
         }`}
       >
         {/* Drawer Tabs */}
-        <div className="flex items-center border-b border-white/10 p-2">
+        <div className="flex items-center border-b border-slate-200 p-2 gap-1 bg-slate-50/70">
           <button
             type="button"
             onClick={() => setActiveDrawerTab("participants")}
             className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition cursor-pointer ${
               activeDrawerTab === "participants"
-                ? "bg-amber-500 text-slate-950 shadow-sm"
-                : "text-slate-400 hover:text-white"
+                ? "bg-[#cf142b] text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white"
             }`}
           >
             <Users className="h-4 w-4" />
@@ -1081,8 +1102,8 @@ export default function WheelOfNamesPage() {
             onClick={() => setActiveDrawerTab("winners")}
             className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition cursor-pointer ${
               activeDrawerTab === "winners"
-                ? "bg-amber-500 text-slate-950 shadow-sm"
-                : "text-slate-400 hover:text-white"
+                ? "bg-[#cf142b] text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white"
             }`}
           >
             <Trophy className="h-4 w-4" />
@@ -1092,7 +1113,7 @@ export default function WheelOfNamesPage() {
           <button
             type="button"
             onClick={() => setIsDrawerOpen(false)}
-            className="p-2 text-slate-400 hover:text-white rounded-lg ml-1"
+            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg ml-0.5 cursor-pointer"
             title="Đóng bảng bên"
           >
             <ChevronRight className="h-4 w-4" />
@@ -1101,7 +1122,7 @@ export default function WheelOfNamesPage() {
 
         {/* Tab 1: Participants List */}
         {activeDrawerTab === "participants" && (
-          <div className="flex flex-1 flex-col overflow-hidden p-4 space-y-4">
+          <div className="flex flex-1 flex-col overflow-hidden p-4 space-y-3.5 bg-white">
             {/* Quick Add Guest Form */}
             <form onSubmit={handleAddGuest} className="relative">
               <input
@@ -1109,12 +1130,12 @@ export default function WheelOfNamesPage() {
                 placeholder="+ Thêm khách mời / người mới..."
                 value={newGuestName}
                 onChange={(e) => setNewGuestName(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-slate-800/80 px-3.5 py-2.5 text-xs text-white placeholder-slate-400 outline-none focus:border-amber-400/60 focus:ring-1 focus:ring-amber-400/40"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-[#cf142b] focus:bg-white focus:ring-1 focus:ring-[#cf142b]/30 shadow-2xs"
               />
               <button
                 type="submit"
                 disabled={!newGuestName.trim()}
-                className="absolute right-1.5 top-1.5 rounded-lg bg-amber-500 p-1.5 text-slate-950 disabled:opacity-40 hover:bg-amber-400 transition cursor-pointer"
+                className="absolute right-1.5 top-1.5 rounded-lg bg-[#cf142b] p-1.5 text-white disabled:opacity-40 hover:bg-[#b00f24] transition cursor-pointer shadow-xs"
               >
                 <UserPlus className="h-3.5 w-3.5" />
               </button>
@@ -1129,7 +1150,7 @@ export default function WheelOfNamesPage() {
                   placeholder="Tìm theo tên..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-800/50 pl-8 pr-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-blue-400/50"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-[#cf142b] focus:bg-white shadow-2xs"
                 />
               </div>
 
@@ -1138,7 +1159,7 @@ export default function WheelOfNamesPage() {
                 onClick={handleShuffle}
                 title="Xáo trộn danh sách"
                 disabled={isSpinning}
-                className="rounded-xl border border-white/10 bg-slate-800 p-2 text-slate-300 hover:text-white transition cursor-pointer"
+                className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
               >
                 <Shuffle className="h-4 w-4" />
               </button>
@@ -1148,19 +1169,19 @@ export default function WheelOfNamesPage() {
                 onClick={loadSystemUsers}
                 title="Tải lại từ hệ thống iGen Connect"
                 disabled={isSpinning || loadingUsers}
-                className="rounded-xl border border-white/10 bg-slate-800 p-2 text-slate-300 hover:text-white transition cursor-pointer"
+                className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
               >
                 <RefreshCw className={`h-4 w-4 ${loadingUsers ? "animate-spin" : ""}`} />
               </button>
             </div>
 
             {/* Bulk Selection Actions */}
-            <div className="flex items-center justify-between text-[11px] text-slate-400 border-b border-white/10 pb-2">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between text-[11px] text-slate-500 border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-3 font-semibold">
                 <button
                   type="button"
                   onClick={() => handleToggleSelectAll(true)}
-                  className="hover:text-amber-300 transition cursor-pointer"
+                  className="text-[#cf142b] hover:underline transition cursor-pointer"
                 >
                   Chọn tất cả
                 </button>
@@ -1168,13 +1189,13 @@ export default function WheelOfNamesPage() {
                 <button
                   type="button"
                   onClick={() => handleToggleSelectAll(false)}
-                  className="hover:text-amber-300 transition cursor-pointer"
+                  className="text-slate-500 hover:text-slate-800 transition cursor-pointer"
                 >
                   Bỏ chọn tất cả
                 </button>
               </div>
 
-              <span className="font-mono text-slate-500">
+              <span className="font-mono text-slate-400">
                 {activeParticipants.length}/{participants.length}
               </span>
             </div>
@@ -1182,12 +1203,12 @@ export default function WheelOfNamesPage() {
             {/* Scrollable Members List */}
             <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
               {loadingUsers ? (
-                <div className="flex flex-col items-center justify-center py-12 text-slate-500 space-y-2">
-                  <RefreshCw className="h-6 w-6 animate-spin text-amber-400" />
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400 space-y-2">
+                  <RefreshCw className="h-6 w-6 animate-spin text-[#cf142b]" />
                   <span className="text-xs">Đang đồng bộ người dùng từ hệ thống...</span>
                 </div>
               ) : filteredParticipants.length === 0 ? (
-                <div className="py-12 text-center text-xs text-slate-500">
+                <div className="py-12 text-center text-xs text-slate-400">
                   Không tìm thấy thành viên phù hợp
                 </div>
               ) : (
@@ -1196,8 +1217,8 @@ export default function WheelOfNamesPage() {
                     key={p.id}
                     className={`flex items-center justify-between rounded-xl p-2.5 transition border ${
                       p.selected
-                        ? "bg-slate-800/80 border-white/10 text-white"
-                        : "bg-slate-900/40 border-transparent text-slate-500 opacity-60"
+                        ? "bg-white border-slate-200 text-slate-900 shadow-2xs hover:border-slate-300"
+                        : "bg-slate-50/60 border-transparent text-slate-400 opacity-60"
                     }`}
                   >
                     <label className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer select-none">
@@ -1205,7 +1226,7 @@ export default function WheelOfNamesPage() {
                         type="checkbox"
                         checked={p.selected}
                         onChange={() => handleToggleParticipant(p.id)}
-                        className="h-4 w-4 rounded accent-amber-500 cursor-pointer"
+                        className="h-4 w-4 rounded accent-[#cf142b] cursor-pointer"
                       />
 
                       {/* Avatar or Initial */}
@@ -1213,11 +1234,11 @@ export default function WheelOfNamesPage() {
                         <img
                           src={p.avatar}
                           alt={p.name}
-                          className="h-7 w-7 rounded-full object-cover border border-white/20 shrink-0"
+                          className="h-7 w-7 rounded-full object-cover border border-slate-200 shrink-0"
                         />
                       ) : (
                         <div
-                          className="h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                          className="h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-2xs"
                           style={{ backgroundColor: WHEEL_PALETTE[idx % WHEEL_PALETTE.length] }}
                         >
                           {p.name.slice(0, 1).toUpperCase()}
@@ -1225,9 +1246,9 @@ export default function WheelOfNamesPage() {
                       )}
 
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-xs font-bold">{p.name}</div>
+                        <div className="truncate text-xs font-bold text-slate-800">{p.name}</div>
                         {p.department && (
-                          <div className="truncate text-[10px] text-slate-400">{p.department}</div>
+                          <div className="truncate text-[10px] text-slate-500">{p.department}</div>
                         )}
                       </div>
                     </label>
@@ -1237,7 +1258,7 @@ export default function WheelOfNamesPage() {
                       type="button"
                       onClick={() => handleDeleteParticipant(p.id)}
                       title="Xóa khỏi danh sách quay"
-                      className="p-1 text-slate-500 hover:text-rose-400 transition rounded"
+                      className="p-1 text-slate-400 hover:text-rose-600 transition rounded cursor-pointer"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -1250,15 +1271,15 @@ export default function WheelOfNamesPage() {
 
         {/* Tab 2: Winners History */}
         {activeDrawerTab === "winners" && (
-          <div className="flex flex-1 flex-col overflow-hidden p-4 space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-white/10">
-              <span className="text-xs text-slate-400 font-bold">Lịch sử trúng giải hôm nay</span>
+          <div className="flex flex-1 flex-col overflow-hidden p-4 space-y-4 bg-white">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <span className="text-xs text-slate-700 font-bold">Lịch sử trúng giải hôm nay</span>
               {winners.length > 0 && (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={handleExportWinners}
-                    className="flex items-center gap-1 rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 text-[11px] font-bold hover:bg-emerald-600/30 transition cursor-pointer"
+                    className="flex items-center gap-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 text-[11px] font-bold hover:bg-emerald-100 transition cursor-pointer shadow-2xs"
                   >
                     <Download className="h-3 w-3" />
                     <span>Xuất CSV</span>
@@ -1270,7 +1291,7 @@ export default function WheelOfNamesPage() {
                         setWinners([]);
                       }
                     }}
-                    className="p-1 text-slate-500 hover:text-rose-400 transition"
+                    className="p-1 text-slate-400 hover:text-rose-600 transition cursor-pointer"
                     title="Xóa lịch sử"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -1281,24 +1302,24 @@ export default function WheelOfNamesPage() {
 
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
               {winners.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center text-slate-500 space-y-2">
-                  <Trophy className="h-8 w-8 text-slate-600" />
+                <div className="flex flex-col items-center justify-center py-16 text-center text-slate-400 space-y-2">
+                  <Trophy className="h-8 w-8 text-slate-300" />
                   <p className="text-xs">Chưa có ai trúng thưởng. Hãy bấm QUAY để bắt đầu!</p>
                 </div>
               ) : (
                 winners.map((w, idx) => (
                   <div
                     key={w.id}
-                    className="flex items-center justify-between rounded-xl bg-slate-800/80 border border-amber-400/20 p-3 shadow-sm"
+                    className="flex items-center justify-between rounded-xl bg-amber-50/70 border border-amber-200/80 p-3 shadow-2xs"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 border border-amber-400/40 text-xs font-black shrink-0">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white font-black text-xs shrink-0 shadow-2xs">
                         #{winners.length - idx}
                       </div>
                       <div className="min-w-0">
-                        <h4 className="truncate text-xs font-bold text-white">{w.name}</h4>
-                        <p className="text-[10px] text-amber-300 truncate">{w.prizeName}</p>
-                        <p className="text-[9px] text-slate-500 font-mono">{w.wonAt}</p>
+                        <h4 className="truncate text-xs font-bold text-slate-900">{w.name}</h4>
+                        <p className="text-[10px] text-amber-700 font-semibold truncate">{w.prizeName}</p>
+                        <p className="text-[9px] text-slate-400 font-mono">{w.wonAt}</p>
                       </div>
                     </div>
                   </div>
@@ -1313,37 +1334,37 @@ export default function WheelOfNamesPage() {
       {/* WINNER POPUP CELEBRATION MODAL */}
       {/* ======================================================== */}
       {winnerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg rounded-3xl border-2 border-amber-400/60 bg-linear-to-b from-slate-900 via-indigo-950 to-slate-900 p-8 text-center shadow-[0_0_80px_rgba(245,158,11,0.5)] overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg rounded-3xl border-2 border-amber-300 bg-white p-8 text-center shadow-2xl overflow-hidden">
             {/* Top Close Icon */}
             <button
               type="button"
               onClick={() => setWinnerModal(null)}
-              className="absolute right-4 top-4 rounded-full p-2 text-slate-400 hover:bg-white/10 hover:text-white transition cursor-pointer"
+              className="absolute right-4 top-4 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
 
             {/* Glowing Backdrop Aura */}
-            <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-48 w-48 rounded-full bg-amber-400/30 blur-3xl" />
+            <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-48 w-48 rounded-full bg-amber-300/40 blur-3xl" />
 
             {/* Trophy & Badge */}
-            <div className="relative mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-linear-to-tr from-amber-500 to-yellow-300 p-4 shadow-xl shadow-amber-500/30">
-              <Trophy className="h-10 w-10 text-slate-950 animate-bounce" />
+            <div className="relative mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-amber-500 to-yellow-400 p-4 shadow-xl shadow-amber-500/20">
+              <Trophy className="h-10 w-10 text-white animate-bounce" />
             </div>
 
-            <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/20 px-3.5 py-1 text-xs font-black uppercase tracking-widest text-amber-300 border border-amber-400/40 mb-3">
-              <Sparkles className="h-3.5 w-3.5" />
+            <div className="inline-flex items-center gap-2 rounded-full bg-red-50 px-3.5 py-1 text-xs font-black uppercase tracking-widest text-[#cf142b] border border-red-200 mb-3">
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
               <span>CHÚC MỪNG CHIẾN THẮNG</span>
             </div>
 
             {/* Prize Label */}
-            <p className="text-sm font-semibold text-slate-300 mb-2">
-              Đã trúng: <span className="text-amber-300 font-bold">{winnerModal.prize}</span>
+            <p className="text-sm font-semibold text-slate-600 mb-2">
+              Đã trúng: <span className="text-[#cf142b] font-bold">{winnerModal.prize}</span>
             </p>
 
             {/* Winner Big Display */}
-            <div className="my-6 rounded-2xl bg-black/40 border border-white/10 p-6 shadow-inner">
+            <div className="my-6 rounded-2xl bg-gradient-to-b from-amber-50 to-orange-50/60 border border-amber-200/80 p-6 shadow-inner">
               {winnerModal.winner.avatar ? (
                 <img
                   src={winnerModal.winner.avatar}
@@ -1352,12 +1373,12 @@ export default function WheelOfNamesPage() {
                 />
               ) : null}
 
-              <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]">
+              <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 drop-shadow-xs">
                 {winnerModal.winner.name}
               </h2>
 
               {winnerModal.winner.department && (
-                <p className="mt-1 text-xs sm:text-sm text-slate-400 font-medium">
+                <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium">
                   {winnerModal.winner.department}
                 </p>
               )}
@@ -1369,7 +1390,7 @@ export default function WheelOfNamesPage() {
               <button
                 type="button"
                 onClick={() => handleRemoveWinnerFromWheel(winnerModal.winner.id)}
-                className="flex items-center justify-center gap-2 rounded-2xl bg-rose-600/90 hover:bg-rose-500 px-5 py-3.5 text-xs font-bold text-white shadow-lg transition active:scale-95 cursor-pointer"
+                className="flex items-center justify-center gap-2 rounded-2xl bg-rose-600 hover:bg-rose-700 px-5 py-3.5 text-xs font-bold text-white shadow-md transition active:scale-95 cursor-pointer"
               >
                 <UserMinus className="h-4 w-4" />
                 <span>Loại khỏi vòng quay</span>
@@ -1379,7 +1400,7 @@ export default function WheelOfNamesPage() {
               <button
                 type="button"
                 onClick={() => setWinnerModal(null)}
-                className="flex items-center justify-center gap-2 rounded-2xl bg-slate-800 hover:bg-slate-700 px-5 py-3.5 text-xs font-bold text-slate-200 border border-white/10 transition active:scale-95 cursor-pointer"
+                className="flex items-center justify-center gap-2 rounded-2xl bg-slate-900 hover:bg-slate-800 px-5 py-3.5 text-xs font-bold text-white transition active:scale-95 cursor-pointer shadow-md"
               >
                 <Check className="h-4 w-4 text-emerald-400" />
                 <span>Giữ lại & Đóng</span>
