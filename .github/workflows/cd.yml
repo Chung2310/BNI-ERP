@@ -1,0 +1,215 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ develop, production ]
+  pull_request:
+    branches: [ develop, production ]
+
+# Push nhiều commit liên tiếp: chỉ chạy pipeline cho commit mới nhất.
+# PR thì hủy run cũ đang chạy; push (có deploy) thì xếp hàng thay vì hủy giữa chừng
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+
+  # BƯỚC 1: KIỂM TRA CHẤT LƯỢNG CODE (Chạy cho cả Push và Pull Request)
+  ci-checks:
+    name: Step 1 - Lint & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=1536
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --prefer-offline --no-progress
+
+      - name: Type check
+        run: yarn typecheck
+
+      # Chỉ build thử trên PR để bắt lỗi build (vite/esbuild) trước khi merge.
+      # Khi push thì bỏ qua vì Step 2 đã build trong Docker rồi — tránh build trùng
+      - name: Build check (PR only)
+        if: github.event_name == 'pull_request'
+        run: yarn build
+
+  # BƯỚC 2: BUILD DOCKER IMAGE (Chỉ chạy khi push/merge và Step 1 thành công)
+  build-image:
+    name: Step 2 - Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: ci-checks
+    if: github.event_name == 'push'
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Tên image trên registry bắt buộc viết thường; github.repository có chữ hoa
+      - name: Set lowercase image name
+        run: echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      # Giải phóng ~25-30GB dung lượng runner (xóa toolchain không dùng đến)
+      # để BuildKit đủ chỗ build image + chuẩn bị cache export
+      - name: Free up runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=sha
+          
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Registry cache trên GHCR (không tính vào giới hạn 10GB GHA cache).
+          # mode=max: export cả layer của builder stage — yarn.lock không đổi thì
+          # lần build sau nhảy qua bước cài node_modules + có thể tái dùng layer build
+          cache-from: type=registry,ref=ghcr.io/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ env.IMAGE_NAME }}:buildcache,mode=max
+
+      # Dọn dẹp dung lượng Docker ngay sau khi build/push image xong
+      - name: Cleanup build cache
+        if: always()
+        run: |
+          docker builder prune -f
+          docker image prune -f
+
+  # BƯỚC 3: DEPLOY VPS (Chỉ chạy khi Step 2 thành công)
+  deploy:
+    name: Step 3 - Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build-image
+    if: github.event_name == 'push'
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --- Triển khai lên Staging (nhánh develop) ---
+      - name: Copy docker-compose.yml to Staging VPS
+        if: github.ref_name == 'develop'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          source: "docker-compose.yml"
+          target: "/opt/igen-erp/staging"
+
+      - name: Deploy via SSH to Staging VPS
+        if: github.ref_name == 'develop'
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          ENV_FILE_CONTENT: ${{ secrets.ENV_FILE }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          envs: ENV_FILE_CONTENT
+          script: |
+            TARGET_DIR="/opt/igen-erp/staging"
+            IMAGE_TAG="develop"
+            CONTAINER_NAME="igen-erp-staging"
+
+            # Tạo thư mục đích nếu chưa tồn tại và chuyển vào
+            mkdir -p "$TARGET_DIR"
+            cd "$TARGET_DIR"
+
+            # Tạo/ghi nội dung cấu hình từ GitHub Secrets vào file .env cục bộ
+            echo "$ENV_FILE_CONTENT" > .env
+
+            # Đăng nhập vào GHCR trên VPS
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Tải (pull) image mới trước khi tắt container cũ để giảm tối đa downtime
+            export COMPOSE_PROJECT_NAME="$CONTAINER_NAME"
+            IMAGE_TAG="$IMAGE_TAG" CONTAINER_NAME="$CONTAINER_NAME" docker compose pull
+
+            # Khởi động lại container mới (Docker compose tự động recreate và restart với downtime tối thiểu)
+            IMAGE_TAG="$IMAGE_TAG" CONTAINER_NAME="$CONTAINER_NAME" docker compose up -d --remove-orphans
+
+            # Giải phóng dung lượng ổ đĩa bằng cách xóa các image dangling/rác cũ và build cache
+            docker image prune -f
+            docker builder prune -f
+
+      # --- Triển khai lên Production (nhánh production) ---
+      - name: Copy docker-compose.yml to Production VPS
+        if: github.ref_name == 'production'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST_PROD }}
+          username: ${{ secrets.SSH_USER_PROD }}
+          key: ${{ secrets.SSH_KEY_PROD }}
+          port: ${{ secrets.SSH_PORT_PROD || '22' }}
+          source: "docker-compose.yml"
+          target: "/opt/igen-erp/production"
+
+      - name: Deploy via SSH to Production VPS
+        if: github.ref_name == 'production'
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          ENV_FILE_CONTENT: ${{ secrets.ENV_FILE_PROD }}
+        with:
+          host: ${{ secrets.SSH_HOST_PROD }}
+          username: ${{ secrets.SSH_USER_PROD }}
+          key: ${{ secrets.SSH_KEY_PROD }}
+          port: ${{ secrets.SSH_PORT_PROD || '22' }}
+          envs: ENV_FILE_CONTENT
+          script: |
+            TARGET_DIR="/opt/igen-erp/production"
+            IMAGE_TAG="production"
+            CONTAINER_NAME="igen-erp-production"
+
+            # Tạo thư mục đích nếu chưa tồn tại và chuyển vào
+            mkdir -p "$TARGET_DIR"
+            cd "$TARGET_DIR"
+
+            # Tạo/ghi nội dung cấu hình từ GitHub Secrets vào file .env cục bộ
+            echo "$ENV_FILE_CONTENT" > .env
+
+            # Đăng nhập vào GHCR trên VPS
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Tải (pull) image mới trước khi tắt container cũ để giảm tối đa downtime
+            export COMPOSE_PROJECT_NAME="$CONTAINER_NAME"
+            IMAGE_TAG="$IMAGE_TAG" CONTAINER_NAME="$CONTAINER_NAME" docker compose pull
+
+            # Khởi động lại container mới
+            IMAGE_TAG="$IMAGE_TAG" CONTAINER_NAME="$CONTAINER_NAME" docker compose up -d --remove-orphans
+
+            # Giải phóng dung lượng ổ đĩa bằng cách xóa các image dangling/rác cũ và build cache
+            docker image prune -f
+            docker builder prune -f
