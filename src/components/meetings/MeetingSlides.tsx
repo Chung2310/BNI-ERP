@@ -206,7 +206,7 @@ export function MeetingSlides({ meeting, canManage, api }: Props) {
     style={{ width: "100%", height: "100%", objectFit: "contain", visibility: drawing || !active || drawError ? "hidden" : "visible" }} />;
 
   return <section aria-label="Slide giới thiệu" className="space-y-4">
-    {timer && <p className="sr-only" role="timer" aria-live="off">{timer.label}: {timer.time}. Được phân {timer.seconds} giây.</p>}
+    {timer && <p className="sr-only" role="timer" aria-live="off">#{timer.arrivalOrder}: {timer.time}. {timer.label}</p>}
     <div className="flex flex-wrap items-center gap-2">
       <label className="text-sm font-semibold">Chế độ <select aria-label="Chế độ trình chiếu" className="ml-2 rounded-lg border p-2" value={mode} disabled={!!draft} onChange={e => setMode(e.target.value as typeof mode)}>
         <option value="manual">Chuyển thủ công</option><option value="auto">Tự chạy</option><option value="live">Theo người đang phát biểu</option>

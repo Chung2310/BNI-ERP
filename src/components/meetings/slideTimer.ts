@@ -3,12 +3,20 @@ export interface SlideTimerMeeting {
   currentIndex: number;
   speakerStartedAt?: string;
   elapsedSeconds?: number;
-  speakers: { id: string; seconds?: number; spokenSeconds?: number }[];
+  speakers: { id: string; seconds?: number; spokenSeconds?: number; checkedInAt?: string }[];
 }
 
 export function getSlideTimer(meeting: SlideTimerMeeting, speakerId: string | undefined, now: number) {
   const speaker = meeting.speakers.find(s => s.id === speakerId);
   if (!speaker || !Number.isFinite(speaker.seconds)) return null;
+  const arrivalOrder = meeting.speakers
+    .map((person, index) => ({ id: person.id, index, at: Date.parse(person.checkedInAt || "") }))
+    .sort((a, b) => {
+      const aTime = Number.isFinite(a.at) ? a.at : Infinity;
+      const bTime = Number.isFinite(b.at) ? b.at : Infinity;
+      return (aTime === bTime ? 0 : aTime - bTime) || a.index - b.index;
+    })
+    .findIndex(person => person.id === speakerId) + 1;
   const current = ["live", "paused"].includes(meeting.status) && meeting.speakers[meeting.currentIndex]?.id === speakerId;
   const start = meeting.speakerStartedAt ? Date.parse(meeting.speakerStartedAt) : NaN;
   const running = current && meeting.status === "live" && Number.isFinite(start);
@@ -21,8 +29,8 @@ export function getSlideTimer(meeting: SlideTimerMeeting, speakerId: string | un
   const time = `${overtime ? "+" : ""}${Math.floor(whole / 60).toString().padStart(2, "0")}:${(whole % 60).toString().padStart(2, "0")}`;
   const label = current
     ? meeting.status === "paused" ? "Tạm dừng" : running ? overtime ? "Quá giờ" : "Đang phát biểu" : "Chờ bắt đầu"
-    : speaker.spokenSeconds != null ? "Đã phát biểu" : "Thời lượng được phân";
-  return { time, label, seconds: speaker.seconds!, urgent: remaining < 10 && (running || elapsed > 0), overtime };
+    : speaker.spokenSeconds != null ? "Đã phát biểu" : "";
+  return { time, label, arrivalOrder, seconds: speaker.seconds!, urgent: remaining < 10 && (running || elapsed > 0), overtime };
 }
 
 export function drawSlideTimer(ctx: CanvasRenderingContext2D, timer: ReturnType<typeof getSlideTimer>) {
@@ -32,11 +40,11 @@ export function drawSlideTimer(ctx: CanvasRenderingContext2D, timer: ReturnType<
   ctx.beginPath(); ctx.roundRect(65, 780, 350, 185, 18); ctx.fill();
   ctx.textAlign = "center"; ctx.textBaseline = "top";
   ctx.fillStyle = "#666"; ctx.font = '700 21px "Noto Sans", sans-serif';
-  ctx.fillText(timer.label.toLocaleUpperCase("vi-VN"), 240, 798);
+  ctx.fillText(`#${timer.arrivalOrder}`, 240, 798);
   ctx.fillStyle = timer.urgent || timer.overtime ? "#d70b2d" : "#252525";
   ctx.font = '800 65px "Noto Sans", sans-serif';
   ctx.fillText(timer.time, 240, 830);
   ctx.fillStyle = "#777"; ctx.font = '400 21px "Noto Sans", sans-serif';
-  ctx.fillText(`Được phân: ${timer.seconds} giây`, 240, 921);
+  if (timer.label) ctx.fillText(timer.label, 240, 921);
   ctx.restore();
 }

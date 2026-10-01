@@ -7,7 +7,7 @@ const meeting = { status: "live", currentIndex: 0, elapsedSeconds: 5, speakerSta
 
 it("uses the allocation of each attendee, counting down only the current speaker", () => {
   expect(getSlideTimer(meeting, "early", now)).toMatchObject({ time: "00:35", seconds: 60, label: "Đang phát biểu" });
-  expect(getSlideTimer(meeting, "late", now)).toMatchObject({ time: "00:20", seconds: 20, label: "Thời lượng được phân" });
+  expect(getSlideTimer(meeting, "late", now)).toMatchObject({ time: "00:20", seconds: 20, label: "", arrivalOrder: 2 });
 });
 it("freezes on pause and restores the allocation when the speaker timer resets", () => {
   expect(getSlideTimer({ ...meeting, status: "paused", elapsedSeconds: 25 }, "early", now + 90000)?.time).toBe("00:35");
@@ -20,4 +20,14 @@ it("shows overtime and preserves completed speaker time", () => {
 it("ignores invalid timestamps and missing allocations", () => {
   expect(getSlideTimer({ ...meeting, speakerStartedAt: "invalid" }, "early", now)?.time).toBe("00:55");
   expect(getSlideTimer(meeting, "missing", now)).toBeNull();
+});
+
+it("ranks check-in time rather than the reordered speaking queue", () => {
+  const reordered = { ...meeting, speakers: [
+    { id: "late", seconds: 20, checkedInAt: "2026-10-01T07:59:00Z" },
+    { id: "early", seconds: 60, checkedInAt: "2026-10-01T07:30:00Z" },
+  ] };
+  expect(getSlideTimer(reordered, "early", now)?.arrivalOrder).toBe(1);
+  expect(getSlideTimer(reordered, "late", now)?.arrivalOrder).toBe(2);
+  expect(reordered.speakers[0].id).toBe("late");
 });

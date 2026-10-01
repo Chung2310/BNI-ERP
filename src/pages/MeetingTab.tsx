@@ -42,6 +42,7 @@ type Speaker = {
   coverImage?: string;
   seconds: number;
   spokenSeconds?: number;
+  checkedInAt?: string;
 };
 
 type LuckyDrawWinner = {
