@@ -576,37 +576,9 @@ export default function MeetingTab() {
                     </span>
                   </div>
 
-                  {/* Top Action Icons (Bắt đầu, Kết thúc, Sửa, Xóa) */}
+                  {/* Top Action Icons (Sửa, Xóa) */}
                   {canManage && (
                     <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-90 transition-opacity group-hover:opacity-100">
-                      {m.status === "scheduled" && (
-                        <button
-                          type="button"
-                          title="Bắt đầu cuộc họp"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setStartingMeeting(m);
-                          }}
-                          className="rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-white backdrop-blur-md px-2.5 py-1 text-[11px] font-bold shadow-sm transition cursor-pointer flex items-center gap-1"
-                        >
-                          <Play className="h-3 w-3 fill-current" />
-                          <span>Bắt đầu</span>
-                        </button>
-                      )}
-                      {isLive && (
-                        <button
-                          type="button"
-                          title="Kết thúc buổi họp"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEndingMeeting(m);
-                          }}
-                          className="rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white backdrop-blur-md px-2.5 py-1 text-[11px] font-bold shadow-sm transition cursor-pointer flex items-center gap-1"
-                        >
-                          <Square className="h-3 w-3 fill-current" />
-                          <span>Kết thúc</span>
-                        </button>
-                      )}
                       <button
                         type="button"
                         title="Sửa cuộc họp"
