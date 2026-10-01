@@ -1,6 +1,6 @@
 {
-  "name": "iGen ERP",
-  "short_name": "iGen ERP",
+  "name": "iGen Connect",
+  "short_name": "iGen Connect",
   "description": "Nền tảng quản trị doanh nghiệp tích hợp AI cho vận hành, nhân sự, kho, marketing và CRM.",
   "start_url": "/",
   "display": "standalone",

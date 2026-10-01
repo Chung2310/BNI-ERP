@@ -38,7 +38,7 @@ export default function UserDataDeletion() {
   const meta = {
     title: `User Data Deletion | ${BRAND_NAME}`,
     description: `Instructions for disconnecting integrations and requesting user data deletion from ${BRAND_NAME}.`,
-    keywords: "user data deletion, TikTok Shop data deletion, Facebook data deletion, iGen ERP",
+    keywords: "user data deletion, TikTok Shop data deletion, Facebook data deletion, iGen Connect, iGen ERP",
     path: "/user-data-deletion",
   };
 

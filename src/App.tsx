@@ -27,6 +27,7 @@ const UserDataDeletion = lazy(() => import("./pages/UserDataDeletion"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const SubmitProofPage = lazy(() => import("./pages/SubmitProofPage"));
 const PublicRegisterPage = lazy(() => import("./pages/PublicRegisterPage"));
+const WheelOfNamesPage = lazy(() => import("./pages/WheelOfNamesPage"));
 
 function AppContent() {
   const { user, userProfile, loading } = useAuth();
@@ -39,8 +40,13 @@ function AppContent() {
   const isDeletionPage = currentPath === "/user-data-deletion" || currentPath === "/user-data-deletion.html";
   const isSubmitProofPage = currentPath.startsWith("/public/submit-proof");
   const isPublicRegisterPage = currentPath.startsWith("/public/dang-ky");
+  const isWheelPage =
+    currentPath === "/wheel-of-names" ||
+    currentPath === "/wheel-of-names.html" ||
+    currentPath === "/vong-quay" ||
+    currentPath === "/vong-quay-may-man";
   const isLegalPublicPage = isPrivacyPage || isTermsPage || isDeletionPage;
-  const isPublicPage = isLandingGuestPage || isLegalPublicPage || isSubmitProofPage || isPublicRegisterPage;
+  const isPublicPage = isLandingGuestPage || isLegalPublicPage || isSubmitProofPage || isPublicRegisterPage || isWheelPage;
 
   const { activeTab, setActiveTab } = useTabRouter({
     enabled: !isPublicPage && !loading && Boolean(user && userProfile),
@@ -151,6 +157,14 @@ function AppContent() {
     );
   }
 
+  if (isWheelPage) {
+    return (
+      <Suspense fallback={<AuthLoader />}>
+        <WheelOfNamesPage />
+      </Suspense>
+    );
+  }
+
 
   if (isLegalPublicPage) {
     return (
@@ -178,7 +192,7 @@ function AppContent() {
   if (loading) {
     return (
       <>
-        <SEOHead meta={{ ...AUTH_SEO, title: "Đang tải hệ thống iGen ERP", path: "/khoi-tao-he-thong" }} />
+        <SEOHead meta={{ ...AUTH_SEO, title: "Đang tải hệ thống iGen Connect", path: "/khoi-tao-he-thong" }} />
         <div className="relative flex h-screen w-screen flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#f6f8fd] via-[#eef2f7] to-[#e3ecf5] text-center font-sans">
           <div className="pointer-events-none absolute left-[-10%] top-[-10%] h-[600px] w-[600px] rounded-full bg-blue-400/5 blur-[120px]" />
           <div className="pointer-events-none absolute bottom-[-10%] right-[-10%] h-[600px] w-[600px] rounded-full bg-indigo-400/5 blur-[120px]" />

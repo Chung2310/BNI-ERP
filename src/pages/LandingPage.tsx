@@ -38,7 +38,7 @@ export default function LandingPage() {
   const meta = {
     title: `${BRAND_NAME} - Nền tảng quản trị doanh nghiệp tích hợp AI`,
     description: "Giải pháp ERP thế hệ mới tích hợp AI giúp quản trị doanh nghiệp, quản lý khách hàng đa kênh Facebook, Zalo, TikTok, quản lý nhân sự và kho vận tối ưu.",
-    keywords: "igen erp, erp tich hop ai, omni channel crm, quan ly kho, nhan su hrm, tiktok api integration",
+    keywords: "igen connect, igen erp, erp tich hop ai, omni channel crm, quan ly kho, nhan su hrm, tiktok api integration",
     path: "/",
   };
 
@@ -323,7 +323,7 @@ export default function LandingPage() {
       <section id="tinh-nang" className="py-20 bg-white border-y border-slate-200/60 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-12">
           <div className="max-w-2xl mx-auto space-y-4">
-            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Tính năng Nổi bật của iGen ERP</h2>
+            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Tính năng Nổi bật của iGen Connect</h2>
             <p className="text-sm text-slate-500 leading-relaxed">
               Giải pháp all-in-one giúp vận hành mọi phòng ban trơn tru, đồng bộ dữ liệu theo thời gian thực và tự động hóa tác vụ bằng trí tuệ nhân tạo.
             </p>
@@ -498,7 +498,7 @@ export default function LandingPage() {
                 <div className="flex items-center justify-center gap-8 py-4">
                   <div className="flex flex-col items-center gap-2">
                     <img src={BRAND_LOGO_PATH} alt={BRAND_NAME} className="w-16 h-16 rounded-2xl shadow-md border border-slate-100" />
-                    <span className="text-[10px] font-bold text-slate-500">iGen ERP App</span>
+                    <span className="text-[10px] font-bold text-slate-500">iGen Connect App</span>
                   </div>
                   <div className="flex items-center justify-center flex-1 h-[2px] bg-gradient-to-r from-blue-500 to-black relative">
                     <div className="absolute px-3 py-1 bg-slate-100 rounded-full border border-slate-200 text-[9px] font-bold text-slate-500">
@@ -524,7 +524,7 @@ export default function LandingPage() {
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                      <span><strong>seller.order</strong> (TikTok Shop): Đồng bộ đơn hàng phát sinh trên TikTok Shop về hệ thống iGen ERP để lên đơn vận chuyển.</span>
+                      <span><strong>seller.order</strong> (TikTok Shop): Đồng bộ đơn hàng phát sinh trên TikTok Shop về hệ thống iGen Connect để lên đơn vận chuyển.</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
@@ -543,7 +543,7 @@ export default function LandingPage() {
               </div>
               <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Tích hợp và Đồng bộ TikTok thông minh</h2>
               <p className="text-sm text-slate-500 leading-relaxed">
-                Hệ thống iGen ERP kết nối chính thức với API của TikTok thông qua luồng xác thực bảo mật OAuth 2.0. Việc tích hợp này giúp các nhà bán hàng và doanh nghiệp tối ưu hóa hoạt động vận hành mà không cần chuyển đổi nhiều tab.
+                Hệ thống iGen Connect kết nối chính thức với API của TikTok thông qua luồng xác thực bảo mật OAuth 2.0. Việc tích hợp này giúp các nhà bán hàng và doanh nghiệp tối ưu hóa hoạt động vận hành mà không cần chuyển đổi nhiều tab.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -571,7 +571,7 @@ export default function LandingPage() {
                     Quản lý Đơn hàng tập trung
                   </h4>
                   <p className="text-xs text-slate-400 pl-3.5 leading-relaxed">
-                    Đơn hàng từ TikTok Shop được tự động đẩy về hệ thống của iGen ERP phục vụ cho kiểm đếm kho và thống kê doanh thu.
+                    Đơn hàng từ TikTok Shop được tự động đẩy về hệ thống của iGen Connect phục vụ cho kiểm đếm kho và thống kê doanh thu.
                   </p>
                 </div>
                 <div className="space-y-1">
@@ -611,7 +611,7 @@ export default function LandingPage() {
               </div>
               <h4 className="font-bold text-slate-800 text-sm">Yêu cầu kết nối</h4>
               <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
-                Tại trang Quản trị iGen ERP, bạn truy cập mục "Cấu hình tích hợp", sau đó chọn "Kết nối TikTok Shop" để kích hoạt luồng kết nối chính thức.
+                Tại trang Quản trị iGen Connect, bạn truy cập mục "Cấu hình tích hợp", sau đó chọn "Kết nối TikTok Shop" để kích hoạt luồng kết nối chính thức.
               </p>
             </div>
 
@@ -633,7 +633,7 @@ export default function LandingPage() {
               </div>
               <h4 className="font-bold text-slate-800 text-sm">Hoàn tất & Đồng bộ</h4>
               <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
-                TikTok chuyển hướng trở lại iGen ERP. Token kết nối bảo mật được thiết lập, hệ thống bắt đầu đồng bộ đơn hàng, tin nhắn và sản phẩm tự động.
+                TikTok chuyển hướng trở lại iGen Connect. Token kết nối bảo mật được thiết lập, hệ thống bắt đầu đồng bộ đơn hàng, tin nhắn và sản phẩm tự động.
               </p>
             </div>
 
@@ -660,7 +660,7 @@ export default function LandingPage() {
               </div>
               <h4 className="font-bold text-slate-800 text-sm">Mã hóa Dữ liệu Truyền tải</h4>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Tất cả dữ liệu trao đổi giữa iGen ERP và TikTok được mã hóa sử dụng chuẩn HTTPS/TLS 1.3 bảo mật, chống nghe lén thông tin.
+                Tất cả dữ liệu trao đổi giữa iGen Connect và TikTok được mã hóa sử dụng chuẩn HTTPS/TLS 1.3 bảo mật, chống nghe lén thông tin.
               </p>
             </div>
 
@@ -700,8 +700,8 @@ export default function LandingPage() {
           <div className="space-y-4 text-left">
             {[
               {
-                q: "iGen ERP kết nối với TikTok bằng cách nào và có an toàn không?",
-                a: "iGen ERP kết nối trực tiếp với TikTok Shop thông qua giao thức API chính thức (TikTok Shop Open Platform) sử dụng chuẩn xác thực bảo mật OAuth 2.0. Hệ thống không yêu cầu người dùng cung cấp mật khẩu tài khoản TikTok, đảm bảo an toàn tuyệt đối."
+                q: "iGen Connect kết nối với TikTok bằng cách nào và có an toàn không?",
+                a: "iGen Connect kết nối trực tiếp với TikTok Shop thông qua giao thức API chính thức (TikTok Shop Open Platform) sử dụng chuẩn xác thực bảo mật OAuth 2.0. Hệ thống không yêu cầu người dùng cung cấp mật khẩu tài khoản TikTok, đảm bảo an toàn tuyệt đối."
               },
               {
                 q: "Quyền 'seller.order' và 'seller.product' được sử dụng cụ thể vào mục đích gì?",
@@ -709,7 +709,7 @@ export default function LandingPage() {
               },
               {
                 q: "Tôi có thể hủy liên kết tài khoản TikTok Shop bất cứ lúc nào không?",
-                a: "Hoàn toàn được. Bạn có thể ngắt kết nối tài khoản TikTok Shop của mình ngay lập tức chỉ với một nút bấm trong mục 'Cài đặt kết nối' của ERP. Sau khi ngắt kết nối, iGen ERP sẽ ngưng mọi hoạt động truy xuất dữ liệu từ API TikTok."
+                a: "Hoàn toàn được. Bạn có thể ngắt kết nối tài khoản TikTok Shop của mình ngay lập tức chỉ với một nút bấm trong mục 'Cài đặt kết nối' của ERP. Sau khi ngắt kết nối, iGen Connect sẽ ngưng mọi hoạt động truy xuất dữ liệu từ API TikTok."
               },
               {
                 q: "Làm cách nào để yêu cầu xóa toàn bộ dữ liệu đã đồng bộ khỏi hệ thống?",
@@ -744,7 +744,7 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8 relative z-10">
           <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Sẵn sàng nâng tầm chuyển đổi số doanh nghiệp?</h2>
           <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto leading-relaxed">
-            Đăng ký trải nghiệm iGen ERP tích hợp AI ngay hôm nay để nhận 14 ngày dùng thử miễn phí và kết nối không giới hạn Facebook, Zalo, TikTok Shop.
+            Đăng ký trải nghiệm iGen Connect tích hợp AI ngay hôm nay để nhận 14 ngày dùng thử miễn phí và kết nối không giới hạn Facebook, Zalo, TikTok Shop.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a 

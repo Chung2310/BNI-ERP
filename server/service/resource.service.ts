@@ -792,7 +792,7 @@ export const resourceDriveService = {
     if (!company.driveFolderId) {
       const folder = await googleDriveService.createFolder(
         accessToken,
-        `iGen ERP - Tài liệu ${company.name || company.code}`
+        `iGen Connect - Tài liệu ${company.name || company.code}`
       );
       company.driveFolderId = folder.id;
       company.driveFolderLink = folder.webViewLink || "";
