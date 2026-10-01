@@ -699,11 +699,12 @@ export default function MeetingTab() {
                 <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-0 flex items-center gap-2">
                   <button
                     type="button"
+                    aria-label={isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}
                     onClick={(event) => { event.stopPropagation(); setDetailMeetingId(m._id); setActiveSubTab(m.status === "scheduled" ? "checkin" : "speakers"); }}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-slate-50 group-hover:bg-cyan-600 text-slate-700 group-hover:text-white py-2 text-xs font-bold transition-all duration-200 cursor-pointer"
+                    className="flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-xl bg-slate-50 group-hover:bg-cyan-600 text-slate-700 group-hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap"
                   >
-                    <span>{isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}</span>
-                    <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                    <span className="truncate">{isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}</span>
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
                   </button>
 
                   {canManage && m.status === "scheduled" && (
@@ -714,31 +715,22 @@ export default function MeetingTab() {
                         e.stopPropagation();
                         setStartingMeeting(m);
                       }}
-                      className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 shrink-0 cursor-pointer shadow-xs"
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 shrink-0 cursor-pointer shadow-xs whitespace-nowrap"
                     >
                       <Play className="h-3.5 w-3.5 fill-current" />
                       <span>Bắt đầu</span>
                     </button>
                   )}
 
-                  {canManage && m.status !== "ended" && m.status !== "cancelled" && (
+                  {canManage && isLive && (
                     <button
                       type="button"
-                      disabled={!isLive}
-                      title={isLive ? "Kết thúc buổi họp" : "Chỉ có thể kết thúc khi buổi họp đang diễn ra"}
+                      title="Kết thúc buổi họp"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (!isLive) {
-                          toast.info("Chỉ có thể kết thúc khi buổi họp đang diễn ra.");
-                          return;
-                        }
                         setEndingMeeting(m);
                       }}
-                      className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-all duration-200 shrink-0 ${
-                        isLive
-                          ? "border border-rose-200 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white cursor-pointer shadow-xs"
-                          : "border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-60"
-                      }`}
+                      className="flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-all duration-200 shrink-0 border border-rose-200 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white cursor-pointer shadow-xs whitespace-nowrap"
                     >
                       <Square className="h-3.5 w-3.5 fill-current" />
                       <span>Kết thúc</span>
