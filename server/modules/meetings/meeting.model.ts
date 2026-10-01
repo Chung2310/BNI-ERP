@@ -106,6 +106,7 @@ const meeting = new Schema(
     speakers: { type: [speaker], default: [] },
     currentIndex: { type: Number, default: -1 },
     speakerStartedAt: Date,
+    speechesCompletedAt: Date,
     elapsedSeconds: { type: Number, default: 0 },
     endedAt: Date,
     luckyDraw: {

@@ -2,11 +2,12 @@ export interface SlideTimerMeeting {
   status: string;
   currentIndex: number;
   speakerStartedAt?: string;
+  speechesCompletedAt?: string;
   elapsedSeconds?: number;
   speakers: { id: string; seconds?: number; spokenSeconds?: number; checkedInAt?: string }[];
 }
 
-export function getSlideTimer(meeting: SlideTimerMeeting, speakerId: string | undefined, now: number) {
+export function getSlideTimer(meeting: SlideTimerMeeting, speakerId: string | undefined, now: number, allowOvertime = false) {
   const speaker = meeting.speakers.find(s => s.id === speakerId);
   if (!speaker || !Number.isFinite(speaker.seconds)) return null;
   const arrivalOrder = meeting.speakers
@@ -25,12 +26,13 @@ export function getSlideTimer(meeting: SlideTimerMeeting, speakerId: string | un
     : Math.max(0, speaker.spokenSeconds || 0);
   const remaining = speaker.seconds! - elapsed;
   const overtime = remaining < 0;
-  const whole = Math.floor(Math.abs(remaining));
-  const time = `${overtime ? "+" : ""}${Math.floor(whole / 60).toString().padStart(2, "0")}:${(whole % 60).toString().padStart(2, "0")}`;
+  const expired = remaining <= 0;
+  const whole = Math.floor(allowOvertime ? Math.abs(remaining) : Math.max(0, remaining));
+  const time = `${overtime && allowOvertime ? "+" : ""}${Math.floor(whole / 60).toString().padStart(2, "0")}:${(whole % 60).toString().padStart(2, "0")}`;
   const label = current
-    ? meeting.status === "paused" ? "Tạm dừng" : running ? overtime ? "Quá giờ" : "Đang phát biểu" : "Chờ bắt đầu"
+    ? expired && !allowOvertime ? "Hết giờ" : meeting.status === "paused" ? "Tạm dừng" : running ? overtime ? "Quá giờ" : "Đang phát biểu" : "Chờ bắt đầu"
     : speaker.spokenSeconds != null ? "Đã phát biểu" : "";
-  return { time, label, arrivalOrder, seconds: speaker.seconds!, urgent: remaining < 10 && (running || elapsed > 0), overtime };
+  return { time, label, arrivalOrder, seconds: speaker.seconds!, urgent: remaining < 10 && (running || elapsed > 0), overtime: expired };
 }
 
 export function drawSlideTimer(ctx: CanvasRenderingContext2D, timer: ReturnType<typeof getSlideTimer>) {

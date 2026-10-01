@@ -81,7 +81,11 @@ export async function updateMeeting(companyCode: string, id: string, input: any)
   if (input.tiers !== undefined) item.tiers = input.tiers;
   if (input.fallbackSeconds !== undefined) item.fallbackSeconds = input.fallbackSeconds;
   if (item.status === "scheduled" && (input.tiers !== undefined || input.fallbackSeconds !== undefined)) {
-    item.speakers.forEach((person, index) => { person.seconds = speakingSeconds(index, item.tiers as any, item.fallbackSeconds); });
+    item.set('speakers', allocateSpeakers(
+      item.speakers.map(person => person.toObject()),
+      item.tiers.map(tier => ({ count: tier.count ?? 0, seconds: tier.seconds ?? item.fallbackSeconds })),
+      item.fallbackSeconds
+    ));
   }
   return saveMeeting(item);
 }
@@ -137,8 +141,9 @@ export async function checkIn(item: any, input: any, actorId: string, canManage:
     checkedInAt: new Date(),
     seconds: speakingSeconds(item.speakers.length, item.tiers, item.fallbackSeconds),
   });
-  if (item.status === 'live' && item.currentIndex === -1) {
-    item.currentIndex = 0;
+  if (['live', 'paused'].includes(item.status) && (item.currentIndex === -1 || item.speechesCompletedAt)) {
+    item.currentIndex = item.speechesCompletedAt ? item.speakers.length - 1 : 0;
+    item.speechesCompletedAt = undefined;
     item.speakerStartedAt = undefined;
     item.elapsedSeconds = 0;
   }
@@ -190,8 +195,29 @@ export async function notifyNextSpeaker(item: any) {
   }
 }
 
+export async function reorderMeetingSpeakers(item: any, speakerIds: unknown) {
+  if (!['scheduled', 'live', 'paused'].includes(item.status) || !Array.isArray(speakerIds)
+    || speakerIds.length !== item.speakers.length || new Set(speakerIds).size !== item.speakers.length
+    || speakerIds.some(id => !item.speakers.some((speaker: any) => speaker.id === id))) {
+    throw new MeetingError(400, 'Thứ tự người nói không hợp lệ.');
+  }
+  const pendingStart = item.status === 'scheduled' ? 0 : Math.max(0,
+    item.currentIndex + (item.speakerStartedAt || item.elapsedSeconds > 0 ? 1 : 0));
+  if (item.speakers.slice(0, pendingStart).some((speaker: any, index: number) => speaker.id !== speakerIds[index])) {
+    throw new MeetingError(409, 'Chỉ có thể sắp xếp người đang chờ; giữ nguyên người đang nói và các lượt đã hoàn tất.');
+  }
+  const byId = new Map(item.speakers.map((speaker: any) => [speaker.id, speaker]));
+  item.speakers = speakerIds.map(id => byId.get(id));
+  await saveMeeting(item);
+  await notifyNextSpeaker(item);
+  return item;
+}
+
 export async function controlMeeting(item: any, action: string, now = new Date()) {
   const status = item.status;
+  if (['start_speaker', 'reset_speaker', 'next'].includes(action) && !item.speakers[item.currentIndex]) {
+    throw new MeetingError(409, 'Không có người đang chờ phát biểu.');
+  }
   if (action === 'start' && status === 'scheduled') {
     if (item.speakers && item.speakers.length > 0) {
       item.speakers = allocateSpeakers(
@@ -208,6 +234,7 @@ export async function controlMeeting(item: any, action: string, now = new Date()
       item.elapsedSeconds = 0;
     }
     item.status = 'live';
+    item.speechesCompletedAt = undefined;
   } else if (action === 'start_speaker' && ['live', 'paused'].includes(status)) {
     item.speakerStartedAt = now;
     item.elapsedSeconds = 0;
@@ -221,7 +248,7 @@ export async function controlMeeting(item: any, action: string, now = new Date()
     item.status = 'paused';
   } else if (action === 'resume' && status === 'paused') {
     item.status = 'live';
-    item.speakerStartedAt = now;
+    item.speakerStartedAt = item.speakers[item.currentIndex] && item.elapsedSeconds > 0 ? now : undefined;
   } else if (action === 'finish' && ['live', 'paused'].includes(status)) {
     if (item.speakers[item.currentIndex]) {
       item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
@@ -236,8 +263,9 @@ export async function controlMeeting(item: any, action: string, now = new Date()
       item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
     }
     if (item.currentIndex + 1 >= item.speakers.length) {
-      item.status = 'ended';
-      item.endedAt = now;
+      item.currentIndex = item.speakers.length;
+      item.speechesCompletedAt = now;
+      item.elapsedSeconds = 0;
       item.speakerStartedAt = undefined;
     } else {
       item.currentIndex++;

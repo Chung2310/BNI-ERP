@@ -3,17 +3,19 @@ import { createPortal } from "react-dom";
 import { Download, Maximize, ChevronLeft, ChevronRight, X, Play, Pause, RefreshCw, Pencil } from "lucide-react";
 import { renderProfileSlide, loadSlideImage, SLIDE_WIDTH, SLIDE_HEIGHT } from "./profileSlideRenderer";
 import { drawSlideTimer, getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
+import { SpeechesCompleteMessage } from "./SpeechesCompleteDialog";
 import type { ProfileSlide, SlideDeck } from "./slideTypes";
 
 type Props = {
   meeting: SlideTimerMeeting & { _id: string; __v: number };
   canManage: boolean;
+  allowOvertime?: boolean;
   api: (path: string, method?: string, body?: unknown) => Promise<SlideDeck>;
 };
 const button = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40";
 const fieldClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
 
-export function MeetingSlides({ meeting, canManage, api }: Props) {
+export function MeetingSlides({ meeting, canManage, api, allowOvertime = false }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -61,7 +63,8 @@ export function MeetingSlides({ meeting, canManage, api }: Props) {
     ? deck.slides.find(s => s.id === currentSpeakerId)
     : queue.find(s => s.id === selectedId) || queue[0];
   const active = draft || selected;
-  const timer = useMemo(() => getSlideTimer(meeting, active?.id, now), [meeting, active?.id, now]);
+  const speechesComplete = !!meeting.speechesCompletedAt && ["live", "paused"].includes(meeting.status);
+  const timer = useMemo(() => getSlideTimer(meeting, active?.id, now, allowOvertime), [meeting, active?.id, now, allowOvertime]);
   const index = queue.findIndex(s => s.id === selected?.id);
 
   const move = useCallback((direction: number) => {
@@ -134,6 +137,7 @@ export function MeetingSlides({ meeting, canManage, api }: Props) {
   useEffect(() => {
     if (!presenting) return;
     const keydown = (e: KeyboardEvent) => {
+      if (document.querySelector("[data-speeches-complete]")) return;
       if (e.key === "Escape") { e.preventDefault(); closePresentation(); }
       if (e.key === "Tab") {
         // The presentation is modal; keep keyboard focus on its controls.
@@ -235,7 +239,7 @@ export function MeetingSlides({ meeting, canManage, api }: Props) {
         <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-900">
           {canvas(preview)}
           {(drawing || !active || drawError) && <div className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-white">
-            {drawError || (loading ? "Đang tải hồ sơ…" : active ? "Đang chuẩn bị ảnh và font…" : mode === "live" ? "Chưa có người đang phát biểu." : deck.slides.length ? "Chọn ít nhất một người để trình chiếu." : "Chưa có người check-in. Hãy check-in thành viên hoặc khách mời trước.")}
+            {speechesComplete && mode === "live" ? <div className="rounded-2xl bg-white p-8"><SpeechesCompleteMessage /></div> : drawError || (loading ? "Đang tải hồ sơ…" : active ? "Đang chuẩn bị ảnh và font…" : mode === "live" ? "Chưa có người đang phát biểu." : deck.slides.length ? "Chọn ít nhất một người để trình chiếu." : "Chưa có người check-in. Hãy check-in thành viên hoặc khách mời trước.")}
           </div>}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -268,7 +272,7 @@ export function MeetingSlides({ meeting, canManage, api }: Props) {
     </div>
     {presenting && createPortal(<div role="dialog" aria-modal="true" aria-label="Trình chiếu hồ sơ" className="fixed inset-0 z-[10000] flex items-center justify-center bg-black" onMouseMove={showControls} onTouchStart={showControls} style={{ cursor: controls ? "default" : "none" }}>
       <div style={{ width: "min(100vw, 177.7778vh)", height: "min(100vh, 56.25vw)" }}>{canvas(screen)}</div>
-      {(drawing || !active || drawError) && <p role="status" className="absolute text-white">{drawError || (active ? "Đang chuẩn bị slide…" : "Chờ người phát biểu…")}</p>}
+      {(drawing || !active || drawError) && <div role="status" className="absolute text-white">{speechesComplete && mode === "live" ? <div className="max-w-2xl rounded-3xl bg-white p-12"><SpeechesCompleteMessage /></div> : drawError || (active ? "Đang chuẩn bị slide…" : "Chờ người phát biểu…")}</div>}
       <div data-slide-controls className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-slate-900/90 p-3 text-white" style={{ opacity: controls ? 1 : 0 }} onFocus={() => setControls(true)}>
         <button aria-label="Slide trước khi trình chiếu" className="rounded p-2" onClick={() => { setMode("manual"); move(-1); }}><ChevronLeft /></button>
         <button aria-label={mode === "auto" ? "Tạm dừng tự chạy" : "Bật tự chạy"} className="rounded p-2" onClick={() => setMode(m => m === "auto" ? "manual" : "auto")}>{mode === "auto" ? <Pause /> : <Play />}</button>

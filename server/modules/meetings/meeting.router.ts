@@ -7,6 +7,7 @@ import {
   assertVersion,
   checkIn,
   controlMeeting,
+  reorderMeetingSpeakers,
   createMeeting,
   updateMeeting,
   deleteMeeting,
@@ -140,32 +141,7 @@ meetingRouter.put('/:id/order', manage, async (req: any, res) => {
   try {
     const item = await getMeeting(company(req), req.params.id);
     assertVersion(item, req.body.version);
-    if (
-      item.status !== 'scheduled' ||
-      !Array.isArray(req.body.speakerIds) ||
-      req.body.speakerIds.length !== item.speakers.length ||
-      new Set(req.body.speakerIds).size !== item.speakers.length ||
-      req.body.speakerIds.some((id: string) => !item.speakers.some((p: any) => p.id === id))
-    ) {
-      throw new MeetingError(400, 'Thứ tự người nói không hợp lệ.');
-    }
-    item.speakers = req.body.speakerIds.map((id: string) =>
-      item.speakers.find((p: any) => p.id === id)
-    );
-    item.speakers.forEach((p: any, i: number) => {
-      let n = 0;
-      for (const t of item.tiers) {
-        n += t.count;
-        if (i < n) {
-          p.seconds = t.seconds;
-          break;
-        }
-      }
-      if (i >= item.tiers.reduce((s: number, t: any) => s + t.count, 0)) {
-        p.seconds = item.fallbackSeconds;
-      }
-    });
-    res.json({ data: await saveMeeting(item) });
+    res.json({ data: await reorderMeetingSpeakers(item, req.body.speakerIds) });
   } catch (e) {
     sendError(res, e);
   }
