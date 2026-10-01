@@ -1712,30 +1712,6 @@ export default function OrgChartTab({
                         )}
                       </div>
                     </div>
-
-                    {/* Direct Image URL Inputs */}
-                    <div className="px-4 pb-3 pt-1 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-                      <div>
-                        <label className="text-gray-400 block mb-0.5">Hoặc URL Avatar:</label>
-                        <input
-                          type="url"
-                          placeholder="https://..."
-                          value={editPhotoURL}
-                          onChange={(e) => setEditPhotoURL(e.target.value)}
-                          className="w-full px-2.5 py-1 border border-gray-200 rounded-lg outline-none bg-white text-slate-700"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-gray-400 block mb-0.5">Hoặc URL Ảnh bìa:</label>
-                        <input
-                          type="url"
-                          placeholder="https://..."
-                          value={editCoverImage}
-                          onChange={(e) => setEditCoverImage(e.target.value)}
-                          className="w-full px-2.5 py-1 border border-gray-200 rounded-lg outline-none bg-white text-slate-700"
-                        />
-                      </div>
-                    </div>
                   </div>
 
                   {/* Member Name */}
@@ -2196,30 +2172,6 @@ export default function OrgChartTab({
                         <X className="h-3.5 w-3.5" />
                       </button>
                     )}
-                  </div>
-                </div>
-
-                {/* Direct Image URL Inputs */}
-                <div className="px-4 pb-3 pt-1 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-                  <div>
-                    <label className="text-gray-400 block mb-0.5">Hoặc URL Avatar:</label>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      value={addPhotoURL}
-                      onChange={(e) => setAddPhotoURL(e.target.value)}
-                      className="w-full px-2.5 py-1 border border-gray-200 rounded-lg outline-none bg-white text-slate-700"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-gray-400 block mb-0.5">Hoặc URL Ảnh bìa:</label>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      value={addCoverImage}
-                      onChange={(e) => setAddCoverImage(e.target.value)}
-                      className="w-full px-2.5 py-1 border border-gray-200 rounded-lg outline-none bg-white text-slate-700"
-                    />
                   </div>
                 </div>
               </div>
