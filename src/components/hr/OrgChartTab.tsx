@@ -730,10 +730,7 @@ export default function OrgChartTab({
         const firstBranchOwner = usersList.find(
           (u) => u.companyCode === compCode && u.role === "branch_owner"
         );
-        const firstAdmin = usersList.find(
-          (u) => u.companyCode === compCode && u.role === "admin"
-        );
-        setAddParentId(firstCompanyManager?.uid || firstBranchOwner?.uid || firstAdmin?.uid || "");
+        setAddParentId(firstCompanyManager?.uid || firstBranchOwner?.uid || "");
       }
     }
   }, [isAddModalOpen, userProfile, selectedCompanyCode, usersList]);
@@ -745,18 +742,12 @@ export default function OrgChartTab({
       if (addRole === "admin") {
         setAddParentId("");
       } else if (addRole === "branch_owner") {
-        const companyAdmin = usersList.find(
-          (u) => u.companyCode === compCode && u.role === "admin"
-        );
-        setAddParentId(companyAdmin?.uid || "");
+        setAddParentId("");
       } else if (addRole === "manager") {
         const branchOwner = usersList.find(
           (u) => u.companyCode === compCode && u.role === "branch_owner"
         );
-        const companyAdmin = usersList.find(
-          (u) => u.companyCode === compCode && u.role === "admin"
-        );
-        setAddParentId(branchOwner?.uid || companyAdmin?.uid || "");
+        setAddParentId(branchOwner?.uid || "");
       } else { // addRole === "user"
         if (userProfile?.role === "manager") {
           setAddParentId(userProfile.uid);
@@ -767,10 +758,7 @@ export default function OrgChartTab({
           const branchOwner = usersList.find(
             (u) => u.companyCode === compCode && u.role === "branch_owner"
           );
-          const companyAdmin = usersList.find(
-            (u) => u.companyCode === compCode && u.role === "admin"
-          );
-          setAddParentId(firstCompanyManager?.uid || branchOwner?.uid || companyAdmin?.uid || "");
+          setAddParentId(firstCompanyManager?.uid || branchOwner?.uid || "");
         }
       }
     }
@@ -1155,25 +1143,29 @@ export default function OrgChartTab({
   // Auto-arrange employees without parentId into the correct hierarchy based on role
   const arrangedEmployees = (() => {
     const ROLE_LEVEL: Record<string, number> = {
-      admin: 1,
-      branch_owner: 2,
-      manager: 3,
-      user: 4,
+      branch_owner: 1,
+      manager: 2,
+      user: 3,
     };
 
-    // Build a mutable copy with virtual parentId for rendering
-    const list = employees.map(e => ({ ...e }));
+    // Build a mutable copy with virtual parentId for rendering (excluding admin)
+    const list = employees
+      .filter(e => {
+        const u = usersList.find(usr => usr.uid === e.id);
+        return u ? u.role !== "admin" : true;
+      })
+      .map(e => ({ ...e }));
 
     list.forEach(emp => {
       // If already has a valid parentId that exists, skip
       if (emp.parentId && list.some(p => p.id === emp.parentId)) return;
 
-      const myLevel = ROLE_LEVEL[usersList.find(u => u.uid === emp.id)?.role ?? "user"] ?? 4;
+      const myLevel = ROLE_LEVEL[usersList.find(u => u.uid === emp.id)?.role ?? "user"] ?? 3;
 
       // Find the best parent: highest-level employee that is strictly above this one
       let bestParent: typeof list[0] | undefined;
 
-      for (let targetLevel = myLevel - 1; targetLevel >= 0; targetLevel--) {
+      for (let targetLevel = myLevel - 1; targetLevel >= 1; targetLevel--) {
         const candidates = list.filter(p => {
           const pRole = usersList.find(u => u.uid === p.id)?.role ?? "user";
           return ROLE_LEVEL[pRole] === targetLevel && p.id !== emp.id;

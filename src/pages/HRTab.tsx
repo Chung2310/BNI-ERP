@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { FolderTree, Mail, ChevronLeft, ChevronRight } from "lucide-react";
+import { FolderTree, Mail, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
 import { HRSubTabType, EmployeeNode, UserProfile } from "../types";
 import { useAuth } from "../context/AuthContext";
 import { authService } from "../services/authService";
@@ -7,6 +7,8 @@ import { toast } from "./Toast";
 import { getApiErrorMessage } from "../utils/errorMessage";
 import { useSubTabRouter } from "../hooks/useSubTabRouter";
 import { HR_SUB_TAB_ROUTES } from "../router/subTabRoutes";
+
+const MemberFeesTab = lazy(() => import("../components/hr/MemberFeesTab"));
 
 // Lazy-loaded subcomponents
 const OrgChartTab = lazy(() => import("../components/hr/OrgChartTab"));
@@ -21,6 +23,7 @@ export default function HRTab() {
     userProfile?.role === "admin" ||
     userProfile?.role === "manager";
   const canManageOrgChart = isManager || hasPermission("access:manage");
+  const canReadFees = hasPermission("hr:read") || hasPermission("hr:manage") || hasPermission("access:manage");
   const canManageCelebration = userProfile?.role === "admin" || hasPermission("settings:manage");
 
   const [subTab, setSubTab] = useSubTabRouter<HRSubTabType>(HR_SUB_TAB_ROUTES, "SƠ ĐỒ TỔ CHỨC");
@@ -52,14 +55,15 @@ export default function HRTab() {
     fetchUsers();
   }, [companyCode, userProfile?.uid]);
 
-  // Map user profile to EmployeeNode tree model
-  const employees: EmployeeNode[] = usersList.map((usr) => ({
-    id: usr.uid,
-    name: usr.displayName,
-    role: usr.jobTitle || (
-      usr.role === "admin" ? "Quản trị viên" :
-      usr.role === "manager" ? "Quản lý" : "Thành viên"
-    ),
+  // Map user profile to EmployeeNode tree model (excluding admin)
+  const employees: EmployeeNode[] = usersList
+    .filter((usr) => usr.role !== "admin")
+    .map((usr) => ({
+      id: usr.uid,
+      name: usr.displayName,
+      role: usr.jobTitle || (
+        usr.role === "manager" ? "Quản lý" : "Thành viên"
+      ),
     department: usr.department || "Ban Giám đốc",
     email: usr.email,
     phone: usr.phone || "Chưa cập nhật",
@@ -95,6 +99,7 @@ export default function HRTab() {
           <div ref={subTabsRef} className="flex min-w-0 max-w-full flex-1 gap-1 overflow-x-auto select-none scrollbar-none -mb-px">
             {[
               { id: "SƠ ĐỒ TỔ CHỨC", label: "Sơ đồ tổ chức", icon: FolderTree },
+              ...(canReadFees ? [{ id: "PHÍ THƯỜNG NIÊN", label: "Phí thường niên", icon: Wallet }] : []),
               ...(canManageCelebration ? [{ id: CELEBRATION_TAB, label: "Email chúc mừng", icon: Mail }] : []),
             ].map((tab) => {
               const isActive = subTab === tab.id;
@@ -136,6 +141,7 @@ export default function HRTab() {
           />
         )}
 
+        {subTab === "PHÍ THƯỜNG NIÊN" && (canReadFees ? <MemberFeesTab /> : <p className="p-6 text-sm text-slate-500">Bạn chưa có quyền xem phí thường niên.</p>)}
         {subTab === CELEBRATION_TAB && canManageCelebration && <CelebrationEmailTab />}
       </Suspense>
     </div>
