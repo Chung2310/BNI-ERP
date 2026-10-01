@@ -305,6 +305,10 @@ export default function MeetingTab() {
 
   const handleEndMeeting = async () => {
     if (!endingMeeting) return;
+    if (endingMeeting.status !== "live" && endingMeeting.status !== "paused") {
+      toast.error("Chỉ có thể kết thúc khi cuộc họp đang diễn ra.");
+      return;
+    }
     setIsEnding(true);
     try {
       await api(`/${endingMeeting._id}/control`, "POST", { action: "finish", version: endingMeeting.__v });
@@ -558,7 +562,7 @@ export default function MeetingTab() {
                   {/* Top Action Icons (Kết thúc, Sửa, Xóa) */}
                   {canManage && (
                     <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-90 transition-opacity group-hover:opacity-100">
-                      {m.status !== "ended" && m.status !== "cancelled" && (
+                      {isLive && (
                         <button
                           type="button"
                           title="Kết thúc cuộc họp"
@@ -641,7 +645,7 @@ export default function MeetingTab() {
                     <span>{isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}</span>
                     <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                   </button>
-                  {canManage && m.status !== "ended" && m.status !== "cancelled" && (
+                  {canManage && isLive && (
                     <button
                       type="button"
                       title="Kết thúc buổi họp"

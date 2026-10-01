@@ -175,13 +175,15 @@ export async function controlMeeting(item: any, action: string, now = new Date()
   } else if (action === 'resume' && status === 'paused') {
     item.status = 'live';
     item.speakerStartedAt = now;
-  } else if (action === 'finish' && ['scheduled', 'live', 'paused'].includes(status)) {
+  } else if (action === 'finish' && ['live', 'paused'].includes(status)) {
     if (item.speakers[item.currentIndex]) {
       item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
     }
     item.status = 'ended';
     item.endedAt = now;
     item.speakerStartedAt = undefined;
+  } else if (action === 'finish') {
+    throw new MeetingError(409, 'Cuộc họp phải đang diễn ra mới có thể kết thúc.');
   } else if (action === 'next' && ['live', 'paused'].includes(status)) {
     if (item.speakers[item.currentIndex]) {
       item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
