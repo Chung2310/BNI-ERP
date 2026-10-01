@@ -25,9 +25,9 @@ export function buildDocumentTitle(title: string) {
 export const DEFAULT_SEO: SeoMeta = {
   title: "Nền tảng quản trị doanh nghiệp tích hợp AI",
   description:
-    "iGen ERP là nền tảng quản trị doanh nghiệp tích hợp AI thế hệ mới, hỗ trợ quản lý kho vận, nhân sự, tiếp thị tự động, quản lý khách hàng đa kênh và tối ưu hiệu suất vận hành doanh nghiệp.",
+    "iGen Connect là nền tảng quản trị doanh nghiệp tích hợp AI thế hệ mới, hỗ trợ quản lý kho vận, nhân sự, tiếp thị tự động, quản lý khách hàng đa kênh và tối ưu hiệu suất vận hành doanh nghiệp.",
   keywords:
-    "iGen ERP, ERP tích hợp AI, phần mềm quản trị doanh nghiệp, quản lý nhân sự HRM, quản lý kho thông minh, marketing AI, sales CRM đa kênh, tối ưu vận hành",
+    "iGen Connect, iGen ERP, ERP tích hợp AI, phần mềm quản trị doanh nghiệp, quản lý nhân sự HRM, quản lý kho thông minh, marketing AI, sales CRM đa kênh, tối ưu vận hành",
   path: "/",
   image: SEO_DEFAULT_IMAGE,
   robots: "index, follow",
@@ -39,9 +39,9 @@ export const DEFAULT_SEO: SeoMeta = {
 export const AUTH_SEO: SeoMeta = {
   title: "Đăng nhập - Quản trị doanh nghiệp thông minh",
   description:
-    "Đăng nhập vào iGen ERP để quản lý vận hành, nhân sự, kho, tiếp thị và khách hàng trên một nền tảng doanh nghiệp tích hợp AI.",
+    "Đăng nhập vào iGen Connect để quản lý vận hành, nhân sự, kho, tiếp thị và khách hàng trên một nền tảng doanh nghiệp tích hợp AI.",
   keywords:
-    "đăng nhập iGen ERP, hệ thống ERP doanh nghiệp, cổng quản trị AI, phần mềm ERP",
+    "đăng nhập iGen Connect, đăng nhập iGen ERP, hệ thống ERP doanh nghiệp, cổng quản trị AI, phần mềm ERP",
   path: "/dang-nhap",
   image: SEO_DEFAULT_IMAGE,
   robots: "noindex, nofollow",
@@ -52,8 +52,8 @@ export const AUTH_SEO: SeoMeta = {
 
 export const PRIVACY_SEO: SeoMeta = {
   title: "Chính sách bảo mật",
-  description: "Chính sách bảo mật thông tin người dùng và dữ liệu của iGen ERP.",
-  keywords: "chính sách bảo mật, bảo mật dữ liệu, igen erp",
+  description: "Chính sách bảo mật thông tin người dùng và dữ liệu của iGen Connect.",
+  keywords: "chính sách bảo mật, bảo mật dữ liệu, igen connect, igen erp",
   path: "/privacy-policy",
   image: SEO_DEFAULT_IMAGE,
   robots: "index, follow",
@@ -64,8 +64,8 @@ export const PRIVACY_SEO: SeoMeta = {
 
 export const TERMS_SEO: SeoMeta = {
   title: "Điều khoản dịch vụ",
-  description: "Điều khoản dịch vụ và thỏa thuận sử dụng phần mềm quản trị doanh nghiệp iGen ERP.",
-  keywords: "điều khoản dịch vụ, thoả thuận sử dụng, igen erp",
+  description: "Điều khoản dịch vụ và thỏa thuận sử dụng phần mềm quản trị doanh nghiệp iGen Connect.",
+  keywords: "điều khoản dịch vụ, thoả thuận sử dụng, igen connect, igen erp",
   path: "/terms-of-service",
   image: SEO_DEFAULT_IMAGE,
   robots: "index, follow",
@@ -76,8 +76,8 @@ export const TERMS_SEO: SeoMeta = {
 
 export const DELETION_SEO: SeoMeta = {
   title: "Yêu cầu xóa dữ liệu người dùng",
-  description: "Hướng dẫn xóa dữ liệu người dùng và tra cứu trạng thái yêu cầu xóa thông tin trên hệ thống iGen ERP.",
-  keywords: "xóa dữ liệu người dùng, bảo mật dữ liệu, user data deletion, igen erp",
+  description: "Hướng dẫn xóa dữ liệu người dùng và tra cứu trạng thái yêu cầu xóa thông tin trên hệ thống iGen Connect.",
+  keywords: "xóa dữ liệu người dùng, bảo mật dữ liệu, user data deletion, igen connect, igen erp",
   path: "/user-data-deletion",
   image: SEO_DEFAULT_IMAGE,
   robots: "index, follow",
@@ -90,30 +90,30 @@ export const TAB_SEO_MAP: Partial<Record<TabType, SeoMeta>> & Record<string, Seo
   "TỔNG QUAN": {
     title: "Tổng quan doanh nghiệp - Dashboard điều hành thông minh",
     description:
-      "Báo cáo tổng quan hiệu suất kinh doanh, doanh thu bán hàng, tiến độ công việc và phân tích vận hành doanh nghiệp tự động với AI trên iGen ERP.",
+      "Báo cáo tổng quan hiệu suất kinh doanh, doanh thu bán hàng, tiến độ công việc và phân tích vận hành doanh nghiệp tự động với AI trên iGen Connect.",
     keywords:
-      "dashboard doanh nghiệp, tổng quan ERP, báo cáo điều hành, dashboard AI, iGen ERP, doanh thu erp",
+      "dashboard doanh nghiệp, tổng quan ERP, báo cáo điều hành, dashboard AI, iGen Connect, iGen ERP, doanh thu erp",
     path: "/tong-quan",
     priority: "0.9",
     changeFrequency: "daily",
   },
   "CUỘC HỌP": { title: "Cuộc họp", description: "Lịch họp và điều phối phát biểu.", keywords: "cuộc họp, check-in, điều phối", path: "/cuoc-hop", robots: "noindex, nofollow", priority: "0.2", changeFrequency: "weekly" },
   "NHÂN SỰ": {
-    title: "Quản lý nhân sự HRM - Sơ đồ tổ chức, KPI và Đào tạo",
+    title: "Quản lý thành viên - Sơ đồ tổ chức",
     description:
-      "Giải pháp HRM toàn diện trên iGen ERP giúp quản lý hồ sơ nhân sự, vẽ sơ đồ tổ chức tự động, thiết lập KPI và số hóa tài liệu đào tạo nội bộ.",
+      "Giải pháp HRM toàn diện trên iGen Connect giúp quản lý hồ sơ nhân sự, vẽ sơ đồ tổ chức tự động, thiết lập KPI và số hóa tài liệu đào tạo nội bộ.",
     keywords:
-      "quản lý nhân sự, HRM, KPI nhân viên, đào tạo nội bộ, sơ đồ tổ chức, ERP nhân sự, sơ đồ báo cáo",
-    path: "/nhan-su",
+      "quản lý thành viên, BNI chapter, sơ đồ tổ chức, thành viên doanh nghiệp",
+    path: "/thanh-vien",
     priority: "0.8",
     changeFrequency: "weekly",
   },
   "QUẢN LÝ TÀI NGUYÊN": {
     title: "Quản lý tài nguyên - Lưu trữ và đồng bộ Google Drive",
     description:
-      "Không gian quản lý tài nguyên, tài liệu nội bộ và liên kết đồng bộ trực tiếp với tài khoản Google Drive cá nhân của nhân viên trên iGen ERP.",
+      "Không gian quản lý tài nguyên, tài liệu nội bộ và liên kết đồng bộ trực tiếp với tài khoản Google Drive cá nhân của nhân viên trên iGen Connect.",
     keywords:
-      "quản lý tài nguyên, lưu trữ tài liệu, google drive erp, đồng bộ google drive, thư mục tài nguyên, igen erp",
+      "quản lý tài nguyên, lưu trữ tài liệu, google drive erp, đồng bộ google drive, thư mục tài nguyên, igen connect, igen erp",
     path: "/quan-ly-tai-nguyen",
     priority: "0.8",
     changeFrequency: "weekly",
@@ -121,9 +121,9 @@ export const TAB_SEO_MAP: Partial<Record<TabType, SeoMeta>> & Record<string, Seo
   "TRÒ CHUYỆN": {
     title: "Trò chuyện nội bộ - Trực quan, Thời gian thực",
     description:
-      "Trực tiếp trao đổi công việc, trò chuyện 1-1 hoặc tạo phòng chat nhóm giữa các tài khoản nhân viên trong doanh nghiệp tại iGen ERP.",
+      "Trực tiếp trao đổi công việc, trò chuyện 1-1 hoặc tạo phòng chat nhóm giữa các tài khoản nhân viên trong doanh nghiệp tại iGen Connect.",
     keywords:
-      "chat nội bộ, chat nhóm, chat 1-1, trò chuyện nội bộ, nhắn tin realtime, socket.io chat, igen erp",
+      "chat nội bộ, chat nhóm, chat 1-1, trò chuyện nội bộ, nhắn tin realtime, socket.io chat, igen connect, igen erp",
     path: "/tro-chuyen",
     priority: "0.7",
     changeFrequency: "weekly",
@@ -164,7 +164,7 @@ export const TAB_SEO_MAP: Partial<Record<TabType, SeoMeta>> & Record<string, Seo
   "TÀI NGUYÊN": {
     title: "Tài nguyên - Quản lý tài liệu & Drive nội bộ",
     description:
-      "Lưu trữ và quản lý tài liệu nội bộ, kết nối Google Drive và chia sẻ tài nguyên doanh nghiệp tập trung trên iGen ERP.",
+      "Lưu trữ và quản lý tài liệu nội bộ, kết nối Google Drive và chia sẻ tài nguyên doanh nghiệp tập trung trên iGen Connect.",
     keywords:
       "tài liệu nội bộ, google drive, quản lý tài nguyên, lưu trữ doanh nghiệp, tài nguyên ERP",
     path: "/tai-nguyen",
@@ -175,9 +175,9 @@ export const TAB_SEO_MAP: Partial<Record<TabType, SeoMeta>> & Record<string, Seo
   "HƯỚNG DẪN": {
     title: "Hướng dẫn sử dụng - Cẩm nang thao tác hệ thống",
     description:
-      "Hướng dẫn sử dụng chi tiết từng phân hệ trong iGen ERP bằng ngôn ngữ giản dị, trực quan dành cho người dùng không chuyên.",
+      "Hướng dẫn sử dụng chi tiết từng phân hệ trong iGen Connect bằng ngôn ngữ giản dị, trực quan dành cho người dùng không chuyên.",
     keywords:
-      "hướng dẫn sử dụng, cẩm nang erp, tài liệu hướng dẫn, igen erp, hỗ trợ sử dụng",
+      "hướng dẫn sử dụng, cẩm nang erp, tài liệu hướng dẫn, igen connect, igen erp, hỗ trợ sử dụng",
     path: "/huong-dan",
     robots: "noindex, nofollow",
     priority: "0.5",
@@ -232,6 +232,7 @@ export function tabToPath(tab: TabType): string {
 
 export function pathToTab(pathname: string): TabType | null {
   const normalized = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  if (normalized.toLowerCase() === "/nhan-su") return "NHÂN SỰ";
   const matched = (Object.entries(TAB_SEO_MAP) as Array<[TabType, SeoMeta]>).find(
     ([, meta]) => meta.path.toLowerCase() === normalized.toLowerCase()
   );

@@ -466,6 +466,17 @@ export default function MeetingTab() {
           </div>
 
           <div className="flex items-center gap-2">
+            <a
+              href="/wheel-of-names"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-xl bg-linear-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 px-4 py-2.5 text-xs font-black shadow-sm shadow-amber-500/20 transition cursor-pointer"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Vòng quay may mắn (Full screen)</span>
+              <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+            </a>
+
             {canManage && (
               <button
                 type="button"

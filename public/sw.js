@@ -1,4 +1,4 @@
-/* Service Worker cho Web Push của iGen ERP — nhận thông báo tin nhắn mới kể cả khi đã đóng tab web */
+/* Service Worker cho Web Push của iGen Connect — nhận thông báo tin nhắn mới kể cả khi đã đóng tab web */
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -13,16 +13,16 @@ self.addEventListener("push", (event) => {
   try {
     payload = event.data ? event.data.json() : {};
   } catch (e) {
-    payload = { title: "iGen ERP", body: event.data ? event.data.text() : "" };
+    payload = { title: "iGen Connect", body: event.data ? event.data.text() : "" };
   }
 
-  const title = payload.title || "iGen ERP — Thông báo mới";
+  const title = payload.title || "iGen Connect — Thông báo mới";
   event.waitUntil(
     self.registration.showNotification(title, {
       body: payload.body || "",
       icon: "/brand-icon.png",
       badge: "/brand-icon.png",
-      tag: payload.tag || "igen-erp",
+      tag: payload.tag || "igen-connect",
       data: { url: payload.url || "/tro-chuyen" },
     })
   );

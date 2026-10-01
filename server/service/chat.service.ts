@@ -55,7 +55,7 @@ export const chatService = {
         senderId: CHATBOT_SENDER_ID,
         senderName: "Trợ lý AI",
         senderPhoto: "ai-avatar",
-        content: `Chào bạn! Tôi là trợ lý ảo AI của hệ thống iGen ERP.
+        content: `Chào bạn! Tôi là trợ lý ảo AI của hệ thống iGen Connect.
 
 Tôi có thể giúp bạn tra cứu nhanh dữ liệu doanh nghiệp:
 - Khách hàng (CRM) — pipeline, trạng thái, giá trị cơ hội.

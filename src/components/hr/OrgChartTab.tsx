@@ -22,7 +22,9 @@ import {
   Eye,
   CalendarDays,
   List,
-  Network
+  Network,
+  Camera,
+  Image as ImageIcon
 } from "lucide-react";
 import { EmployeeNode, UserProfile, TrainingCourse } from "../../types";
 import { authService, getAccessToken } from "../../services/authService";
@@ -74,20 +76,34 @@ const parseDurationToHours = (durationStr: string): number => {
   return value;
 };
 
-const renderAvatar = (avatar: string, sizeClasses: string = "w-8 h-8", textClass: string = "text-base") => {
+const renderAvatar = (avatar: string, sizeClasses: string = "w-8 h-8", textClass: string = "text-base", nameFallback?: string) => {
   if (isUrl(avatar)) {
     return (
-      <div className={`${sizeClasses} rounded-full overflow-hidden shrink-0 flex items-center justify-center border border-gray-150`}>
-        <img src={avatar} className="w-full h-full object-cover" alt="Avatar thành viên" />
+      <div className={`${sizeClasses} rounded-full overflow-hidden shrink-0 flex items-center justify-center border-2 border-white shadow-xs bg-slate-100`}>
+        <img
+          src={avatar}
+          className="w-full h-full object-cover"
+          alt={nameFallback || "Avatar thành viên"}
+          onError={(e) => {
+            const target = e.currentTarget;
+            target.style.display = "none";
+            const parent = target.parentElement;
+            if (parent) {
+              parent.classList.add("bg-gradient-to-tr", "from-blue-600", "to-indigo-500", "text-white", "font-bold");
+              parent.innerText = nameFallback ? nameFallback.trim().charAt(0).toUpperCase() : "👤";
+            }
+          }}
+        />
       </div>
     );
   }
   return (
-    <div className={`${sizeClasses} bg-slate-50 rounded-full shrink-0 flex items-center justify-center border border-gray-100 select-none`}>
-      <span className={textClass}>{avatar || "👤"}</span>
+    <div className={`${sizeClasses} bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-bold rounded-full shrink-0 flex items-center justify-center border-2 border-white shadow-xs select-none`}>
+      <span className={textClass}>{nameFallback ? nameFallback.trim().charAt(0).toUpperCase() : (avatar || "👤")}</span>
     </div>
   );
 };
+
 
 const FUNCTIONAL_CATEGORIES = [
   { key: "governance", label: "Quản trị", badge: "GOVERNANCE", color: "bg-slate-900", border: "border-t-4 border-slate-900", dot: "#0f172a" },
@@ -370,8 +386,7 @@ export default function OrgChartTab({
     return employees.filter(e => e.parentId === nodeId);
   };
 
-  // Add Employee Modal States
-
+  // Add Member Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddingEmployee, setIsAddingEmployee] = useState(false);
   const [addName, setAddName] = useState("");
@@ -380,35 +395,33 @@ export default function OrgChartTab({
   const [addPhone, setAddPhone] = useState("");
   const [addCompanyName, setAddCompanyName] = useState("");
   const [addIndustry, setAddIndustry] = useState("");
-  const [addDepartment, setAddDepartment] = useState("Phòng Kỹ Thuật");
+  const [addDepartment, setAddDepartment] = useState("Ban Thành viên");
   const [addParentId, setAddParentId] = useState("");
   const [addRole, setAddRole] = useState<"user" | "manager" | "branch_owner" | "admin">("user");
-  const [addJobDescriptionLink, setAddJobDescriptionLink] = useState("");
-  const [addJobDescriptionUploadToken, setAddJobDescriptionUploadToken] = useState("");
-  const [addQualification, setAddQualification] = useState("");
-  const [addMonthlySalary, setAddMonthlySalary] = useState("");
-  const [uploadingAddJobDescription, setUploadingAddJobDescription] = useState(false);
-  const addJobDescriptionFileInputRef = useRef<HTMLInputElement>(null);
+  const [addPhotoURL, setAddPhotoURL] = useState("");
+  const [addCoverImage, setAddCoverImage] = useState("");
+  const [uploadingAddAvatar, setUploadingAddAvatar] = useState(false);
+  const [uploadingAddCover, setUploadingAddCover] = useState(false);
+  const addAvatarFileInputRef = useRef<HTMLInputElement>(null);
+  const addCoverFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Edit Employee States
+  // Edit Member States
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editRoleText, setEditRoleText] = useState("");
   const [editCompanyName, setEditCompanyName] = useState("");
   const [editIndustry, setEditIndustry] = useState("");
-  const [editQualification, setEditQualification] = useState("");
-  const [editDivision, setEditDivision] = useState("");
   const [editDepartment, setEditDepartment] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
-  const [editLevel, setEditLevel] = useState<number>(4);
+  const [editBirthDate, setEditBirthDate] = useState("");
+  const [editPhotoURL, setEditPhotoURL] = useState("");
+  const [editCoverImage, setEditCoverImage] = useState("");
   const [editParentId, setEditParentId] = useState("");
-  const [editJobDescriptionLink, setEditJobDescriptionLink] = useState("");
-  const [editJobDescriptionUploadToken, setEditJobDescriptionUploadToken] = useState("");
-  const [editMonthlySalary, setEditMonthlySalary] = useState("");
-  const [uploadingEditJobDescription, setUploadingEditJobDescription] = useState(false);
-  const [showJobDescriptionPreview, setShowJobDescriptionPreview] = useState(false);
-  const editJobDescriptionFileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingEditCover, setUploadingEditCover] = useState(false);
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+  const editCoverFileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingLeader, setIsSavingLeader] = useState(false);
 
@@ -419,21 +432,111 @@ export default function OrgChartTab({
 
   const startEditing = () => {
     if (!selectedEmp) return;
-    setEditName(selectedEmp.name || "");
-    setEditRoleText(selectedEmp.role || "");
-    setEditCompanyName(selectedEmp.companyName || "");
-    setEditIndustry(selectedEmp.industry || "");
-    setEditQualification(selectedEmp.qualification || "");
-    setEditDivision(selectedEmp.division || "Khối Vận Hành");
-    setEditDepartment(selectedEmp.department || "");
-    setEditMonthlySalary(selectedEmp.monthlySalary == null ? "" : String(selectedEmp.monthlySalary));
-    setEditEmail(selectedEmp.email || "");
-    setEditPhone(selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : "");
-    setEditLevel(selectedEmp.level || 4);
-    setEditParentId(selectedEmp.parentId || "");
-    setEditJobDescriptionLink(selectedEmp.jobDescriptionLink || "");
-    setEditJobDescriptionUploadToken("");
+    const raw = usersList.find(u => u.uid === selectedEmp.id);
+    setEditName(raw?.displayName || selectedEmp.name || "");
+    setEditRoleText(raw?.jobTitle || selectedEmp.role || "");
+    setEditCompanyName(raw?.companyName || selectedEmp.companyName || "");
+    setEditIndustry(raw?.industry || selectedEmp.industry || "");
+    setEditDepartment(raw?.department || selectedEmp.department || "");
+    setEditEmail(raw?.email || selectedEmp.email || "");
+    setEditPhone(raw?.phone && raw.phone !== "Chưa cập nhật" ? raw.phone : (selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : ""));
+    setEditParentId(raw?.parentId || selectedEmp.parentId || "");
+    setEditPhotoURL(raw?.photoURL || selectedEmp.avatar || "");
+    setEditCoverImage(raw?.coverImage || selectedEmp.coverImage || "");
+    setEditBirthDate(
+      raw?.birthDate
+        ? (typeof raw.birthDate === "string" ? raw.birthDate.split("T")[0] : new Date(raw.birthDate).toISOString().split("T")[0])
+        : (selectedEmp.birthDate ? selectedEmp.birthDate.split("T")[0] : "")
+    );
     setIsEditing(true);
+  };
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setUploadingAvatar(true);
+    try {
+      const compCode = selectedCompanyCode || userProfile?.companyCode;
+      const res = await authService.uploadManagedFile(
+        file,
+        "profile.avatar",
+        compCode === "SYSTEM" ? undefined : compCode
+      );
+      setEditPhotoURL(res.url);
+      toast.success("Đã tải lên ảnh đại diện.");
+    } catch (err: any) {
+      toast.error(err?.message || "Không thể tải lên ảnh đại diện.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleEditCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setUploadingEditCover(true);
+    try {
+      const compCode = selectedCompanyCode || userProfile?.companyCode;
+      const res = await authService.uploadManagedFile(
+        file,
+        "profile.cover",
+        compCode === "SYSTEM" ? undefined : compCode
+      );
+      setEditCoverImage(res.url);
+      toast.success("Đã tải lên ảnh bìa thành công.");
+    } catch (err: any) {
+      toast.error(err?.message || "Không thể tải lên ảnh bìa.");
+    } finally {
+      setUploadingEditCover(false);
+    }
+  };
+
+  const handleAddAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setUploadingAddAvatar(true);
+    try {
+      const compCode = selectedCompanyCode || userProfile?.companyCode;
+      const res = await authService.uploadManagedFile(
+        file,
+        "profile.avatar",
+        compCode === "SYSTEM" ? undefined : compCode
+      );
+      setAddPhotoURL(res.url);
+      toast.success("Đã tải lên ảnh đại diện.");
+    } catch (err: any) {
+      toast.error(err?.message || "Không thể tải lên ảnh đại diện.");
+    } finally {
+      setUploadingAddAvatar(false);
+    }
+  };
+
+  const handleAddCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setUploadingAddCover(true);
+    try {
+      const compCode = selectedCompanyCode || userProfile?.companyCode;
+      const res = await authService.uploadManagedFile(
+        file,
+        "profile.cover",
+        compCode === "SYSTEM" ? undefined : compCode
+      );
+      setAddCoverImage(res.url);
+      toast.success("Đã tải lên ảnh bìa thành công.");
+    } catch (err: any) {
+      toast.error(err?.message || "Không thể tải lên ảnh bìa.");
+    } finally {
+      setUploadingAddCover(false);
+    }
   };
 
   const handleToggleLeader = async () => {
@@ -457,28 +560,6 @@ export default function OrgChartTab({
     }
   };
 
-  const handleJobDescriptionFileChange = async (e: React.ChangeEvent<HTMLInputElement>, target: "add" | "edit") => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
-    const setUploading = target === "add" ? setUploadingAddJobDescription : setUploadingEditJobDescription;
-    const setLink = target === "add" ? setAddJobDescriptionLink : setEditJobDescriptionLink;
-    const setToken = target === "add" ? setAddJobDescriptionUploadToken : setEditJobDescriptionUploadToken;
-
-    setUploading(true);
-    try {
-      const uploaded = await authService.uploadManagedFile(file, "hr.org-chart", selectedCompanyCode || userProfile?.companyCode);
-      setLink(uploaded.url);
-      setToken(uploaded.uploadToken);
-      toast.success("Đã tải lên mô tả công việc.");
-    } catch (error: any) {
-      toast.error(error?.message || "Tải file mô tả công việc lên Cloudinary thất bại.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const handleEditEmployeeSave = async () => {
     if (!selectedEmp) return;
 
@@ -487,16 +568,6 @@ export default function OrgChartTab({
       return;
     }
 
-    // Kiểm tra định dạng Số điện thoại Việt Nam (nếu nhập)
-    if (editPhone.trim()) {
-      const vnPhoneRegex = /^(0|\+84|84)(3|5|7|8|9)[0-9]{8}$/;
-      if (!vnPhoneRegex.test(editPhone.trim().replace(/\s+/g, ""))) {
-        toast.warning("Số điện thoại Việt Nam không đúng định dạng (ví dụ: 0987654321)!");
-        return;
-      }
-    }
-
-    // Kiểm tra trùng số điện thoại
     if (editPhone.trim()) {
       const phoneNormalized = editPhone.trim().replace(/\s+/g, "");
       const duplicatePhone = usersList.find(u => u.uid !== selectedEmp.id && u.phone && u.phone.replace(/\s+/g, "") === phoneNormalized);
@@ -508,17 +579,17 @@ export default function OrgChartTab({
 
     setIsSaving(true);
     try {
-      const updateData = {
+      const updateData: any = {
         displayName: editName.trim(),
         jobTitle: editRoleText.trim(),
-        qualification: editQualification.trim(),
-        division: editDivision,
+        companyName: editCompanyName.trim(),
+        industry: editIndustry.trim(),
         department: editDepartment.trim(),
         phone: editPhone.trim() || "",
         parentId: editParentId || null,
-        jobDescriptionLink: editJobDescriptionLink.trim() || "",
-        jobDescriptionUploadToken: editJobDescriptionUploadToken || undefined,
-        monthlySalary: editMonthlySalary === "" ? undefined : Number(editMonthlySalary),
+        photoURL: editPhotoURL.trim() || "",
+        coverImage: editCoverImage.trim() || "",
+        birthDate: editBirthDate || undefined,
       };
 
       await authService.updateUser(selectedEmp.id, updateData);
@@ -527,18 +598,19 @@ export default function OrgChartTab({
       await fetchUsers();
 
       // Cập nhật selectedEmp cục bộ
-      const updatedNode = {
-        ...selectedEmp,
+      setSelectedEmp((prev) => prev ? {
+        ...prev,
         name: updateData.displayName,
         role: updateData.jobTitle,
-        qualification: updateData.qualification,
-        division: updateData.division,
+        companyName: updateData.companyName,
+        industry: updateData.industry,
         department: updateData.department,
         phone: updateData.phone || "Chưa cập nhật",
         parentId: updateData.parentId || undefined,
-        jobDescriptionLink: updateData.jobDescriptionLink || "",
-      };
-      setSelectedEmp(updatedNode);
+        avatar: updateData.photoURL || prev.avatar,
+        coverImage: updateData.coverImage || prev.coverImage,
+        birthDate: updateData.birthDate,
+      } : null);
     } catch (err) {
       console.error(err);
       toast.error(getApiErrorMessage(err, "Lỗi khi cập nhật thông tin thành viên."));
@@ -546,6 +618,7 @@ export default function OrgChartTab({
       setIsSaving(false);
     }
   };
+
 
   const canEditEmployee = (selectedEmpId: string): boolean => {
     if (!userProfile) return false;
@@ -714,12 +787,12 @@ export default function OrgChartTab({
     }
   }, [addRole, addParentId, usersList, isAddModalOpen]);
 
-  // Reset addDepartment when modal closes
+  // Reset add form when modal closes
   useEffect(() => {
     if (!isAddModalOpen) {
       setAddDepartment("Phòng Kỹ Thuật");
-      setAddJobDescriptionLink("");
-      setAddJobDescriptionUploadToken("");
+      setAddPhotoURL("");
+      setAddCoverImage("");
     }
   }, [isAddModalOpen]);
 
@@ -823,6 +896,7 @@ export default function OrgChartTab({
     const isDeptScopedRole = addRole === "user" || addRole === "manager";
     const deptName = isDeptScopedRole ? (addDepartment.trim() || (addRole === "manager" ? "Quản lý" : "Nhân sự")) : undefined;
 
+    const finalCompName = addCompanyName.trim() || compName;
     try {
       setIsAddingEmployee(true);
       const newUid = await authService.registerUserForCompany(
@@ -831,19 +905,24 @@ export default function OrgChartTab({
         addPassword,
         addRole,
         compCode,
-        compName,
+        finalCompName,
         addParentId || undefined,
         managerLevel,
         deptName,
         deptName,
         addPhone.trim(),
         undefined,
-        addJobDescriptionLink.trim() || undefined,
+        undefined,
         activeBranchId || undefined,
         undefined,
-        addQualification.trim() || undefined,
-        addMonthlySalary.trim() === "" ? undefined : Number(addMonthlySalary),
-        addJobDescriptionUploadToken || undefined,
+        undefined,
+        undefined,
+        undefined,
+        {
+          industry: addIndustry.trim() || undefined,
+          photoURL: addPhotoURL.trim() || undefined,
+          coverImage: addCoverImage.trim() || undefined,
+        }
       );
 
       toast.success(`Đã thêm thành viên "${addName}" thành công!`);
@@ -858,19 +937,20 @@ export default function OrgChartTab({
       setAddEmail("");
       setAddPassword("");
       setAddPhone("");
+      setAddCompanyName("");
+      setAddIndustry("");
+      setAddPhotoURL("");
+      setAddCoverImage("");
       setAddParentId("");
       setAddRole("user");
-      setAddDepartment("Phòng Kỹ Thuật");
-      setAddJobDescriptionLink("");
-      setAddJobDescriptionUploadToken("");
-      setAddQualification("");
-      setAddMonthlySalary("");
+      setAddDepartment("Ban Thành viên");
 
       await fetchUsers();
       if (compCode) {
         await fetchCourses(compCode);
       }
     } catch (err) {
+
       console.error(err);
       toast.error(getApiErrorMessage(err, "Lỗi khi thêm thành viên mới."));
     } finally {
@@ -1315,7 +1395,7 @@ export default function OrgChartTab({
                 data-testid="org-chart-add-button"
                 type="button"
                 onClick={() => setIsAddModalOpen(true)}
-                className="col-span-full flex w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-650 px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-indigo-700 active:scale-95 cursor-pointer min-[768px]:col-span-1 min-[1200px]:w-auto"
+                className="col-span-full flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-blue-700 active:scale-95 cursor-pointer min-[768px]:col-span-1 min-[1200px]:w-auto"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>Thêm thành viên</span>
@@ -1573,614 +1653,701 @@ export default function OrgChartTab({
       </div>
 
       {/* EMPLOYEE DETAIL & EDIT MODAL */}
-      {isDetailModalOpen && selectedEmp && (
-        <div className="fixed inset-0 bg-black/55 backdrop-blur-2xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" id="employee_detail_modal">
-          {isEditing ? (
-            <div className="bg-white border border-slate-100 rounded-2xl shadow-xl w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 relative text-left space-y-4 animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex justify-between items-center pb-2 border-b">
-                <h4 className="font-bold text-slate-800 text-sm font-sans uppercase">Chỉnh Sửa Thành Viên</h4>
-                <button type="button" onClick={() => setIsEditing(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+      {isDetailModalOpen && selectedEmp && (() => {
+        const rawUser = usersList.find(u => u.uid === selectedEmp.id);
+        const memberAvatar = rawUser?.photoURL || selectedEmp.avatar;
+        const memberCover = rawUser?.coverImage || selectedEmp.coverImage;
+        const memberName = rawUser?.displayName || selectedEmp.name;
+        const memberRole = rawUser?.jobTitle || selectedEmp.role;
+        const memberCompany = rawUser?.companyName || selectedEmp.companyName || "Chưa cập nhật";
+        const memberIndustry = rawUser?.industry || selectedEmp.industry || "Chưa cập nhật";
+        const memberDept = rawUser?.department || selectedEmp.department || "Ban Thành viên";
+        const memberPhone = (rawUser?.phone && rawUser.phone !== "Chưa cập nhật") ? rawUser.phone : (selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : "Chưa cập nhật");
+        const memberEmail = rawUser?.email || selectedEmp.email || "Chưa cập nhật";
+        const memberBirthDate = rawUser?.birthDate || selectedEmp.birthDate;
 
-              <div className="space-y-3.5 text-xs text-left">
-                <div className="flex justify-center pb-2">
-                  {renderAvatar(selectedEmp.avatar, "w-16 h-16", "text-3xl")}
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" id="employee_detail_modal">
+            {isEditing ? (
+              <div className="bg-white border border-slate-100 rounded-3xl shadow-2xl w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 relative text-left space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                  <h4 className="font-bold text-slate-800 text-sm font-sans uppercase">Chỉnh Sửa Thành Viên</h4>
+                  <button type="button" onClick={() => setIsEditing(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-gray-500 mb-1">Họ tên *</label>
-                  <input
-                    type="text"
-                    required
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 bg-white"
-                  />
-                </div>
+                <div className="space-y-3.5 text-xs text-left">
+                  {/* Visual Cover Image & Avatar Preview Section */}
+                  <div className="relative rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden shadow-xs">
+                    {/* Cover Banner */}
+                    <div className="relative h-28 sm:h-32 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 overflow-hidden">
+                      {editCoverImage ? (
+                        <img
+                          src={editCoverImage}
+                          alt="Ảnh bìa"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-1 opacity-40 text-white">
+                          <ImageIcon className="h-7 w-7" />
+                          <span className="text-[10px] font-medium tracking-wide">Chưa có ảnh bìa</span>
+                        </div>
+                      )}
+                      {/* Cover Image Action Buttons */}
+                      <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                        <input
+                          ref={editCoverFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleEditCoverFileChange}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => editCoverFileInputRef.current?.click()}
+                          disabled={uploadingEditCover}
+                          className="px-2.5 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-md text-white rounded-xl text-[11px] font-medium flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50"
+                        >
+                          {uploadingEditCover ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Camera className="h-3.5 w-3.5" />
+                          )}
+                          <span>{uploadingEditCover ? "Đang tải..." : (editCoverImage ? "Đổi ảnh bìa" : "Tải ảnh bìa")}</span>
+                        </button>
+                        {editCoverImage && (
+                          <button
+                            type="button"
+                            onClick={() => setEditCoverImage("")}
+                            title="Xóa ảnh bìa"
+                            className="p-1.5 bg-black/60 hover:bg-red-600 backdrop-blur-md text-white rounded-xl transition cursor-pointer"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
 
-                <div>
-                  <label className="block font-bold text-gray-500 mb-1">Trình độ</label>
-                  <input type="text" value={editQualification} onChange={(e) => setEditQualification(e.target.value)} placeholder="Ví dụ: TESOL, Cử nhân Sư phạm" className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 bg-white" />
-                </div>
+                    {/* Avatar & Upload Bar */}
+                    <div className="px-4 pb-3.5 pt-2 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                      <div className="flex items-center gap-3.5 -mt-10 sm:-mt-12">
+                        <div className="relative group shrink-0">
+                          <div className="h-18 w-18 sm:h-20 sm:w-20 rounded-2xl border-4 border-white bg-white shadow-md overflow-hidden flex items-center justify-center">
+                            {renderAvatar(editPhotoURL || selectedEmp.avatar, "w-full h-full", "text-xl", editName || selectedEmp.name)}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => avatarFileInputRef.current?.click()}
+                            disabled={uploadingAvatar}
+                            title="Tải ảnh đại diện"
+                            className="absolute inset-0 bg-black/45 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"
+                          >
+                            {uploadingAvatar ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-800 text-sm block">{editName || selectedEmp.name}</span>
+                          <span className="text-[11px] text-gray-500 font-medium">{editRoleText || selectedEmp.role || "Thành viên"}</span>
+                        </div>
+                      </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          ref={avatarFileInputRef}
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarFileChange}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => avatarFileInputRef.current?.click()}
+                          disabled={uploadingAvatar}
+                          className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 font-bold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50 text-[11px]"
+                        >
+                          {uploadingAvatar ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                          <span>{uploadingAvatar ? "Đang tải..." : (editPhotoURL ? "Đổi avatar" : "Tải avatar")}</span>
+                        </button>
+                        {editPhotoURL && (
+                          <button
+                            type="button"
+                            onClick={() => setEditPhotoURL("")}
+                            title="Xóa avatar"
+                            className="p-1.5 border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl transition cursor-pointer"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Member Name */}
                   <div>
-                    <label className="block font-bold text-gray-500 mb-1">Chức danh</label>
+                    <label className="block font-bold text-gray-500 mb-1">Họ tên *</label>
                     <input
                       type="text"
-                      value={editRoleText}
-                      onChange={(e) => setEditRoleText(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 bg-white"
+                      required
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white font-medium"
                     />
                   </div>
+
+                  {/* Company & Industry */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-gray-500 mb-1">Công ty / Doanh nghiệp</label>
+                      <input
+                        type="text"
+                        placeholder="Ví dụ: Công ty TNHH Giải Pháp Số"
+                        value={editCompanyName}
+                        onChange={(e) => setEditCompanyName(e.target.value)}
+                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-gray-500 mb-1">Lĩnh vực hoạt động</label>
+                      <input
+                        type="text"
+                        placeholder="Ví dụ: Phần mềm & Chuyển đổi số"
+                        value={editIndustry}
+                        onChange={(e) => setEditIndustry(e.target.value)}
+                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Role in Chapter */}
                   <div>
-                    <label className="block font-bold text-gray-500 mb-1">Phân khối</label>
+                    <label className="block font-bold text-gray-500 mb-1">Chức vụ trong Chapter</label>
+                    <input
+                      type="text"
+                      placeholder="Ví dụ: Thành viên, Phó Chủ tịch"
+                      value={editRoleText}
+                      onChange={(e) => setEditRoleText(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                    />
+                  </div>
+
+                  {/* Phone & BirthDate */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-gray-500 mb-1">Số điện thoại</label>
+                      <input
+                        type="text"
+                        placeholder="090XXXXXXXX"
+                        value={editPhone}
+                        onChange={(e) => setEditPhone(e.target.value)}
+                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-gray-500 mb-1">Ngày sinh</label>
+                      <input
+                        type="date"
+                        value={editBirthDate}
+                        onChange={(e) => setEditBirthDate(e.target.value)}
+                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email (fixed) */}
+                  <div>
+                    <label className="block font-bold text-gray-500 mb-1">Email liên lạc (Cố định)</label>
+                    <input
+                      type="email"
+                      value={editEmail}
+                      disabled
+                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none bg-gray-100 text-gray-400 cursor-not-allowed select-none"
+                    />
+                  </div>
+
+                  {/* Direct Manager / Connector */}
+                  <div>
+                    <label className="block font-bold text-gray-500 mb-1">Người kết nối / Báo cáo cho</label>
                     <select
-                      value={editDivision}
-                      onChange={(e) => setEditDivision(e.target.value)}
-                      className="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white cursor-pointer text-slate-700"
+                      value={editParentId}
+                      onChange={(e) => setEditParentId(e.target.value)}
+                      className="w-full p-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer text-slate-700"
                     >
-                      {uniqueDivisions.map(div => (
-                        <option key={div} value={div}>{div}</option>
-                      ))}
+                      <option value="">Không phân công (Gốc sơ đồ)</option>
+                      {employees
+                        .filter(emp => emp.id !== selectedEmp.id)
+                        .map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.name} ({emp.role}{emp.companyName ? ` · ${emp.companyName}` : ""})</option>
+                        ))
+                      }
                     </select>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-gray-500 mb-1">Phòng ban</label>
-                    <input
-                      type="text"
-                      value={editDepartment}
-                      onChange={(e) => setEditDepartment(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-gray-500 mb-1">Số điện thoại</label>
-                    <input
-                      type="text"
-                      value={editPhone}
-                      onChange={(e) => setEditPhone(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 bg-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="block font-bold text-gray-500 mb-1">Lương tháng (VND)</label><input type="number" min="0" step="1000" value={editMonthlySalary} onChange={(e) => setEditMonthlySalary(e.target.value)} className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none" placeholder="26000000" /></div>
-                </div>
-                <div>
-                  <label className="block font-bold text-gray-500 mb-1">Email liên lạc (Cố định)</label>
-                  <input
-                    type="email"
-                    value={editEmail}
-                    disabled
-                    className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none bg-gray-100 text-gray-400 cursor-not-allowed select-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-gray-500 mb-1">Link mô tả công việc</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="url"
-                      placeholder="Dán link hoặc tải file lên"
-                      value={editJobDescriptionLink}
-                      onChange={(e) => setEditJobDescriptionLink(e.target.value)}
-                      className="flex-1 px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 bg-white"
-                    />
-                    <input
-                      ref={editJobDescriptionFileInputRef}
-                      type="file"
-                      className="hidden"
-                      onChange={(e) => handleJobDescriptionFileChange(e, "edit")}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => editJobDescriptionFileInputRef.current?.click()}
-                      disabled={uploadingEditJobDescription}
-                      title="Tải file lên Google Drive"
-                      className="shrink-0 p-2 px-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      {uploadingEditJobDescription ? (
-                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Upload className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                    {editJobDescriptionLink && (
-                      <button
-                        type="button"
-                        onClick={() => setShowJobDescriptionPreview(true)}
-                        title="Xem trước"
-                        className="shrink-0 p-2 px-2.5 border border-indigo-200 bg-indigo-50 rounded-xl text-indigo-650 hover:bg-indigo-100 transition-all cursor-pointer"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-gray-500 mb-1">Quản lý trực tiếp</label>
-                  <select
-                    value={editParentId}
-                    onChange={(e) => setEditParentId(e.target.value)}
-                    className="w-full p-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white cursor-pointer text-slate-700"
+                <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 text-xs font-bold">
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => setIsEditing(false)}
+                    className="px-4 py-2 border rounded-xl hover:bg-slate-50 cursor-pointer disabled:opacity-50"
                   >
-                    <option value="">Không phân công</option>
-                    {employees
-                      .filter(emp => {
-                        const checkIsDescendant = (pId: string, cId: string): boolean => {
-                          const child = employees.find(e => e.id === cId);
-                          if (!child || !child.parentId) return false;
-                          if (child.parentId === pId) return true;
-                          return checkIsDescendant(pId, child.parentId);
-                        };
-
-                        const targetUserRaw = usersList.find(u => u.uid === selectedEmp.id);
-                        const rawUser = usersList.find(u => u.uid === emp.id);
-                        if (!targetUserRaw || !rawUser) return false;
-
-                        const ROLES_HIERARCHY: Record<string, number> = {
-                          admin: 1,
-                          branch_owner: 2,
-                          manager: 3,
-                          user: 4
-                        };
-                        const targetLevel = ROLES_HIERARCHY[targetUserRaw.role] || 4;
-                        const parentLevel = ROLES_HIERARCHY[rawUser.role] || 4;
-
-                        // Chỉ cho phép chọn quản lý có vai trò cấp cao hơn và không phải là chính mình/cấp dưới
-                        return parentLevel < targetLevel && emp.id !== selectedEmp.id && !checkIsDescendant(selectedEmp.id, emp.id);
-                      })
-                      .map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
-                      ))
-                    }
-                  </select>
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={handleEditEmployeeSave}
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+                  >
+                    {isSaving ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        Đang lưu...
+                      </>
+                    ) : (
+                      "Lưu thay đổi"
+                    )}
+                  </button>
                 </div>
               </div>
-
-              <div className="pt-4 border-t flex justify-end gap-3 text-xs font-bold">
-                <button
-                  type="button"
-                  disabled={isSaving}
-                  onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 border rounded-xl hover:bg-slate-50 cursor-pointer disabled:opacity-50"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="button"
-                  disabled={isSaving}
-                  onClick={handleEditEmployeeSave}
-                  className="px-5 py-2 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {isSaving ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      Đang lưu...
-                    </>
-                  ) : (
-                    "Lưu thay đổi"
+            ) : (
+              <div className="bg-white border border-slate-100 rounded-3xl shadow-2xl w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto relative text-left animate-in fade-in zoom-in-95 duration-200">
+                {/* Header Cover Banner */}
+                <div className="relative h-28 w-full overflow-hidden rounded-t-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500">
+                  {memberCover && (
+                    <img src={memberCover} alt="Cover" className="w-full h-full object-cover opacity-90" />
                   )}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white border border-slate-100 rounded-2xl shadow-xl w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 relative text-left space-y-4 animate-in fade-in zoom-in-95 duration-200 animate-out duration-150">
-              <div className="flex justify-between items-center pb-2 border-b">
-                <h4 className="font-extrabold text-slate-850 text-sm font-sans uppercase tracking-wide">Chi Tiết Thành Viên</h4>
-                <button type="button" onClick={closeDetailModal} className="text-gray-400 hover:text-gray-650 cursor-pointer">
-                  <X className="h-4.5 w-4.5" />
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={closeDetailModal}
+                    className="absolute top-3 right-3 h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-xs z-10"
+                    title="Đóng"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
 
-              <div className="text-center pb-4 border-b border-gray-200">
-                <div className="mb-2.5 mx-auto flex justify-center">{renderAvatar(selectedEmp.avatar, "w-24 h-24", "text-5xl")}</div>
-                <h3 className="font-extrabold text-lg text-slate-900 font-sans leading-snug">{selectedEmp.name}</h3>
-                <p className="text-xs font-extrabold font-mono uppercase tracking-wide mt-1 text-indigo-600">{selectedEmp.role}</p>
-                <span className={`inline-block text-[10px] font-bold border px-2.5 py-0.5 rounded-lg uppercase tracking-wider font-mono mt-2 ${getDivisionBadgeStyles(selectedEmp.division)}`}>
-                  {selectedEmp.division}
-                </span>
-              </div>
-
-              {selectedLeaveBalance && (
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-3">
-                  <div className="mb-2 flex items-center gap-2 text-xs font-extrabold text-emerald-800"><CalendarDays className="h-4 w-4" /> Phép năm {selectedLeaveBalance.year}</div>
-                  <div className="grid grid-cols-4 gap-2 text-center">
-                    <div><div className="text-[9px] text-slate-500">Hạn mức</div><strong className="text-sm text-emerald-700">{selectedLeaveBalance.entitlement}</strong></div>
-                    <div><div className="text-[9px] text-slate-500">Đã dùng</div><strong className="text-sm text-slate-700">{selectedLeaveBalance.used}</strong></div>
-                    <div><div className="text-[9px] text-slate-500">Chờ duyệt</div><strong className="text-sm text-amber-600">{selectedLeaveBalance.pending}</strong></div>
-                    <div><div className="text-[9px] text-slate-500">Còn lại</div><strong className="text-sm text-cyan-700">{selectedLeaveBalance.remaining}</strong></div>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-4 text-xs text-slate-655 text-slate-600">
-                <div className="grid grid-cols-2 gap-3"><div><span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">Trạng thái</span><strong>{selectedEmp.status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}</strong></div><div><span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">Cấp thành viên</span><strong>Cấp {selectedEmp.level || missingValue}</strong></div></div>
-                <div><span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">Lương tháng</span><strong>{selectedEmp.monthlySalary != null ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(Number(selectedEmp.monthlySalary)) : missingValue}</strong></div>
-                <div className="flex items-center gap-3">
-                  <Building2 className="w-4.5 h-4.5 text-gray-400 shrink-0" />
-                  <div>
-                    <span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">Phòng ban</span>
-                    <strong className="text-slate-800 text-xs font-bold">{selectedEmp.department}</strong>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Mail className="w-4.5 h-4.5 text-gray-400 shrink-0" />
-                  <div>
-                    <span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">Email liên lạc</span>
-                    <strong className="text-slate-800 text-xs font-bold">{selectedEmp.email}</strong>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Phone className="w-4.5 h-4.5 text-gray-400 shrink-0" />
-                  <div>
-                    <span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">Số điện thoại</span>
-                    <strong className="text-slate-800 text-xs font-bold">{selectedEmp.phone}</strong>
-                  </div>
-                </div>
-                {selectedEmp.jobDescriptionLink && (
-                  <div className="flex items-center gap-3">
-                    <Link2 className="w-4.5 h-4.5 text-gray-400 shrink-0" />
-                    <div className="flex-1 flex items-center justify-between gap-2">
-                      <div>
-                        <span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">Mô tả công việc</span>
-                        <strong className="text-slate-800 text-xs font-bold">Đã đính kèm</strong>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditJobDescriptionLink(selectedEmp.jobDescriptionLink || "");
-                          setShowJobDescriptionPreview(true);
-                        }}
-                        title="Xem trước"
-                        className="shrink-0 p-2 border border-indigo-200 bg-indigo-50 rounded-xl text-indigo-650 hover:bg-indigo-100 transition-all cursor-pointer"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </button>
+                {/* Avatar & Profile Identity */}
+                <div className="px-6 pb-6 pt-0">
+                  <div className="flex flex-col items-center -mt-12 text-center pb-4 border-b border-slate-100">
+                    <div className="relative">
+                      {renderAvatar(memberAvatar, "w-24 h-24", "text-3xl", memberName)}
+                      <span
+                        className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white ${
+                          selectedEmp.status === "online" ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
+                        }`}
+                        title={selectedEmp.status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
+                      />
+                    </div>
+                    <h3 className="font-extrabold text-xl text-slate-900 mt-2.5 font-sans leading-tight">
+                      {memberName}
+                    </h3>
+                    <div className="flex flex-wrap items-center justify-center gap-2 mt-1.5">
+                      <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-0.5 rounded-full">
+                        {memberRole}
+                      </span>
+                      {selectedEmp.isLeader && (
+                        <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                          👑 Trưởng ban
+                        </span>
+                      )}
                     </div>
                   </div>
-                )}
-                {selectedEmp.parentId && (() => {
-                  const manager = employees.find(e => e.id === selectedEmp.parentId);
-                  return (
-                    <div className="flex items-center gap-3">
-                      <Users className="w-4.5 h-4.5 text-gray-400 shrink-0" />
-                      <div>
-                        <span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">Quản lý trực tiếp</span>
-                        <strong className="text-indigo-700 text-xs font-bold">
-                          {manager ? `${manager.name} (${manager.department})` : 'Quản lý cấp trên'}
-                        </strong>
+
+                  {/* Information Grid */}
+                  <div className="mt-4 space-y-3 text-xs">
+                    <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-150 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div className="flex items-start gap-2.5">
+                        <Building2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Doanh nghiệp</span>
+                          <strong className="text-slate-800 text-xs font-bold block truncate">{memberCompany}</strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2.5">
+                        <Briefcase className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lĩnh vực hoạt động</span>
+                          <strong className="text-slate-800 text-xs font-bold block truncate">{memberIndustry}</strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2.5">
+                        <CalendarDays className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ngày sinh</span>
+                          <strong className="text-slate-800 text-xs font-bold block truncate">
+                            {memberBirthDate ? new Date(memberBirthDate).toLocaleDateString("vi-VN") : "Chưa cập nhật"}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2.5">
+                        <Phone className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Số điện thoại</span>
+                          <a href={`tel:${memberPhone}`} className="text-slate-800 hover:text-blue-600 text-xs font-bold block truncate">
+                            {memberPhone}
+                          </a>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2.5 sm:col-span-2">
+                        <Mail className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email liên hệ</span>
+                          <a href={`mailto:${memberEmail}`} className="text-slate-800 hover:text-blue-600 text-xs font-bold block truncate">
+                            {memberEmail}
+                          </a>
+                        </div>
                       </div>
                     </div>
-                  );
-                })()}
-                {(() => {
-                  const directSubs = getDirectSubordinates(selectedEmp.id);
-                  if (directSubs.length > 0) {
-                    return (
-                      <div className="flex flex-col gap-1.5 pt-1">
-                        <div className="flex items-start gap-3">
-                          <Users className="w-4.5 h-4.5 text-gray-400 shrink-0 mt-0.5" />
-                          <div className="flex-1 min-w-0">
-                            <span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">
-                              Thành viên cấp dưới trực tiếp ({directSubs.length})
+
+                    {/* Direct Manager / Connector */}
+                    {selectedEmp.parentId && (() => {
+                      const manager = employees.find(e => e.id === selectedEmp.parentId);
+                      return (
+                        <div className="p-3 rounded-2xl bg-indigo-50/50 border border-indigo-100 flex items-center gap-3">
+                          <Users className="w-4.5 h-4.5 text-indigo-600 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <span className="block text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Người kết nối / Quản lý</span>
+                            <strong className="text-slate-800 text-xs font-bold truncate block">
+                              {manager ? `${manager.name} (${manager.role})` : "Quản lý cấp trên"}
+                            </strong>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Subordinates */}
+                    {(() => {
+                      const directSubs = getDirectSubordinates(selectedEmp.id);
+                      if (directSubs.length > 0) {
+                        return (
+                          <div className="pt-2">
+                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                              Thành viên nhánh kết nối ({directSubs.length})
                             </span>
-                            <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pb-1 pt-1 pr-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                            <div className="flex flex-col gap-2 max-h-[160px] overflow-y-auto pr-1">
                               {directSubs.map((sub) => (
                                 <button
                                   type="button"
                                   key={sub.id}
                                   onClick={() => setSelectedEmp(sub)}
-                                  className="flex items-center gap-3 bg-slate-50 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-200 px-3.5 py-2.5 rounded-xl cursor-pointer transition-all duration-200 text-left active:scale-95 outline-none font-sans w-full"
-                                  title={`Bấm để xem chi tiết ${sub.name}`}
+                                  className="flex items-center gap-3 bg-slate-50 hover:bg-blue-50/60 border border-slate-150 hover:border-blue-200 px-3 py-2 rounded-xl transition-all text-left cursor-pointer"
                                 >
-                                  {renderAvatar(sub.avatar, "w-8 h-8", "text-xs")}
-                                  <div className="min-w-0">
-                                    <span className="block text-xs font-bold text-slate-800 truncate">
-                                      {sub.name}
-                                    </span>
-                                    <span className="block text-[10px] text-slate-500 truncate mt-0.5">
-                                      {sub.role}
-                                    </span>
+                                  {renderAvatar(sub.avatar, "w-8 h-8", "text-xs", sub.name)}
+                                  <div className="min-w-0 flex-1">
+                                    <span className="block text-xs font-bold text-slate-800 truncate">{sub.name}</span>
+                                    <span className="block text-[10px] text-slate-500 truncate">{sub.companyName || sub.role}</span>
                                   </div>
                                 </button>
                               ))}
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  } else {
-                    return (
-                      <div className="flex items-center gap-3">
-                        <Users className="w-4.5 h-4.5 text-gray-400 shrink-0" />
-                        <div>
-                          <span className="block text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wider">
-                            Thành viên cấp dưới trực tiếp
-                          </span>
-                          <span className="text-[11px] text-gray-400 italic font-medium">Không có thành viên cấp dưới trực tiếp</span>
-                        </div>
-                      </div>
-                    );
-                  }
-                })()}
-              </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
 
-              <div className="pt-4 border-t flex flex-col gap-2 font-sans font-bold">
-                {isManager && usersList.find(u => u.uid === selectedEmp.id)?.role === "user" && (
-                  <button
-                    type="button"
-                    onClick={handleToggleLeader}
-                    disabled={isSavingLeader}
-                    className={`w-full py-2.5 border rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-95 disabled:opacity-50 ${selectedEmp.isLeader
-                        ? "bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-800"
-                        : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"
-                      }`}
-                  >
-                    👑 {selectedEmp.isLeader ? "Hủy chức vụ Trưởng nhóm (Leader)" : "Đặt làm Trưởng nhóm (Leader)"}
-                  </button>
-                )}
-                {canEditEmployee(selectedEmp.id) && (
-                  <button
-                    type="button"
-                    onClick={startEditing}
-                    className="w-full py-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Edit className="w-3.5 h-3.5" />
-                    Chỉnh Sửa Thông Tin
-                  </button>
-                )}
-                {isManager && canDeleteEmployee(selectedEmp.id) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleDeleteEmployeeSubmit(selectedEmp.id);
-                      closeDetailModal();
-                    }}
-                    className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Xóa Khỏi Hệ Thống
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={closeDetailModal}
-                  className="w-full py-2 border rounded-xl hover:bg-slate-50 text-gray-500 text-xs font-bold cursor-pointer text-center"
-                >
-                  Đóng
-                </button>
+                  {/* Modal Actions */}
+                  <div className="pt-4 mt-4 border-t border-slate-100 flex flex-wrap gap-2.5">
+                    {canEditEmployee(selectedEmp.id) && (
+                      <button
+                        type="button"
+                        onClick={startEditing}
+                        className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-95"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                        Chỉnh sửa thông tin
+                      </button>
+                    )}
+
+                    {isManager && usersList.find(u => u.uid === selectedEmp.id)?.role === "user" && (
+                      <button
+                        type="button"
+                        onClick={handleToggleLeader}
+                        disabled={isSavingLeader}
+                        className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-95 disabled:opacity-50 ${
+                          selectedEmp.isLeader
+                            ? "bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-800"
+                            : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        {isSavingLeader ? (
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        ) : selectedEmp.isLeader ? (
+                          "Hủy Trưởng ban"
+                        ) : (
+                          "👑 Đặt làm Trưởng ban"
+                        )}
+                      </button>
+                    )}
+
+                    {canDeleteEmployee(selectedEmp.id) && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteEmployeeSubmit(selectedEmp.id)}
+                        className="py-2.5 px-3.5 border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                        title="Xóa thành viên này khỏi sơ đồ"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Xóa
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
-      {/* ADD EMPLOYEE MODAL */}
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ADD MEMBER MODAL */}
       {isAddModalOpen && (
-
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-2xs flex items-center justify-center z-50 p-4">
-          <form onSubmit={handleAddEmployee} className="bg-white border rounded-2xl shadow-xl w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 relative text-left space-y-4">
-            <div className="flex justify-between items-center pb-2 border-b">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <form onSubmit={handleAddEmployee} className="bg-white border rounded-3xl shadow-2xl w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 relative text-left space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
               <h4 className="font-bold text-slate-800 text-sm font-sans uppercase">Thêm Thành Viên Mới</h4>
               <button type="button" onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-650 cursor-pointer">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="space-y-3.5 text-xs">
+            <div className="space-y-3 text-xs">
+              {/* Visual Cover Image & Avatar Preview Section */}
+              <div className="relative rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden shadow-xs">
+                {/* Cover Banner */}
+                <div className="relative h-28 sm:h-32 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 overflow-hidden">
+                  {addCoverImage ? (
+                    <img
+                      src={addCoverImage}
+                      alt="Ảnh bìa"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-1 opacity-40 text-white">
+                      <ImageIcon className="h-7 w-7" />
+                      <span className="text-[10px] font-medium tracking-wide">Ảnh bìa thành viên</span>
+                    </div>
+                  )}
+                  {/* Cover Image Action Buttons */}
+                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                    <input
+                      ref={addCoverFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAddCoverFileChange}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addCoverFileInputRef.current?.click()}
+                      disabled={uploadingAddCover}
+                      className="px-2.5 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-md text-white rounded-xl text-[11px] font-medium flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50"
+                    >
+                      {uploadingAddCover ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Camera className="h-3.5 w-3.5" />
+                      )}
+                      <span>{uploadingAddCover ? "Đang tải..." : (addCoverImage ? "Đổi ảnh bìa" : "Tải ảnh bìa")}</span>
+                    </button>
+                    {addCoverImage && (
+                      <button
+                        type="button"
+                        onClick={() => setAddCoverImage("")}
+                        title="Xóa ảnh bìa"
+                        className="p-1.5 bg-black/60 hover:bg-red-600 backdrop-blur-md text-white rounded-xl transition cursor-pointer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Avatar & Upload Bar */}
+                <div className="px-4 pb-3.5 pt-2 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                  <div className="flex items-center gap-3.5 -mt-10 sm:-mt-12">
+                    <div className="relative group shrink-0">
+                      <div className="h-18 w-18 sm:h-20 sm:w-20 rounded-2xl border-4 border-white bg-white shadow-md overflow-hidden flex items-center justify-center">
+                        {renderAvatar(addPhotoURL, "w-full h-full", "text-xl", addName || "Thành viên")}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => addAvatarFileInputRef.current?.click()}
+                        disabled={uploadingAddAvatar}
+                        title="Tải ảnh đại diện"
+                        className="absolute inset-0 bg-black/45 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"
+                      >
+                        {uploadingAddAvatar ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-800 text-sm block">{addName || "Thành viên mới"}</span>
+                      <span className="text-[11px] text-gray-500 font-medium">{addCompanyName || "Công ty thành viên"}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      ref={addAvatarFileInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAddAvatarFileChange}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addAvatarFileInputRef.current?.click()}
+                      disabled={uploadingAddAvatar}
+                      className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 font-bold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50 text-[11px]"
+                    >
+                      {uploadingAddAvatar ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                      <span>{uploadingAddAvatar ? "Đang tải..." : (addPhotoURL ? "Đổi avatar" : "Tải avatar")}</span>
+                    </button>
+                    {addPhotoURL && (
+                      <button
+                        type="button"
+                        onClick={() => setAddPhotoURL("")}
+                        title="Xóa avatar"
+                        className="p-1.5 border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl transition cursor-pointer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div>
-                <label className="block font-bold text-gray-500 mb-1">Họ tên *</label>
+                <label className="block font-bold text-gray-500 mb-1">Họ tên thành viên *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ví dụ: Lê Thị B"
+                  placeholder="Ví dụ: Nguyễn Văn A"
                   value={addName}
                   onChange={(e) => setAddName(e.target.value)}
-                  className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-800"
                 />
               </div>
 
-              <div>
-                <label className="block font-bold text-gray-500 mb-1">Trình độ</label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: TESOL, Cử nhân Sư phạm"
-                  value={addQualification}
-                  onChange={(e) => setAddQualification(e.target.value)}
-                  className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="block font-bold text-gray-500 mb-1">Lương tháng (VND)</label><input type="number" min="0" step="1000" value={addMonthlySalary} onChange={(e) => setAddMonthlySalary(e.target.value)} className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none" placeholder="26000000" /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-500 mb-1">Công ty / Doanh nghiệp *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ví dụ: Công ty TNHH ABC"
+                    value={addCompanyName}
+                    onChange={(e) => setAddCompanyName(e.target.value)}
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+                  />
                 </div>
                 <div>
-                  <label className="block font-bold text-gray-500 mb-1">Email *</label>
+                  <label className="block font-bold text-gray-500 mb-1">Lĩnh vực hoạt động *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ví dụ: Bất động sản, Thiết kế nội thất"
+                    value={addIndustry}
+                    onChange={(e) => setAddIndustry(e.target.value)}
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-500 mb-1">Email đăng nhập *</label>
                   <input
                     type="email"
                     required
-                    placeholder="b.lt@igen.vn"
+                    placeholder="nguyenvana@gmail.com"
                     value={addEmail}
                     onChange={(e) => setAddEmail(e.target.value)}
-                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-gray-500 mb-1">Số điện thoại</label>
+                  <label className="block font-bold text-gray-500 mb-1">Số điện thoại *</label>
                   <input
                     type="text"
+                    required
                     placeholder="090XXXXXXXX"
                     value={addPhone}
                     onChange={(e) => setAddPhone(e.target.value)}
-                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-gray-500 mb-1">Mật khẩu khởi tạo *</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Tối thiểu 6 ký tự"
-                  value={addPassword}
-                  onChange={(e) => setAddPassword(e.target.value)}
-                  className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-gray-500 mb-1">Quyền hạn (Role) *</label>
-                <select
-                  value={addRole}
-                  onChange={(e) => setAddRole(e.target.value as any)}
-                  className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white cursor-pointer"
-                >
-                  <option value="user">USER (Thành viên)</option>
-                  <option value="manager">MANAGER (Quản lý)</option>
-                  <option value="branch_owner">BRANCH OWNER (Chủ chi nhánh)</option>
-                </select>
-              </div>
-
-              {addRole !== "admin" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-gray-500 mb-1">Quản lý trực tiếp (Báo cáo cho)</label>
+                  <label className="block font-bold text-gray-500 mb-1">Mật khẩu khởi tạo *</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Tối thiểu 6 ký tự"
+                    value={addPassword}
+                    onChange={(e) => setAddPassword(e.target.value)}
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-500 mb-1">Người kết nối / Phụ trách</label>
                   <select
                     value={addParentId}
                     onChange={(e) => setAddParentId(e.target.value)}
-                    className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white cursor-pointer"
+                    className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer text-slate-800"
                   >
                     <option value="">Không phân công</option>
-                    {employees.filter(emp => {
-                      const rawUser = usersList.find(u => u.uid === emp.id);
-                      if (!rawUser) return false;
-
-                      const ROLES_HIERARCHY: Record<string, number> = {
-                        admin: 1,
-                        branch_owner: 2,
-                        manager: 3,
-                        user: 4
-                      };
-                      const targetLevel = ROLES_HIERARCHY[addRole] || 4;
-                      const parentLevel = ROLES_HIERARCHY[rawUser.role] || 4;
-
-                      // Chỉ cho phép chọn quản lý có vai trò cấp cao hơn
-                      if (parentLevel >= targetLevel) return false;
-
-                      if (userProfile?.role === "admin") {
-                        return true;
-                      }
-                      if (userProfile?.role === "manager") {
-                        const checkIsDescendant = (parentId: string, childId: string): boolean => {
-                          const child = employees.find(e => e.id === childId);
-                          if (!child || !child.parentId) return false;
-                          if (child.parentId === parentId) return true;
-                          return checkIsDescendant(parentId, child.parentId);
-                        };
-                        return emp.id === userProfile.uid || checkIsDescendant(userProfile.uid, emp.id);
-                      }
-                      return false;
-                    }).map(emp => (
+                    {employees.map(emp => (
                       <option key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.role}{emp.department ? ` · ${emp.department}` : ""})
+                        {emp.name} ({emp.role}{emp.companyName ? ` · ${emp.companyName}` : ""})
                       </option>
                     ))}
                   </select>
                 </div>
-              )}
-
-              {(addRole === "user" || addRole === "manager") && (
-                <div>
-                  <label className="block font-bold text-gray-500 mb-1">
-                    {addRole === "manager" ? "Phòng ban quản lý *" : "Phòng ban *"}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    disabled={addRole === "user" && !!addParentId}
-                    placeholder="Ví dụ: Phòng Kỹ Thuật"
-                    value={addDepartment}
-                    onChange={(e) => setAddDepartment(e.target.value)}
-                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400"
-                  />
-                  {addRole === "user" && !!addParentId && (
-                    <p className="text-[10px] text-indigo-650 font-mono mt-0.5">
-                      Tự động điền theo phòng ban của quản lý trực tiếp.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div>
-                <label className="block font-bold text-gray-500 mb-1">Link mô tả công việc</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="url"
-                    placeholder="Dán link hoặc tải file lên"
-                    value={addJobDescriptionLink}
-                    onChange={(e) => setAddJobDescriptionLink(e.target.value)}
-                    className="flex-1 px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <input
-                    ref={addJobDescriptionFileInputRef}
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => handleJobDescriptionFileChange(e, "add")}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => addJobDescriptionFileInputRef.current?.click()}
-                    disabled={uploadingAddJobDescription}
-                    title="Tải file lên Google Drive"
-                    className="shrink-0 p-2 px-2.5 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    {uploadingAddJobDescription ? (
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                </div>
               </div>
             </div>
 
-            <div className="pt-4 border-t flex justify-end gap-3 text-xs font-bold">
+            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 text-xs font-bold">
               <button
                 type="button"
                 disabled={isAddingEmployee}
                 onClick={() => setIsAddModalOpen(false)}
-                className="px-4 py-2 border rounded-xl hover:bg-slate-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 border rounded-xl hover:bg-slate-50 cursor-pointer disabled:opacity-50"
               >
                 Hủy bỏ
               </button>
               <button
                 type="submit"
                 disabled={isAddingEmployee}
-                className="px-5 py-2 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
               >
                 {isAddingEmployee ? (
                   <>
                     <RefreshCw className="animate-spin h-3.5 w-3.5" />
-                    Đang tạo tài khoản...
+                    Đang thêm...
                   </>
                 ) : (
                   "Lưu thành viên"
                 )}
-
               </button>
             </div>
           </form>
         </div>
       )}
+
 
       {/* Custom confirm dialog */}
       {confirmState && (
@@ -2195,47 +2362,6 @@ export default function OrgChartTab({
         />
       )}
 
-      {/* Job description preview modal */}
-      {showJobDescriptionPreview && editJobDescriptionLink && (
-        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4" onClick={() => setShowJobDescriptionPreview(false)}>
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-3 border-b shrink-0">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">Xem trước mô tả công việc</span>
-              <div className="flex items-center gap-2">
-                <a
-                  href={editJobDescriptionLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[11px] font-bold text-indigo-650 hover:underline px-2"
-                >
-                  Mở trong tab mới
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setShowJobDescriptionPreview(false)}
-                  className="p-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"
-                >
-                  <X className="h-4 w-4 text-gray-500" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 bg-gray-50">
-              <iframe
-                src={
-                  editJobDescriptionLink.includes("drive.google.com")
-                    ? editJobDescriptionLink.replace(/\/(edit|view)(\?.*)?$/, "/preview")
-                    : editJobDescriptionLink
-                }
-                className="w-full h-full border-0"
-                title="Xem trước mô tả công việc"
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

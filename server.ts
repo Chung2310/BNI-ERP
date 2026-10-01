@@ -24,7 +24,7 @@ import { requestContextMiddleware } from "./server/middleware/request-context";
 import { apiNotFound } from "./server/middleware/api-not-found";
 import { apiErrorHandler } from "./server/middleware/api-error-handler";
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3012;
 
 /** Che các tham số nhạy cảm trên URL để chúng không nằm lại trong log. */
 const SENSITIVE_QUERY_KEYS = ["secret", "token", "apikey", "api_key", "password"];
@@ -245,7 +245,7 @@ async function startServer() {
   // 1. Cấu hình CORS bảo mật sử dụng allowedOrigins từ biến môi trường LINK_COR
   const allowedOrigins = process.env.LINK_COR
     ? process.env.LINK_COR.split(",")
-    : ["http://localhost:5173", "http://localhost:3000"];
+    : ["http://localhost:5173", "http://localhost:3000", "http://localhost:3012", `http://localhost:${PORT}`];
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;

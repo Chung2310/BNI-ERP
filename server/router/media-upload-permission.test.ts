@@ -6,6 +6,12 @@ describe("permissionForMediaUpload", () => {
     expect(permissionForMediaUpload("hr.kanban")).toBe("work:manage");
   });
 
+  it("allows profile avatar, cover, and settings uploads through access:read", () => {
+    expect(permissionForMediaUpload("profile.avatar")).toBe("access:read");
+    expect(permissionForMediaUpload("profile.cover")).toBe("access:read");
+    expect(permissionForMediaUpload("settings.profile")).toBe("access:read");
+  });
+
   it("keeps generic and unknown uploads behind resource management", () => {
     expect(permissionForMediaUpload(undefined)).toBe("resource:manage");
     expect(permissionForMediaUpload("unknown.source")).toBe("resource:manage");

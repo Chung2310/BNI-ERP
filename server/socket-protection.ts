@@ -75,6 +75,100 @@ export class RedisSocketProtectionCounter implements SocketProtectionCounter {
   }
 }
 
+export class MemorySocketProtectionCounter implements SocketProtectionCounter {
+  private readonly windows = new Map<string, { count: number; expiresAt: number }>();
+  private readonly connections = new Map<string, number>();
+
+  async incrementWindow(key: string, windowMs: number): Promise<{ count: number; retryAfterMs: number }> {
+    const now = Date.now();
+    const entry = this.windows.get(key);
+
+    if (!entry || entry.expiresAt <= now) {
+      this.windows.set(key, { count: 1, expiresAt: now + windowMs });
+      this.cleanupExpired(now);
+      return { count: 1, retryAfterMs: windowMs };
+    }
+
+    entry.count += 1;
+    return { count: entry.count, retryAfterMs: Math.max(0, entry.expiresAt - now) };
+  }
+
+  async acquire(key: string, limit: number): Promise<boolean> {
+    const current = this.connections.get(key) ?? 0;
+    if (current >= limit) {
+      return false;
+    }
+    this.connections.set(key, current + 1);
+    return true;
+  }
+
+  async release(key: string): Promise<void> {
+    const current = this.connections.get(key) ?? 0;
+    if (current <= 1) {
+      this.connections.delete(key);
+    } else {
+      this.connections.set(key, current - 1);
+    }
+  }
+
+  private cleanupExpired(now: number): void {
+    if (this.windows.size > 2000) {
+      for (const [k, v] of this.windows.entries()) {
+        if (v.expiresAt <= now) {
+          this.windows.delete(k);
+        }
+      }
+    }
+  }
+
+  clear(): void {
+    this.windows.clear();
+    this.connections.clear();
+  }
+}
+
+export class FallbackSocketProtectionCounter implements SocketProtectionCounter {
+  private readonly memoryCounter: MemorySocketProtectionCounter;
+
+  constructor(
+    private readonly primary: SocketProtectionCounter,
+    private readonly isPrimaryReady: () => boolean,
+    memoryCounter?: MemorySocketProtectionCounter,
+  ) {
+    this.memoryCounter = memoryCounter ?? new MemorySocketProtectionCounter();
+  }
+
+  async incrementWindow(key: string, windowMs: number): Promise<{ count: number; retryAfterMs: number }> {
+    if (this.isPrimaryReady()) {
+      try {
+        return await this.primary.incrementWindow(key, windowMs);
+      } catch {
+        // Fall back to memory if primary fails at runtime
+      }
+    }
+    return this.memoryCounter.incrementWindow(key, windowMs);
+  }
+
+  async acquire(key: string, limit: number): Promise<boolean> {
+    if (this.isPrimaryReady()) {
+      try {
+        return await this.primary.acquire(key, limit);
+      } catch {
+        // Fall back to memory if primary fails at runtime
+      }
+    }
+    return this.memoryCounter.acquire(key, limit);
+  }
+
+  async release(key: string): Promise<void> {
+    const promises: Promise<void>[] = [this.memoryCounter.release(key)];
+    if (this.isPrimaryReady()) {
+      promises.push(this.primary.release(key).catch(() => {}));
+    }
+    await Promise.all(promises);
+  }
+}
+
 export class SocketProtection {
   private readonly socketViolations = new Map<string, number>();
 

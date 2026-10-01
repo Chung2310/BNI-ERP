@@ -1,5 +1,12 @@
 export function permissionForMediaUpload(sourceType: unknown): string {
-  return String(sourceType || "").trim().toLowerCase() === "hr.kanban"
-    ? "work:manage"
-    : "resource:manage";
+  const normalized = String(sourceType || "").trim().toLowerCase();
+  if (normalized === "hr.kanban") return "work:manage";
+  if (
+    normalized === "profile.avatar" ||
+    normalized === "profile.cover" ||
+    normalized === "settings.profile"
+  ) {
+    return "access:read";
+  }
+  return "resource:manage";
 }

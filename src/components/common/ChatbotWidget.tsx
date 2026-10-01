@@ -14,7 +14,7 @@ const POSITION_KEY = "igen_erp_chatbot_fab_pos";
 // Tin nhắn chào mừng ban đầu
 const welcomeMessage: Message = {
   role: "assistant",
-  content: `Chào bạn! Tôi là trợ lý ảo AI của hệ thống iGen ERP.
+  content: `Chào bạn! Tôi là trợ lý ảo AI của hệ thống iGen Connect.
 
 Tôi có thể giúp bạn tra cứu nhanh dữ liệu doanh nghiệp:
 - Khách hàng — quy trình bán hàng, trạng thái, giá trị cơ hội.

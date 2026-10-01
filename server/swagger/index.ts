@@ -12,13 +12,13 @@ import { analyticsSwagger } from "./analytics.swagger";
 const swaggerDocument = {
   openapi: "3.0.0",
   info: {
-    title: "iGen ERP Smart AI API Docs",
+    title: "iGen Connect Smart AI API Docs",
     version: "1.0.0",
-    description: "Tài liệu API Swagger của iGen ERP.",
+    description: "Tài liệu API Swagger của iGen Connect.",
   },
   servers: [
     {
-      url: "http://localhost:3000",
+      url: `http://localhost:${process.env.PORT || 3012}`,
       description: "Cơ sở phục vụ cục bộ",
     },
   ],

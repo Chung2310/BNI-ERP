@@ -5,7 +5,7 @@ import {
   Package, Megaphone, Sparkles, CheckCheck, ShoppingCart, AlertTriangle, Send, Sun, Moon,
   Briefcase, GraduationCap, LayoutGrid, LayoutDashboard, Users, MessageSquareShare,
   FolderOpen, MessageSquare, Shield, LineChart, Menu, FolderTree, Calendar, Clock, User,
-  LogIn, LogOut as LogOutIcon, Handshake, BriefcaseBusiness, ChevronDown, Landmark, ContactRound
+  LogIn, LogOut as LogOutIcon, Handshake, BriefcaseBusiness, ChevronDown, Landmark, ContactRound, ExternalLink
 } from "lucide-react";
 import { TabType } from "../types";
 import { useAuth } from "../context/AuthContext";
@@ -24,7 +24,7 @@ interface HeaderProps {
 
 const searchIndex = [
   { label: "Tổng quan Doanh nghiệp", tab: "TỔNG QUAN" as TabType, keywords: "tong quan dashboard kpi hieu suat bieu do" },
-  { label: "Sơ đồ tổ chức", tab: "NHÂN SỰ" as TabType, subTab: "SƠ ĐỒ TỔ CHỨC", keywords: "hr so do to chuc nhan su phong ban" },
+  { label: "Sơ đồ tổ chức", tab: "NHÂN SỰ" as TabType, subTab: "SƠ ĐỒ TỔ CHỨC", keywords: "hr so do to chuc thanh vien doanh nghiep phong ban" },
   { label: "Email chúc mừng", tab: "NHÂN SỰ" as TabType, subTab: "EMAIL CHÚC MỪNG", keywords: "email chuc mung sinh nhat ky niem" },
   { label: "Quản lý tài nguyên", tab: "QUẢN LÝ TÀI NGUYÊN" as TabType, keywords: "tai lieu file drive upload tai nguyen" },
   { label: "Trò chuyện nội bộ", tab: "TRÒ CHUYỆN" as TabType, keywords: "chat tro chuyen tin nhan nhom" },
@@ -249,16 +249,18 @@ export default function Header({ currentTab, onSearchSelect, onMenuClick }: Head
           </div>
         </div>
 
-        <div className="ml-1 flex shrink-0 items-center gap-1 sm:ml-6 sm:gap-3" id="header_controls">
-
-
-
-
-
-
-
-
-
+        <div className="ml-1 flex shrink-0 items-center gap-1 sm:ml-6 sm:gap-2.5" id="header_controls">
+          <a
+            href="/wheel-of-names"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Mở Vòng quay may mắn (Tab mới)"
+            className="flex items-center gap-1.5 rounded-xl bg-linear-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 px-3 py-1.5 text-xs font-black shadow-xs shadow-amber-500/20 transition-all hover:scale-105 active:scale-95 cursor-pointer border border-amber-300/80"
+          >
+            <Sparkles className="h-4 w-4" />
+            <span className="hidden sm:inline">Vòng quay may mắn</span>
+            <ExternalLink className="h-3 w-3 opacity-60" />
+          </a>
 
           <div className="relative" id="notification_dropdown_button">
             <button

@@ -7,7 +7,7 @@ export type ModuleKey = (typeof MODULE_KEYS)[number];
 export const DEFAULT_MODULE_KEYS = [...MODULE_KEYS];
 
 export const MODULE_LABELS: Record<ModuleKey, string> = {
-  hr: "Nhân sự",
+  hr: "Thành viên",
   resource: "Quản lý tài nguyên",
   chat: "Trò chuyện",
 };

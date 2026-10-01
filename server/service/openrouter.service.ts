@@ -61,7 +61,7 @@ function buildHeaders(apiKey: string): Record<string, string> {
     "Content-Type": "application/json",
     Authorization: `Bearer ${apiKey}`,
     "HTTP-Referer": process.env.APP_URL || "https://igen-erp.app",
-    "X-Title": "Igen ERP",
+    "X-Title": "iGen Connect",
   };
 }
 
