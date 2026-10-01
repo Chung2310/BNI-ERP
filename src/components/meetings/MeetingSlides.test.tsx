@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, act } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, act, within } from "@testing-library/react";
 import { MeetingSlides } from "./MeetingSlides";
 
 vi.mock("./profileSlideRenderer", () => ({
@@ -80,7 +80,7 @@ it("does not keep showing the last speaker after the meeting ends", async () => 
 it("starts at the first slide and follows subsequent speaker changes", async () => {
   const deck = [...slides, { ...slides[1], id: "c", name: "Người thứ ba" }];
   const api = vi.fn().mockResolvedValue({ slides: deck, version: 1 });
-  const view = render(<MeetingSlides meeting={{ ...meeting, speakers: deck }} canManage api={api} />);
+  const view = render(<MeetingSlides meeting={{ ...meeting, speakers: deck }} canManage api={api} autoAdvance />);
   await screen.findByText("Nguyễn An");
   fireEvent.change(screen.getByLabelText("Chế độ trình chiếu"), { target: { value: "live" } });
   expect((await screen.findByRole("img")).getAttribute("aria-label")).toContain("Trần Bình");
@@ -89,7 +89,8 @@ it("starts at the first slide and follows subsequent speaker changes", async () 
   await waitFor(() => expect(screen.getAllByRole("img").every(canvas => canvas.getAttribute("aria-label")?.includes("Nguyễn An"))).toBe(true));
   view.rerender(<MeetingSlides meeting={{ ...meeting, currentIndex: 2, speakers: deck }} canManage api={api} />);
   await waitFor(() => expect(screen.getAllByRole("img").every(canvas => canvas.getAttribute("aria-label")?.includes("Người thứ ba"))).toBe(true));
-  fireEvent.click(screen.getByRole("button", { name: "Thoát trình chiếu" }));
+  expect(within(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).queryAllByRole("button")).toHaveLength(0);
+  fireEvent.keyDown(document, { key: "Escape" });
   expect(screen.queryByRole("dialog", { name: "Trình chiếu hồ sơ" })).toBeNull();
 });
 
@@ -98,6 +99,37 @@ it("opens the first slide after data loads when launched from operation controls
   const onPresentationStarted = vi.fn();
   render(<MeetingSlides meeting={meeting} canManage api={api} startFromFirst onPresentationStarted={onPresentationStarted} />);
   await screen.findByRole("dialog", { name: "Trình chiếu hồ sơ" });
-  expect(onPresentationStarted).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(onPresentationStarted).toHaveBeenCalledTimes(1));
   expect(screen.getAllByRole("img").every(canvas => canvas.getAttribute("aria-label")?.includes("Nguyễn An"))).toBe(true);
+});
+
+
+it("clean manual presentation uses only arrow keys, traps focus and exits with Escape", async () => {
+  render(<MeetingSlides meeting={meeting} canManage api={vi.fn().mockResolvedValue({ slides, version: 1 })} />);
+  await screen.findByText("Nguyễn An");
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
+  const dialog = screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" });
+  expect(within(dialog).queryAllByRole("button")).toHaveLength(0);
+  fireEvent.mouseMove(dialog);
+  expect(within(dialog).queryAllByRole("button")).toHaveLength(0);
+  fireEvent.keyDown(document, { key: "ArrowRight" });
+  await waitFor(() => expect(within(dialog).getByRole("img").getAttribute("aria-label")).toContain("Trần Bình"));
+  fireEvent.keyDown(document, { key: "ArrowLeft" });
+  await waitFor(() => expect(within(dialog).getByRole("img").getAttribute("aria-label")).toContain("Nguyễn An"));
+  fireEvent.keyDown(document, { key: "Tab" });
+  expect(document.activeElement).toBe(dialog);
+  fireEvent.keyDown(document, { code: "Space" });
+  expect((screen.getByLabelText("Chế độ trình chiếu") as HTMLSelectElement).value).toBe("manual");
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(screen.queryByRole("dialog", { name: "Trình chiếu hồ sơ" })).toBeNull();
+});
+
+it("clean automatic presentation ignores arrow and space keys", async () => {
+  render(<MeetingSlides meeting={meeting} canManage autoAdvance api={vi.fn().mockResolvedValue({ slides, version: 1 })} />);
+  await screen.findByText("Nguyễn An");
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
+  fireEvent.keyDown(document, { key: "ArrowRight" });
+  fireEvent.keyDown(document, { code: "Space" });
+  await waitFor(() => expect(within(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).getByRole("img").getAttribute("aria-label")).toContain("Nguyễn An"));
+  expect((screen.getByLabelText("Chế độ trình chiếu") as HTMLSelectElement).value).toBe("live");
 });

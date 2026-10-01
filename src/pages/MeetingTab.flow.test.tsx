@@ -138,9 +138,17 @@ it("launches the first profile from MC controls and explains the post-speech del
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
   expect(screen.getByText(/Đây là thời gian chờ chuyển lượt/)).toBeTruthy();
   expect((screen.getByLabelText("Số giây chờ chuyển slide sau khi hết giờ") as HTMLInputElement).value).toBe("3");
+  const requestFullscreen = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(document.documentElement, "requestFullscreen", { configurable: true, value: requestFullscreen });
   fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
+  expect(requestFullscreen).toHaveBeenCalledTimes(1);
   await screen.findByRole("dialog", { name: "Trình chiếu hồ sơ" });
-  expect(screen.getAllByRole("img").filter(element => element.tagName === "CANVAS").every(element => element.getAttribute("aria-label")?.includes("Người đầu tiên"))).toBe(true);
+  await waitFor(() => {
+    const canvases = screen.getAllByRole("img").filter(element => element.tagName === "CANVAS");
+    expect(canvases.length).toBeGreaterThan(0);
+    expect(canvases.every(element => element.getAttribute("aria-label")?.includes("Người đầu tiên"))).toBe(true);
+  });
+  delete (document.documentElement as any).requestFullscreen;
   expect(fetchMock.mock.calls.every(([url]) => !String(url).endsWith("/control"))).toBe(true);
   vi.restoreAllMocks();
 });

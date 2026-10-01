@@ -148,6 +148,7 @@ export default function MeetingTab() {
   const [finishRequested, setFinishRequested] = useState(false);
   const [dismissedCompletion, setDismissedCompletion] = useState("");
   const [startPresentation, setStartPresentation] = useState(false);
+  const presentationFullscreen = useRef<Promise<boolean> | null>(null);
   const presentationStarted = useCallback(() => setStartPresentation(false), []);
   const [prioritySpeakerId, setPrioritySpeakerId] = useState("");
   const [priorityPosition, setPriorityPosition] = useState(1);
@@ -874,7 +875,7 @@ export default function MeetingTab() {
 
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} allowOvertime={autoAdvance} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} />}
+              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} allowOvertime={autoAdvance} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} autoAdvance={autoAdvance} fullscreenRequest={presentationFullscreen.current} />}
               {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
               {(activeSubTab === "speakers" || activeSubTab === "checkin") && (
                 <div className="space-y-4">
@@ -938,7 +939,12 @@ export default function MeetingTab() {
                       {/* Operation Control Buttons */}
                       <div className="flex flex-wrap items-center gap-2">
                         <button type="button" disabled={!activeMeeting.speakers.length}
-                          onClick={() => { setStartPresentation(true); setActiveSubTab("slides"); }}
+                          onClick={() => {
+                            presentationFullscreen.current = document.documentElement.requestFullscreen && !document.fullscreenElement
+                              ? document.documentElement.requestFullscreen().then(() => true).catch(() => false)
+                              : null;
+                            setStartPresentation(true); setActiveSubTab("slides");
+                          }}
                           className="flex items-center gap-1.5 rounded-xl bg-cyan-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-40">
                           <Play className="h-3.5 w-3.5" /> Bắt đầu thuyết trình
                         </button>

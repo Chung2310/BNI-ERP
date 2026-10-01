@@ -11,13 +11,15 @@ type Props = {
   canManage: boolean;
   allowOvertime?: boolean;
   startFromFirst?: boolean;
+  autoAdvance?: boolean;
+  fullscreenRequest?: Promise<boolean> | null;
   onPresentationStarted?: () => void;
   api: (path: string, method?: string, body?: unknown) => Promise<SlideDeck>;
 };
 const button = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40";
 const fieldClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
 
-export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, startFromFirst = false, onPresentationStarted }: Props) {
+export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, startFromFirst = false, onPresentationStarted, autoAdvance = false, fullscreenRequest }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -33,7 +35,11 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, 
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<"manual" | "auto" | "live">("manual");
   const [seconds, setSeconds] = useState(8);
-  const [presenting, setPresenting] = useState(false);
+  const [presenting, setPresenting] = useState(startFromFirst);
+  const [cleanPresentation, setCleanPresentation] = useState(startFromFirst);
+  const presentationActive = useRef(startFromFirst);
+  presentationActive.current = presenting;
+  const presentationDialog = useRef<HTMLDivElement>(null);
   const [openingSlide, setOpeningSlide] = useState<{ slideId: string; speakerId: string | undefined } | null>(null);
   const [controls, setControls] = useState(true);
   const [draft, setDraft] = useState<ProfileSlide | null>(null);
@@ -125,10 +131,26 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, 
 
   const closePresentation = useCallback(() => {
     setPresenting(false); setMode("manual"); setOpeningSlide(null);
+    presentationActive.current = false;
+    onPresentationStarted?.();
     if (fullScreenOwned.current && document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     fullScreenOwned.current = false;
     window.setTimeout(() => launchButton.current?.focus(), 0);
-  }, []);
+  }, [onPresentationStarted]);
+
+  useEffect(() => {
+    if (!fullscreenRequest) return;
+    let cancelled = false;
+    void fullscreenRequest.then(opened => {
+      if (!opened) return;
+      if (cancelled || !presentationActive.current) {
+        if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+      } else {
+        fullScreenOwned.current = true;
+      }
+    });
+    return () => { cancelled = true; };
+  }, [fullscreenRequest]);
 
   useEffect(() => {
     const onFullscreen = () => {
@@ -148,6 +170,7 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, 
       if (document.querySelector("[data-speeches-complete]")) return;
       if (e.key === "Escape") { e.preventDefault(); closePresentation(); }
       if (e.key === "Tab") {
+        if (cleanPresentation) { e.preventDefault(); presentationDialog.current?.focus(); return; }
         // The presentation is modal; keep keyboard focus on its controls.
         const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-slide-controls] button'));
         const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
@@ -156,29 +179,38 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, 
         setControls(true);
       }
       if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-        e.preventDefault(); setMode("manual"); move(e.key === "ArrowRight" ? 1 : -1);
+        e.preventDefault();
+        if (cleanPresentation && mode !== "manual") return;
+        setMode("manual"); move(e.key === "ArrowRight" ? 1 : -1);
       }
-      if (e.code === "Space" && !(document.activeElement instanceof HTMLButtonElement)) {
+      if (!cleanPresentation && e.code === "Space" && !(document.activeElement instanceof HTMLButtonElement)) {
         e.preventDefault(); setMode(m => m === "auto" ? "manual" : "auto");
       }
     };
     document.addEventListener("keydown", keydown);
     return () => document.removeEventListener("keydown", keydown);
-  }, [presenting, move, closePresentation]);
+  }, [presenting, move, closePresentation, cleanPresentation, mode]);
 
-  useEffect(() => { if (presenting) exitButton.current?.focus(); }, [presenting]);
+  useEffect(() => {
+    if (presenting) (cleanPresentation ? presentationDialog.current : exitButton.current)?.focus();
+  }, [presenting, cleanPresentation]);
 
   const showControls = useCallback(() => {
     setControls(true); window.clearTimeout(hideTimer.current);
     hideTimer.current = window.setTimeout(() => setControls(false), 2500);
   }, []);
 
-  const present = useCallback(() => {
+  const present = useCallback((clean = false) => {
+    setCleanPresentation(clean);
+    presentationActive.current = true;
     setDraft(null); setPresenting(true); showControls();
-    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-      void document.documentElement.requestFullscreen().then(() => { fullScreenOwned.current = true; }).catch(() => {});
+    if (!document.fullscreenElement && !(startFromFirst && fullscreenRequest) && document.documentElement.requestFullscreen) {
+      void document.documentElement.requestFullscreen().then(() => {
+        if (presentationActive.current) fullScreenOwned.current = true;
+        else if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+      }).catch(() => {});
     }
-  }, [showControls]);
+  }, [showControls, fullscreenRequest, startFromFirst]);
 
   const presentFromFirst = useCallback(() => {
     const first = deck.slides[0];
@@ -186,9 +218,9 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, 
     setOpeningSlide({ slideId: first.id, speakerId: currentSpeakerId });
     setExcluded(new Set());
     setSelectedId(first.id);
-    setMode("live");
-    present();
-  }, [deck.slides, currentSpeakerId, present]);
+    setMode(previous => autoAdvance ? "live" : previous === "auto" ? "auto" : "manual");
+    present(true);
+  }, [deck.slides, currentSpeakerId, present, autoAdvance]);
 
   useEffect(() => {
     if (!startFromFirst || loading || error || !deck.slides.length) return;
@@ -243,7 +275,7 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, 
       <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={16} /> Làm mới hồ sơ</button>
       <button className={button} disabled={!ready} onClick={download}><Download size={16} /> Tải PNG</button>
       <button className={button} disabled={loading || !!error || !deck.slides.length || !!draft} onClick={presentFromFirst}><Play size={16} /> Bắt đầu thuyết trình</button>
-      <button ref={launchButton} className={button} disabled={!ready || !!draft} onClick={present}><Maximize size={16} /> Trình chiếu</button>
+      <button ref={launchButton} className={button} disabled={!ready || !!draft} onClick={() => present()}><Maximize size={16} /> Trình chiếu</button>
     </div>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error} <button className="underline" onClick={() => setRevision(v => v + 1)}>Tải lại dữ liệu</button></p>}
     <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
@@ -295,16 +327,16 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, 
         </form>}
       </div>
     </div>
-    {presenting && createPortal(<div role="dialog" aria-modal="true" aria-label="Trình chiếu hồ sơ" className="fixed inset-0 z-[10000] flex items-center justify-center bg-black" onMouseMove={showControls} onTouchStart={showControls} style={{ cursor: controls ? "default" : "none" }}>
+    {presenting && createPortal(<div ref={presentationDialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Trình chiếu hồ sơ" className="fixed inset-0 z-[10000] flex items-center justify-center bg-black" onMouseMove={showControls} onTouchStart={showControls} style={{ cursor: cleanPresentation || !controls ? "none" : "default", outline: "none" }}>
       <div style={{ width: "min(100vw, 177.7778vh)", height: "min(100vh, 56.25vw)" }}>{canvas(screen)}</div>
-      {(drawing || !active || drawError) && <div role="status" className="absolute text-white">{speechesComplete && mode === "live" ? <div className="max-w-2xl rounded-3xl bg-white p-12"><SpeechesCompleteMessage /></div> : drawError || (active ? "Đang chuẩn bị slide…" : "Chờ người phát biểu…")}</div>}
-      <div data-slide-controls className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-slate-900/90 p-3 text-white" style={{ opacity: controls ? 1 : 0 }} onFocus={() => setControls(true)}>
+      {(loading || error || drawing || !active || drawError) && <div role="status" className="absolute text-white">{speechesComplete && mode === "live" ? <div className="max-w-2xl rounded-3xl bg-white p-12"><SpeechesCompleteMessage /></div> : error || drawError || (loading ? "Đang tải slide…" : active ? "Đang chuẩn bị slide…" : "Chờ người phát biểu…")}</div>}
+      {!cleanPresentation && <div data-slide-controls className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-slate-900/90 p-3 text-white" style={{ opacity: controls ? 1 : 0 }} onFocus={() => setControls(true)}>
         <button aria-label="Slide trước khi trình chiếu" className="rounded p-2" onClick={() => { setMode("manual"); move(-1); }}><ChevronLeft /></button>
         <button aria-label={mode === "auto" ? "Tạm dừng tự chạy" : "Bật tự chạy"} className="rounded p-2" onClick={() => setMode(m => m === "auto" ? "manual" : "auto")}>{mode === "auto" ? <Pause /> : <Play />}</button>
         <span className="whitespace-nowrap text-sm">{mode === "live" ? "Theo diễn giả" : `${index + 1} / ${queue.length}`}</span>
         <button aria-label="Slide tiếp khi trình chiếu" className="rounded p-2" onClick={() => { setMode("manual"); move(1); }}><ChevronRight /></button>
         <button ref={exitButton} aria-label="Thoát trình chiếu" className="rounded p-2" onClick={closePresentation}><X /></button>
-      </div>
+      </div>}
     </div>, document.body)}
   </section>;
 }
