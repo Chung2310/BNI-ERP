@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 import { Download, Maximize, ChevronLeft, ChevronRight, X, Play, Pause, RefreshCw, Pencil } from "lucide-react";
 import { renderProfileSlide, loadSlideImage, SLIDE_WIDTH, SLIDE_HEIGHT } from "./profileSlideRenderer";
+import { drawSlideTimer, getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
 import type { ProfileSlide, SlideDeck } from "./slideTypes";
 
 type Props = {
-  meeting: { _id: string; __v: number; currentIndex: number; status: string; speakers: { id: string }[] };
+  meeting: SlideTimerMeeting & { _id: string; __v: number };
   canManage: boolean;
   api: (path: string, method?: string, body?: unknown) => Promise<SlideDeck>;
 };
@@ -13,6 +14,13 @@ const button = "inline-flex items-center justify-center gap-2 rounded-lg border 
 const fieldClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
 
 export function MeetingSlides({ meeting, canManage, api }: Props) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
+    setNow(Date.now());
+    const clock = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(clock);
+  }, [meeting.status, meeting.speakerStartedAt]);
   const [deck, setDeck] = useState<SlideDeck>({ slides: [], version: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -53,6 +61,7 @@ export function MeetingSlides({ meeting, canManage, api }: Props) {
     ? deck.slides.find(s => s.id === currentSpeakerId)
     : queue.find(s => s.id === selectedId) || queue[0];
   const active = draft || selected;
+  const timer = useMemo(() => getSlideTimer(meeting, active?.id, now), [meeting, active?.id, now]);
   const index = queue.findIndex(s => s.id === selected?.id);
 
   const move = useCallback((direction: number) => {
@@ -86,6 +95,14 @@ export function MeetingSlides({ meeting, canManage, api }: Props) {
   useEffect(() => {
     if (presenting && rendered.current) screen.current?.getContext("2d")?.drawImage(rendered.current, 0, 0);
   }, [presenting]);
+
+  useEffect(() => {
+    if (!rendered.current || drawing) return;
+    for (const target of [preview.current, screen.current]) {
+      const ctx = target?.getContext("2d");
+      if (ctx) { ctx.drawImage(rendered.current, 0, 0); drawSlideTimer(ctx, timer); }
+    }
+  }, [timer, drawing, presenting]);
 
   // Preload the next two attendees, including during manual presentation.
   useEffect(() => {
@@ -166,7 +183,13 @@ export function MeetingSlides({ meeting, canManage, api }: Props) {
   function download() {
     if (!rendered.current || !active) return;
     try {
-      rendered.current.toBlob(blob => {
+      const snapshot = document.createElement("canvas");
+      snapshot.width = SLIDE_WIDTH; snapshot.height = SLIDE_HEIGHT;
+      const ctx = snapshot.getContext("2d");
+      if (!ctx) throw new Error("Canvas unavailable");
+      ctx.drawImage(rendered.current, 0, 0);
+      drawSlideTimer(ctx, timer);
+      snapshot.toBlob(blob => {
         if (!blob) { setDrawError("Không thể xuất ảnh. Vui lòng thử lại."); return; }
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -183,6 +206,7 @@ export function MeetingSlides({ meeting, canManage, api }: Props) {
     style={{ width: "100%", height: "100%", objectFit: "contain", visibility: drawing || !active || drawError ? "hidden" : "visible" }} />;
 
   return <section aria-label="Slide giới thiệu" className="space-y-4">
+    {timer && <p className="sr-only" role="timer" aria-live="off">{timer.label}: {timer.time}. Được phân {timer.seconds} giây.</p>}
     <div className="flex flex-wrap items-center gap-2">
       <label className="text-sm font-semibold">Chế độ <select aria-label="Chế độ trình chiếu" className="ml-2 rounded-lg border p-2" value={mode} disabled={!!draft} onChange={e => setMode(e.target.value as typeof mode)}>
         <option value="manual">Chuyển thủ công</option><option value="auto">Tự chạy</option><option value="live">Theo người đang phát biểu</option>
