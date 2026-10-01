@@ -3,6 +3,7 @@ import { MeetingModel, MeetingDeliveryModel } from './meeting.model';
 import { UserModel } from '../../model/user.model';
 import { companyEmailService } from '../../service/company-email.service';
 import { emitToCompany } from '../../socket';
+import { autoStartDueMeetings } from './meeting.service';
 export async function runMeetingReminderScan(now = new Date()) {
   const due = await MeetingModel.find({ status: 'scheduled', reminderAt: { $lte: now }, startsAt: { $gt: now } }).limit(100).lean(); let queued = 0;
   for (const meeting of due) {
@@ -31,4 +32,4 @@ export async function runMeetingDeliveryScan(now = new Date(), batchSize = 100) 
   }
   return { sent };
 }
-export function startMeetingScheduler() { let running = false; const timer = setInterval(async () => { if (running) return; running = true; try { await runMeetingReminderScan(); await runMeetingDeliveryScan(); } catch (e) { console.error('[MeetingScheduler]', e); } finally { running = false; } }, 60_000); timer.unref(); return () => clearInterval(timer); }
+export function startMeetingScheduler() { let running = false; const timer = setInterval(async () => { if (running) return; running = true; try { await autoStartDueMeetings(); await runMeetingReminderScan(); await runMeetingDeliveryScan(); } catch (e) { console.error('[MeetingScheduler]', e); } finally { running = false; } }, 15_000); timer.unref(); return () => clearInterval(timer); }

@@ -7,6 +7,8 @@ import {
   assertVersion,
   checkIn,
   controlMeeting,
+  startMeetingPresentation,
+  reorderMeetingSpeakers,
   createMeeting,
   updateMeeting,
   deleteMeeting,
@@ -19,8 +21,11 @@ import {
   redrawPrizeWinner,
   resetLuckyDrawWinners,
   createCheckInQr,
+  getCheckInQr,
+  autoStartDueMeetings,
 } from './meeting.service';
-import { checkinInput, controlInput, meetingInput, updateMeetingInput } from './meeting.validation';
+import { checkinInput, controlInput, meetingInput, updateMeetingInput, slideProfileInput } from './meeting.validation';
+import { getMeetingSlides, updateMeetingSlide } from './meeting-slides.service';
 
 
 export const meetingRouter = Router();
@@ -36,6 +41,7 @@ const sendError = (res: any, error: any) =>
 
 meetingRouter.get('/', read, async (req: any, res) => {
   try {
+    await autoStartDueMeetings();
     res.json({
       data: await MeetingModel.find({ companyCode: company(req) })
         .sort({ startsAt: -1 })
@@ -56,6 +62,22 @@ meetingRouter.get('/:id', read, async (req: any, res) => {
   } catch (e) {
     sendError(res, e);
   }
+});
+
+meetingRouter.get('/:id/slides', read, async (req: any, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
+    res.json({ data: await getMeetingSlides(company(req), req.params.id) });
+  } catch (e) { sendError(res, e); }
+});
+
+meetingRouter.put('/:id/slides/:speakerId', manage, async (req: any, res) => {
+  const { error, value } = slideProfileInput.validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
+    res.json({ data: await updateMeetingSlide(company(req), req.params.id, req.params.speakerId, value) });
+  } catch (e) { sendError(res, e); }
 });
 
 meetingRouter.post('/', manage, async (req: any, res) => {
@@ -105,6 +127,15 @@ meetingRouter.post('/:id/checkin', requirePermission(['meetings:read', 'meetings
   }
 });
 
+meetingRouter.post('/:id/presentation', manage, async (req: any, res) => {
+  if (typeof req.body?.speakerId !== 'string' || !req.body.speakerId) return res.status(400).json({ message: 'Chọn người thuyết trình.' });
+  try {
+    const item = await getMeeting(company(req), req.params.id);
+    assertVersion(item, req.body.version);
+    res.json({ data: await startMeetingPresentation(item, req.body.speakerId) });
+  } catch (e) { sendError(res, e); }
+});
+
 meetingRouter.post('/:id/control', manage, async (req: any, res) => {
   const { error, value } = controlInput.validate(req.body);
   if (error) return res.status(400).json({ message: error.message });
@@ -121,32 +152,7 @@ meetingRouter.put('/:id/order', manage, async (req: any, res) => {
   try {
     const item = await getMeeting(company(req), req.params.id);
     assertVersion(item, req.body.version);
-    if (
-      item.status !== 'scheduled' ||
-      !Array.isArray(req.body.speakerIds) ||
-      req.body.speakerIds.length !== item.speakers.length ||
-      new Set(req.body.speakerIds).size !== item.speakers.length ||
-      req.body.speakerIds.some((id: string) => !item.speakers.some((p: any) => p.id === id))
-    ) {
-      throw new MeetingError(400, 'Thứ tự người nói không hợp lệ.');
-    }
-    item.speakers = req.body.speakerIds.map((id: string) =>
-      item.speakers.find((p: any) => p.id === id)
-    );
-    item.speakers.forEach((p: any, i: number) => {
-      let n = 0;
-      for (const t of item.tiers) {
-        n += t.count;
-        if (i < n) {
-          p.seconds = t.seconds;
-          break;
-        }
-      }
-      if (i >= item.tiers.reduce((s: number, t: any) => s + t.count, 0)) {
-        p.seconds = item.fallbackSeconds;
-      }
-    });
-    res.json({ data: await saveMeeting(item) });
+    res.json({ data: await reorderMeetingSpeakers(item, req.body.speakerIds) });
   } catch (e) {
     sendError(res, e);
   }
@@ -250,6 +256,21 @@ meetingRouter.post('/:id/lucky-draw/reset', manage, async (req: any, res) => {
   } catch (e) {
     sendError(res, e);
   }
+});
+
+meetingRouter.get('/:id/checkin-qr', manage, async (req: any, res) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.json({ data: await getCheckInQr(company(req), req.params.id) });
+  } catch (e) { sendError(res, e); }
+});
+
+meetingRouter.put('/:id/checkin-qr', manage, async (req: any, res) => {
+  try {
+    if (typeof req.body?.token !== 'string') throw new MeetingError(400, 'Thiếu mã QR cần khôi phục.');
+    res.set('Cache-Control', 'no-store');
+    res.json({ data: await getCheckInQr(company(req), req.params.id, req.body.token) });
+  } catch (e) { sendError(res, e); }
 });
 
 meetingRouter.post('/:id/checkin-qr', manage, async (req: any, res) => {

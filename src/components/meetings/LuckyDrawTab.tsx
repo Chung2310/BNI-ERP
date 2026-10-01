@@ -25,6 +25,9 @@ import {
   ChevronRight,
   PartyPopper,
   ExternalLink,
+  Dices,
+  Play,
+  Disc,
 } from "lucide-react";
 import {
   Meeting,
@@ -86,6 +89,16 @@ export function LuckyDrawTab({
   // Settings dropdown/modal
   const [showConfigPanel, setShowConfigPanel] = useState(false);
 
+  // Confirm popup state (replaces window.confirm)
+  const [confirmModal, setConfirmModal] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const showConfirm = (message: string, onConfirm: () => void) => {
+    setConfirmModal({ message, onConfirm });
+  };
+
   const containerRef = useRef<HTMLDivElement>(null);
   const tickerIntervalRef = useRef<any>(null);
 
@@ -125,12 +138,16 @@ export function LuckyDrawTab({
   // Quick Preset Prizes
   const handleApplyPresets = async () => {
     if (!canManage) return;
-    if (
-      luckyConfig.prizes?.length &&
-      !window.confirm("Áp dụng cấu hình mẫu sẽ thêm các giải thưởng chuẩn vào danh sách. Tiếp tục?")
-    ) {
+    if (luckyConfig.prizes?.length) {
+      showConfirm("Áp dụng cấu hình mẫu sẽ thêm các giải thưởng chuẩn vào danh sách. Tiếp tục?", async () => {
+        await doApplyPresets();
+      });
       return;
     }
+    await doApplyPresets();
+  };
+
+  const doApplyPresets = async () => {
 
     const presets: Array<Partial<LuckyDrawPrize>> = [
       { name: "Giải Đặc Biệt", reward: "Phần thưởng trị giá 10.000.000đ", quantity: 1, order: 1, color: "#e11d48" },
@@ -204,18 +221,19 @@ export function LuckyDrawTab({
 
   // Delete Prize
   const handleDeletePrize = async (prizeId: string) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa giải thưởng này?")) return;
-    try {
-      const updated = await meetingService.deletePrize(meeting._id, prizeId);
-      setLuckyConfig(updated);
-      if (selectedPrizeId === prizeId) {
-        setSelectedPrizeId(updated.prizes?.[0]?.id || "");
+    showConfirm("Bạn có chắc chắn muốn xóa giải thưởng này?", async () => {
+      try {
+        const updated = await meetingService.deletePrize(meeting._id, prizeId);
+        setLuckyConfig(updated);
+        if (selectedPrizeId === prizeId) {
+          setSelectedPrizeId(updated.prizes?.[0]?.id || "");
+        }
+        toast.success("Đã xóa giải thưởng.");
+        await onRefreshMeeting();
+      } catch (err: any) {
+        toast.error(err.message || "Xóa giải thưởng thất bại.");
       }
-      toast.success("Đã xóa giải thưởng.");
-      await onRefreshMeeting();
-    } catch (err: any) {
-      toast.error(err.message || "Xóa giải thưởng thất bại.");
-    }
+    });
   };
 
   // Save Settings
@@ -344,16 +362,16 @@ export function LuckyDrawTab({
   // Redraw Winner
   const handleRedraw = async (winner: LuckyDrawWinner) => {
     if (!canManage) return;
-    if (!window.confirm(`Bạn có chắc muốn hủy kết quả của "${winner.name}" và cho phép quay lại?`)) return;
-
-    try {
-      await meetingService.redrawWinner(meeting._id, winner.prizeId, winner.id);
-      toast.success("Đã hủy kết quả. Bạn có thể bấm Quay lại giải này.");
-      setActiveWinnerModal(null);
-      await onRefreshMeeting();
-    } catch (err: any) {
-      toast.error(err.message || "Không thể hủy kết quả.");
-    }
+    showConfirm(`Hủy kết quả của "${winner.name}" và cho phép quay lại?`, async () => {
+      try {
+        await meetingService.redrawWinner(meeting._id, winner.prizeId, winner.id);
+        toast.success("Đã hủy kết quả. Bạn có thể bấm Quay lại giải này.");
+        setActiveWinnerModal(null);
+        await onRefreshMeeting();
+      } catch (err: any) {
+        toast.error(err.message || "Không thể hủy kết quả.");
+      }
+    });
   };
 
   // Reset Winners
@@ -362,16 +380,16 @@ export function LuckyDrawTab({
     const confirmMsg = prizeId
       ? "Đặt lại kết quả người trúng giải này?"
       : "Đặt lại toàn bộ kết quả trúng thưởng của tất cả các giải?";
-    if (!window.confirm(confirmMsg)) return;
-
-    try {
-      const updated = await meetingService.resetWinners(meeting._id, prizeId);
-      setLuckyConfig(updated);
-      toast.success("Đã làm mới danh sách người trúng giải.");
-      await onRefreshMeeting();
-    } catch (err: any) {
-      toast.error(err.message || "Đặt lại thất bại.");
-    }
+    showConfirm(confirmMsg, async () => {
+      try {
+        const updated = await meetingService.resetWinners(meeting._id, prizeId);
+        setLuckyConfig(updated);
+        toast.success("Đã làm mới danh sách người trúng giải.");
+        await onRefreshMeeting();
+      } catch (err: any) {
+        toast.error(err.message || "Đặt lại thất bại.");
+      }
+    });
   };
 
   // Export Results
@@ -419,23 +437,17 @@ export function LuckyDrawTab({
     >
       {/* Top Banner Alert: CHỈ QUAY KHI CUỘC HỌP ĐÃ BẮT ĐẦU */}
       {!isMeetingStarted ? (
-        <div className="rounded-2xl border border-amber-300 bg-linear-to-r from-amber-50 to-orange-50 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="p-2.5 bg-amber-100 text-amber-700 rounded-xl shrink-0 mt-0.5">
+        <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-amber-100 text-amber-600 rounded-xl shrink-0 mt-0.5">
               <Lock className="h-5 w-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h4 className="font-bold text-amber-900 text-sm sm:text-base">
-                  Cuộc họp chưa bắt đầu — Chức năng quay thưởng đang tạm khóa
-                </h4>
-                <span className="px-2 py-0.5 rounded-full bg-amber-200/60 text-[10px] font-bold text-amber-800 uppercase tracking-wider">
-                  Chờ bắt đầu
-                </span>
-              </div>
-              <p className="text-xs text-amber-800/90 mt-1 leading-relaxed">
-                Theo quy định, chương trình quay thưởng chỉ được phép kích hoạt sau khi cuộc họp đã bắt đầu.
-                {canManage ? " Bạn có thể nhấn nút bên cạnh để bắt đầu cuộc họp ngay." : " Vui lòng chờ người chủ trì bắt đầu cuộc họp."}
+              <h4 className="text-sm text-amber-900 font-semibold">
+                Quay thưởng đang tạm khóa
+              </h4>
+              <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                Chức năng quay thưởng chỉ kích hoạt khi cuộc họp đã bắt đầu.{canManage ? " Nhấn nút bên cạnh để bắt đầu." : ""}
               </p>
             </div>
           </div>
@@ -444,199 +456,226 @@ export function LuckyDrawTab({
             <button
               type="button"
               onClick={onStartMeeting}
-              className="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
+              className="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <CheckCircle2 className="h-4 w-4" />
-              Bắt đầu cuộc họp ngay
+              Bắt đầu cuộc họp
             </button>
           )}
         </div>
       ) : (
-        <div className="rounded-2xl border border-emerald-300 bg-linear-to-r from-emerald-50 to-teal-50 p-4 shadow-xs flex items-center justify-between">
+        <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 shadow-xs flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
-              <Sparkles className="h-5 w-5" />
+            <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl">
+              <CheckCircle2 className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <h4 className="font-bold text-emerald-950 text-sm">
-                  Cuộc họp đang diễn ra — Quay thưởng đã sẵn sàng!
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <h4 className="text-sm text-emerald-900 font-semibold">
+                  Cuộc họp đang diễn ra — Sẵn sàng quay thưởng
                 </h4>
               </div>
-              <p className="text-xs text-emerald-800 mt-0.5">
-                {meeting.speakers?.length || 0} thành viên đã điểm danh check-in sẵn sàng bốc thăm.
+              <p className="text-xs text-emerald-700 mt-0.5">
+                {meeting.speakers?.length || 0} thành viên đã điểm danh check-in.
               </p>
             </div>
           </div>
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 text-white font-mono text-xs font-bold">
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-medium">
             <ShieldCheck className="h-3.5 w-3.5" />
-            Random.org Verified
+            Đã xác thực
           </span>
         </div>
       )}
 
-      {/* Main Stage: Random.org Futuristic Neon Wheel/Ticker */}
-      <div className="relative rounded-3xl border border-slate-800 bg-linear-to-b from-slate-900 via-indigo-950 to-slate-950 p-6 sm:p-10 shadow-2xl overflow-hidden text-center text-white">
-        {/* Glow ambient effects */}
-        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-rose-500/20 blur-3xl pointer-events-none" />
-
-        {/* Stage Header Toolbar */}
-        <div className="relative z-10 flex items-center justify-between gap-3 pb-6 border-b border-white/10">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/30">
-              <Trophy className="h-5 w-5" />
+      {/* ======================================================== */}
+      {/* BNI LUXURY LUCKY DRAW SHOWCASE (VÒNG QUAY & LỒNG CẦU BINGO) */}
+      {/* ======================================================== */}
+      <div className="rounded-2xl border border-red-100 bg-white p-5 sm:p-6 shadow-xs overflow-hidden">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#cf142b] text-white shadow-sm">
+              <Gift className="h-5 w-5" />
             </div>
-            <div className="text-left">
-              <h3 className="font-bold text-base sm:text-lg tracking-tight">
-                VÒNG QUAY MAY MẮN (RANDOM.ORG)
-              </h3>
-              <p className="text-[11px] text-slate-400 font-mono">
-                {meeting.title} • {new Date(meeting.startsAt).toLocaleDateString("vi-VN")}
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-semibold text-slate-900">
+                  Quay thưởng buổi họp
+                </h3>
+                <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-[#cf142b] ring-1 ring-inset ring-red-200">
+                  BNI Chapter
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {meeting.title} · {meeting.speakers?.length || 0} người đã check-in
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <a
-              href="/wheel-of-names"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Mở Vòng quay tên ngẫu nhiên toàn màn hình (Tab riêng biệt)"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 text-xs font-bold transition cursor-pointer"
-            >
-              <Sparkles className="h-4 w-4 text-amber-400" />
-              <span className="hidden sm:inline">Mở Wheel of Names</span>
-              <ExternalLink className="h-3.5 w-3.5 opacity-70" />
-            </a>
-
+          <div className="flex items-center gap-2 self-end sm:self-auto">
             <button
               type="button"
               onClick={() => setSoundEnabled(!soundEnabled)}
               title={soundEnabled ? "Tắt âm thanh" : "Bật âm thanh"}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition cursor-pointer"
+              className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 transition cursor-pointer"
             >
-              {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 text-rose-400" />}
+              {soundEnabled ? <Volume2 className="h-4 w-4 text-[#cf142b]" /> : <VolumeX className="h-4 w-4 text-slate-400" />}
             </button>
+          </div>
+        </div>
 
+        {/* Game Options */}
+        <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Game 1: Vòng quay may mắn */}
+          <div className="group rounded-xl border border-slate-200 bg-slate-50/50 p-4 transition-all duration-200 hover:border-[#cf142b]/40 hover:shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className="h-8 w-8 rounded-lg bg-[#cf142b] text-white flex items-center justify-center">
+                  <Disc className="h-4 w-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900 group-hover:text-[#cf142b] transition">Vòng quay may mắn</h4>
+                  <p className="text-[11px] text-slate-400">Đĩa quay 3D</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Quay đĩa tròn với tên thành viên, hiệu ứng âm thanh sống động.
+              </p>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-200">
+              <a
+                href={`/quay-thuong?meetingId=${meeting._id}&game=wheel`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 rounded-lg bg-[#cf142b] hover:bg-[#b00f24] text-white py-2.5 text-xs font-medium shadow-sm transition active:scale-[0.98] cursor-pointer"
+              >
+                <Play className="h-4 w-4 fill-current" />
+                Mở vòng quay
+                <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+              </a>
+            </div>
+          </div>
+
+          {/* Game 2: Lồng cầu Bingo */}
+          <div className="group rounded-xl border border-slate-200 bg-slate-50/50 p-4 transition-all duration-200 hover:border-amber-400/60 hover:shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className="h-8 w-8 rounded-lg bg-amber-500 text-white flex items-center justify-center">
+                  <Dices className="h-4 w-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900 group-hover:text-amber-600 transition">Lồng cầu Bingo</h4>
+                  <p className="text-[11px] text-slate-400">Quay xổ số 3D</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Lồng cầu 3D với các quả bóng số, mô phỏng vật lý thực tế.
+              </p>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-200">
+              <a
+                href={`/quay-thuong?meetingId=${meeting._id}&game=bingo`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white py-2.5 text-xs font-medium shadow-sm transition active:scale-[0.98] cursor-pointer"
+              >
+                <Dices className="h-4 w-4" />
+                Mở lồng cầu
+                <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Bốc thăm nhanh tại chỗ */}
+        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
+            <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
+              <Sparkles className="h-4 w-4 text-[#cf142b]" />
+              <span>Bốc thăm nhanh tại chỗ</span>
+            </div>
+
+            {selectedPrize ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-[#cf142b] text-xs font-medium ring-1 ring-inset ring-red-200">
+                <Gift className="h-3.5 w-3.5" />
+                {selectedPrize.name} ({selectedPrize.winners.length}/{selectedPrize.quantity})
+              </span>
+            ) : (
+              <span className="text-xs text-slate-400">Chọn giải thưởng bên dưới</span>
+            )}
+          </div>
+
+          {/* Digital Display */}
+          <div className="my-4 rounded-xl border border-slate-200 bg-white p-5 text-center">
+            <div className="text-[11px] text-slate-400 mb-2">
+              {luckyConfig.drawMode === "attendees" ? "Thành viên & Khách mời" : "Số may mắn"} · {meeting.speakers?.length || 0} ứng viên
+            </div>
+
+            <div
+              className={`font-mono text-2xl sm:text-3xl font-semibold tracking-wider transition-all duration-75 select-none ${
+                isSpinning
+                  ? "text-[#cf142b] scale-105"
+                  : "text-slate-800"
+              }`}
+            >
+              {spinningDisplay}
+            </div>
+          </div>
+
+          <div className="flex justify-center">
             <button
               type="button"
-              onClick={toggleFullscreen}
-              title={isFullscreen ? "Thu nhỏ" : "Toàn màn hình máy chiếu"}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition cursor-pointer"
+              disabled={!isMeetingStarted || !selectedPrize || isSpinning || (selectedPrize && selectedPrize.winners.length >= selectedPrize.quantity)}
+              onClick={handleSpin}
+              className={`px-6 py-3 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm flex items-center gap-2 ${
+                !isMeetingStarted
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                  : isSpinning
+                  ? "bg-amber-500 text-white cursor-wait"
+                  : selectedPrize && selectedPrize.winners.length >= selectedPrize.quantity
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                  : "bg-[#cf142b] hover:bg-[#b00f24] text-white hover:shadow-md active:scale-[0.97] cursor-pointer"
+              }`}
             >
-              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {isSpinning ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span>Đang quay...</span>
+                </>
+              ) : !isMeetingStarted ? (
+                <>
+                  <Lock className="h-4 w-4" />
+                  <span>Chưa bắt đầu</span>
+                </>
+              ) : selectedPrize && selectedPrize.winners.length >= selectedPrize.quantity ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Đã quay đủ</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  <span>Quay thưởng</span>
+                </>
+              )}
             </button>
           </div>
-        </div>
-
-        {/* Selected Prize Banner */}
-        <div className="relative z-10 pt-6 max-w-xl mx-auto">
-          {selectedPrize ? (
-            <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs sm:text-sm font-bold text-amber-300 shadow-lg">
-              <Gift className="h-4 w-4 text-amber-400" />
-              <span>Đang chọn: {selectedPrize.name}</span>
-              <span className="text-white/60 font-normal">({selectedPrize.reward || "Chưa có mô tả"})</span>
-              <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-[10px] text-amber-300 font-mono">
-                {selectedPrize.winners.length}/{selectedPrize.quantity} giải
-              </span>
-            </div>
-          ) : (
-            <div className="text-xs text-amber-300 italic">
-              Vui lòng tạo hoặc chọn một giải thưởng bên dưới để quay!
-            </div>
-          )}
-        </div>
-
-        {/* Random.org Digital Display Board */}
-        <div className="relative z-10 py-8 sm:py-12">
-          <div className="mx-auto max-w-2xl rounded-3xl border-2 border-indigo-400/40 bg-black/60 backdrop-blur-xl p-8 sm:p-12 shadow-[0_0_50px_rgba(99,102,241,0.25)] relative overflow-hidden">
-            <div className="absolute top-2 left-3 flex items-center gap-1.5 text-[9px] font-mono text-emerald-400">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-              TRUE RANDOM GENERATOR
-            </div>
-            <div className="absolute top-2 right-3 text-[9px] font-mono text-slate-400">
-              ENTROPY: CRYPTOGRAPHIC RNG
-            </div>
-
-            <div className="pt-3">
-              <div
-                className={`font-mono text-3xl sm:text-5xl md:text-6xl font-black tracking-wider transition-all duration-75 select-none ${
-                  isSpinning
-                    ? "text-amber-400 scale-105 drop-shadow-[0_0_20px_rgba(245,158,11,0.8)]"
-                    : "text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]"
-                }`}
-              >
-                {spinningDisplay}
-              </div>
-
-              <div className="mt-4 text-[11px] font-mono text-slate-400 flex items-center justify-center gap-3">
-                <span>Chế độ: {luckyConfig.drawMode === "attendees" ? "Người tham gia họp" : "Số may mắn"}</span>
-                <span>•</span>
-                <span>Ứng viên hợp lệ: {meeting.speakers?.length || 0}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Big Spin Action Button */}
-        <div className="relative z-10 flex flex-col items-center justify-center gap-4">
-          <button
-            type="button"
-            disabled={!isMeetingStarted || !selectedPrize || isSpinning || selectedPrize.winners.length >= selectedPrize.quantity}
-            onClick={handleSpin}
-            className={`group relative px-10 py-4 sm:px-14 sm:py-5 rounded-2xl text-base sm:text-xl font-black uppercase tracking-widest transition-all duration-200 shadow-2xl flex items-center gap-3 ${
-              !isMeetingStarted
-                ? "bg-slate-700/60 text-slate-400 cursor-not-allowed border border-slate-600"
-                : isSpinning
-                ? "bg-amber-500 text-slate-950 scale-95 shadow-amber-500/50 cursor-wait"
-                : selectedPrize && selectedPrize.winners.length >= selectedPrize.quantity
-                ? "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed"
-                : "bg-linear-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 hover:scale-105 hover:shadow-amber-500/40 active:scale-95 cursor-pointer"
-            }`}
-          >
-            {isSpinning ? (
-              <>
-                <RefreshCw className="h-6 w-6 animate-spin" />
-                <span>Đang quay thưởng...</span>
-              </>
-            ) : !isMeetingStarted ? (
-              <>
-                <Lock className="h-6 w-6" />
-                <span>Cuộc họp chưa bắt đầu</span>
-              </>
-            ) : selectedPrize && selectedPrize.winners.length >= selectedPrize.quantity ? (
-              <>
-                <CheckCircle2 className="h-6 w-6 text-emerald-400" />
-                <span>Giải này đã quay đủ</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-6 w-6 animate-bounce" />
-                <span>BẤM ĐỂ QUAY THƯỞNG</span>
-              </>
-            )}
-          </button>
-
-          {!isMeetingStarted && (
-            <p className="text-xs text-amber-300/80 font-mono">
-              * Yêu cầu cuộc họp ở trạng thái Đang diễn ra để mở khóa nút quay thưởng.
-            </p>
-          )}
         </div>
       </div>
 
-      {/* Prize Selector Ribbon */}
+      {/* Danh sách giải thưởng */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h4 className="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-amber-500" />
-              Danh sách các giải thưởng ({luckyConfig.prizes?.length || 0})
+            <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-[#cf142b]" />
+              Giải thưởng ({luckyConfig.prizes?.length || 0})
             </h4>
             <p className="text-xs text-slate-500">
-              Chọn giải thưởng bạn muốn tiến hành quay hoặc cấu hình thêm giải mới.
+              Chọn giải muốn quay hoặc thêm giải mới.
             </p>
           </div>
 
@@ -646,29 +685,29 @@ export function LuckyDrawTab({
                 <button
                   type="button"
                   onClick={handleApplyPresets}
-                  className="px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-xs font-medium transition flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Áp dụng bộ giải mẫu
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                  Giải mẫu
                 </button>
               )}
 
               <button
                 type="button"
                 onClick={() => setShowConfigPanel(!showConfigPanel)}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-xs font-medium transition flex items-center gap-1.5 cursor-pointer"
               >
-                <Layers className="h-3.5 w-3.5 text-slate-500" />
-                Cài đặt quay
+                <Layers className="h-3.5 w-3.5 text-slate-400" />
+                Cài đặt
               </button>
 
               <button
                 type="button"
                 onClick={openAddPrizeModal}
-                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-[#cf142b] hover:bg-[#b00f24] text-white text-xs font-medium shadow-sm transition flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" />
-                Thêm giải mới
+                Thêm giải
               </button>
             </div>
           )}
@@ -677,8 +716,8 @@ export function LuckyDrawTab({
         {/* Collapsible Settings Panel */}
         {showConfigPanel && canManage && (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5 space-y-4">
-            <h5 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-              Cấu hình quay thưởng cuộc họp
+            <h5 className="text-xs font-medium text-slate-700 uppercase tracking-wider">
+              Cấu hình quay thưởng
             </h5>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
@@ -796,8 +835,8 @@ export function LuckyDrawTab({
 
                 {/* Card footer actions */}
                 <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-[11px] font-semibold text-slate-500">
-                    {isSelected ? "★ Đang chọn quay" : "Bấm để chọn giải này"}
+                  <span className="text-[11px] text-slate-400">
+                    {isSelected ? "Đang chọn" : "Bấm để chọn"}
                   </span>
 
                   {canManage && (
@@ -827,16 +866,16 @@ export function LuckyDrawTab({
         </div>
       </div>
 
-      {/* Hall of Fame (Bảng vinh danh người trúng thưởng) */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+      {/* Kết quả trúng thưởng */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
-            <h4 className="font-bold text-slate-900 text-base flex items-center gap-2">
-              <PartyPopper className="h-5 w-5 text-indigo-600" />
-              Bảng vàng vinh danh người trúng thưởng
+            <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-[#cf142b]" />
+              Kết quả trúng thưởng
             </h4>
             <p className="text-xs text-slate-500">
-              Danh sách chi tiết tất cả các giải đã quay thành công trong buổi họp này.
+              Danh sách người trúng giải trong buổi họp.
             </p>
           </div>
 
@@ -844,20 +883,20 @@ export function LuckyDrawTab({
             <button
               type="button"
               onClick={handleExportCSV}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium transition flex items-center gap-1.5 cursor-pointer"
             >
-              <Download className="h-3.5 w-3.5 text-slate-500" />
-              Xuất kết quả (CSV)
+              <Download className="h-3.5 w-3.5 text-slate-400" />
+              Xuất CSV
             </button>
 
             {canManage && (
               <button
                 type="button"
                 onClick={() => handleResetWinners()}
-                className="px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-medium transition flex items-center gap-1.5 cursor-pointer"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                Đặt lại kết quả
+                Đặt lại
               </button>
             )}
           </div>
@@ -884,12 +923,12 @@ export function LuckyDrawTab({
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-150 bg-slate-50 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-medium uppercase tracking-wider text-slate-500">
                     <th className="p-3 pl-4">Giải thưởng</th>
-                    <th className="p-3">Người trúng thưởng</th>
-                    <th className="p-3">Số vé / ID</th>
-                    <th className="p-3">Thời gian trúng</th>
-                    <th className="p-3">Mã xác thực Random.org</th>
+                    <th className="p-3">Người trúng</th>
+                    <th className="p-3">Số vé</th>
+                    <th className="p-3">Thời gian</th>
+                    <th className="p-3">Mã xác thực</th>
                     {canManage && <th className="p-3 pr-4 text-right">Thao tác</th>}
                   </tr>
                 </thead>
@@ -968,60 +1007,59 @@ export function LuckyDrawTab({
       {/* WINNER SPOTLIGHT CELEBRATION MODAL */}
       {activeWinnerModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-3xl border-2 border-amber-400 bg-linear-to-b from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-8 text-white shadow-2xl text-center relative overflow-hidden animate-in fade-in zoom-in duration-300">
-            {/* Confetti ambient */}
-            <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-amber-400/20 blur-2xl" />
+          <div className="w-full max-w-md rounded-2xl border border-[#cf142b]/30 bg-white p-6 sm:p-8 text-slate-900 shadow-2xl text-center relative overflow-hidden">
+            {/* Accent bar */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#cf142b] via-amber-500 to-[#cf142b]" />
 
-            <div className="inline-flex p-3 rounded-2xl bg-amber-400/20 text-amber-300 border border-amber-400/30 mb-3 shadow-lg animate-bounce">
-              <Trophy className="h-8 w-8" />
+            <div className="inline-flex p-3 rounded-xl bg-red-50 text-[#cf142b] mb-3">
+              <Trophy className="h-7 w-7" />
             </div>
 
-            <h3 className="text-xs uppercase font-mono tracking-widest text-amber-400">
-              CHÚC MỪNG CHIẾN THẮNG
-            </h3>
-            <h4 className="text-2xl font-black mt-1 text-white tracking-tight">
+            <p className="text-xs uppercase tracking-widest text-[#cf142b] font-medium">
+              Chúc mừng
+            </p>
+            <h4 className="text-xl font-semibold mt-1 text-slate-900">
               {activeWinnerModal.prize.name}
             </h4>
-            <p className="text-xs text-amber-200 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               {activeWinnerModal.prize.reward}
             </p>
 
-            {/* Winner Badge Card */}
-            <div className="my-6 p-4 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-md">
+            {/* Winner Card */}
+            <div className="my-5 p-4 rounded-xl border border-slate-200 bg-slate-50">
               <div className="flex flex-col items-center gap-3">
                 {activeWinnerModal.winner.photoURL ? (
                   <img
                     src={activeWinnerModal.winner.photoURL}
                     alt={activeWinnerModal.winner.name}
-                    className="h-20 w-20 rounded-2xl border-2 border-amber-400 object-cover shadow-lg"
+                    className="h-16 w-16 rounded-xl border-2 border-[#cf142b] object-cover shadow-sm"
                   />
                 ) : (
-                  <div className="h-20 w-20 rounded-2xl border-2 border-amber-400 bg-amber-400 text-slate-950 flex items-center justify-center font-bold text-2xl">
+                  <div className="h-16 w-16 rounded-xl border-2 border-[#cf142b] bg-[#cf142b] text-white flex items-center justify-center font-semibold text-xl">
                     {activeWinnerModal.winner.name.slice(0, 2).toUpperCase()}
                   </div>
                 )}
                 <div>
-                  <h5 className="text-xl font-bold text-white">
+                  <h5 className="text-lg font-semibold text-slate-900">
                     {activeWinnerModal.winner.name}
                   </h5>
                   {activeWinnerModal.winner.email && (
-                    <p className="text-xs text-slate-300 font-mono mt-0.5">
+                    <p className="text-xs text-slate-500 mt-0.5">
                       {activeWinnerModal.winner.email}
                     </p>
                   )}
                   {activeWinnerModal.winner.ticketNumber && (
-                    <div className="inline-block mt-2 px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 font-mono font-bold text-xs border border-amber-400/30">
+                    <div className="inline-block mt-2 px-3 py-1 rounded-md bg-red-50 text-[#cf142b] text-xs font-medium ring-1 ring-inset ring-red-200">
                       Số may mắn: #{activeWinnerModal.winner.ticketNumber}
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Random.org Verification Proof */}
-              <div className="mt-4 pt-3 border-t border-white/10 text-[10px] font-mono text-slate-400 text-left space-y-1">
+              {/* Verification */}
+              <div className="mt-3 pt-3 border-t border-slate-200 text-[10px] font-mono text-slate-400 text-left space-y-0.5">
                 <div className="truncate">Seed: {activeWinnerModal.seed}</div>
                 <div className="truncate">Hash: {activeWinnerModal.verificationHash}</div>
-                <div>Xác thực: Random.org Cryptographic Signature</div>
               </div>
             </div>
 
@@ -1029,14 +1067,14 @@ export function LuckyDrawTab({
               <button
                 type="button"
                 onClick={() => handleRedraw(activeWinnerModal.winner)}
-                className="px-4 py-2 rounded-xl border border-rose-400/30 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs font-bold transition cursor-pointer"
+                className="px-4 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium transition cursor-pointer"
               >
                 Quay lại (Vắng mặt)
               </button>
               <button
                 type="button"
                 onClick={() => setActiveWinnerModal(null)}
-                className="px-6 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition shadow-lg shadow-amber-400/20 cursor-pointer"
+                className="px-5 py-2 rounded-lg bg-[#cf142b] hover:bg-[#b00f24] text-white text-xs font-medium transition shadow-sm cursor-pointer"
               >
                 Xác nhận nhận giải
               </button>
@@ -1143,6 +1181,46 @@ export function LuckyDrawTab({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM CONFIRM POPUP (replaces window.confirm) */}
+      {confirmModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-xl border border-slate-200 overflow-hidden">
+            <div className="p-5">
+              <div className="flex items-start gap-3">
+                <div className="shrink-0 p-2 rounded-lg bg-amber-50 text-amber-500">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900">Xác nhận</h4>
+                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                    {confirmModal.message}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-3 bg-slate-50 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-medium hover:bg-slate-50 transition cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-[#cf142b] hover:bg-[#b00f24] text-white text-xs font-medium shadow-sm transition cursor-pointer"
+              >
+                Xác nhận
+              </button>
+            </div>
           </div>
         </div>
       )}

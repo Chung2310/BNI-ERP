@@ -46,3 +46,22 @@ Khi mã nguồn được merge thành công vào các nhánh chỉ định, CD s
 * **Nhánh `develop`**: Triển khai lên môi trường **Staging** trên VPS (đường dẫn `/opt/igen-erp/staging`).
 * **Nhánh `production`**: Triển khai lên môi trường **Production** trên VPS (đường dẫn `/opt/igen-erp/production`).
 * Cả hai môi trường đều tự động cập nhật Firebase Cloud Functions, Firestore & Storage Security Rules.
+
+
+## Slide giới thiệu BNI
+
+Trong **Cuộc họp → mở buổi họp → Slide**, chọn người đã check-in để xem trước.
+Hệ thống tự chọn mẫu Member/Guest và lấy tên, công ty, avatar, ảnh bìa,
+SĐT, lĩnh vực từ hồ sơ thành viên; khách mời dùng dữ liệu check-in và không hiển thị ngày sinh/lĩnh vực.
+Người có quyền quản lý cuộc họp có thể bổ sung bio và chỉnh thông tin riêng cho
+slide của buổi họp. **Dùng lại hồ sơ** xóa bản chỉnh riêng và lấy dữ liệu mới nhất.
+
+Có ba chế độ: chuyển thủ công, tự chạy (3–120 giây), theo người đang phát biểu.
+**Trình chiếu** mở toàn màn hình; dùng ← / → để chuyển, Esc để thoát.
+**Tải PNG** xuất slide đang xem ở 1920×1080, cùng bố cục với màn hình chiếu.
+Font tiếng Việt được đóng gói trong ứng dụng. Chữ dài được thu nhỏ/rút gọn;
+Mục thiếu dữ liệu được ẩn cả nhãn và khung; ảnh thiếu hoặc không tải được không hiển thị ảnh thay thế. Lỗi tải ảnh có thông báo riêng trong phần xem trước.
+Ảnh ngoài hệ thống cần cho phép CORS để trình duyệt có thể ghép và xuất PNG.
+
+Thiết kế tham chiếu: `public/slide-for-member.png`, `public/slide-for-guest.png`.
+Logo dùng khi dựng slide: `public/bni-logo.png`.
