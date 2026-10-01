@@ -1252,8 +1252,8 @@ export default function MeetingTab() {
                           </select>
                         </label>
                         <label className="text-xs font-semibold">Thứ tự ưu tiên
-                          <input aria-label="Thứ tự ưu tiên" type="number" min={1} max={activeMeeting.speakers.length - pendingStart} disabled={saving}
-                            value={Math.min(priorityPosition, activeMeeting.speakers.length - pendingStart)} className="mt-1 block w-24 rounded-lg border bg-white p-2 text-sm"
+                          <input aria-label="Thứ tự ưu tiên" type="number" inputMode="numeric" min={1} max={activeMeeting.speakers.length - pendingStart} disabled={saving}
+                            value={Math.min(priorityPosition, activeMeeting.speakers.length - pendingStart)} className="mt-1 block w-24 rounded-lg border bg-white p-2 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             onChange={event => setPriorityPosition(Math.max(1, Math.min(activeMeeting.speakers.length - pendingStart, Math.floor(Number(event.target.value) || 1))))} />
                         </label>
                         <button type="button" disabled={saving} className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
