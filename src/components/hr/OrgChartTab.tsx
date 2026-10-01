@@ -89,7 +89,7 @@ const renderAvatar = (avatar: string, sizeClasses: string = "w-8 h-8", textClass
             target.style.display = "none";
             const parent = target.parentElement;
             if (parent) {
-              parent.classList.add("bg-gradient-to-tr", "from-red-600", "to-rose-500", "text-white", "font-bold");
+              parent.classList.add("bg-gradient-to-tr", "from-blue-600", "to-indigo-500", "text-white", "font-bold");
               parent.innerText = nameFallback ? nameFallback.trim().charAt(0).toUpperCase() : "👤";
             }
           }}
@@ -98,7 +98,7 @@ const renderAvatar = (avatar: string, sizeClasses: string = "w-8 h-8", textClass
     );
   }
   return (
-    <div className={`${sizeClasses} bg-gradient-to-tr from-red-600 to-rose-500 text-white font-bold rounded-full shrink-0 flex items-center justify-center border-2 border-white shadow-xs select-none`}>
+    <div className={`${sizeClasses} bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-bold rounded-full shrink-0 flex items-center justify-center border-2 border-white shadow-xs select-none`}>
       <span className={textClass}>{nameFallback ? nameFallback.trim().charAt(0).toUpperCase() : (avatar || "👤")}</span>
     </div>
   );
@@ -1395,7 +1395,7 @@ export default function OrgChartTab({
                 data-testid="org-chart-add-button"
                 type="button"
                 onClick={() => setIsAddModalOpen(true)}
-                className="col-span-full flex w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-650 px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-indigo-700 active:scale-95 cursor-pointer min-[768px]:col-span-1 min-[1200px]:w-auto"
+                className="col-span-full flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-blue-700 active:scale-95 cursor-pointer min-[768px]:col-span-1 min-[1200px]:w-auto"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>Thêm thành viên</span>
@@ -1681,7 +1681,7 @@ export default function OrgChartTab({
                   {/* Visual Cover Image & Avatar Preview Section */}
                   <div className="relative rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden shadow-xs">
                     {/* Cover Banner */}
-                    <div className="relative h-28 sm:h-32 w-full bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 overflow-hidden">
+                    <div className="relative h-28 sm:h-32 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 overflow-hidden">
                       {editCoverImage ? (
                         <img
                           src={editCoverImage}
@@ -1794,7 +1794,7 @@ export default function OrgChartTab({
                       required
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-slate-700 bg-white font-medium"
+                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white font-medium"
                     />
                   </div>
 
@@ -1807,7 +1807,7 @@ export default function OrgChartTab({
                         placeholder="Ví dụ: Công ty TNHH Giải Pháp Số"
                         value={editCompanyName}
                         onChange={(e) => setEditCompanyName(e.target.value)}
-                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-slate-700 bg-white"
+                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
                       />
                     </div>
                     <div>
@@ -1817,33 +1817,21 @@ export default function OrgChartTab({
                         placeholder="Ví dụ: Phần mềm & Chuyển đổi số"
                         value={editIndustry}
                         onChange={(e) => setEditIndustry(e.target.value)}
-                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-slate-700 bg-white"
+                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
                       />
                     </div>
                   </div>
 
-                  {/* Role & Department */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block font-bold text-gray-500 mb-1">Chức vụ trong Chapter</label>
-                      <input
-                        type="text"
-                        placeholder="Ví dụ: Thành viên, Phó Chủ tịch"
-                        value={editRoleText}
-                        onChange={(e) => setEditRoleText(e.target.value)}
-                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-slate-700 bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-bold text-gray-500 mb-1">Ban / Nhóm</label>
-                      <input
-                        type="text"
-                        placeholder="Ví dụ: Ban Khách Mời, Ban Sự Kiện"
-                        value={editDepartment}
-                        onChange={(e) => setEditDepartment(e.target.value)}
-                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-slate-700 bg-white"
-                      />
-                    </div>
+                  {/* Role in Chapter */}
+                  <div>
+                    <label className="block font-bold text-gray-500 mb-1">Chức vụ trong Chapter</label>
+                    <input
+                      type="text"
+                      placeholder="Ví dụ: Thành viên, Phó Chủ tịch"
+                      value={editRoleText}
+                      onChange={(e) => setEditRoleText(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                    />
                   </div>
 
                   {/* Phone & BirthDate */}
@@ -1855,7 +1843,7 @@ export default function OrgChartTab({
                         placeholder="090XXXXXXXX"
                         value={editPhone}
                         onChange={(e) => setEditPhone(e.target.value)}
-                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-slate-700 bg-white"
+                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
                       />
                     </div>
                     <div>
@@ -1864,7 +1852,7 @@ export default function OrgChartTab({
                         type="date"
                         value={editBirthDate}
                         onChange={(e) => setEditBirthDate(e.target.value)}
-                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-slate-700 bg-white"
+                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
                       />
                     </div>
                   </div>
@@ -1886,7 +1874,7 @@ export default function OrgChartTab({
                     <select
                       value={editParentId}
                       onChange={(e) => setEditParentId(e.target.value)}
-                      className="w-full p-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 bg-white cursor-pointer text-slate-700"
+                      className="w-full p-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer text-slate-700"
                     >
                       <option value="">Không phân công (Gốc sơ đồ)</option>
                       {employees
@@ -1912,7 +1900,7 @@ export default function OrgChartTab({
                     type="button"
                     disabled={isSaving}
                     onClick={handleEditEmployeeSave}
-                    className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
                   >
                     {isSaving ? (
                       <>
@@ -1928,7 +1916,7 @@ export default function OrgChartTab({
             ) : (
               <div className="bg-white border border-slate-100 rounded-3xl shadow-2xl w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto relative text-left animate-in fade-in zoom-in-95 duration-200">
                 {/* Header Cover Banner */}
-                <div className="relative h-28 w-full overflow-hidden rounded-t-3xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600">
+                <div className="relative h-28 w-full overflow-hidden rounded-t-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500">
                   {memberCover && (
                     <img src={memberCover} alt="Cover" className="w-full h-full object-cover opacity-90" />
                   )}
@@ -1958,7 +1946,7 @@ export default function OrgChartTab({
                       {memberName}
                     </h3>
                     <div className="flex flex-wrap items-center justify-center gap-2 mt-1.5">
-                      <span className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-3 py-0.5 rounded-full">
+                      <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-0.5 rounded-full">
                         {memberRole}
                       </span>
                       {selectedEmp.isLeader && (
@@ -1973,7 +1961,7 @@ export default function OrgChartTab({
                   <div className="mt-4 space-y-3 text-xs">
                     <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-150 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div className="flex items-start gap-2.5">
-                        <Building2 className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                        <Building2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                         <div className="min-w-0">
                           <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Doanh nghiệp</span>
                           <strong className="text-slate-800 text-xs font-bold block truncate">{memberCompany}</strong>
@@ -1985,14 +1973,6 @@ export default function OrgChartTab({
                         <div className="min-w-0">
                           <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lĩnh vực hoạt động</span>
                           <strong className="text-slate-800 text-xs font-bold block truncate">{memberIndustry}</strong>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-2.5">
-                        <Users className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-                        <div className="min-w-0">
-                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ban / Nhóm</span>
-                          <strong className="text-slate-800 text-xs font-bold block truncate">{memberDept}</strong>
                         </div>
                       </div>
 
@@ -2010,17 +1990,17 @@ export default function OrgChartTab({
                         <Phone className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
                         <div className="min-w-0">
                           <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Số điện thoại</span>
-                          <a href={`tel:${memberPhone}`} className="text-slate-800 hover:text-red-600 text-xs font-bold block truncate">
+                          <a href={`tel:${memberPhone}`} className="text-slate-800 hover:text-blue-600 text-xs font-bold block truncate">
                             {memberPhone}
                           </a>
                         </div>
                       </div>
 
-                      <div className="flex items-start gap-2.5">
+                      <div className="flex items-start gap-2.5 sm:col-span-2">
                         <Mail className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                         <div className="min-w-0">
                           <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email liên hệ</span>
-                          <a href={`mailto:${memberEmail}`} className="text-slate-800 hover:text-red-600 text-xs font-bold block truncate">
+                          <a href={`mailto:${memberEmail}`} className="text-slate-800 hover:text-blue-600 text-xs font-bold block truncate">
                             {memberEmail}
                           </a>
                         </div>
@@ -2058,7 +2038,7 @@ export default function OrgChartTab({
                                   type="button"
                                   key={sub.id}
                                   onClick={() => setSelectedEmp(sub)}
-                                  className="flex items-center gap-3 bg-slate-50 hover:bg-red-50/60 border border-slate-150 hover:border-red-200 px-3 py-2 rounded-xl transition-all text-left cursor-pointer"
+                                  className="flex items-center gap-3 bg-slate-50 hover:bg-blue-50/60 border border-slate-150 hover:border-blue-200 px-3 py-2 rounded-xl transition-all text-left cursor-pointer"
                                 >
                                   {renderAvatar(sub.avatar, "w-8 h-8", "text-xs", sub.name)}
                                   <div className="min-w-0 flex-1">
@@ -2081,7 +2061,7 @@ export default function OrgChartTab({
                       <button
                         type="button"
                         onClick={startEditing}
-                        className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-95"
+                        className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-95"
                       >
                         <Edit className="w-3.5 h-3.5" />
                         Chỉnh sửa thông tin
@@ -2143,7 +2123,7 @@ export default function OrgChartTab({
               {/* Visual Cover Image & Avatar Preview Section */}
               <div className="relative rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden shadow-xs">
                 {/* Cover Banner */}
-                <div className="relative h-28 sm:h-32 w-full bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 overflow-hidden">
+                <div className="relative h-28 sm:h-32 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 overflow-hidden">
                   {addCoverImage ? (
                     <img
                       src={addCoverImage}
@@ -2256,7 +2236,7 @@ export default function OrgChartTab({
                   placeholder="Ví dụ: Nguyễn Văn A"
                   value={addName}
                   onChange={(e) => setAddName(e.target.value)}
-                  className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-red-500 font-medium text-slate-800"
+                  className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-800"
                 />
               </div>
 
@@ -2269,7 +2249,7 @@ export default function OrgChartTab({
                     placeholder="Ví dụ: Công ty TNHH ABC"
                     value={addCompanyName}
                     onChange={(e) => setAddCompanyName(e.target.value)}
-                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-slate-800"
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
                   />
                 </div>
                 <div>
@@ -2280,7 +2260,7 @@ export default function OrgChartTab({
                     placeholder="Ví dụ: Bất động sản, Thiết kế nội thất"
                     value={addIndustry}
                     onChange={(e) => setAddIndustry(e.target.value)}
-                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-slate-800"
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
                   />
                 </div>
               </div>
@@ -2294,7 +2274,7 @@ export default function OrgChartTab({
                     placeholder="nguyenvana@gmail.com"
                     value={addEmail}
                     onChange={(e) => setAddEmail(e.target.value)}
-                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-slate-800"
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
                   />
                 </div>
                 <div>
@@ -2305,7 +2285,7 @@ export default function OrgChartTab({
                     placeholder="090XXXXXXXX"
                     value={addPhone}
                     onChange={(e) => setAddPhone(e.target.value)}
-                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-slate-800"
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
                   />
                 </div>
               </div>
@@ -2319,41 +2299,15 @@ export default function OrgChartTab({
                     placeholder="Tối thiểu 6 ký tự"
                     value={addPassword}
                     onChange={(e) => setAddPassword(e.target.value)}
-                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-slate-800"
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-gray-500 mb-1">Ban / Nhóm hoạt động</label>
-                  <input
-                    type="text"
-                    placeholder="Ví dụ: Ban Thành viên, Ban Khách Mời"
-                    value={addDepartment}
-                    onChange={(e) => setAddDepartment(e.target.value)}
-                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-slate-800"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-gray-500 mb-1">Vai trò hệ thống</label>
-                  <select
-                    value={addRole}
-                    onChange={(e) => setAddRole(e.target.value as any)}
-                    className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-red-500 bg-white cursor-pointer text-slate-800"
-                  >
-                    <option value="user">Thành viên (Member)</option>
-                    <option value="manager">Ban điều hành (LT / Manager)</option>
-                    <option value="branch_owner">Chủ tịch Chapter</option>
-                  </select>
-                </div>
-
                 <div>
                   <label className="block font-bold text-gray-500 mb-1">Người kết nối / Phụ trách</label>
                   <select
                     value={addParentId}
                     onChange={(e) => setAddParentId(e.target.value)}
-                    className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-red-500 bg-white cursor-pointer text-slate-800"
+                    className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer text-slate-800"
                   >
                     <option value="">Không phân công</option>
                     {employees.map(emp => (
@@ -2378,7 +2332,7 @@ export default function OrgChartTab({
               <button
                 type="submit"
                 disabled={isAddingEmployee}
-                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
               >
                 {isAddingEmployee ? (
                   <>
