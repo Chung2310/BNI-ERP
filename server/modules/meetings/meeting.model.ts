@@ -13,7 +13,7 @@ const speaker = new Schema(
     slideProfile: {
       type: new Schema({
         name: String, company: String, photoURL: String, coverImage: String,
-        birthDate: String, industry: String, bio: String,
+        phone: String, industry: String, bio: String,
       }, { _id: false }),
       default: undefined,
     },

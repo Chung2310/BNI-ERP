@@ -80,11 +80,6 @@ function cover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, 
   ctx.drawImage(img, (img.naturalWidth - sw) / 2, top ? (img.naturalHeight - sh) * 0.25 : (img.naturalHeight - sh) / 2, sw, sh, x, y, w, h);
 }
 
-export function slideBirthday(value: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  return match ? `${match[3]} / ${match[2]} / ${match[1]}` : "Chưa cập nhật";
-}
-
 export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas: HTMLCanvasElement; warnings: string[] }> {
   const member = slide.kind === "member";
   const [template, avatar, banner] = await Promise.all([
@@ -146,9 +141,11 @@ export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas:
     textBox(ctx, label, x + 30, cardsY + 22, 610, 1, 23, 23, "#858585", 700);
     textBox(ctx, value, x + 30, cardsY + 65, 610, 1, 37, 23, "#252525", 700);
   }
-  card(480, "NGÀY SINH", slideBirthday(slide.birthDate));
-  card(1190, "LOẠI HÌNH DỊCH VỤ", slide.industry || "Chưa cập nhật");
-  const bioY = member ? 843 : 785;
+  if (member) {
+    card(480, "SỐ ĐIỆN THOẠI", slide.phone || "Chưa cập nhật");
+    card(1190, "LOẠI HÌNH DỊCH VỤ", slide.industry || "Chưa cập nhật");
+  }
+  const bioY = member ? 843 : 635;
   textBox(ctx, "BIO / GIỚI THIỆU NGẮN", 480, bioY, 1380, 1, 30, 30, RED, 700);
   textBox(ctx, slide.bio || "Chưa có giới thiệu ngắn.", 480, bioY + 50, 1380, member ? 3 : 4, 30, 25, "#646464");
   textBox(ctx, member ? "THÀNH VIÊN BNI" : "KHÁCH MỜI BNI", 65, 993, 380, 1, 18, 18, "#888", 700);

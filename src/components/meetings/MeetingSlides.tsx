@@ -173,7 +173,7 @@ export function MeetingSlides({ meeting, canManage, api }: Props) {
     setSaving(true); setError("");
     try {
       const id = active.id;
-      const profile = { name: active.name, company: active.company, photoURL: active.photoURL, coverImage: active.coverImage, birthDate: active.birthDate, industry: active.industry, bio: active.bio };
+      const profile = { name: active.name, company: active.company, photoURL: active.photoURL, coverImage: active.coverImage, phone: active.phone, industry: active.industry, bio: active.bio };
       const data = await api(`/${meeting._id}/slides/${id}`, "PUT", { version: draft ? draftVersion.current : deck.version, profile: reset ? null : profile });
       setDeck(data); setDraft(null);
     } catch (e) { setError(e instanceof Error ? e.message : "Không lưu được slide."); }
@@ -202,7 +202,7 @@ export function MeetingSlides({ meeting, canManage, api }: Props) {
 
   const ready = !!active && !drawing && !drawError && !loading && !error;
   const canvas = (ref: React.RefObject<HTMLCanvasElement>) => <canvas ref={ref} width={SLIDE_WIDTH} height={SLIDE_HEIGHT}
-    role="img" aria-label={active ? `Slide ${active.kind === "member" ? "thành viên" : "khách mời"}: ${active.name}, ${active.company}, ${active.industry}, ${active.bio}` : "Chưa chọn người"}
+    role="img" aria-label={active ? `Slide ${active.kind === "member" ? "thành viên" : "khách mời"}: ${active.name}, ${active.company}, ${active.kind === "member" ? [active.phone, active.industry].filter(Boolean).join(", ") : ""}, ${active.bio}` : "Chưa chọn người"}
     style={{ width: "100%", height: "100%", objectFit: "contain", visibility: drawing || !active || drawError ? "hidden" : "visible" }} />;
 
   return <section aria-label="Slide giới thiệu" className="space-y-4">
@@ -247,16 +247,16 @@ export function MeetingSlides({ meeting, canManage, api }: Props) {
           {canManage && active && !draft && <button className={button} disabled={loading || !!error} onClick={() => { setMode("manual"); setSelectedId(active.id); draftVersion.current = deck.version; setDraft({ ...active }); }}><Pencil size={16} /> Bổ sung thông tin slide</button>}
         </div>
         {warnings.map(w => <p key={w} role="status" className="text-sm text-amber-700">{w}</p>)}
-        {active && !draft && <p className="text-xs text-slate-500">Thông tin còn thiếu: {[!active.company && "công ty", !active.birthDate && "ngày sinh", !active.industry && "lĩnh vực", !active.bio && "bio", !active.photoURL && "avatar"].filter(Boolean).join(", ") || "Đã đủ các trường chính"}. Chữ dài được thu nhỏ hoặc rút gọn để vừa khung.</p>}
+        {active && !draft && <p className="text-xs text-slate-500">Thông tin còn thiếu: {[!active.company && "công ty", active.kind === "member" && !active.phone && "SĐT", active.kind === "member" && !active.industry && "lĩnh vực", !active.bio && "bio", !active.photoURL && "avatar"].filter(Boolean).join(", ") || "Đã đủ các trường chính"}. Chữ dài được thu nhỏ hoặc rút gọn để vừa khung.</p>}
         {draft && <form className="space-y-3 rounded-xl border bg-white p-4" onSubmit={e => { e.preventDefault(); void save(); }}>
           <p className="text-sm font-bold">Thông tin riêng cho slide trong cuộc họp này</p>
           <p className="text-xs text-slate-500">Tự điền từ hồ sơ khi chưa có bản chỉnh riêng. Bio có thể nhập tại đây. Lưu sẽ giữ bản thông tin hiện tại cho slide; dùng “Dùng lại hồ sơ” để lấy thông tin hồ sơ mới nhất.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {([
               ["name", "Họ và tên", "text", 150], ["company", "Công ty / thương hiệu", "text", 150],
-              ["birthDate", "Ngày sinh", "date", 10], ["industry", "Lĩnh vực / dịch vụ", "text", 150],
+              ["phone", "Số điện thoại", "tel", 40], ["industry", "Lĩnh vực / dịch vụ", "text", 150],
               ["photoURL", "URL ảnh đại diện", "url", 2000], ["coverImage", "URL ảnh bìa", "url", 2000],
-            ] as const).map(([key, label, type, max]) => <label key={key} className="space-y-1 text-xs font-semibold">{label}<input className={fieldClass} type={type} maxLength={max} required={key === "name"} value={draft[key]} disabled={saving} onChange={e => setDraft({ ...draft, [key]: e.target.value })} /></label>)}
+            ] as const).filter(([key]) => draft.kind === "member" || (key !== "phone" && key !== "industry")).map(([key, label, type, max]) => <label key={key} className="space-y-1 text-xs font-semibold">{label}<input className={fieldClass} type={type} maxLength={max} required={key === "name"} value={draft[key]} disabled={saving} onChange={e => setDraft({ ...draft, [key]: e.target.value })} /></label>)}
           </div>
           <label className="block text-xs font-semibold">Bio / giới thiệu ngắn<textarea className={fieldClass} rows={3} maxLength={1000} value={draft.bio} disabled={saving} onChange={e => setDraft({ ...draft, bio: e.target.value })} /></label>
           <div className="flex flex-wrap gap-2">

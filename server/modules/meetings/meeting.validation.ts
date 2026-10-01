@@ -6,11 +6,7 @@ export const slideProfileInput = Joi.object({
     company: Joi.string().trim().max(150).allow('').required(),
     photoURL: Joi.string().uri({ scheme: ['http', 'https'] }).max(2000).allow('').required(),
     coverImage: Joi.string().uri({ scheme: ['http', 'https'] }).max(2000).allow('').required(),
-    birthDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).custom((value, helpers) => {
-      const date = new Date(`${value}T00:00:00Z`);
-      return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
-        ? value : helpers.error('any.invalid');
-    }).allow('').required(),
+    phone: Joi.string().trim().max(40).allow('').required(),
     industry: Joi.string().trim().max(150).allow('').required(),
     bio: Joi.string().trim().max(1000).allow('').required(),
   }).allow(null).required(),

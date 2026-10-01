@@ -10,8 +10,8 @@ vi.mock("./profileSlideRenderer", () => ({
   renderProfileSlide: vi.fn(async () => ({ canvas: document.createElement("canvas"), warnings: [] })),
 }));
 const slides = [
-  { id: "a", kind: "member", name: "Nguyễn An", company: "ACME", photoURL: "", coverImage: "", birthDate: "", industry: "", bio: "" },
-  { id: "b", kind: "guest", name: "Trần Bình", company: "Guest Co", photoURL: "", coverImage: "", birthDate: "", industry: "", bio: "" },
+  { id: "a", kind: "member", name: "Nguyễn An", company: "ACME", photoURL: "", coverImage: "", phone: "", industry: "", bio: "" },
+  { id: "b", kind: "guest", name: "Trần Bình", company: "Guest Co", photoURL: "", coverImage: "", phone: "", industry: "", bio: "" },
 ];
 const meeting = { _id: "m", __v: 1, currentIndex: 1, status: "live", speakers: slides };
 beforeEach(() => vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn() } as any));
@@ -27,7 +27,7 @@ it("selects the guest in live mode and saves only slide fields with the server v
   fireEvent.change(screen.getByLabelText("Bio / giới thiệu ngắn"), { target: { value: "Kết nối kinh doanh" } });
   fireEvent.click(screen.getByText("Lưu thông tin slide"));
   await waitFor(() => expect(api).toHaveBeenCalledWith("/m/slides/b", "PUT", {
-    version: 4, profile: { name: "Trần Bình", company: "Guest Co", photoURL: "", coverImage: "", birthDate: "", industry: "", bio: "Kết nối kinh doanh" },
+    version: 4, profile: { name: "Trần Bình", company: "Guest Co", photoURL: "", coverImage: "", phone: "", industry: "", bio: "Kết nối kinh doanh" },
   }));
 });
 

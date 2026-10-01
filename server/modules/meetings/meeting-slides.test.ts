@@ -9,23 +9,24 @@ import { UserModel } from "../../model/user.model";
 
 test("member slide uses latest profile and explicit blank overrides; guest keeps check-in company", () => {
   const member = buildProfileSlide({ id: "s", userId: "u", name: "Old", slideProfile: { company: "", bio: "Giới thiệu" } },
-    { displayName: "Nguyễn An", companyName: "ACME", birthDate: new Date("1990-10-01T00:00:00Z"), industry: "Thiết kế" });
+    { displayName: "Nguyễn An", companyName: "ACME", phone: "0901234567", industry: "Thiết kế" });
   assert.equal(member.kind, "member");
   assert.equal(member.name, "Nguyễn An");
   assert.equal(member.company, "");
-  assert.equal(member.birthDate, "1990-10-01");
+  assert.equal(member.phone, "0901234567");
   assert.equal(member.bio, "Giới thiệu");
-  const guest = buildProfileSlide({ id: "g", name: "Guest", company: "Guest Co" });
+  const guest = buildProfileSlide({ id: "g", name: "Guest", company: "Guest Co", phone: "0901234567", slideProfile: { industry: "Legacy industry" } });
   assert.equal(guest.kind, "guest");
   assert.equal(guest.company, "Guest Co");
-  assert.equal(guest.birthDate, "");
+  assert.equal(guest.phone, "");
+  assert.equal(guest.industry, "");
 });
 
-test("slide input rejects impossible dates, script URLs, oversized bio and unknown fields", () => {
-  const profile = { name: "An", company: "", photoURL: "", coverImage: "", birthDate: "", industry: "", bio: "" };
+test("slide input rejects oversized phone numbers, script URLs, oversized bio and unknown fields", () => {
+  const profile = { name: "An", company: "", photoURL: "", coverImage: "", phone: "", industry: "", bio: "" };
   assert.equal(slideProfileInput.validate({ version: 0, profile }).error, undefined);
   assert.equal(slideProfileInput.validate({ version: 0, profile: null }).error, undefined);
-  for (const patch of [{ birthDate: "2026-02-30" }, { photoURL: "javascript:alert(1)" }, { bio: "x".repeat(1001) }, { userId: "other" }]) {
+  for (const patch of [{ phone: "1".repeat(41) }, { photoURL: "javascript:alert(1)" }, { bio: "x".repeat(1001) }, { userId: "other" }]) {
     assert.ok(slideProfileInput.validate({ version: 0, profile: { ...profile, ...patch } }).error);
   }
 });

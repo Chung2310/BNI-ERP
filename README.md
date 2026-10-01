@@ -52,7 +52,7 @@ Khi mã nguồn được merge thành công vào các nhánh chỉ định, CD s
 
 Trong **Cuộc họp → mở buổi họp → Slide**, chọn người đã check-in để xem trước.
 Hệ thống tự chọn mẫu Member/Guest và lấy tên, công ty, avatar, ảnh bìa,
-ngày sinh, lĩnh vực từ hồ sơ thành viên; khách mời dùng dữ liệu check-in.
+SĐT, lĩnh vực từ hồ sơ thành viên; khách mời dùng dữ liệu check-in và không hiển thị ngày sinh/lĩnh vực.
 Người có quyền quản lý cuộc họp có thể bổ sung bio và chỉnh thông tin riêng cho
 slide của buổi họp. **Dùng lại hồ sơ** xóa bản chỉnh riêng và lấy dữ liệu mới nhất.
 

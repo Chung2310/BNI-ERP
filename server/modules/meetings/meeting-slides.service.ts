@@ -1,10 +1,9 @@
 import { UserModel } from '../../model/user.model';
 import { assertVersion, getMeeting, MeetingError, saveMeeting } from './meeting.service';
 
-const fields = ['name', 'company', 'photoURL', 'coverImage', 'birthDate', 'industry', 'bio'] as const;
+const fields = ['name', 'company', 'photoURL', 'coverImage', 'phone', 'industry', 'bio'] as const;
 
 export function buildProfileSlide(speaker: any, profile?: any) {
-  const date = profile?.birthDate ? new Date(profile.birthDate) : null;
   const result: Record<string, string> = {
     id: speaker.id,
     kind: speaker.userId ? 'member' : 'guest',
@@ -12,13 +11,14 @@ export function buildProfileSlide(speaker: any, profile?: any) {
     company: profile?.companyName ?? speaker.company ?? '',
     photoURL: profile?.photoURL ?? speaker.photoURL ?? '',
     coverImage: profile?.coverImage ?? speaker.coverImage ?? '',
-    birthDate: date && !Number.isNaN(date.getTime()) ? date.toISOString().slice(0, 10) : '',
+    phone: profile?.phone ?? speaker.phone ?? '',
     industry: profile?.industry ?? '',
     bio: profile?.bio ?? '',
   };
   for (const field of fields) {
     if (typeof speaker.slideProfile?.[field] === 'string') result[field] = speaker.slideProfile[field];
   }
+  if (!speaker.userId) { result.phone = ''; result.industry = ''; }
   return result;
 }
 
@@ -27,7 +27,7 @@ export async function getMeetingSlides(companyCode: string, meetingId: string) {
   const userIds = meeting.speakers.map(s => s.userId).filter(Boolean);
   const profiles = userIds.length ? await UserModel.find({
     _id: { $in: userIds }, companyCode, isActive: { $ne: false },
-  }).select('displayName companyName photoURL coverImage birthDate industry bio').lean() : [];
+  }).select('displayName companyName photoURL coverImage phone industry bio').lean() : [];
   const byId = new Map(profiles.map(p => [String(p._id), p]));
   return {
     version: meeting.__v,
