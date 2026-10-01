@@ -53,6 +53,20 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, 
   const draftVersion = useRef(0);
   const hideTimer = useRef<number | undefined>(undefined);
   const fullScreenOwned = useRef(false);
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      // StrictMode immediately sets effects up again; only a real unmount exits.
+      queueMicrotask(() => {
+        if (!mounted.current && fullScreenOwned.current && document.fullscreenElement) {
+          void document.exitFullscreen().catch(() => {});
+        }
+      });
+    };
+  }, []);
   const launchButton = useRef<HTMLButtonElement>(null);
   const exitButton = useRef<HTMLButtonElement>(null);
 
@@ -143,7 +157,8 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, 
     let cancelled = false;
     void fullscreenRequest.then(opened => {
       if (!opened) return;
-      if (cancelled || !presentationActive.current) {
+      if (cancelled && mounted.current) return;
+      if (!mounted.current || !presentationActive.current) {
         if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
       } else {
         fullScreenOwned.current = true;
@@ -160,7 +175,6 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, 
     return () => {
       document.removeEventListener("fullscreenchange", onFullscreen);
       window.clearTimeout(hideTimer.current);
-      if (fullScreenOwned.current && document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     };
   }, [closePresentation]);
 
@@ -206,7 +220,7 @@ export function MeetingSlides({ meeting, canManage, api, allowOvertime = false, 
     setDraft(null); setPresenting(true); showControls();
     if (!document.fullscreenElement && !(startFromFirst && fullscreenRequest) && document.documentElement.requestFullscreen) {
       void document.documentElement.requestFullscreen().then(() => {
-        if (presentationActive.current) fullScreenOwned.current = true;
+        if (mounted.current && presentationActive.current) fullScreenOwned.current = true;
         else if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
       }).catch(() => {});
     }

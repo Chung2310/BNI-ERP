@@ -133,3 +133,22 @@ it("clean automatic presentation ignores arrow and space keys", async () => {
   await waitFor(() => expect(within(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).getByRole("img").getAttribute("aria-label")).toContain("Nguyễn An"));
   expect((screen.getByLabelText("Chế độ trình chiếu") as HTMLSelectElement).value).toBe("live");
 });
+
+
+it("StrictMode does not exit an incoming fullscreen request; real unmount still exits", async () => {
+  const exitFullscreen = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(document, "fullscreenElement", { configurable: true, value: document.documentElement });
+  Object.defineProperty(document, "exitFullscreen", { configurable: true, value: exitFullscreen });
+  const api = vi.fn().mockResolvedValue({ slides, version: 1 });
+  const view = render(<React.StrictMode><MeetingSlides meeting={meeting} canManage api={api} startFromFirst fullscreenRequest={Promise.resolve(true)} onPresentationStarted={vi.fn()} /></React.StrictMode>);
+  try {
+    await waitFor(() => expect(within(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).getByRole("img").getAttribute("aria-label")).toContain("Nguyễn An"));
+    expect(exitFullscreen).not.toHaveBeenCalled();
+    view.unmount();
+    await waitFor(() => expect(exitFullscreen).toHaveBeenCalledTimes(1));
+  } finally {
+    view.unmount();
+    delete (document as any).fullscreenElement;
+    delete (document as any).exitFullscreen;
+  }
+});
