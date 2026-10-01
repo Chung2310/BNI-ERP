@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { SpeechesCompleteDialog } from "../components/meetings/SpeechesCompleteDialog";
+import { SlideTransitionDelayInput } from "../components/meetings/SlideTransitionDelayInput";
 import { MeetingSlides } from "../components/meetings/MeetingSlides";
 import { MeetingCheckInPanel } from "../components/meetings/MeetingCheckInPanel";
 import { MeetingLocationFields } from "../components/meetings/MeetingLocationFields";
@@ -202,8 +203,18 @@ export default function MeetingTab() {
   });
   const [autoAdvanceDelay, setAutoAdvanceDelay] = useState(() => {
     const saved = localStorage.getItem("bni_auto_advance_delay");
-    return saved !== null ? Math.max(0, parseInt(saved, 10) || 0) : 3;
+    const parsed = saved === null ? 3 : Number(saved);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 3;
   });
+  const updateAutoAdvance = useCallback((enabled: boolean) => {
+    setAutoAdvance(enabled);
+    localStorage.setItem("bni_auto_advance_speaker", String(enabled));
+  }, []);
+  const updateAutoAdvanceDelay = useCallback((seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds < 0) return;
+    setAutoAdvanceDelay(seconds);
+    localStorage.setItem("bni_auto_advance_delay", String(seconds));
+  }, []);
   const autoAdvancedSpeakerRef = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -866,7 +877,7 @@ export default function MeetingTab() {
 
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} autoAdvance={autoAdvance} fullscreenRequest={presentationFullscreen.current} />}
+              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} autoAdvance={autoAdvance} autoAdvanceDelay={autoAdvanceDelay} onAutoAdvanceChange={updateAutoAdvance} onAutoAdvanceDelayChange={updateAutoAdvanceDelay} fullscreenRequest={presentationFullscreen.current} />}
               {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
               {(activeSubTab === "speakers" || activeSubTab === "checkin") && (
                 <div className="space-y-4">
@@ -1122,10 +1133,7 @@ export default function MeetingTab() {
                               <input
                                 type="checkbox"
                                 checked={autoAdvance}
-                                onChange={(e) => {
-                                  setAutoAdvance(e.target.checked);
-                                  localStorage.setItem("bni_auto_advance_speaker", String(e.target.checked));
-                                }}
+                                onChange={e => updateAutoAdvance(e.target.checked)}
                                 className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 cursor-pointer"
                               />
                               <span className="flex items-center gap-1.5">
@@ -1137,19 +1145,7 @@ export default function MeetingTab() {
                             {autoAdvance && (
                               <div className="flex items-center gap-1.5 ml-auto">
                                 <span className="text-slate-500 font-medium">Chờ sau khi hết giờ:</span>
-                                <input
-                                  type="number"
-                                  aria-label="Số giây chờ chuyển slide sau khi hết giờ"
-                                  min={0}
-                                  max={60}
-                                  value={autoAdvanceDelay}
-                                  onChange={(e) => {
-                                    const val = Math.max(0, parseInt(e.target.value, 10) || 0);
-                                    setAutoAdvanceDelay(val);
-                                    localStorage.setItem("bni_auto_advance_delay", String(val));
-                                  }}
-                                  className="w-12 text-center rounded-lg border border-slate-200 bg-white py-1 px-1 text-xs font-bold text-cyan-700 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
-                                />
+                                <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={updateAutoAdvanceDelay} />
                                 <span className="text-slate-600 font-semibold">giây</span>
                               </div>
                             )}

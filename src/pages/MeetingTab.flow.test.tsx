@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import MeetingTab from "./MeetingTab";
 vi.mock("../components/meetings/profileSlideRenderer", () => ({
   SLIDE_WIDTH: 1920, SLIDE_HEIGHT: 1080, loadSlideImage: vi.fn().mockResolvedValue(null),
@@ -190,4 +190,43 @@ it("settings place priority last and list all checked-in people including locked
   const section = screen.getByText("Sắp xếp thứ tự thuyết trình").parentElement!;
   expect(section.nextElementSibling?.textContent).toContain("Lưu thay đổi");
   expect(section.previousElementSibling?.textContent).toContain("Cấu hình theo toàn bộ thứ tự check-in");
+});
+
+
+it.each([0, 3, 150])("slide delay %s waits until speaking time ends before changing the speaker", async delay => {
+  const origin = Date.now();
+  vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+  vi.setSystemTime(origin);
+  let item = { ...meeting, status: "live", currentIndex: 0, speakerStartedAt: new Date(origin).toISOString(),
+    speakers: [{ id: "first", kind: "guest", name: "Đầu tiên", company: "", seconds: 30 }, { id: "second", kind: "member", name: "Tiếp theo", company: "", seconds: 60 }] };
+  const fetchMock = vi.fn(async (url, options) => {
+    if (options?.method === "POST") item = { ...item, currentIndex: 1, __v: 1, speakerStartedAt: new Date().toISOString() };
+    return { ok: true, json: async () => ({ data: String(url).endsWith("/slides") ? { slides: item.speakers, version: item.__v } : options?.method === "POST" ? item : [item] }) };
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
+  render(<MeetingTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  fireEvent.click(screen.getByRole("button", { name: "Slide" }));
+  await screen.findByText("Đầu tiên");
+
+  try {
+    fireEvent.change(screen.getByLabelText("Chế độ trình chiếu"), { target: { value: "auto" } });
+    const field = screen.getByLabelText("Số giây chờ chuyển slide sau khi hết giờ") as HTMLInputElement;
+    fireEvent.change(field, { target: { value: String(delay) } });
+    expect(field.value).toBe(String(delay));
+    expect(field.max).toBe("");
+    expect(field.min).toBe("0");
+    const calls = () => fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
+    await act(async () => { vi.advanceTimersByTime(3000); });
+    expect(calls()).toHaveLength(0);
+    await act(async () => { vi.advanceTimersByTime(27000 + delay * 1000 - 250); });
+    expect(calls()).toHaveLength(0);
+    await act(async () => { vi.advanceTimersByTime(250); });
+    expect(calls()).toHaveLength(1);
+    expect(JSON.parse(calls()[0][1].body).action).toBe("next");
+    expect(item.currentIndex).toBe(1);
+  } finally {
+    vi.useRealTimers(); vi.restoreAllMocks();
+  }
 });

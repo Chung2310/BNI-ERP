@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Download, Maximize, ChevronLeft, ChevronRight, X, Play, Pause, RefreshCw, Pencil } from "lucide-react";
 import { renderProfileSlide, loadSlideImage, SLIDE_WIDTH, SLIDE_HEIGHT } from "./profileSlideRenderer";
 import { drawSlideTimer, getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
+import { SlideTransitionDelayInput } from "./SlideTransitionDelayInput";
 import { SpeechesCompleteMessage } from "./SpeechesCompleteDialog";
 import type { ProfileSlide, SlideDeck } from "./slideTypes";
 
@@ -11,6 +12,9 @@ type Props = {
   canManage: boolean;
   startFromFirst?: boolean;
   autoAdvance?: boolean;
+  autoAdvanceDelay?: number;
+  onAutoAdvanceChange?: (enabled: boolean) => void;
+  onAutoAdvanceDelayChange?: (seconds: number) => void;
   fullscreenRequest?: Promise<boolean> | null;
   onPresentationStarted?: () => void;
   api: (path: string, method?: string, body?: unknown) => Promise<SlideDeck>;
@@ -18,7 +22,7 @@ type Props = {
 const button = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40";
 const fieldClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
 
-export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, autoAdvance = false, fullscreenRequest }: Props) {
+export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -32,8 +36,15 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   const [revision, setRevision] = useState(0);
   const [selectedId, setSelectedId] = useState("");
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
-  const [mode, setMode] = useState<"manual" | "auto" | "live">("manual");
-  const [seconds, setSeconds] = useState(8);
+  const [mode, setMode] = useState<"manual" | "auto" | "live">(autoAdvance ? "auto" : "manual");
+  const changeMode = useCallback((next: "manual" | "auto" | "live") => {
+    if (next === "auto" && !canManage) return;
+    setMode(next);
+    onAutoAdvanceChange?.(next === "auto");
+  }, [onAutoAdvanceChange, canManage]);
+  useEffect(() => {
+    setMode(previous => autoAdvance ? "auto" : previous === "auto" ? "manual" : previous);
+  }, [autoAdvance]);
   const [presenting, setPresenting] = useState(startFromFirst);
   const [cleanPresentation, setCleanPresentation] = useState(startFromFirst);
   const presentationActive = useRef(startFromFirst);
@@ -83,7 +94,8 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   const currentSpeakerId = ["live", "paused"].includes(meeting.status) ? meeting.speakers[meeting.currentIndex]?.id : undefined;
   // Preview the first profile on launch, then follow the next MC speaker change.
   const liveSlideId = openingSlide && openingSlide.speakerId === currentSpeakerId ? openingSlide.slideId : currentSpeakerId;
-  const selected = mode === "live"
+  const followsSpeaker = mode !== "manual";
+  const selected = followsSpeaker
     ? deck.slides.find(s => s.id === liveSlideId)
     : queue.find(s => s.id === selectedId) || queue[0];
   useEffect(() => {
@@ -99,11 +111,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     if (queue.length) setSelectedId(queue[(Math.max(0, index) + direction + queue.length) % queue.length].id);
   }, [queue, index]);
 
-  useEffect(() => {
-    if (mode !== "auto" || queue.length < 2 || draft || drawing || loading || error) return;
-    const timer = window.setTimeout(() => move(1), seconds * 1000);
-    return () => window.clearTimeout(timer);
-  }, [mode, queue.length, selected?.id, seconds, draft, move, drawing, loading, error]);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -143,13 +151,13 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   }, [queue, index]);
 
   const closePresentation = useCallback(() => {
-    setPresenting(false); setMode("manual"); setOpeningSlide(null);
+    setPresenting(false); setMode(autoAdvance ? "auto" : "manual"); setOpeningSlide(null);
     presentationActive.current = false;
     onPresentationStarted?.();
     if (fullScreenOwned.current && document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     fullScreenOwned.current = false;
     window.setTimeout(() => launchButton.current?.focus(), 0);
-  }, [onPresentationStarted]);
+  }, [onPresentationStarted, autoAdvance]);
 
   useEffect(() => {
     if (!fullscreenRequest) return;
@@ -194,15 +202,15 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
         if (cleanPresentation && mode !== "manual") return;
-        setMode("manual"); move(e.key === "ArrowRight" ? 1 : -1);
+        changeMode("manual"); move(e.key === "ArrowRight" ? 1 : -1);
       }
       if (!cleanPresentation && e.code === "Space" && !(document.activeElement instanceof HTMLButtonElement)) {
-        e.preventDefault(); setMode(m => m === "auto" ? "manual" : "auto");
+        e.preventDefault(); changeMode(mode === "auto" ? "manual" : "auto");
       }
     };
     document.addEventListener("keydown", keydown);
     return () => document.removeEventListener("keydown", keydown);
-  }, [presenting, move, closePresentation, cleanPresentation, mode]);
+  }, [presenting, move, closePresentation, cleanPresentation, mode, changeMode]);
 
   useEffect(() => {
     if (presenting) (cleanPresentation ? presentationDialog.current : exitButton.current)?.focus();
@@ -231,7 +239,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     setOpeningSlide({ slideId: first.id, speakerId: currentSpeakerId });
     setExcluded(new Set());
     setSelectedId(first.id);
-    setMode(previous => autoAdvance ? "live" : previous === "auto" ? "auto" : "manual");
+    setMode(autoAdvance ? "auto" : "manual");
     present(true);
   }, [deck.slides, currentSpeakerId, present, autoAdvance]);
 
@@ -281,10 +289,10 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   return <section aria-label="Slide giới thiệu" className="space-y-4">
     {timer && <p className="sr-only" role="timer" aria-live="off">#{timer.arrivalOrder}: {timer.time}. {timer.label}</p>}
     <div className="flex flex-wrap items-center gap-2">
-      <label className="text-sm font-semibold">Chế độ <select aria-label="Chế độ trình chiếu" className="ml-2 rounded-lg border p-2" value={mode} disabled={!!draft} onChange={e => setMode(e.target.value as typeof mode)}>
-        <option value="manual">Chuyển thủ công</option><option value="auto">Tự chạy</option><option value="live">Theo người đang phát biểu</option>
+      <label className="text-sm font-semibold">Chế độ <select aria-label="Chế độ trình chiếu" className="ml-2 rounded-lg border p-2" value={mode} disabled={!!draft} onChange={e => changeMode(e.target.value as typeof mode)}>
+        <option value="manual">Chuyển thủ công</option><option value="auto" disabled={!canManage}>Tự chuyển sau khi hết giờ</option><option value="live">Theo người đang phát biểu</option>
       </select></label>
-      {mode === "auto" && <label className="text-sm">Mỗi <input aria-label="Số giây mỗi slide" type="number" min={3} max={120} value={seconds} className="w-16 rounded border p-2" onChange={e => setSeconds(Math.min(120, Math.max(3, Number(e.target.value) || 3)))} /> giây</label>}
+      {mode === "auto" && <label className="flex items-center gap-2 text-sm">Chờ sau khi hết giờ <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={value => onAutoAdvanceDelayChange?.(value)} disabled={!canManage} /> giây rồi chuyển slide</label>}
       <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={16} /> Làm mới hồ sơ</button>
       <button className={button} disabled={!ready} onClick={download}><Download size={16} /> Tải PNG</button>
       <button className={button} disabled={loading || !!error || !deck.slides.length || !!draft} onClick={presentFromFirst}><Play size={16} /> Bắt đầu thuyết trình</button>
@@ -298,8 +306,8 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         <button className="text-xs text-red-700 underline" disabled={!!draft} onClick={() => setExcluded(new Set())}>Chọn tất cả</button>
         <div className="max-h-80 space-y-1 overflow-auto">
           {deck.slides.map(s => <div key={s.id} className={`flex items-center gap-2 rounded-lg p-2 ${selected?.id === s.id ? "bg-red-50" : ""}`}>
-            <input type="checkbox" aria-label={`Chiếu ${s.name}`} checked={!excluded.has(s.id)} disabled={!!draft || mode === "live"} onChange={e => setExcluded(old => { const next = new Set(old); if (e.target.checked) next.delete(s.id); else next.add(s.id); return next; })} />
-            <button className="min-w-0 text-left text-sm disabled:opacity-50" disabled={!!draft || excluded.has(s.id)} onClick={() => { setSelectedId(s.id); setMode("manual"); }}>
+            <input type="checkbox" aria-label={`Chiếu ${s.name}`} checked={!excluded.has(s.id)} disabled={!!draft || followsSpeaker} onChange={e => setExcluded(old => { const next = new Set(old); if (e.target.checked) next.delete(s.id); else next.add(s.id); return next; })} />
+            <button className="min-w-0 text-left text-sm disabled:opacity-50" disabled={!!draft || excluded.has(s.id)} onClick={() => { setSelectedId(s.id); changeMode("manual"); }}>
               <span className="block truncate font-semibold">{s.name}</span><span className="text-xs text-slate-500">{s.kind === "member" ? "Thành viên" : "Khách mời"}</span>
             </button>
           </div>)}
@@ -309,16 +317,16 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-900">
           {canvas(preview)}
           {(drawing || !active || drawError) && <div className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-white">
-            {speechesComplete && mode === "live" ? <div className="rounded-2xl bg-white p-8"><SpeechesCompleteMessage /></div> : drawError || (loading ? "Đang tải hồ sơ…" : active ? "Đang chuẩn bị ảnh và font…" : mode === "live" ? "Chưa có người đang phát biểu." : deck.slides.length ? "Chọn ít nhất một người để trình chiếu." : "Chưa có người check-in. Hãy check-in thành viên hoặc khách mời trước.")}
+            {speechesComplete && followsSpeaker ? <div className="rounded-2xl bg-white p-8"><SpeechesCompleteMessage /></div> : drawError || (loading ? "Đang tải hồ sơ…" : active ? "Đang chuẩn bị ảnh và font…" : followsSpeaker ? "Chưa có người đang phát biểu." : deck.slides.length ? "Chọn ít nhất một người để trình chiếu." : "Chưa có người check-in. Hãy check-in thành viên hoặc khách mời trước.")}
           </div>}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <button aria-label="Slide trước" className={button} disabled={!queue.length || !!draft || mode === "live"} onClick={() => { setMode("manual"); move(-1); }}><ChevronLeft size={16} /></button>
-            <span className="text-sm text-slate-500">{mode === "live" ? "Đồng bộ diễn giả" : `${index < 0 ? 0 : index + 1} / ${queue.length}`}</span>
-            <button aria-label="Slide tiếp" className={button} disabled={!queue.length || !!draft || mode === "live"} onClick={() => { setMode("manual"); move(1); }}><ChevronRight size={16} /></button>
+            <button aria-label="Slide trước" className={button} disabled={!queue.length || !!draft || followsSpeaker} onClick={() => { changeMode("manual"); move(-1); }}><ChevronLeft size={16} /></button>
+            <span className="text-sm text-slate-500">{followsSpeaker ? "Đồng bộ diễn giả" : `${index < 0 ? 0 : index + 1} / ${queue.length}`}</span>
+            <button aria-label="Slide tiếp" className={button} disabled={!queue.length || !!draft || followsSpeaker} onClick={() => { changeMode("manual"); move(1); }}><ChevronRight size={16} /></button>
           </div>
-          {canManage && active && !draft && <button className={button} disabled={loading || !!error} onClick={() => { setMode("manual"); setSelectedId(active.id); draftVersion.current = deck.version; setDraft({ ...active }); }}><Pencil size={16} /> Bổ sung thông tin slide</button>}
+          {canManage && active && !draft && <button className={button} disabled={loading || !!error} onClick={() => { changeMode("manual"); setSelectedId(active.id); draftVersion.current = deck.version; setDraft({ ...active }); }}><Pencil size={16} /> Bổ sung thông tin slide</button>}
         </div>
         {warnings.map(w => <p key={w} role="status" className="text-sm text-amber-700">{w}</p>)}
         {draft && <form className="space-y-3 rounded-xl border bg-white p-4" onSubmit={e => { e.preventDefault(); void save(); }}>
@@ -342,12 +350,12 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     </div>
     {presenting && createPortal(<div ref={presentationDialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Trình chiếu hồ sơ" className="fixed inset-0 z-[10000] flex items-center justify-center bg-black" onMouseMove={showControls} onTouchStart={showControls} style={{ cursor: cleanPresentation || !controls ? "none" : "default", outline: "none" }}>
       <div style={{ width: "min(100vw, 177.7778vh)", height: "min(100vh, 56.25vw)" }}>{canvas(screen)}</div>
-      {(loading || error || drawing || !active || drawError) && <div role="status" className="absolute text-white">{speechesComplete && mode === "live" ? <div className="max-w-2xl rounded-3xl bg-white p-12"><SpeechesCompleteMessage /></div> : error || drawError || (loading ? "Đang tải slide…" : active ? "Đang chuẩn bị slide…" : "Chờ người phát biểu…")}</div>}
+      {(loading || error || drawing || !active || drawError) && <div role="status" className="absolute text-white">{speechesComplete && followsSpeaker ? <div className="max-w-2xl rounded-3xl bg-white p-12"><SpeechesCompleteMessage /></div> : error || drawError || (loading ? "Đang tải slide…" : active ? "Đang chuẩn bị slide…" : "Chờ người phát biểu…")}</div>}
       {!cleanPresentation && <div data-slide-controls className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-slate-900/90 p-3 text-white" style={{ opacity: controls ? 1 : 0 }} onFocus={() => setControls(true)}>
-        <button aria-label="Slide trước khi trình chiếu" className="rounded p-2" onClick={() => { setMode("manual"); move(-1); }}><ChevronLeft /></button>
-        <button aria-label={mode === "auto" ? "Tạm dừng tự chạy" : "Bật tự chạy"} className="rounded p-2" onClick={() => setMode(m => m === "auto" ? "manual" : "auto")}>{mode === "auto" ? <Pause /> : <Play />}</button>
-        <span className="whitespace-nowrap text-sm">{mode === "live" ? "Theo diễn giả" : `${index + 1} / ${queue.length}`}</span>
-        <button aria-label="Slide tiếp khi trình chiếu" className="rounded p-2" onClick={() => { setMode("manual"); move(1); }}><ChevronRight /></button>
+        <button aria-label="Slide trước khi trình chiếu" className="rounded p-2" onClick={() => { changeMode("manual"); move(-1); }}><ChevronLeft /></button>
+        <button aria-label={mode === "auto" ? "Tạm dừng tự chạy" : "Bật tự chạy"} className="rounded p-2" onClick={() => changeMode(mode === "auto" ? "manual" : "auto")}>{mode === "auto" ? <Pause /> : <Play />}</button>
+        <span className="whitespace-nowrap text-sm">{followsSpeaker ? "Theo diễn giả" : `${index + 1} / ${queue.length}`}</span>
+        <button aria-label="Slide tiếp khi trình chiếu" className="rounded p-2" onClick={() => { changeMode("manual"); move(1); }}><ChevronRight /></button>
         <button ref={exitButton} aria-label="Thoát trình chiếu" className="rounded p-2" onClick={closePresentation}><X /></button>
       </div>}
     </div>, document.body)}

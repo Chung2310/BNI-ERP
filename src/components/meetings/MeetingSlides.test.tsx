@@ -42,7 +42,7 @@ it("read-only users can choose attendees but cannot edit; empty selection disabl
   expect(screen.getByText("Chọn ít nhất một người để trình chiếu.")).toBeTruthy();
 });
 
-it("auto advance survives the parent's frequent clock rerenders", async () => {
+it("automatic slides follow the speaker instead of advancing on a separate interval", async () => {
   const api = vi.fn().mockResolvedValue({ slides, version: 1 });
   const view = render(<MeetingSlides meeting={meeting} canManage api={api} />);
   await screen.findByText("Nguyễn An");
@@ -51,10 +51,10 @@ it("auto advance survives the parent's frequent clock rerenders", async () => {
   fireEvent.change(screen.getByLabelText("Chế độ trình chiếu"), { target: { value: "auto" } });
   for (let i = 0; i < 33; i++) {
     await act(async () => { vi.advanceTimersByTime(250); });
-    view.rerender(<MeetingSlides meeting={{ ...meeting }} canManage api={api} />);
+    view.rerender(<MeetingSlides meeting={{ ...meeting, currentIndex: 0 }} canManage api={api} />);
   }
   vi.useRealTimers();
-  expect((await screen.findByRole("img")).getAttribute("aria-label")).toContain("Trần Bình");
+  expect((await screen.findByRole("img")).getAttribute("aria-label")).toContain("Nguyễn An");
 });
 
 it("keeps the version captured when editing even if live meeting data refreshes", async () => {
@@ -87,7 +87,7 @@ it("starts at the first slide and follows subsequent speaker changes", async () 
   fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
   expect(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).toBeTruthy();
   await waitFor(() => expect(screen.getAllByRole("img").every(canvas => canvas.getAttribute("aria-label")?.includes("Nguyễn An"))).toBe(true));
-  view.rerender(<MeetingSlides meeting={{ ...meeting, currentIndex: 2, speakers: deck }} canManage api={api} />);
+  view.rerender(<MeetingSlides meeting={{ ...meeting, currentIndex: 2, speakers: deck }} canManage api={api} autoAdvance />);
   await waitFor(() => expect(screen.getAllByRole("img").every(canvas => canvas.getAttribute("aria-label")?.includes("Người thứ ba"))).toBe(true));
   expect(within(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).queryAllByRole("button")).toHaveLength(0);
   fireEvent.keyDown(document, { key: "Escape" });
@@ -131,7 +131,7 @@ it("clean automatic presentation ignores arrow and space keys", async () => {
   fireEvent.keyDown(document, { key: "ArrowRight" });
   fireEvent.keyDown(document, { code: "Space" });
   await waitFor(() => expect(within(screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" })).getByRole("img").getAttribute("aria-label")).toContain("Nguyễn An"));
-  expect((screen.getByLabelText("Chế độ trình chiếu") as HTMLSelectElement).value).toBe("live");
+  expect((screen.getByLabelText("Chế độ trình chiếu") as HTMLSelectElement).value).toBe("auto");
 });
 
 
