@@ -60,7 +60,7 @@ Có ba chế độ: chuyển thủ công, tự chạy (3–120 giây), theo ngư
 **Trình chiếu** mở toàn màn hình; dùng ← / → để chuyển, Esc để thoát.
 **Tải PNG** xuất slide đang xem ở 1920×1080, cùng bố cục với màn hình chiếu.
 Font tiếng Việt được đóng gói trong ứng dụng. Chữ dài được thu nhỏ/rút gọn;
-ảnh không tải được sẽ dùng ảnh thay thế và có thông báo trong phần xem trước.
+Mục thiếu dữ liệu được ẩn cả nhãn và khung; ảnh thiếu hoặc không tải được không hiển thị ảnh thay thế. Lỗi tải ảnh có thông báo riêng trong phần xem trước.
 Ảnh ngoài hệ thống cần cho phép CORS để trình duyệt có thể ghép và xuất PNG.
 
 Thiết kế tham chiếu: `public/slide-for-member.png`, `public/slide-for-guest.png`.

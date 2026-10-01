@@ -107,32 +107,22 @@ export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas:
   ctx.textAlign = "left"; ctx.fillStyle = "#e2e2e2"; ctx.fillRect(60, 150, 1800, 7);
 
   const bannerY = 180, bannerH = member ? 310 : 185;
-  ctx.fillStyle = "#eeeeee"; ctx.fillRect(60, bannerY, 1800, bannerH);
   if (banner) cover(ctx, banner, 60, bannerY, 1800, bannerH);
-  else {
-    const gradient = ctx.createLinearGradient(60, bannerY, 1860, bannerY + bannerH);
-    gradient.addColorStop(0, "#f5f5f5"); gradient.addColorStop(1, "#e7e7e7");
-    ctx.fillStyle = gradient; ctx.fillRect(60, bannerY, 1800, bannerH);
-    ctx.fillStyle = RED; ctx.beginPath(); ctx.moveTo(1600, bannerY); ctx.lineTo(1860, bannerY + bannerH); ctx.lineTo(1600, bannerY + bannerH); ctx.fill();
-  }
 
-  const cy = member ? 550 : 500;
-  ctx.save(); ctx.shadowColor = "#00000026"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 4;
-  ctx.beginPath(); ctx.arc(255, cy, 170, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill(); ctx.restore();
-  ctx.save(); ctx.beginPath(); ctx.arc(255, cy, 156, 0, Math.PI * 2); ctx.clip();
-  ctx.fillStyle = "#e9e9e9"; ctx.fillRect(99, cy - 156, 312, 312);
-  if (avatar) cover(ctx, avatar, 99, cy - 156, 312, 312, true);
-  else {
-    const initials = slide.name.trim().split(/\s+/).slice(-2).map(s => Array.from(s)[0] || "").join("").toUpperCase();
-    ctx.textAlign = "center"; font(ctx, 85, 700); ctx.fillStyle = "#9b9b9b"; ctx.fillText(initials || "BNI", 255, cy - 58);
+  if (avatar) {
+    const cy = member ? 550 : 500;
+    ctx.save(); ctx.shadowColor = "#00000026"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 4;
+    ctx.beginPath(); ctx.arc(255, cy, 170, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill(); ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.arc(255, cy, 156, 0, Math.PI * 2); ctx.clip();
+    cover(ctx, avatar, 99, cy - 156, 312, 312, true);
+    ctx.restore();
   }
-  ctx.restore();
   const badgeY = member ? 455 : 355;
   ctx.fillStyle = RED; ctx.beginPath(); ctx.roundRect(480, badgeY, 280, 58, 8); ctx.fill();
   ctx.fillStyle = "#fff"; font(ctx, 25, 800); ctx.fillText(member ? "THÀNH VIÊN BNI" : "KHÁCH MỜI", 503, badgeY + 12);
   const nameY = member ? 532 : 441;
   textBox(ctx, slide.name.toLocaleUpperCase("vi-VN"), 480, nameY, 1380, 1, 62, 33, "#242424", 800);
-  textBox(ctx, slide.company || "Chưa cập nhật công ty", 480, nameY + 79, 1380, 1, 37, 25, RED, 700);
+  if (slide.company?.trim()) textBox(ctx, slide.company.trim(), 480, nameY + 79, 1380, 1, 37, 25, RED, 700);
 
   const cardsY = member ? 671 : 601;
   function card(x: number, label: string, value: string) {
@@ -141,13 +131,19 @@ export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas:
     textBox(ctx, label, x + 30, cardsY + 22, 610, 1, 23, 23, "#858585", 700);
     textBox(ctx, value, x + 30, cardsY + 65, 610, 1, 37, 23, "#252525", 700);
   }
+  let cardCount = 0;
   if (member) {
-    card(480, "SỐ ĐIỆN THOẠI", slide.phone || "Chưa cập nhật");
-    card(1190, "LOẠI HÌNH DỊCH VỤ", slide.industry || "Chưa cập nhật");
+    for (const [label, value] of [["SỐ ĐIỆN THOẠI", slide.phone], ["LOẠI HÌNH DỊCH VỤ", slide.industry]]) {
+      if (!value?.trim()) continue;
+      card(480 + cardCount * 710, label, value.trim());
+      cardCount++;
+    }
   }
-  const bioY = member ? 843 : 635;
-  textBox(ctx, "BIO / GIỚI THIỆU NGẮN", 480, bioY, 1380, 1, 30, 30, RED, 700);
-  textBox(ctx, slide.bio || "Chưa có giới thiệu ngắn.", 480, bioY + 50, 1380, member ? 3 : 4, 30, 25, "#646464");
+  if (slide.bio?.trim()) {
+    const bioY = member ? (cardCount ? 843 : 700) : 635;
+    textBox(ctx, "BIO / GIỚI THIỆU NGẮN", 480, bioY, 1380, 1, 30, 30, RED, 700);
+    textBox(ctx, slide.bio.trim(), 480, bioY + 50, 1380, member && cardCount ? 3 : 4, 30, 25, "#646464");
+  }
   textBox(ctx, member ? "THÀNH VIÊN BNI" : "KHÁCH MỜI BNI", 65, 993, 380, 1, 18, 18, "#888", 700);
   const warnings: string[] = [];
   if (slide.photoURL && !avatar) warnings.push("Không tải được ảnh đại diện (đường dẫn hoặc quyền truy cập ảnh).");

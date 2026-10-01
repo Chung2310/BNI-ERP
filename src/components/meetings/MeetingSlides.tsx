@@ -247,7 +247,6 @@ export function MeetingSlides({ meeting, canManage, api }: Props) {
           {canManage && active && !draft && <button className={button} disabled={loading || !!error} onClick={() => { setMode("manual"); setSelectedId(active.id); draftVersion.current = deck.version; setDraft({ ...active }); }}><Pencil size={16} /> Bổ sung thông tin slide</button>}
         </div>
         {warnings.map(w => <p key={w} role="status" className="text-sm text-amber-700">{w}</p>)}
-        {active && !draft && <p className="text-xs text-slate-500">Thông tin còn thiếu: {[!active.company && "công ty", active.kind === "member" && !active.phone && "SĐT", active.kind === "member" && !active.industry && "lĩnh vực", !active.bio && "bio", !active.photoURL && "avatar"].filter(Boolean).join(", ") || "Đã đủ các trường chính"}. Chữ dài được thu nhỏ hoặc rút gọn để vừa khung.</p>}
         {draft && <form className="space-y-3 rounded-xl border bg-white p-4" onSubmit={e => { e.preventDefault(); void save(); }}>
           <p className="text-sm font-bold">Thông tin riêng cho slide trong cuộc họp này</p>
           <p className="text-xs text-slate-500">Tự điền từ hồ sơ khi chưa có bản chỉnh riêng. Bio có thể nhập tại đây. Lưu sẽ giữ bản thông tin hiện tại cho slide; dùng “Dùng lại hồ sơ” để lấy thông tin hồ sơ mới nhất.</p>
