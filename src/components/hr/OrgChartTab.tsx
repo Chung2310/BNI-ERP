@@ -395,6 +395,7 @@ export default function OrgChartTab({
   const [addPhone, setAddPhone] = useState("");
   const [addCompanyName, setAddCompanyName] = useState("");
   const [addIndustry, setAddIndustry] = useState("");
+  const [addBirthDate, setAddBirthDate] = useState("");
   const [addDepartment, setAddDepartment] = useState("Ban Thành viên");
   const [addParentId, setAddParentId] = useState("");
   const [addRole, setAddRole] = useState<"user" | "manager" | "branch_owner" | "admin">("user");
@@ -914,7 +915,7 @@ export default function OrgChartTab({
         undefined,
         undefined,
         activeBranchId || undefined,
-        undefined,
+        addBirthDate ? addBirthDate : undefined,
         undefined,
         undefined,
         undefined,
@@ -939,6 +940,7 @@ export default function OrgChartTab({
       setAddPhone("");
       setAddCompanyName("");
       setAddIndustry("");
+      setAddBirthDate("");
       setAddPhotoURL("");
       setAddCoverImage("");
       setAddParentId("");
@@ -2292,6 +2294,15 @@ export default function OrgChartTab({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
+                  <label className="block font-bold text-gray-500 mb-1">Ngày sinh</label>
+                  <input
+                    type="date"
+                    value={addBirthDate}
+                    onChange={(e) => setAddBirthDate(e.target.value)}
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+                  />
+                </div>
+                <div>
                   <label className="block font-bold text-gray-500 mb-1">Mật khẩu khởi tạo *</label>
                   <input
                     type="password"
@@ -2302,21 +2313,22 @@ export default function OrgChartTab({
                     className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-gray-500 mb-1">Người kết nối / Phụ trách</label>
-                  <select
-                    value={addParentId}
-                    onChange={(e) => setAddParentId(e.target.value)}
-                    className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer text-slate-800"
-                  >
-                    <option value="">Không phân công</option>
-                    {employees.map(emp => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.role}{emp.companyName ? ` · ${emp.companyName}` : ""})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-500 mb-1">Người kết nối / Phụ trách</label>
+                <select
+                  value={addParentId}
+                  onChange={(e) => setAddParentId(e.target.value)}
+                  className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer text-slate-800"
+                >
+                  <option value="">Không phân công</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} ({emp.role}{emp.companyName ? ` · ${emp.companyName}` : ""})
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
