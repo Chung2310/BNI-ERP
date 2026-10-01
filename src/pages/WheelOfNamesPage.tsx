@@ -181,19 +181,6 @@ export const getDisplaySlices = (active: Participant[]): DisplaySlice[] => {
   }));
 };
 
-// Fallback sample participants for demo / unauthenticated state
-const DEFAULT_PARTICIPANTS: Participant[] = [
-  { id: "sample-1", name: "Nguyễn Văn An", department: "Ban Điều Hành", role: "Chủ tịch", selected: true, type: "member_present" },
-  { id: "sample-2", name: "Trần Thị Mai", department: "Ban Khách Mời", role: "Phó Chủ tịch", selected: true, type: "member_present" },
-  { id: "sample-3", name: "Lê Hoàng Long", department: "Ban Sự Kiện", role: "Trưởng ban", selected: true, type: "member_present" },
-  { id: "sample-4", name: "Phạm Hồng Ngọc", department: "Ban Hội Viên", role: "Thành viên", selected: true, type: "member_present" },
-  { id: "sample-5", name: "Đỗ Minh Quân", department: "Ban Đào Tạo", role: "Điều phối viên", selected: true, type: "member_present" },
-  { id: "sample-6", name: "Vũ Phương Thảo", department: "Ban Truyền Thông", role: "Thành viên", selected: true, type: "member_absent" },
-  { id: "sample-7", name: "Bùi Tuấn Anh", department: "Ban Công Nghệ", role: "Thành viên", selected: true, type: "member_absent" },
-  { id: "sample-8", name: "Hoàng Gia Bảo", department: "Ban Tài Chính", role: "Thủ quỹ", selected: true, type: "member_absent" },
-  { id: "sample-guest-1", name: "Lê Thị Thúy Hằng (Khách)", department: "Công ty BDS Vạn Phát", role: "Khách mời", selected: true, type: "guest" },
-  { id: "sample-guest-2", name: "Trần Đình Trọng (Khách)", department: "Nội Thất Sen Vàng", role: "Khách mời", selected: true, type: "guest" },
-];
 
 export const matchesFilterCategory = (p: Participant, category: ParticipantFilterCategory): boolean => {
   const pType = p.type || "member_present";
@@ -218,8 +205,16 @@ export const matchesFilterCategory = (p: Participant, category: ParticipantFilte
 export default function WheelOfNamesPage() {
   const { userProfile, loading: authLoading } = useAuth();
 
+  // Query Params for meeting-specific lucky draw
+  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const urlMeetingId = searchParams?.get("meetingId") || searchParams?.get("id");
+  const urlGame = searchParams?.get("game");
+
   // State
-  const [selectedGame, setSelectedGame] = useState<"wheel" | "bingo">("wheel");
+  const [selectedGame, setSelectedGame] = useState<"wheel" | "bingo">(
+    urlGame === "bingo" ? "bingo" : "wheel"
+  );
+  const [meetingTitle, setMeetingTitle] = useState<string>("");
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [winners, setWinners] = useState<WinnerRecord[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -303,95 +298,145 @@ export default function WheelOfNamesPage() {
         console.warn("Không thể tải danh sách cuộc họp cho vòng quay:", e);
       }
 
-      // Find the active/today meeting
+      // Prioritize meeting with checked-in speakers:
+      // Prioritize target meeting:
+      // 0. If urlMeetingId is passed in URL query, target that exact meeting
+      // 1. Live or paused meeting with speakers
+      // 2. Today's meeting with speakers
+      // 3. Most recent meeting that has speakers
+      // 4. Any meeting that has speakers
       const now = new Date();
       const isSameDate = (d1: Date, d2: Date) =>
         d1.getFullYear() === d2.getFullYear() &&
         d1.getMonth() === d2.getMonth() &&
         d1.getDate() === d2.getDate();
 
-      let targetMeeting: Meeting | undefined = meetings.find(
-        (m) => m.status === "live" || m.status === "paused"
-      );
+      let targetMeeting: Meeting | undefined;
+
+      if (urlMeetingId) {
+        targetMeeting = meetings.find((m) => String(m._id) === String(urlMeetingId));
+      }
+
+      if (!targetMeeting) {
+        targetMeeting = meetings.find(
+          (m) => (m.status === "live" || m.status === "paused") && m.speakers && m.speakers.length > 0
+        );
+      }
 
       if (!targetMeeting) {
         targetMeeting = meetings.find((m) => {
-          if (!m.startsAt) return false;
+          if (!m.startsAt || !m.speakers || m.speakers.length === 0) return false;
           return isSameDate(new Date(m.startsAt), now);
         });
       }
 
-      if (!targetMeeting && meetings.length > 0) {
-        // Fallback to latest meeting
-        const sorted = [...meetings].sort(
-          (a, b) => new Date(b.startsAt || 0).getTime() - new Date(a.startsAt || 0).getTime()
-        );
-        targetMeeting = sorted[0];
+      if (!targetMeeting) {
+        const sortedWithSpeakers = meetings
+          .filter((m) => m.speakers && m.speakers.length > 0)
+          .sort((a, b) => new Date(b.startsAt || 0).getTime() - new Date(a.startsAt || 0).getTime());
+        if (sortedWithSpeakers.length > 0) {
+          targetMeeting = sortedWithSpeakers[0];
+        }
       }
 
-      const speakers: Speaker[] = targetMeeting?.speakers || [];
+      if (!targetMeeting && meetings.length > 0) {
+        targetMeeting = meetings.find((m) => m.status === "live" || m.status === "paused") || meetings[0];
+      }
+
+      if (targetMeeting) {
+        setMeetingTitle(targetMeeting.title);
+        if (targetMeeting.luckyDraw?.prizes?.length) {
+          const firstPrize = targetMeeting.luckyDraw.prizes[0];
+          setCurrentPrize(firstPrize.name);
+          setPrizeInput(firstPrize.name);
+        }
+      }
+
+      // Collect speakers from target meeting, or fallback merge all speakers from recent meetings if target has none
+      let speakers: Speaker[] = targetMeeting?.speakers || [];
+      if (speakers.length === 0) {
+        const seenSpeakerIds = new Set<string>();
+        for (const m of meetings) {
+          for (const s of m.speakers || []) {
+            if (!seenSpeakerIds.has(s.id)) {
+              seenSpeakerIds.add(s.id);
+              speakers.push(s);
+            }
+          }
+        }
+      }
+
+      // Build chapter members roster from DB users
+      const userMap = new Map<string, { id: string; name: string; avatar?: string; department?: string; role?: string }>();
+
+      // Add DB users
+      for (const u of users) {
+        const uid = String(u.uid || (u as any).id || (u as any)._id || u.email || "").trim();
+        const uName = (u.displayName || u.email?.split("@")[0] || "Thành viên").trim();
+        userMap.set(uName.toLowerCase(), {
+          id: uid || `user-${Math.random()}`,
+          name: uName,
+          avatar: u.photoURL,
+          department: u.department || u.branchName || "Ban Giám Đốc",
+          role: u.role === "admin" ? "Chủ tịch / Admin" : u.role || "Thành viên",
+        });
+      }
+
 
       // Match speakers to members
       const matchedSpeakerIds = new Set<string>();
 
-      const isSpeakerMatch = (s: Speaker, u: UserProfile): boolean => {
-        const uid = String(u.uid || (u as any).id || (u as any)._id || "").trim();
-        const uEmail = (u.email || "").trim().toLowerCase();
-        const uName = (u.displayName || "").trim().toLowerCase();
-
+      const isSpeakerMatch = (s: Speaker, mName: string, mId: string): boolean => {
         const sUserId = String(s.userId || "").trim();
-        const sEmail = (s.email || "").trim().toLowerCase();
         const sName = (s.name || "").trim().toLowerCase();
+        const nameToMatch = mName.trim().toLowerCase();
 
-        if (sUserId && uid && sUserId === uid) return true;
-        if (sEmail && uEmail && sEmail === uEmail) return true;
-        if (sName && uName && sName === uName) return true;
+        if (sUserId && mId && sUserId === mId) return true;
+        if (sName && nameToMatch && (sName === nameToMatch || sName.includes(nameToMatch) || nameToMatch.includes(sName))) {
+          return true;
+        }
         return false;
       };
 
-      if (users && users.length > 0) {
-        // 1. Map all registered chapter members (present or absent)
-        const loadedMembers: Participant[] = users.map((u) => {
-          const uid = String(u.uid || (u as any).id || (u as any)._id || u.email || "").trim();
-          const matchedSpeaker = speakers.find((s) => isSpeakerMatch(s, u));
-          const isPresent = Boolean(matchedSpeaker);
+      // 1. Map all registered chapter members (present or absent)
+      const loadedMembers: Participant[] = Array.from(userMap.values()).map((m) => {
+        const matchedSpeaker = speakers.find((s) => isSpeakerMatch(s, m.name, m.id));
+        const isPresent = Boolean(matchedSpeaker);
 
-          if (matchedSpeaker) {
-            matchedSpeakerIds.add(matchedSpeaker.id);
-          }
+        if (matchedSpeaker) {
+          matchedSpeakerIds.add(matchedSpeaker.id);
+        }
 
-          return {
-            id: uid || `user-${Math.random()}`,
-            name: (u.displayName || u.email?.split("@")[0] || "Thành viên").trim(),
-            avatar: u.photoURL,
-            department: u.department || u.branchName || "Thành viên",
-            role: u.role,
-            selected: true,
-            type: isPresent ? "member_present" : "member_absent",
-          };
-        });
+        return {
+          id: m.id,
+          name: m.name,
+          avatar: m.avatar || (matchedSpeaker ? matchedSpeaker.photoURL || matchedSpeaker.coverImage : undefined),
+          department: m.department,
+          role: m.role,
+          selected: true,
+          type: isPresent ? "member_present" : "member_absent",
+          checkedInAt: matchedSpeaker?.checkedInAt,
+        };
+      });
 
-        // 2. Identify guests who checked in for today's meeting (speakers not matching members)
-        const guestSpeakers: Participant[] = speakers
-          .filter((s) => !matchedSpeakerIds.has(s.id))
-          .map((s) => ({
-            id: `guest-speaker-${s.id}`,
-            name: s.name.trim(),
-            avatar: s.photoURL,
-            department: "Khách tham dự",
-            role: "Khách mời",
-            selected: true,
-            type: "guest" as const,
-            checkedInAt: s.checkedInAt,
-          }));
+      // 2. Identify guests / attendees from the meeting (speakers not matching chapter members)
+      const guestSpeakers: Participant[] = speakers
+        .filter((s) => !matchedSpeakerIds.has(s.id))
+        .map((s) => ({
+          id: `guest-speaker-${s.id}`,
+          name: s.name.trim(),
+          avatar: s.photoURL || s.coverImage,
+          department: (s as any).company || (s as any).slideProfile?.company || "Khách tham dự",
+          role: "Khách mời",
+          selected: true,
+          type: "guest" as const,
+          checkedInAt: s.checkedInAt,
+        }));
 
-        setParticipants([...loadedMembers, ...guestSpeakers]);
-      } else {
-        setParticipants(DEFAULT_PARTICIPANTS);
-      }
+      setParticipants([...loadedMembers, ...guestSpeakers]);
     } catch (err) {
       console.error("Lỗi khi tải danh sách người dùng cho vòng quay:", err);
-      setParticipants(DEFAULT_PARTICIPANTS);
+      setParticipants([]);
     } finally {
       setLoadingUsers(false);
     }
@@ -581,28 +626,9 @@ export default function WheelOfNamesPage() {
     ctx.stroke();
     ctx.restore();
 
-    // 4. Curved Exit Chute from Bottom of Cage to Catcher Cup
+    // 4. Chute position references (used by winning ball drop animation)
     const chuteStartY = cy + cageRadius - 4;
     const chuteEndY = size * 0.74;
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(cx - 16, chuteStartY);
-    ctx.quadraticCurveTo(cx - 24, (chuteStartY + chuteEndY) / 2, cx - 18, chuteEndY);
-    ctx.lineTo(cx + 18, chuteEndY);
-    ctx.quadraticCurveTo(cx + 24, (chuteStartY + chuteEndY) / 2, cx + 16, chuteStartY);
-    ctx.strokeStyle = "rgba(217, 119, 6, 0.75)";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // Velvet Catcher Cup at the bottom of the chute
-    ctx.beginPath();
-    ctx.arc(cx, chuteEndY + 6, 22, 0, Math.PI);
-    ctx.fillStyle = "#991b1b";
-    ctx.fill();
-    ctx.strokeStyle = "#f59e0b";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.restore();
 
     // Empty state check
     if (activeParticipants.length === 0) {
@@ -664,17 +690,26 @@ export default function WheelOfNamesPage() {
 
     for (let i = 0; i < bingoBallsRef.current.length; i++) {
       const b = bingoBallsRef.current[i];
+      if (!b) continue;
       if (winningBallDropRef.current && winningBallDropRef.current.ball.ballNumber === b.ballNumber) {
         continue;
       }
 
-      const bx = cx + b.x;
-      const by = cy + b.y;
-      const r = b.radius;
-      const pal = LOTTERY_BALL_PALETTE[b.colorIdx % LOTTERY_BALL_PALETTE.length];
+      const bx = isFinite(b.x) ? cx + b.x : cx;
+      const by = isFinite(b.y) ? cy + b.y : cy;
+      const r = Math.max(10, isFinite(b.radius) && b.radius > 0 ? b.radius : 18);
+      const palIdx = Math.abs(b.colorIdx || 0) % LOTTERY_BALL_PALETTE.length;
+      const pal = LOTTERY_BALL_PALETTE[palIdx] || LOTTERY_BALL_PALETTE[0];
 
       ctx.save();
-      const ballGrad = ctx.createRadialGradient(bx - r * 0.35, by - r * 0.35, r * 0.1, bx, by, r);
+      const ballGrad = ctx.createRadialGradient(
+        bx - r * 0.35,
+        by - r * 0.35,
+        Math.max(1, r * 0.1),
+        bx,
+        by,
+        r
+      );
       ballGrad.addColorStop(0, pal.start);
       ballGrad.addColorStop(0.4, pal.mid);
       ballGrad.addColorStop(1, pal.end);
@@ -700,7 +735,7 @@ export default function WheelOfNamesPage() {
       // Specular highlight sheen
       ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
       ctx.beginPath();
-      ctx.arc(bx - r * 0.35, by - r * 0.35, r * 0.22, 0, 2 * Math.PI);
+      ctx.arc(bx - r * 0.35, by - r * 0.35, Math.max(1, r * 0.22), 0, 2 * Math.PI);
       ctx.fill();
       ctx.restore();
     }
@@ -751,22 +786,31 @@ export default function WheelOfNamesPage() {
     ctx.restore();
 
     // 8. WINNING BALL DROPPING DOWN THE CHUTE
-    if (winningBallDropRef.current) {
+    if (winningBallDropRef.current && winningBallDropRef.current.ball) {
       const { ball, progress } = winningBallDropRef.current;
       const startY = chuteStartY;
       const targetY = chuteEndY - 4;
-      const curY = startY + (targetY - startY) * progress;
+      const safeProg = Math.max(0, Math.min(1, progress));
+      const curY = startY + (targetY - startY) * safeProg;
       const curX = cx;
-      const r = ball.radius * 1.15;
-      const pal = LOTTERY_BALL_PALETTE[ball.colorIdx % LOTTERY_BALL_PALETTE.length];
+      const r = Math.max(12, (ball.radius || 18) * 1.15);
+      const palIdx = Math.abs(ball.colorIdx || 0) % LOTTERY_BALL_PALETTE.length;
+      const pal = LOTTERY_BALL_PALETTE[palIdx] || LOTTERY_BALL_PALETTE[0];
 
       ctx.save();
-      if (progress > 0.8) {
+      if (safeProg > 0.8) {
         ctx.shadowColor = "#f59e0b";
         ctx.shadowBlur = 24;
       }
 
-      const ballGrad = ctx.createRadialGradient(curX - r * 0.35, curY - r * 0.35, r * 0.1, curX, curY, r);
+      const ballGrad = ctx.createRadialGradient(
+        curX - r * 0.35,
+        curY - r * 0.35,
+        Math.max(1, r * 0.1),
+        curX,
+        curY,
+        r
+      );
       ballGrad.addColorStop(0, pal.start);
       ballGrad.addColorStop(0.4, pal.mid);
       ballGrad.addColorStop(1, pal.end);
@@ -791,7 +835,7 @@ export default function WheelOfNamesPage() {
       // Specular highlight
       ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
       ctx.beginPath();
-      ctx.arc(curX - r * 0.35, curY - r * 0.35, r * 0.22, 0, 2 * Math.PI);
+      ctx.arc(curX - r * 0.35, curY - r * 0.35, Math.max(1, r * 0.22), 0, 2 * Math.PI);
       ctx.fill();
       ctx.restore();
     }
@@ -1429,113 +1473,139 @@ export default function WheelOfNamesPage() {
     }
 
     const animateBingo = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(1, elapsed / durationMs);
+      try {
+        const elapsed = now - startTime;
+        const progress = Math.min(1, elapsed / durationMs);
 
-      if (elapsed < tumbleDurationMs) {
-        // Tumbling phase
-        const tumbleProgress = elapsed / tumbleDurationMs;
-        const speed = Math.max(0.04, (1 - Math.pow(tumbleProgress, 2.5)) * 0.35);
+        if (elapsed < tumbleDurationMs) {
+          // Tumbling phase
+          const tumbleProgress = elapsed / tumbleDurationMs;
+          const speed = Math.max(0.04, (1 - Math.pow(tumbleProgress, 2.5)) * 0.35);
 
-        cageAngleRef.current += speed;
+          cageAngleRef.current = (cageAngleRef.current + speed) % (2 * Math.PI);
 
-        if (soundEnabled && now - lastAudioTick > 65) {
-          lastAudioTick = now;
-          playTickSound(350 + Math.random() * 450);
-        }
+          if (soundEnabled && now - lastAudioTick > 65) {
+            lastAudioTick = now;
+            playTickSound(350 + Math.random() * 450);
+          }
 
-        const balls = bingoBallsRef.current;
-        const maxR = cageRadius - (balls[0]?.radius || 18) - 4;
+          const balls = bingoBallsRef.current;
+          const maxR = Math.max(30, cageRadius - (balls[0]?.radius || 18) - 4);
 
-        for (let i = 0; i < balls.length; i++) {
-          const b = balls[i];
-          b.vx += (Math.random() - 0.5) * speed * 26 + Math.cos(cageAngleRef.current) * speed * 8;
-          b.vy += -speed * 18 + (Math.random() - 0.5) * speed * 22 + 0.35;
-          b.rotation += (Math.random() - 0.5) * 0.3;
+          for (let i = 0; i < balls.length; i++) {
+            const b = balls[i];
+            b.vx += (Math.random() - 0.5) * speed * 20 + Math.cos(cageAngleRef.current) * speed * 6;
+            b.vy += -speed * 14 + (Math.random() - 0.5) * speed * 16 + 0.35;
+            b.rotation += (Math.random() - 0.5) * 0.25;
 
-          b.vx *= 0.94;
-          b.vy *= 0.94;
+            b.vx *= 0.94;
+            b.vy *= 0.94;
 
-          b.x += b.vx;
-          b.y += b.vy;
+            b.x += b.vx;
+            b.y += b.vy;
 
-          const d = Math.hypot(b.x, b.y);
-          if (d > maxR) {
-            const nx = b.x / d;
-            const ny = b.y / d;
-            b.x = nx * maxR;
-            b.y = ny * maxR;
-            const dot = b.vx * nx + b.vy * ny;
-            b.vx = b.vx - 1.65 * dot * nx + (Math.random() - 0.5) * 2;
-            b.vy = b.vy - 1.65 * dot * ny + (Math.random() - 0.5) * 2;
+            // Constrain physics safely to prevent explosive NaN
+            const d = Math.hypot(b.x, b.y);
+            if (d > maxR && d > 0.0001) {
+              const nx = b.x / d;
+              const ny = b.y / d;
+              b.x = nx * maxR;
+              b.y = ny * maxR;
+              const dot = b.vx * nx + b.vy * ny;
+              if (dot > 0) {
+                // Outward velocity: reflect inwards with 0.6 restitution damping
+                b.vx -= 1.6 * dot * nx;
+                b.vy -= 1.6 * dot * ny;
+              }
+            } else if (!isFinite(b.x) || !isFinite(b.y)) {
+              b.x = (Math.random() - 0.5) * maxR * 0.5;
+              b.y = (Math.random() - 0.5) * maxR * 0.5;
+              b.vx = 0;
+              b.vy = 0;
+            }
+
+            // Clamp max velocity
+            const vSpeed = Math.hypot(b.vx, b.vy);
+            if (vSpeed > 14) {
+              b.vx = (b.vx / vSpeed) * 14;
+              b.vy = (b.vy / vSpeed) * 14;
+            }
+          }
+        } else {
+          // Drop phase: winning ball rolls down chute
+          const dropElapsed = elapsed - tumbleDurationMs;
+          const dropProgress = Math.min(1, dropElapsed / 1400);
+
+          cageAngleRef.current = (cageAngleRef.current + Math.max(0, 0.04 * (1 - dropProgress))) % (2 * Math.PI);
+
+          const balls = bingoBallsRef.current;
+          const maxR = Math.max(30, cageRadius - (balls[0]?.radius || 18) - 4);
+          for (let i = 0; i < balls.length; i++) {
+            const b = balls[i];
+            b.vy += 0.45;
+            b.vx *= 0.88;
+            b.vy *= 0.88;
+            b.x += b.vx;
+            b.y += b.vy;
+            const d = Math.hypot(b.x, b.y);
+            if (d > maxR && d > 0.0001) {
+              b.x = (b.x / d) * maxR;
+              b.y = (b.y / d) * maxR;
+              b.vx = 0;
+              b.vy = 0;
+            } else if (!isFinite(b.x) || !isFinite(b.y)) {
+              b.x = 0;
+              b.y = maxR * 0.6;
+              b.vx = 0;
+              b.vy = 0;
+            }
+          }
+
+          const winningBallObj = balls[winningIndex] || balls[0];
+          if (winningBallObj) {
+            winningBallDropRef.current = {
+              ball: winningBallObj,
+              progress: dropProgress,
+            };
           }
         }
-      } else {
-        // Drop phase: winning ball rolls down chute
-        const dropElapsed = elapsed - tumbleDurationMs;
-        const dropProgress = Math.min(1, dropElapsed / 1400);
 
-        cageAngleRef.current += Math.max(0, 0.04 * (1 - dropProgress));
+        drawWheel();
 
-        const balls = bingoBallsRef.current;
-        const maxR = cageRadius - (balls[0]?.radius || 18) - 4;
-        for (let i = 0; i < balls.length; i++) {
-          const b = balls[i];
-          b.vy += 0.45;
-          b.vx *= 0.88;
-          b.vy *= 0.88;
-          b.x += b.vx;
-          b.y += b.vy;
-          const d = Math.hypot(b.x, b.y);
-          if (d > maxR) {
-            b.x = (b.x / d) * maxR;
-            b.y = (b.y / d) * maxR;
-            b.vx = 0;
-            b.vy = 0;
-          }
-        }
+        if (progress < 1) {
+          animationFrameIdRef.current = requestAnimationFrame(animateBingo);
+        } else {
+          setIsSpinning(false);
 
-        const winningBallObj = balls[winningIndex] || balls[0];
-        if (winningBallObj) {
-          winningBallDropRef.current = {
-            ball: winningBallObj,
-            progress: dropProgress,
+          const record: WinnerRecord = {
+            id: `win-${Date.now()}`,
+            name: winningParticipant.name,
+            prizeName: currentPrize,
+            avatar: winningParticipant.avatar,
+            department: winningParticipant.department,
+            wonAt: new Date().toLocaleTimeString("vi-VN", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            }),
           };
+
+          setWinners((prev) => [record, ...prev]);
+
+          if (soundEnabled) {
+            playWinFanfare();
+          }
+          launchConfetti(4500);
+
+          setWinnerModal({
+            winner: winningParticipant,
+            prize: currentPrize,
+            ballNumber: winningBallNumber,
+          });
         }
-      }
-
-      drawWheel();
-
-      if (progress < 1) {
-        animationFrameIdRef.current = requestAnimationFrame(animateBingo);
-      } else {
+      } catch (err) {
+        console.error("Bingo animation error:", err);
         setIsSpinning(false);
-
-        const record: WinnerRecord = {
-          id: `win-${Date.now()}`,
-          name: winningParticipant.name,
-          prizeName: currentPrize,
-          avatar: winningParticipant.avatar,
-          department: winningParticipant.department,
-          wonAt: new Date().toLocaleTimeString("vi-VN", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          }),
-        };
-
-        setWinners((prev) => [record, ...prev]);
-
-        if (soundEnabled) {
-          playWinFanfare();
-        }
-        launchConfetti(4500);
-
-        setWinnerModal({
-          winner: winningParticipant,
-          prize: currentPrize,
-          ballNumber: winningBallNumber,
-        });
       }
     };
 
@@ -1662,75 +1732,64 @@ export default function WheelOfNamesPage() {
       {/* Main Wheel Area */}
       <div className="flex flex-1 flex-col h-full overflow-hidden">
         {/* Top Header Bar */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur-xl sm:px-6 shadow-2xs z-20">
-          <div className="flex items-center gap-3">
+        <header className="flex h-12 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/90 px-3 backdrop-blur-xl z-20">
+          {/* Left: Back + Logo + Title + Game Switcher */}
+          <div className="flex items-center gap-2">
             <a
               href="/"
-              title="Quay lại hệ thống"
-              className="flex items-center gap-2 rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition cursor-pointer"
+              title="Quay lại"
+              className="flex items-center p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-4 w-4" />
             </a>
 
-            <div className="flex items-center gap-2.5">
-              <img
-                src={BRAND_LOGO_PATH}
-                alt={BRAND_NAME}
-                className="h-8 w-8 rounded-lg border border-slate-200 object-cover shadow-2xs"
-              />
-              <div>
-                <h1 className="flex items-center gap-2 text-sm font-black tracking-tight text-slate-900 sm:text-base">
-                  <span>{selectedGame === "wheel" ? "VÒNG QUAY MAY MẮN" : "LỒNG CẦU BINGO (QUAY XỔ SỐ)"}</span>
-                  <span className="rounded-full bg-[#cf142b] px-2.5 py-0.5 text-[10px] font-bold text-white shadow-2xs uppercase tracking-wider">
-                    {userProfile?.companyName || userProfile?.companyCode || "BNI CHAPTER"}
-                  </span>
-                </h1>
-              </div>
-            </div>
+            <img
+              src={BRAND_LOGO_PATH}
+              alt={BRAND_NAME}
+              className="h-7 w-7 rounded-md border border-slate-200 object-cover"
+            />
 
-            {/* Game Mode Switcher: Wheel vs Bingo */}
-            <div className="hidden lg:flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200 shadow-2xs ml-2">
+            <span className="text-sm font-semibold text-slate-800">Quay thưởng</span>
+
+            <span className="rounded bg-[#cf142b] px-1.5 py-0.5 text-[9px] font-semibold text-white uppercase tracking-wide">
+              {userProfile?.companyName || userProfile?.companyCode || "BNI"}
+            </span>
+
+            {/* Game Switcher */}
+            <div className="hidden md:flex items-center rounded-lg bg-slate-100 p-0.5 ml-1">
               <button
                 type="button"
-                onClick={() => {
-                  if (!isSpinning) {
-                    setSelectedGame("wheel");
-                  }
-                }}
+                onClick={() => { if (!isSpinning) setSelectedGame("wheel"); }}
                 disabled={isSpinning}
-                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition cursor-pointer disabled:opacity-50 ${
+                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition cursor-pointer disabled:opacity-50 ${
                   selectedGame === "wheel"
-                    ? "bg-[#cf142b] text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
+                    ? "bg-white text-[#cf142b] shadow-xs"
+                    : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                <Disc className="h-3.5 w-3.5" />
-                <span>Vòng quay</span>
+                <Disc className="h-3 w-3" />
+                Vòng quay
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (!isSpinning) {
-                    setSelectedGame("bingo");
-                  }
-                }}
+                onClick={() => { if (!isSpinning) setSelectedGame("bingo"); }}
                 disabled={isSpinning}
-                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition cursor-pointer disabled:opacity-50 ${
+                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition cursor-pointer disabled:opacity-50 ${
                   selectedGame === "bingo"
-                    ? "bg-[#cf142b] text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
+                    ? "bg-white text-[#cf142b] shadow-xs"
+                    : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                <Dices className="h-3.5 w-3.5" />
-                <span>Lồng cầu Bingo</span>
+                <Dices className="h-3 w-3" />
+                Lồng cầu Bingo
               </button>
             </div>
           </div>
 
-          {/* Center Prize Display / Edit */}
-          <div className="hidden md:flex items-center gap-2">
+          {/* Center: Prize Display */}
+          <div className="hidden lg:flex items-center">
             {isEditingPrize ? (
-              <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1 border border-amber-400 shadow-xs">
+              <div className="flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1 border border-amber-300 shadow-xs">
                 <input
                   type="text"
                   value={prizeInput}
@@ -1742,7 +1801,7 @@ export default function WheelOfNamesPage() {
                     }
                   }}
                   autoFocus
-                  className="bg-transparent text-xs font-bold text-amber-900 outline-none w-48 text-center"
+                  className="bg-transparent text-xs text-amber-900 outline-none w-40 text-center"
                 />
                 <button
                   type="button"
@@ -1750,7 +1809,7 @@ export default function WheelOfNamesPage() {
                     setCurrentPrize(prizeInput.trim() || "Giải Thưởng May Mắn");
                     setIsEditingPrize(false);
                   }}
-                  className="text-emerald-600 hover:text-emerald-700 p-1 cursor-pointer"
+                  className="text-emerald-600 hover:text-emerald-700 p-0.5 cursor-pointer"
                 >
                   <Check className="h-3.5 w-3.5" />
                 </button>
@@ -1762,30 +1821,30 @@ export default function WheelOfNamesPage() {
                   setPrizeInput(currentPrize);
                   setIsEditingPrize(true);
                 }}
-                className="group flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-4 py-1.5 text-xs font-bold text-amber-900 transition hover:bg-amber-100 hover:border-amber-400 cursor-pointer shadow-2xs"
+                className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] text-amber-800 transition hover:bg-amber-100 cursor-pointer"
               >
-                <Trophy className="h-4 w-4 text-amber-600 group-hover:scale-110 transition-transform" />
-                <span>{currentPrize}</span>
-                <span className="text-[10px] text-amber-600 group-hover:text-amber-800 font-semibold transition-colors">Đổi</span>
+                <Trophy className="h-3.5 w-3.5 text-amber-500" />
+                <span className="font-medium">{currentPrize}</span>
+                <span className="text-[9px] text-amber-500">Đổi</span>
               </button>
             )}
           </div>
 
-          {/* Right Action Icons */}
-          <div className="flex items-center gap-2">
-            {/* Spin Duration Selector */}
-            <div className="hidden sm:flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200">
-              <Clock className="h-3.5 w-3.5 text-slate-500 ml-1.5 mr-1" />
+          {/* Right: Controls */}
+          <div className="flex items-center gap-1.5">
+            {/* Spin Duration */}
+            <div className="hidden sm:flex items-center rounded-lg bg-slate-100 p-0.5">
+              <Clock className="h-3 w-3 text-slate-400 ml-1 mr-0.5" />
               {[5, 8, 12].map((dur) => (
                 <button
                   key={dur}
                   type="button"
                   onClick={() => setSpinDuration(dur)}
                   disabled={isSpinning}
-                  className={`rounded-lg px-2 py-0.5 text-[10px] font-bold transition cursor-pointer ${
+                  className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium transition cursor-pointer ${
                     spinDuration === dur
-                      ? "bg-[#cf142b] text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
+                      ? "bg-white text-[#cf142b] shadow-xs"
+                      : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
                   {dur}s
@@ -1793,37 +1852,37 @@ export default function WheelOfNamesPage() {
               ))}
             </div>
 
-            {/* Sound Toggle */}
+            {/* Sound */}
             <button
               type="button"
               onClick={() => setSoundEnabled(!soundEnabled)}
               title={soundEnabled ? "Tắt âm thanh" : "Bật âm thanh"}
-              className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 transition cursor-pointer"
             >
-              {soundEnabled ? <Volume2 className="h-4 w-4 text-emerald-600" /> : <VolumeX className="h-4 w-4 text-rose-500" />}
+              {soundEnabled ? <Volume2 className="h-4 w-4 text-emerald-500" /> : <VolumeX className="h-4 w-4 text-slate-400" />}
             </button>
 
-            {/* Fullscreen Toggle */}
+            {/* Fullscreen */}
             <button
               type="button"
               onClick={toggleFullscreen}
               title={isFullscreen ? "Thu nhỏ (F)" : "Toàn màn hình (F)"}
-              className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 transition cursor-pointer"
             >
               {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </button>
 
-            {/* Toggle Drawer */}
+            {/* Drawer Toggle */}
             <button
               type="button"
               onClick={() => setIsDrawerOpen(!isDrawerOpen)}
-              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition cursor-pointer shadow-2xs ${
+              className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition cursor-pointer ${
                 isDrawerOpen
-                  ? "border-[#cf142b]/40 bg-[#cf142b]/10 text-[#cf142b]"
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  ? "border-[#cf142b]/30 bg-red-50 text-[#cf142b]"
+                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               }`}
             >
-              <Users className="h-4 w-4" />
+              <Users className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Thành viên ({activeParticipants.length})</span>
             </button>
           </div>
