@@ -10,6 +10,13 @@ const speaker = new Schema(
     company: String,
     photoURL: String,
     coverImage: String,
+    slideProfile: {
+      type: new Schema({
+        name: String, company: String, photoURL: String, coverImage: String,
+        birthDate: String, industry: String, bio: String,
+      }, { _id: false }),
+      default: undefined,
+    },
     checkedInAt: { type: Date, required: true },
     seconds: { type: Number, required: true },
     spokenSeconds: Number,

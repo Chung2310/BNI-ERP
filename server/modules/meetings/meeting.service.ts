@@ -151,11 +151,11 @@ export async function autoStartDueMeetings(now = new Date()) {
   });
   for (const item of dueMeetings) {
     if (item.speakers && item.speakers.length > 0) {
-      item.speakers = allocateSpeakers(
-        item.speakers.map((p: any) => (p.toObject ? p.toObject() : p)),
-        item.tiers,
+      item.set('speakers', allocateSpeakers(
+        item.speakers.map(p => p.toObject()),
+        item.tiers.map(t => ({ count: t.count ?? 0, seconds: t.seconds ?? item.fallbackSeconds })),
         item.fallbackSeconds
-      );
+      ));
       item.currentIndex = 0;
       item.speakerStartedAt = undefined;
       item.elapsedSeconds = 0;

@@ -21,7 +21,8 @@ import {
   createCheckInQr,
   autoStartDueMeetings,
 } from './meeting.service';
-import { checkinInput, controlInput, meetingInput, updateMeetingInput } from './meeting.validation';
+import { checkinInput, controlInput, meetingInput, updateMeetingInput, slideProfileInput } from './meeting.validation';
+import { getMeetingSlides, updateMeetingSlide } from './meeting-slides.service';
 
 
 export const meetingRouter = Router();
@@ -58,6 +59,22 @@ meetingRouter.get('/:id', read, async (req: any, res) => {
   } catch (e) {
     sendError(res, e);
   }
+});
+
+meetingRouter.get('/:id/slides', read, async (req: any, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
+    res.json({ data: await getMeetingSlides(company(req), req.params.id) });
+  } catch (e) { sendError(res, e); }
+});
+
+meetingRouter.put('/:id/slides/:speakerId', manage, async (req: any, res) => {
+  const { error, value } = slideProfileInput.validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
+    res.json({ data: await updateMeetingSlide(company(req), req.params.id, req.params.speakerId, value) });
+  } catch (e) { sendError(res, e); }
 });
 
 meetingRouter.post('/', manage, async (req: any, res) => {
