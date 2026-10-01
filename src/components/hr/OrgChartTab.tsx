@@ -1225,17 +1225,6 @@ export default function OrgChartTab({
       }
     };
 
-    const renderCardIcon = (role: string) => {
-      const rLower = (role || "").toLowerCase();
-      if (rLower.includes("ceo") || rLower.includes("chủ tịch") || rLower.includes("coo") || rLower.includes("cfo") || rLower.includes("cmo") || rLower.includes("cso") || rLower.includes("director") || rLower.includes("giám đốc")) {
-        return "👑";
-      }
-      if (rLower.includes("trưởng phòng") || rLower.includes("manager") || rLower.includes("leader") || rLower.includes("trưởng nhóm")) {
-        return "💼";
-      }
-      return "👤";
-    };
-
     return (
       <div className="flex flex-col items-center" key={node.id}>
         {/* Smart Employee Card */}
@@ -1262,8 +1251,6 @@ export default function OrgChartTab({
           </div>
 
           <div className="space-y-2">
-
-
             {/* Middle row: Department (Main Title) */}
             <div className="min-h-[32px] flex items-center flex-wrap gap-1.5">
               <h4 className="font-bold text-xs text-slate-800 leading-snug font-sans line-clamp-2">
@@ -1276,16 +1263,18 @@ export default function OrgChartTab({
               )}
             </div>
 
-            {/* Bottom row: Manager Info */}
+            {/* Bottom row: Member Info */}
             <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
-              {renderAvatar(node.avatar, "w-6 h-6", "text-xs")}
+              {renderAvatar(node.avatar, "w-7 h-7", "text-xs", node.name)}
               <div className="min-w-0 flex-1">
-                <span className="block text-[8px] font-bold text-gray-400 uppercase tracking-wider truncate font-mono">
-                  {renderCardIcon(node.role)} {node.role}
-                </span>
-                <span className="block text-[10px] font-bold text-indigo-950 truncate">
+                <span className="block text-xs font-bold text-slate-900 truncate">
                   {node.name}
                 </span>
+                {node.companyName && (
+                  <span className="block text-[10px] text-slate-500 truncate">
+                    {node.companyName}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -1428,7 +1417,7 @@ export default function OrgChartTab({
                           <div className="min-w-0">
                             <div className="font-bold text-slate-800 truncate">{employee.name || missingValue}</div>
                             <div className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
-                              {employee.role || missingValue} • {employee.department || missingValue}
+                              {employee.companyName ? `${employee.companyName} • ` : ""}{employee.department || missingValue}
                             </div>
                             {manager && (
                               <div className="text-[9px] text-slate-400 mt-0.5">
