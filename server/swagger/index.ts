@@ -18,7 +18,7 @@ const swaggerDocument = {
   },
   servers: [
     {
-      url: "http://localhost:3000",
+      url: `http://localhost:${process.env.PORT || 3012}`,
       description: "Cơ sở phục vụ cục bộ",
     },
   ],

@@ -108,7 +108,8 @@ async function attachRedisAdapter(server: SocketIOServer) {
 }
 
 function getAllowedOrigins(): string[] {
-  const origins = new Set<string>(["http://localhost:5173", "http://localhost:3000"]);
+  const defaultPort = process.env.PORT || "3012";
+  const origins = new Set<string>(["http://localhost:5173", "http://localhost:3000", "http://localhost:3012", `http://localhost:${defaultPort}`]);
   
   if (process.env.LINK_COR) {
     process.env.LINK_COR.split(",").forEach(o => origins.add(o.trim()));
