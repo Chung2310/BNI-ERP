@@ -514,9 +514,9 @@ export default function MeetingTab() {
   });
 
   return (
-    <div className="mx-auto max-h-[85vh] max-w-7xl overflow-y-auto px-0.5 pb-8 text-left sm:pr-2" id="meeting_tab_view">
+    <div className="@container w-full max-h-[85vh] overflow-y-auto px-0.5 pb-5 text-left sm:pr-2" id="meeting_tab_view">
       {/* Header bar */}
-      <div className="mb-6 flex flex-col gap-4">
+      <div className="mb-4 flex flex-col gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-gradient-to-br from-cyan-600 to-teal-700 rounded-2xl shadow-sm text-white shrink-0">
@@ -611,7 +611,7 @@ export default function MeetingTab() {
 
       {/* Grid of Meeting Cards (Dạng danh sách / Thẻ hiển thị) */}
       {filteredItems.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 @min-[32rem]:grid-cols-2 @min-[48rem]:grid-cols-3 @min-[64rem]:grid-cols-4 gap-3">
           {filteredItems.map((m) => {
             const s = statusMap[m.status] || {
               label: m.status,
@@ -630,10 +630,10 @@ export default function MeetingTab() {
                   setDetailMeetingId(m._id);
                   setActiveSubTab(m.status === "scheduled" ? "checkin" : "speakers");
                 }}
-                className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-white shadow-2xs transition-all duration-200 hover:shadow-md cursor-pointer ${s.border}`}
+                className={`group relative flex flex-col justify-between overflow-hidden rounded-lg border bg-white shadow-2xs transition-all duration-200 hover:shadow-md cursor-pointer ${s.border}`}
               >
                 {/* Top Cover / Header Image */}
-                <div className="relative h-36 w-full overflow-hidden bg-slate-100">
+                <div className="relative h-24 w-full overflow-hidden bg-slate-100">
                   {m.coverImage ? (
                     <img
                       src={m.coverImage}
@@ -641,18 +641,17 @@ export default function MeetingTab() {
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="h-full w-full bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-950 p-4 flex flex-col justify-between text-white">
-                      <CalendarDays className="h-8 w-8 text-cyan-400/40" />
-                      <span className="text-[11px] font-mono text-slate-400">BNI CHAPTER MEETING</span>
+                    <div className="h-full w-full bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-950 p-3 flex items-center justify-end text-white">
+                      <CalendarDays className="h-16 w-16 rotate-12 text-cyan-400/15" />
                     </div>
                   )}
 
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-black/20" />
 
                   {/* Status Badge */}
-                  <div className="absolute top-3 left-3">
+                  <div className="absolute top-2 left-2">
                     <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold border backdrop-blur-md ${s.badge}`}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold border backdrop-blur-md ${s.badge}`}
                     >
                       <span className={`h-2 w-2 rounded-full ${s.dot}`} />
                       {s.label}
@@ -661,12 +660,12 @@ export default function MeetingTab() {
 
                   {/* Top Action Icons (Sửa, Xóa) */}
                   {canManage && (
-                    <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-90 transition-opacity group-hover:opacity-100">
+                    <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-90 transition-opacity group-hover:opacity-100">
                       <button
                         type="button"
                         title="Sửa cuộc họp"
                         onClick={(e) => openEditModal(m, e)}
-                        className="rounded-xl bg-white/80 backdrop-blur-md p-1.5 text-slate-700 hover:bg-white hover:text-cyan-700 shadow-sm transition cursor-pointer"
+                        className="rounded-lg bg-white/80 backdrop-blur-md p-1.5 text-slate-700 hover:bg-white hover:text-cyan-700 shadow-sm transition cursor-pointer"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -677,7 +676,7 @@ export default function MeetingTab() {
                           e.stopPropagation();
                           setDeletingMeeting(m);
                         }}
-                        className="rounded-xl bg-white/80 backdrop-blur-md p-1.5 text-slate-700 hover:bg-rose-50 hover:text-rose-600 shadow-sm transition cursor-pointer"
+                        className="rounded-lg bg-white/80 backdrop-blur-md p-1.5 text-slate-700 hover:bg-rose-50 hover:text-rose-600 shadow-sm transition cursor-pointer"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -692,22 +691,22 @@ export default function MeetingTab() {
                 </div>
 
                 {/* Card Body */}
-                <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
+                <div className="p-3 flex-1 flex flex-col justify-between gap-3">
                   <div>
-                    <h3 className="font-extrabold text-slate-900 text-base leading-snug line-clamp-2 group-hover:text-cyan-700 transition">
+                    <h3 className="font-extrabold text-slate-900 text-sm leading-snug line-clamp-2 group-hover:text-cyan-700 transition">
                       {m.title}
                     </h3>
 
                     {m.location && (
-                      <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500 line-clamp-1">
+                      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500 line-clamp-1">
                         <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                        <span>{m.location}</span>
+                        <span className="truncate" title={m.location}>{m.location}</span>
                       </p>
                     )}
                   </div>
 
                   {/* Stats Bar */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
+                  <div className="pt-2.5 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
                     <div className="flex items-center gap-1.5 text-slate-600 font-medium">
                       <Users className="h-4 w-4 text-cyan-600 shrink-0" />
                       <span>{m.speakers?.length || 0} check-in</span>
@@ -723,14 +722,14 @@ export default function MeetingTab() {
                 </div>
 
                 {/* Card Footer: Action Button */}
-                <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-0 flex items-center gap-2">
+                <div className="px-3 pb-3 pt-0 flex items-center gap-2">
                   <button
                     type="button"
                     aria-label={isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}
                     onClick={(event) => { event.stopPropagation(); setDetailMeetingId(m._id); setActiveSubTab(m.status === "scheduled" ? "checkin" : "speakers"); }}
-                    className="flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-xl bg-slate-50 group-hover:bg-cyan-600 text-slate-700 group-hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap"
+                    className="flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-lg bg-slate-50 group-hover:bg-cyan-600 text-slate-700 group-hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap"
                   >
-                    <span className="truncate">{isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}</span>
+                    <span className="truncate">{isLive ? "Điều hành" : m.status === "scheduled" ? "Check-in" : "Xem cuộc họp"}</span>
                     <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
                   </button>
 
@@ -742,7 +741,7 @@ export default function MeetingTab() {
                         e.stopPropagation();
                         setStartingMeeting(m);
                       }}
-                      className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 shrink-0 cursor-pointer shadow-xs whitespace-nowrap"
+                      className="flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 shrink-0 cursor-pointer shadow-xs whitespace-nowrap"
                     >
                       <Play className="h-3.5 w-3.5 fill-current" />
                       <span>Bắt đầu</span>
@@ -757,7 +756,7 @@ export default function MeetingTab() {
                         e.stopPropagation();
                         setEndingMeeting(m);
                       }}
-                      className="flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-all duration-200 shrink-0 border border-rose-200 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white cursor-pointer shadow-xs whitespace-nowrap"
+                      className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-all duration-200 shrink-0 border border-rose-200 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white cursor-pointer shadow-xs whitespace-nowrap"
                     >
                       <Square className="h-3.5 w-3.5 fill-current" />
                       <span>Kết thúc</span>
@@ -779,7 +778,7 @@ export default function MeetingTab() {
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 text-xs font-bold shadow-sm transition cursor-pointer"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 text-xs font-bold shadow-sm transition cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               Tạo cuộc họp mới
