@@ -76,6 +76,9 @@ export default function MeetingCheckInPage() {
   };
   return <main className="min-h-dvh overflow-y-auto bg-slate-100 px-4 py-8 text-slate-900">
     <section className="mx-auto max-w-lg overflow-hidden rounded-2xl bg-white shadow-lg">
+      <div className="flex justify-center bg-white py-2">
+        <img src="/igen-connect.png" alt="iGen Connect" width={128} height={128} className="h-32 w-32 object-contain" />
+      </div>
       <header className="bg-cyan-800 p-6 text-white">
         <p className="text-xs font-semibold uppercase tracking-widest text-cyan-100">Check-in buổi họp</p>
         <h1 className="mt-2 text-2xl font-bold">{meeting?.title || (loading ? "Đang tải buổi họp…" : "Không thể mở check-in")}</h1>
