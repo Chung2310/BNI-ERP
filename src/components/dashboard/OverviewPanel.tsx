@@ -18,7 +18,7 @@ export function OverviewPanel({
   const goToTab = (tab: string, subTab?: string) => {
     const pathMap: Record<string, string> = {
       "TỔNG QUAN": "/tong-quan",
-      "NHÂN SỰ": "/nhan-su",
+      "NHÂN SỰ": "/thanh-vien",
       "ANALYTICS": "/analytics",
     };
     let path = pathMap[tab];

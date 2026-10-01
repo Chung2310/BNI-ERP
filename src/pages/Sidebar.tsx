@@ -51,7 +51,7 @@ const baseMenuItems: MenuItem[] = [
   },
   {
     label: "NHÂN SỰ",
-    title: "Nhân sự",
+    title: "Thành viên",
     icon: Users,
     group: "operations",
   },

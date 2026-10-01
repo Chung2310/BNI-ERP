@@ -71,35 +71,27 @@ export default function GuideTab() {
     {
       id: "nhan-su",
       tabName: "NHÂN SỰ",
-      title: "Quản lý Nhân sự & Phân chia Công việc",
-      shortDesc: "Quản lý hồ sơ nhân viên, vẽ sơ đồ công ty, bảng công việc kéo thả và chấm công.",
+      title: "Quản lý Thành viên & Sơ đồ tổ chức",
+      shortDesc: "Quản lý hồ sơ thành viên Chapter, doanh nghiệp, ngành nghề và sơ đồ cơ cấu tổ chức.",
       icon: Users,
       tone: "green",
-      purpose: "Giúp phòng nhân sự quản lý thông tin nhân viên, sơ đồ tổ chức, theo dõi lịch chấm công hằng ngày và quản lý tiến độ công việc một cách trực quan bằng bảng kéo thả.",
+      purpose: "Giúp Chapter quản lý thông tin thành viên, doanh nghiệp, lĩnh vực hoạt động và cơ cấu tổ chức một cách trực quan.",
       steps: [
         {
-          title: "Xem và thêm hồ sơ nhân viên mới",
-          desc: "Vào danh sách nhân viên, bấm nút 'Thêm mới', điền đầy đủ các thông tin như Họ tên, Số điện thoại, Email, chức vụ và người quản lý trực tiếp. Hệ thống sẽ tự động gửi email kích hoạt tài khoản cho nhân viên."
+          title: "Xem và thêm thành viên mới",
+          desc: "Vào Sơ đồ tổ chức, bấm nút 'Thêm thành viên', điền đầy đủ các thông tin như Họ tên, Doanh nghiệp, Lĩnh vực hoạt động, Số điện thoại, Email, chức vụ và người phụ trách."
         },
         {
-          title: "Xem sơ đồ cây tổ chức công ty",
-          desc: "Hệ thống sẽ tự động kết nối thông tin 'Người quản lý trực tiếp' của từng nhân viên để vẽ ra một sơ đồ dạng cây trực quan. Bạn có thể nhìn rõ ai đang báo cáo cho ai và cấu trúc từng phòng ban."
+          title: "Xem sơ đồ cây cơ cấu tổ chức Chapter",
+          desc: "Hệ thống sẽ tự động kết nối thông tin người phụ trách của từng thành viên để hiển thị sơ đồ dạng cây trực quan, thể hiện rõ cấu trúc từng ban/nhóm."
         },
         {
-          title: "Theo dõi chấm công hàng ngày",
-          desc: "Hệ thống hiển thị danh sách nhân viên đã đi làm hôm nay, giờ đến cụ thể, những ai đi muộn (chữ màu cam) và những người chưa check-in để người quản lý dễ dàng nắm bắt quân số."
-        },
-        {
-          title: "Giao việc và cập nhật tiến độ công việc (Kéo thả)",
-          desc: "Trong bảng công việc, bạn có thể tạo các thẻ nhiệm vụ mới, mô tả công việc bằng tiếng Việt dễ hiểu và chọn người thực hiện. Khi nhân viên làm việc, họ có thể kéo thẻ này từ cột 'Chưa làm' sang 'Đang làm' hoặc 'Đã xong' để mọi người cùng theo dõi."
-        },
-        {
-          title: "Đăng tải tài liệu đào tạo nội bộ",
-          desc: "Tạo các bài giảng hướng dẫn công việc hoặc video quy trình cho nhân viên mới tự học. Bạn có thể theo dõi tiến độ học tập (ví dụ nhân viên A đã hoàn thành 80% khóa đào tạo hội nhập)."
+          title: "Gửi email chúc mừng sinh nhật",
+          desc: "Hệ thống hỗ trợ gửi email chúc mừng sinh nhật tự động và tạo thiệp chúc mừng ý nghĩa gửi tới các thành viên trong Chapter."
         }
       ],
-      protip: "Khi sử dụng bảng kéo thả công việc, hãy khuyến khích nhân viên cập nhật thẻ ngay khi bắt đầu làm và khi hoàn thành để toàn đội luôn nắm được tiến độ dự án mà không cần họp báo cáo nhiều.",
-      warning: "Để vẽ sơ đồ tổ chức chính xác, hãy nhớ chọn đúng thông tin 'Người quản lý' khi thêm hoặc sửa hồ sơ của mỗi nhân viên."
+      protip: "Khi thêm thành viên mới, hãy điền đầy đủ thông tin Tên công ty và Lĩnh vực hoạt động để các thành viên khác dễ dàng kết nối kinh doanh.",
+      warning: "Để hiển thị sơ đồ tổ chức chính xác, hãy chọn đúng thông tin 'Người phụ trách / Trưởng ban' khi thêm hoặc sửa thông tin thành viên."
     },
     {
       id: "quan-ly-tai-nguyen",
@@ -214,7 +206,7 @@ export default function GuideTab() {
   const handleQuickRedirect = (tab: TabType, subTab?: string) => {
     const pathMap: Record<string, string> = {
       "TỔNG QUAN": "/tong-quan",
-      "NHÂN SỰ": "/nhan-su",
+      "NHÂN SỰ": "/thanh-vien",
       "KHO & SẢN PHẨM": "/kho-san-pham",
       "QUẢN TRỊ USER": "/quan-tri-user",
       "CÀI ĐẶT": "/cai-dat",

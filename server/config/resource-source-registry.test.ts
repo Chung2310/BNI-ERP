@@ -10,7 +10,7 @@ describe("resource source registry", () => {
   it("maps HR contracts to stable folders and inherited permissions", () => {
     expect(getResourceSourceDefinition("hr.contract")).toMatchObject({
       moduleKey: "hr",
-      moduleLabel: "Nhân sự",
+      moduleLabel: "Thành viên",
       groupKey: "contracts",
       groupLabel: "Hợp đồng",
       requiredPermissions: ["hr:read"],

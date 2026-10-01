@@ -7,8 +7,12 @@ import { UserModel } from "./model/user.model";
 import { ChatRoomModel } from "./model/chat-room.model";
 import { getJwtAccessSecret } from "./config/env";
 import { ddosConfig } from "./config/ddos";
-import { getRateLimitRedisClient } from "./infrastructure/rate-limit-redis";
-import { RedisSocketProtectionCounter, SocketProtection } from "./socket-protection";
+import { getRateLimitRedisClient, isRateLimitRedisReady } from "./infrastructure/rate-limit-redis";
+import {
+  FallbackSocketProtectionCounter,
+  RedisSocketProtectionCounter,
+  SocketProtection,
+} from "./socket-protection";
 import { getTrustedSocketClientIp } from "./socket-client-ip";
 import { getEnabledModulesForCompany, resolveModuleAccess } from "./middleware/require-module";
 
@@ -22,8 +26,13 @@ function warnSocketLimiter(message: string, error: unknown): void {
   console.warn(message, error);
 }
 
+const rateLimitRedisClient = getRateLimitRedisClient();
+
 const socketProtection = new SocketProtection(
-  new RedisSocketProtectionCounter(getRateLimitRedisClient(), `${ddosConfig.redisKeyPrefix}socket:`),
+  new FallbackSocketProtectionCounter(
+    new RedisSocketProtectionCounter(rateLimitRedisClient, `${ddosConfig.redisKeyPrefix}socket:`),
+    () => isRateLimitRedisReady(rateLimitRedisClient),
+  ),
   {
     handshakeWindowMs: ddosConfig.socketHandshakeWindowMs,
     handshakeLimit: ddosConfig.socketHandshakeLimit,
@@ -108,7 +117,8 @@ async function attachRedisAdapter(server: SocketIOServer) {
 }
 
 function getAllowedOrigins(): string[] {
-  const origins = new Set<string>(["http://localhost:5173", "http://localhost:3000"]);
+  const defaultPort = process.env.PORT || "3012";
+  const origins = new Set<string>(["http://localhost:5173", "http://localhost:3000", "http://localhost:3012", `http://localhost:${defaultPort}`]);
   
   if (process.env.LINK_COR) {
     process.env.LINK_COR.split(",").forEach(o => origins.add(o.trim()));

@@ -99,12 +99,12 @@ export const TAB_SEO_MAP: Partial<Record<TabType, SeoMeta>> & Record<string, Seo
   },
   "CUỘC HỌP": { title: "Cuộc họp", description: "Lịch họp và điều phối phát biểu.", keywords: "cuộc họp, check-in, điều phối", path: "/cuoc-hop", robots: "noindex, nofollow", priority: "0.2", changeFrequency: "weekly" },
   "NHÂN SỰ": {
-    title: "Quản lý nhân sự HRM - Sơ đồ tổ chức, KPI và Đào tạo",
+    title: "Quản lý thành viên - Sơ đồ tổ chức",
     description:
       "Giải pháp HRM toàn diện trên iGen Connect giúp quản lý hồ sơ nhân sự, vẽ sơ đồ tổ chức tự động, thiết lập KPI và số hóa tài liệu đào tạo nội bộ.",
     keywords:
-      "quản lý nhân sự, HRM, KPI nhân viên, đào tạo nội bộ, sơ đồ tổ chức, ERP nhân sự, sơ đồ báo cáo",
-    path: "/nhan-su",
+      "quản lý thành viên, BNI chapter, sơ đồ tổ chức, thành viên doanh nghiệp",
+    path: "/thanh-vien",
     priority: "0.8",
     changeFrequency: "weekly",
   },
@@ -232,6 +232,7 @@ export function tabToPath(tab: TabType): string {
 
 export function pathToTab(pathname: string): TabType | null {
   const normalized = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  if (normalized.toLowerCase() === "/nhan-su") return "NHÂN SỰ";
   const matched = (Object.entries(TAB_SEO_MAP) as Array<[TabType, SeoMeta]>).find(
     ([, meta]) => meta.path.toLowerCase() === normalized.toLowerCase()
   );

@@ -31,16 +31,16 @@ export default defineConfig(() => {
       allowedHosts: true as const,
       proxy: {
         '/api': {
-          target: 'http://localhost:3000',
+          target: `http://localhost:${process.env.PORT || 3012}`,
           changeOrigin: true,
         },
         '/socket.io': {
-          target: 'http://localhost:3000',
+          target: `http://localhost:${process.env.PORT || 3012}`,
           changeOrigin: true,
           ws: true,
         },
         '/uploads': {
-          target: 'http://localhost:3000',
+          target: `http://localhost:${process.env.PORT || 3012}`,
           changeOrigin: true,
         },
       },

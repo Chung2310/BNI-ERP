@@ -18,6 +18,7 @@ import {
   spinLuckyDraw,
   redrawPrizeWinner,
   resetLuckyDrawWinners,
+  createCheckInQr,
 } from './meeting.service';
 import { checkinInput, controlInput, meetingInput, updateMeetingInput } from './meeting.validation';
 
@@ -97,6 +98,7 @@ meetingRouter.post('/:id/checkin', requirePermission(['meetings:read', 'meetings
       await getEffectivePermissions(req.user.id, req.user.role, req.user.companyCode),
       ['meetings:manage', 'access:manage']
     );
+    if (!canManage) throw new MeetingError(403, "Vui lòng quét QR của buổi họp để xác nhận vị trí và check-in.");
     res.json({ data: await checkIn(item, value, req.user.id, canManage) });
   } catch (e) {
     sendError(res, e);
@@ -248,4 +250,11 @@ meetingRouter.post('/:id/lucky-draw/reset', manage, async (req: any, res) => {
   } catch (e) {
     sendError(res, e);
   }
+});
+
+meetingRouter.post('/:id/checkin-qr', manage, async (req: any, res) => {
+  try {
+    const result = await createCheckInQr(company(req), req.params.id, Number(req.body?.hours));
+    res.json({ data: { expiresAt: result.expiresAt, checkInUrl: `/meeting-checkin/${result.token}`, token: result.token } });
+  } catch (e) { sendError(res, e); }
 });

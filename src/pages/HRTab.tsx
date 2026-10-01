@@ -41,8 +41,8 @@ export default function HRTab() {
       }
       setUsersList(data);
     } catch (error) {
-      console.error("Lỗi khi tải danh sách nhân sự:", error);
-      toast.error(getApiErrorMessage(error, "Không thể tải sơ đồ nhân sự."));
+      console.error("Lỗi khi tải danh sách thành viên:", error);
+      toast.error(getApiErrorMessage(error, "Không thể tải sơ đồ tổ chức."));
     } finally {
       setLoading(false);
     }
@@ -58,7 +58,7 @@ export default function HRTab() {
     name: usr.displayName,
     role: usr.jobTitle || (
       usr.role === "admin" ? "Quản trị viên" :
-      usr.role === "manager" ? "Quản lý" : "Nhân viên"
+      usr.role === "manager" ? "Quản lý" : "Thành viên"
     ),
     department: usr.department || "Ban Giám đốc",
     email: usr.email,
@@ -77,16 +77,21 @@ export default function HRTab() {
     isLeader: usr.isLeader,
     jobDescriptionLink: usr.jobDescriptionLink || "",
     monthlySalary: usr.monthlySalary,
+    companyName: usr.companyName,
+    industry: usr.industry,
+    birthDate: usr.birthDate,
+    coverImage: usr.coverImage,
   }));
+
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-white max-h-[85vh] overflow-hidden" id="hr_tab_wrapper">
-      <h1 className="sr-only">Quản lý Nhân sự - {subTab}</h1>
+      <h1 className="sr-only">Thành viên - {subTab}</h1>
 
       {/* Sub Tabs switcher navigation bar */}
       <div className="flex shrink-0 flex-col items-stretch gap-3 border-b border-slate-200/80 bg-white px-3 pt-2 pb-0 text-xs sm:flex-row sm:items-center sm:justify-between sm:px-5" id="hr_sub_tabs_bar">
         <div className="flex min-w-0 flex-1 items-center gap-1 select-none">
-          <button type="button" aria-label="Cuộn tab HR sang trái" onClick={() => scrollSubTabs("left")} className="flex h-6 w-5 shrink-0 items-center justify-center text-slate-400 transition-colors hover:text-slate-700 sm:hidden"><ChevronLeft className="h-4 w-4" /></button>
+          <button type="button" aria-label="Cuộn tab sang trái" onClick={() => scrollSubTabs("left")} className="flex h-6 w-5 shrink-0 items-center justify-center text-slate-400 transition-colors hover:text-slate-700 sm:hidden"><ChevronLeft className="h-4 w-4" /></button>
           <div ref={subTabsRef} className="flex min-w-0 max-w-full flex-1 gap-1 overflow-x-auto select-none scrollbar-none -mb-px">
             {[
               { id: "SƠ ĐỒ TỔ CHỨC", label: "Sơ đồ tổ chức", icon: FolderTree },
@@ -115,7 +120,7 @@ export default function HRTab() {
       </div>
 
       {/* Conditional Rendering of Modular Tab Components */}
-      <Suspense fallback={<TabLoader label="Đang tải dữ liệu nhân sự..." />}>
+      <Suspense fallback={<TabLoader label="Đang tải dữ liệu thành viên..." />}>
         {subTab === "SƠ ĐỒ TỔ CHỨC" && (
           <OrgChartTab
             userProfile={userProfile}

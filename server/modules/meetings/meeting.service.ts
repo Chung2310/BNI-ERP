@@ -1,4 +1,5 @@
 import { randomBytes, randomInt, randomUUID, createHash } from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import { MeetingModel } from './meeting.model';
 import { allocateSpeakers, elapsedSeconds, reminderDueAt, speakingSeconds } from './meeting.rules';
 import { UserModel } from '../../model/user.model';
@@ -53,9 +54,19 @@ export async function createMeeting(companyCode: string, actorId: string, input:
 
 export async function updateMeeting(companyCode: string, id: string, input: any) {
   const item = await getMeeting(companyCode, id);
+  const locationChanged = (input.latitude !== undefined && input.latitude !== item.latitude)
+    || (input.longitude !== undefined && input.longitude !== item.longitude)
+    || (input.gpsRadiusMeters !== undefined && input.gpsRadiusMeters !== item.gpsRadiusMeters);
+  if (locationChanged) {
+    item.checkInQrTokenHash = undefined;
+    item.checkInQrExpiresAt = undefined;
+  }
   if (input.title !== undefined) item.title = input.title;
   if (input.description !== undefined) item.description = input.description;
   if (input.location !== undefined) item.location = input.location;
+  if (input.latitude !== undefined) item.latitude = input.latitude;
+  if (input.longitude !== undefined) item.longitude = input.longitude;
+  if (input.gpsRadiusMeters !== undefined) item.gpsRadiusMeters = input.gpsRadiusMeters;
   if (input.coverImage !== undefined) item.coverImage = input.coverImage;
   if (input.startsAt !== undefined) {
     item.startsAt = new Date(input.startsAt);
@@ -67,6 +78,9 @@ export async function updateMeeting(companyCode: string, id: string, input: any)
   }
   if (input.tiers !== undefined) item.tiers = input.tiers;
   if (input.fallbackSeconds !== undefined) item.fallbackSeconds = input.fallbackSeconds;
+  if (item.status === "scheduled" && (input.tiers !== undefined || input.fallbackSeconds !== undefined)) {
+    item.speakers.forEach((person, index) => { person.seconds = speakingSeconds(index, item.tiers as any, item.fallbackSeconds); });
+  }
   return saveMeeting(item);
 }
 
@@ -114,6 +128,8 @@ export async function checkIn(item: any, input: any, actorId: string, canManage:
     userId,
     name: person?.displayName || input.name,
     email: (person?.email || input.email || '').toLowerCase(),
+    phone: person?.phone || input.phone,
+    company: person?.companyName || input.company,
     photoURL: person?.photoURL || input.photoURL,
     coverImage: person?.coverImage || input.coverImage,
     checkedInAt: new Date(),
@@ -433,4 +449,62 @@ export async function resetLuckyDrawWinners(item: any, prizeId?: string) {
   }
   await saveMeeting(item);
   return item.luckyDraw;
+}
+
+export function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const dLat = radians(lat2 - lat1);
+  const dLon = radians(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+export async function createCheckInQr(companyCode: string, id: string, hours: number) {
+  const item = await getMeeting(companyCode, id);
+  if (![1, 2].includes(hours)) throw new MeetingError(400, 'Thời hạn QR chỉ được chọn 1 hoặc 2 giờ.');
+  if (typeof item.latitude !== 'number' || typeof item.longitude !== 'number') throw new MeetingError(400, 'Hãy lưu tọa độ GPS địa điểm trước khi tạo QR check-in.');
+  if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp hiện không nhận check-in.');
+  const token = randomBytes(32).toString('base64url');
+  const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+  item.checkInQrTokenHash = createHash('sha256').update(token).digest('hex');
+  item.checkInQrExpiresAt = expiresAt;
+  await saveMeeting(item);
+  return { token, expiresAt, meeting: { id: String(item._id), title: item.title } };
+}
+
+function validateQrAndLocation(item: any, input: any) {
+  if (!item.checkInQrTokenHash || !item.checkInQrExpiresAt || new Date(item.checkInQrExpiresAt).getTime() <= Date.now()) throw new MeetingError(410, 'Mã QR đã hết hạn hoặc bị thay thế. Hãy liên hệ ban tổ chức.');
+  if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp hiện không nhận check-in.');
+  if (typeof item.latitude !== 'number' || typeof item.longitude !== 'number') throw new MeetingError(409, 'Cuộc họp chưa cấu hình tọa độ GPS.');
+  if (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude)) throw new MeetingError(400, 'Cần cho phép truy cập vị trí GPS để check-in.');
+  const distance = distanceMeters(item.latitude, item.longitude, input.latitude, input.longitude);
+  if (distance > (item.gpsRadiusMeters || 200)) throw new MeetingError(403, `Bạn đang cách địa điểm họp khoảng ${Math.round(distance)} m; phạm vi check-in là ${item.gpsRadiusMeters || 200} m.`);
+}
+
+export async function getPublicQrMeeting(token: string) {
+  const hash = createHash('sha256').update(token).digest('hex');
+  const item = await MeetingModel.findOne({ checkInQrTokenHash: hash, checkInQrExpiresAt: { $gt: new Date() } }).lean();
+  if (!item || !['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(410, 'Mã QR đã hết hạn hoặc không còn hiệu lực.');
+  return { title: item.title, startsAt: item.startsAt, location: item.location, expiresAt: item.checkInQrExpiresAt };
+}
+
+export async function qrCheckInMember(token: string, input: any) {
+  const hash = createHash('sha256').update(token).digest('hex');
+  const item: any = await MeetingModel.findOne({ checkInQrTokenHash: hash, checkInQrExpiresAt: { $gt: new Date() } });
+  if (!item) throw new MeetingError(410, 'Mã QR đã hết hạn hoặc không còn hiệu lực.');
+  validateQrAndLocation(item, input);
+  const email = String(input.email || '').trim().toLowerCase();
+  const person: any = await UserModel.findOne({ email, companyCode: item.companyCode, isActive: { $ne: false } }).select('+password displayName email photoURL coverImage password').lean();
+  if (!person?.password || !(await bcrypt.compare(input.password, person.password))) throw new MeetingError(401, 'Tài khoản hoặc mật khẩu không đúng với thành viên của đơn vị tổ chức.');
+  await checkIn(item, { userId: String(person._id) }, String(person._id), false);
+  return { success: true, name: person.displayName };
+}
+
+export async function qrCheckInGuest(token: string, input: any) {
+  const hash = createHash('sha256').update(token).digest('hex');
+  const item: any = await MeetingModel.findOne({ checkInQrTokenHash: hash, checkInQrExpiresAt: { $gt: new Date() } });
+  if (!item) throw new MeetingError(410, 'Mã QR đã hết hạn hoặc không còn hiệu lực.');
+  validateQrAndLocation(item, input);
+  await checkIn(item, { name: input.name, email: input.email, phone: input.phone, company: input.company }, 'public-qr', true);
+  return { success: true, name: input.name };
 }
