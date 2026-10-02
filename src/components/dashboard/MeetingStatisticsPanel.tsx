@@ -1304,47 +1304,57 @@ export function MeetingStatisticsPanel() {
                   rankIndex: 3, // #4 (ngoài cùng bên trái)
                   rankNum: 4,
                   heightClass: "h-28 sm:h-36",
-                  bgGradient:
-                    "bg-gradient-to-t from-purple-500 via-indigo-500 to-purple-400 text-white border border-purple-300/60 shadow-sm",
-                  badgeColor: "bg-purple-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-purple-300",
+                  bgColor: "bg-blue-500",
+                  textColor: "text-white",
+                  dividerColor: "border-white/20",
+                  borderColor: "border-blue-400/50",
+                  badgeColor: "bg-blue-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-blue-400",
                 },
                 {
                   rankIndex: 1, // #2 (trái giữa)
                   rankNum: 2,
                   heightClass: "h-44 sm:h-52",
-                  bgGradient:
-                    "bg-gradient-to-t from-blue-500 via-sky-500 to-cyan-400 text-white border border-sky-300/60 shadow-md",
-                  badgeColor: "bg-sky-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-sky-300",
+                  bgColor: "bg-red-500",
+                  textColor: "text-white",
+                  dividerColor: "border-white/20",
+                  borderColor: "border-red-400/50",
+                  badgeColor: "bg-red-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-red-400",
                 },
                 {
                   rankIndex: 0, // #1 (CHÍNH GIỮA - TOP 1 QUÁN QUÂN)
                   rankNum: 1,
                   heightClass: "h-56 sm:h-64",
-                  bgGradient:
-                    "bg-gradient-to-t from-amber-500 via-amber-400 to-yellow-300 text-white border border-amber-300/70 shadow-lg shadow-amber-100/60 ring-2 ring-amber-200/50",
+                  bgColor: "bg-yellow-400",
+                  textColor: "text-slate-900",
+                  dividerColor: "border-slate-900/15",
+                  borderColor: "border-yellow-400 shadow-sm",
                   badgeColor: "bg-amber-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-amber-300 shadow-sm",
+                  ringColor: "ring-2 ring-yellow-400",
                   isTop1: true,
                 },
                 {
                   rankIndex: 2, // #3 (phải giữa)
                   rankNum: 3,
                   heightClass: "h-36 sm:h-44",
-                  bgGradient:
-                    "bg-gradient-to-t from-emerald-500 via-teal-500 to-emerald-400 text-white border border-emerald-300/60 shadow-md",
-                  badgeColor: "bg-emerald-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-emerald-300",
+                  bgColor: "bg-green-500",
+                  textColor: "text-white",
+                  dividerColor: "border-white/20",
+                  borderColor: "border-green-400/50",
+                  badgeColor: "bg-green-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-green-400",
                 },
                 {
                   rankIndex: 4, // #5 (ngoài cùng bên phải)
                   rankNum: 5,
                   heightClass: "h-22 sm:h-28",
-                  bgGradient:
-                    "bg-gradient-to-t from-rose-500 via-rose-400 to-pink-400 text-white border border-rose-300/60 shadow-sm",
-                  badgeColor: "bg-rose-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-rose-300",
+                  bgColor: "bg-orange-500",
+                  textColor: "text-white",
+                  dividerColor: "border-white/20",
+                  borderColor: "border-orange-400/50",
+                  badgeColor: "bg-orange-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-orange-400",
                 },
               ];
 
@@ -1421,9 +1431,9 @@ export function MeetingStatisticsPanel() {
 
                         {/* The Pillar / Column bar */}
                         <div
-                          className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border flex flex-col items-center justify-between py-2.5 sm:py-3 px-1 transition-all duration-300 ease-out group-hover:scale-[1.02] ${slot.heightClass} ${slot.bgGradient}`}
+                          className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border flex flex-col items-center justify-between py-2.5 sm:py-3 px-1 transition-all duration-300 ease-out group-hover:scale-[1.02] ${slot.heightClass} ${slot.bgColor} ${slot.borderColor} ${slot.textColor}`}
                         >
-                          <div className="text-center text-white">
+                          <div className="text-center">
                             <span className="block text-xs sm:text-sm font-semibold tracking-normal">
                               {m.attendedCount} buổi
                             </span>
@@ -1432,7 +1442,7 @@ export function MeetingStatisticsPanel() {
                             </span>
                           </div>
 
-                          <div className="text-center border-t border-white/20 pt-1.5 w-full text-white">
+                          <div className={`text-center border-t ${slot.dividerColor} pt-1.5 w-full`}>
                             <span className="block text-[10px] font-medium opacity-90 truncate">
                               {m.avgEarlyMinutes > 0
                                 ? `Sớm +${m.avgEarlyMinutes}p`
