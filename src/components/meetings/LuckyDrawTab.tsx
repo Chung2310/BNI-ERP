@@ -479,9 +479,6 @@ export function LuckyDrawTab({
                 <h3 className="text-base font-semibold text-slate-900">
                   Quay thưởng buổi họp
                 </h3>
-                <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-[#cf142b] ring-1 ring-inset ring-red-200">
-                  BNI Chapter
-                </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 {meeting.title} · {meeting.speakers?.length || 0} người đã check-in
