@@ -1273,42 +1273,20 @@ export function MeetingStatisticsPanel() {
 
       {/* 4. BẢNG XẾP HẠNG THÀNH VIÊN TÍCH CỰC (Top 5 bục podium cao thấp, Top 1 ở giữa, Top 6-10 danh sách) */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
           <div>
             <div className="flex items-center gap-2">
               <Trophy className="h-4 w-4 text-amber-500" />
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+              <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">
                 Bảng xếp hạng thành viên tích cực
               </h3>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
                 Top {Math.min(10, memberRankings.length)}
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5">
               Xếp hạng theo số buổi điểm danh tham gia và thói quen đến sớm chuẩn giờ
             </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-medium">
-            <span className="flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60 font-semibold">
-              <span className="h-2 w-2 rounded-full bg-amber-400" />
-              #1 Vàng kim (Quán quân)
-            </span>
-            <span className="flex items-center gap-1 text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200/60 font-semibold">
-              <span className="h-2 w-2 rounded-full bg-sky-500" />
-              #2 Xanh dương
-            </span>
-            <span className="flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60 font-semibold">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              #3 Xanh lục
-            </span>
-            <span className="flex items-center gap-1 text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200/60 font-semibold">
-              <span className="h-2 w-2 rounded-full bg-purple-500" />
-              #4 Tím
-            </span>
-            <span className="flex items-center gap-1 text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200/60 font-semibold">
-              <span className="h-2 w-2 rounded-full bg-rose-500" />
-              #5 Hồng
-            </span>
           </div>
         </div>
 
@@ -1327,30 +1305,27 @@ export function MeetingStatisticsPanel() {
                   rankNum: 4,
                   heightClass: "h-28 sm:h-36",
                   bgGradient:
-                    "bg-gradient-to-t from-purple-600 via-indigo-500 to-purple-400 text-white border-purple-300/80 shadow-md shadow-purple-200/50",
-                  badgeColor: "bg-purple-600 text-white font-bold ring-2 ring-white shadow-xs",
-                  ringColor: "ring-2 ring-purple-400 shadow-sm",
-                  nameColor: "text-slate-800",
+                    "bg-gradient-to-t from-purple-500 via-indigo-500 to-purple-400 text-white border border-purple-300/60 shadow-sm",
+                  badgeColor: "bg-purple-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-purple-300",
                 },
                 {
                   rankIndex: 1, // #2 (trái giữa)
                   rankNum: 2,
                   heightClass: "h-44 sm:h-52",
                   bgGradient:
-                    "bg-gradient-to-t from-blue-600 via-sky-500 to-cyan-400 text-white border-sky-300/80 shadow-lg shadow-sky-200/50",
-                  badgeColor: "bg-sky-500 text-white font-bold ring-2 ring-white shadow-xs",
-                  ringColor: "ring-3 ring-sky-400 shadow-md shadow-sky-200",
-                  nameColor: "text-slate-800",
+                    "bg-gradient-to-t from-blue-500 via-sky-500 to-cyan-400 text-white border border-sky-300/60 shadow-md",
+                  badgeColor: "bg-sky-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-sky-300",
                 },
                 {
                   rankIndex: 0, // #1 (CHÍNH GIỮA - TOP 1 QUÁN QUÂN)
                   rankNum: 1,
                   heightClass: "h-56 sm:h-64",
                   bgGradient:
-                    "bg-gradient-to-t from-amber-500 via-amber-400 to-yellow-300 text-amber-950 border-2 border-amber-300 shadow-xl shadow-amber-300/40 ring-4 ring-amber-200/60",
-                  badgeColor: "bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-black ring-2 ring-white shadow-md",
-                  ringColor: "ring-4 ring-amber-400 shadow-lg shadow-amber-300/50",
-                  nameColor: "text-amber-950 font-black",
+                    "bg-gradient-to-t from-amber-500 via-amber-400 to-yellow-300 text-white border border-amber-300/70 shadow-lg shadow-amber-100/60 ring-2 ring-amber-200/50",
+                  badgeColor: "bg-amber-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-amber-300 shadow-sm",
                   isTop1: true,
                 },
                 {
@@ -1358,20 +1333,18 @@ export function MeetingStatisticsPanel() {
                   rankNum: 3,
                   heightClass: "h-36 sm:h-44",
                   bgGradient:
-                    "bg-gradient-to-t from-emerald-600 via-teal-500 to-emerald-400 text-white border-emerald-300/80 shadow-lg shadow-emerald-200/50",
-                  badgeColor: "bg-emerald-600 text-white font-bold ring-2 ring-white shadow-xs",
-                  ringColor: "ring-3 ring-emerald-400 shadow-md shadow-emerald-200",
-                  nameColor: "text-slate-800",
+                    "bg-gradient-to-t from-emerald-500 via-teal-500 to-emerald-400 text-white border border-emerald-300/60 shadow-md",
+                  badgeColor: "bg-emerald-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-emerald-300",
                 },
                 {
                   rankIndex: 4, // #5 (ngoài cùng bên phải)
                   rankNum: 5,
                   heightClass: "h-22 sm:h-28",
                   bgGradient:
-                    "bg-gradient-to-t from-rose-600 via-rose-500 to-pink-400 text-white border-rose-300/80 shadow-md shadow-rose-200/50",
-                  badgeColor: "bg-rose-500 text-white font-bold ring-2 ring-white shadow-xs",
-                  ringColor: "ring-2 ring-rose-400 shadow-sm",
-                  nameColor: "text-slate-800",
+                    "bg-gradient-to-t from-rose-500 via-rose-400 to-pink-400 text-white border border-rose-300/60 shadow-sm",
+                  badgeColor: "bg-rose-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-rose-300",
                 },
               ];
 
@@ -1382,18 +1355,18 @@ export function MeetingStatisticsPanel() {
 
                     if (!m) {
                       return (
-                        <div key={`empty-${slot.rankNum}`} className="flex flex-col items-center justify-end h-full opacity-50">
+                        <div key={`empty-${slot.rankNum}`} className="flex flex-col items-center justify-end h-full opacity-40">
                           <div className="flex flex-col items-center mb-2.5 w-full">
-                            <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 border-dashed border-slate-200 text-slate-400 text-xs font-bold mb-1.5 bg-slate-50">
+                            <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-400 text-xs font-medium mb-1.5 bg-slate-50/50">
                               #{slot.rankNum}
                             </div>
-                            <p className="text-[11px] sm:text-xs text-slate-400 text-center font-medium">Chờ thành viên</p>
-                            <p className="text-[9px] sm:text-[10px] text-slate-300 text-center">-</p>
+                            <p className="text-xs text-slate-400 text-center font-normal">Chờ thành viên</p>
+                            <p className="text-[10px] text-slate-300 text-center">-</p>
                           </div>
                           <div
-                            className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 flex flex-col items-center justify-center py-2 px-1 text-slate-400 ${slot.heightClass}`}
+                            className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center py-2 px-1 text-slate-400 ${slot.heightClass}`}
                           >
-                            <span className="text-xs font-semibold text-slate-300">#{slot.rankNum}</span>
+                            <span className="text-xs font-normal text-slate-300">#{slot.rankNum}</span>
                           </div>
                         </div>
                       );
@@ -1404,21 +1377,21 @@ export function MeetingStatisticsPanel() {
                         {/* Header info above column: Avatar & Name */}
                         <div className="flex flex-col items-center mb-2.5 w-full">
                           {slot.isTop1 && (
-                            <Crown className="h-5 w-5 text-amber-500 fill-amber-400 drop-shadow-sm -mb-1 animate-bounce" />
+                            <Crown className="h-4 w-4 text-amber-500 fill-amber-400 drop-shadow-xs -mb-0.5" />
                           )}
                           <div className="relative mb-1.5">
                             {m.photoURL ? (
                               <img
                                 src={m.photoURL}
                                 alt={m.name}
-                                className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover shadow-xs ${slot.ringColor}`}
+                                className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover shadow-2xs ${slot.ringColor}`}
                                 onError={(e) => {
                                   (e.target as HTMLElement).style.display = "none";
                                 }}
                               />
                             ) : (
                               <div
-                                className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-700 text-xs sm:text-sm shadow-xs ${slot.ringColor}`}
+                                className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-slate-100 font-semibold text-slate-600 text-xs sm:text-sm shadow-2xs ${slot.ringColor}`}
                               >
                                 {(m.name || "?").trim().charAt(0).toUpperCase()}
                               </div>
@@ -1431,16 +1404,14 @@ export function MeetingStatisticsPanel() {
                           </div>
 
                           <p
-                            className={`text-[11px] sm:text-xs text-center truncate max-w-[70px] sm:max-w-[120px] ${
-                              slot.isTop1 ? "font-black text-amber-900" : "font-bold text-slate-800"
-                            }`}
+                            className="text-xs font-medium text-slate-700 text-center truncate max-w-[70px] sm:max-w-[120px]"
                             title={m.name}
                           >
                             {m.name}
                           </p>
                           {m.companyName && (
                             <p
-                              className="text-[9px] sm:text-[10px] text-slate-400 text-center truncate max-w-[70px] sm:max-w-[120px]"
+                              className="text-[10px] text-slate-400 text-center truncate max-w-[70px] sm:max-w-[120px]"
                               title={m.companyName}
                             >
                               {m.companyName}
@@ -1450,23 +1421,19 @@ export function MeetingStatisticsPanel() {
 
                         {/* The Pillar / Column bar */}
                         <div
-                          className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border flex flex-col items-center justify-between py-2 sm:py-3 px-1 transition-all duration-500 ease-out group-hover:scale-[1.03] ${slot.heightClass} ${slot.bgGradient}`}
+                          className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border flex flex-col items-center justify-between py-2.5 sm:py-3 px-1 transition-all duration-300 ease-out group-hover:scale-[1.02] ${slot.heightClass} ${slot.bgGradient}`}
                         >
-                          <div className="text-center">
-                            <span className="block font-black text-xs sm:text-sm tracking-tight">
+                          <div className="text-center text-white">
+                            <span className="block text-xs sm:text-sm font-semibold tracking-normal">
                               {m.attendedCount} buổi
                             </span>
-                            <span
-                              className={`inline-block text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.2 rounded-full mt-0.5 ${
-                                slot.isTop1 ? "bg-amber-900/10 text-amber-950" : "bg-white/20 text-white"
-                              }`}
-                            >
+                            <span className="block text-[10px] font-normal opacity-90 mt-0.5">
                               {m.attendanceRate}%
                             </span>
                           </div>
 
-                          <div className="text-center border-t border-black/10 pt-1 w-full">
-                            <span className="block text-[9px] sm:text-[10px] font-semibold opacity-95 truncate">
+                          <div className="text-center border-t border-white/20 pt-1.5 w-full text-white">
+                            <span className="block text-[10px] font-medium opacity-90 truncate">
                               {m.avgEarlyMinutes > 0
                                 ? `Sớm +${m.avgEarlyMinutes}p`
                                 : m.attendedCount > 0
@@ -1501,7 +1468,7 @@ export function MeetingStatisticsPanel() {
                       className="flex items-center justify-between p-2.5 sm:px-4 hover:bg-slate-50/80 transition-colors text-xs"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 font-mono font-bold text-slate-600 text-xs">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 font-mono font-medium text-slate-500 text-xs">
                           #{idx + 6}
                         </span>
                         {m.photoURL ? (
@@ -1514,12 +1481,12 @@ export function MeetingStatisticsPanel() {
                             }}
                           />
                         ) : (
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-600 text-xs shrink-0">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 font-medium text-slate-600 text-xs shrink-0">
                             {(m.name || "?").trim().charAt(0).toUpperCase()}
                           </div>
                         )}
                         <div className="min-w-0">
-                          <p className="font-semibold text-slate-800 truncate">{m.name}</p>
+                          <p className="font-medium text-slate-800 truncate">{m.name}</p>
                           {m.companyName && (
                             <p className="text-[10px] text-slate-400 truncate">{m.companyName}</p>
                           )}
@@ -1528,11 +1495,11 @@ export function MeetingStatisticsPanel() {
 
                       <div className="flex items-center gap-3 sm:gap-6 text-right shrink-0">
                         <div>
-                          <span className="font-bold text-slate-700">{m.attendedCount}</span>
+                          <span className="font-semibold text-slate-700">{m.attendedCount}</span>
                           <span className="text-slate-400 ml-1">buổi ({m.attendanceRate}%)</span>
                         </div>
                         <span
-                          className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                          className={`text-[11px] font-normal px-2 py-0.5 rounded-full ${
                             m.avgEarlyMinutes > 0
                               ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                               : m.attendedCount > 0
