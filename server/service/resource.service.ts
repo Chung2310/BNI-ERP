@@ -1,3 +1,4 @@
+import { ensureAutomaticResourceFolders } from "./resource-folder-provisioning.service";
 import mongoose from "mongoose";
 import { ResourceItemModel, IResourceItem } from "../model/resource-item.model";
 import { CompanyModel } from "../model/company.model";
@@ -28,6 +29,10 @@ export const resourceService = {
     const normalizedParent = parentId && parentId !== "root" ? parentId : null;
 
 
+
+    if (section === "local" && !normalizedParent && !roomId) {
+      await ensureAutomaticResourceFolders(companyCode);
+    }
 
     if (section === "local" && !normalizedParent) {
       const fixedFolderName = "_GOOGLE DOCUMENTS";

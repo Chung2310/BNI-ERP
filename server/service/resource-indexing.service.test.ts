@@ -107,7 +107,7 @@ describe("ResourceIndexingService", () => {
     const resource = await service.registerUploadedResource(input());
 
     expect(fake.folders.map((folder) => folder.name)).toEqual([
-      "Nhân sự",
+      "Thành viên",
       "Hợp đồng",
       "NV001 - Nguyễn Văn A",
     ]);
@@ -222,4 +222,19 @@ describe("ResourceIndexingService", () => {
     expect(fake.files[0].isDeleted).toBe(true);
     expect(fake.files[1].isDeleted).toBe(false);
   });
+});
+
+it("pre-created member folders are reused by uploads without duplicate files or folders", async () => {
+  const { repository, folders, files } = fakeRepository();
+  const service = createResourceIndexingService(repository);
+  const data = input();
+  const first = await service.ensureSourceFolders(data);
+  expect(files).toHaveLength(0);
+  expect(folders).toHaveLength(3);
+  const file = await service.registerUploadedResource(data);
+  expect(file.parentId).toBe(first._id);
+  expect(folders).toHaveLength(3);
+  await service.ensureSourceFolders({ ...data, entityLabel: "Tên mới" });
+  expect(folders).toHaveLength(3);
+  expect(folders.find(folder => folder._id === first._id)?.name).toBe("Tên mới");
 });

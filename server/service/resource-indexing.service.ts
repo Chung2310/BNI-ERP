@@ -217,7 +217,50 @@ function isDuplicateKeyError(error: unknown): boolean {
 }
 
 export function createResourceIndexingService(repository: ResourceIndexingRepository = mongooseRepository) {
+  const ensureSourceFolders = async (input: { companyCode: string; sourceType: string; entityId?: string; entityLabel?: string; entityType?: string; branchId?: string; sourceAudienceIds?: string[] }) => {
+    input = { ...input, companyCode: requireText(input.companyCode, "Mã công ty").toUpperCase() };
+    const definition = getResourceSourceDefinition(input.sourceType);
+      const moduleFolder = await repository.upsertSystemFolder({
+        companyCode: input.companyCode,
+        name: definition.moduleLabel,
+        parentId: null,
+        systemFolderKey: buildSystemFolderKey(input.companyCode, "module", input.sourceType),
+        sourceModule: definition.moduleKey,
+        requiredPermissions: definition.requiredPermissions,
+      });
+      const groupFolder = await repository.upsertSystemFolder({
+        companyCode: input.companyCode,
+        name: definition.groupLabel,
+        parentId: moduleFolder._id,
+        systemFolderKey: buildSystemFolderKey(input.companyCode, "group", input.sourceType),
+        sourceType: definition.sourceType,
+        sourceModule: definition.moduleKey,
+        sourceGroup: definition.groupKey,
+        requiredPermissions: definition.requiredPermissions,
+      });
+      if (!input.entityId) return groupFolder;
+      const sourceRoute = buildResourceSourceRoute(definition, input.entityId);
+      const entityFolder = await repository.upsertSystemFolder({
+        companyCode: input.companyCode,
+        name: input.entityLabel || input.entityId,
+        parentId: groupFolder._id,
+        systemFolderKey: buildSystemFolderKey(input.companyCode, "entity", input.sourceType, input.entityId),
+        sourceType: definition.sourceType,
+        sourceModule: definition.moduleKey,
+        sourceGroup: definition.groupKey,
+        sourceEntityType: input.entityType,
+        sourceEntityId: input.entityId,
+        sourceEntityLabel: input.entityLabel,
+        sourceRoute,
+        branchId: input.branchId,
+        requiredPermissions: definition.requiredPermissions,
+        sourceAudienceIds: input.sourceAudienceIds,
+      });
+
+    return entityFolder;
+  };
   return {
+    ensureSourceFolders,
     async registerUploadedResource(rawInput: RegisterUploadedResourceInput): Promise<ResourceIndexingRecord> {
       const input = {
         ...rawInput,
@@ -249,41 +292,8 @@ export function createResourceIndexingService(repository: ResourceIndexingReposi
       };
       if (existing) return retirePreviousFieldVersion(existing);
 
-      const moduleFolder = await repository.upsertSystemFolder({
-        companyCode: input.companyCode,
-        name: definition.moduleLabel,
-        parentId: null,
-        systemFolderKey: buildSystemFolderKey(input.companyCode, "module", input.sourceType),
-        sourceModule: definition.moduleKey,
-        requiredPermissions: definition.requiredPermissions,
-      });
-      const groupFolder = await repository.upsertSystemFolder({
-        companyCode: input.companyCode,
-        name: definition.groupLabel,
-        parentId: moduleFolder._id,
-        systemFolderKey: buildSystemFolderKey(input.companyCode, "group", input.sourceType),
-        sourceType: definition.sourceType,
-        sourceModule: definition.moduleKey,
-        sourceGroup: definition.groupKey,
-        requiredPermissions: definition.requiredPermissions,
-      });
+      const entityFolder = await ensureSourceFolders(input);
       const sourceRoute = buildResourceSourceRoute(definition, input.entityId);
-      const entityFolder = await repository.upsertSystemFolder({
-        companyCode: input.companyCode,
-        name: input.entityLabel,
-        parentId: groupFolder._id,
-        systemFolderKey: buildSystemFolderKey(input.companyCode, "entity", input.sourceType, input.entityId),
-        sourceType: definition.sourceType,
-        sourceModule: definition.moduleKey,
-        sourceGroup: definition.groupKey,
-        sourceEntityType: input.entityType,
-        sourceEntityId: input.entityId,
-        sourceEntityLabel: input.entityLabel,
-        sourceRoute,
-        branchId: input.branchId,
-        requiredPermissions: definition.requiredPermissions,
-        sourceAudienceIds: input.sourceAudienceIds,
-      });
 
       try {
         const created = await repository.createSystemFile({
