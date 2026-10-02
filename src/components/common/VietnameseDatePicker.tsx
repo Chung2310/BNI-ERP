@@ -6,8 +6,10 @@ export interface VietnameseDatePickerProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  buttonClassName?: string;
   ariaLabel?: string;
   disabled?: boolean;
+  align?: "left" | "right" | "auto";
 }
 
 const pad2 = (n: number) => n.toString().padStart(2, "0");
@@ -29,17 +31,21 @@ const MONTH_NAMES = [
 ];
 
 const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: 15 }, (_, i) => CURRENT_YEAR - 5 + i);
+// Support from 1940 to CURRENT_YEAR + 10 (covering birthdays, meetings, and future events)
+const YEARS = Array.from({ length: CURRENT_YEAR - 1940 + 11 }, (_, i) => 1940 + i);
 
 export function VietnameseDatePicker({
   value,
   onChange,
   placeholder = "Chọn ngày...",
   className = "",
+  buttonClassName = "",
   ariaLabel = "Chọn ngày",
   disabled = false,
+  align = "auto",
 }: VietnameseDatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Parse "YYYY-MM-DD" safely
@@ -75,7 +81,17 @@ export function VietnameseDatePicker({
     }
   }, [value]);
 
-  // Click outside to close
+  // Check whether to open popup upwards or downwards based on viewport space
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      setOpenUpward(spaceBelow < 320 && spaceAbove > 320);
+    }
+  }, [isOpen]);
+
+  // Click outside and Esc key to close
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
@@ -157,8 +173,16 @@ export function VietnameseDatePicker({
   // Display text formatted as "DD/MM/YYYY"
   const displayText = parsed ? `${pad2(parsed.day)}/${pad2(parsed.month + 1)}/${parsed.year}` : "";
 
+  // Alignment classes for dropdown popup
+  const alignClass =
+    align === "right"
+      ? "right-0"
+      : align === "left"
+      ? "left-0"
+      : "right-0 sm:right-auto sm:left-0";
+
   return (
-    <div ref={containerRef} className={`relative inline-block text-left ${className}`}>
+    <div ref={containerRef} className={`relative text-left ${className}`}>
       {/* Input button triggering calendar */}
       <div
         role="button"
@@ -176,13 +200,20 @@ export function VietnameseDatePicker({
             setIsOpen(!isOpen);
           }
         }}
-        className={`group flex items-center justify-between gap-1.5 rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-2.5 text-xs text-slate-700 transition cursor-pointer select-none hover:bg-white hover:border-slate-300 focus:bg-white focus:border-red-500 focus:outline-hidden ${
-          isOpen ? "bg-white border-red-500 ring-2 ring-red-500/10" : ""
-        } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        className={`group flex items-center justify-between gap-1.5 transition cursor-pointer select-none ${
+          buttonClassName ||
+          "rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-2.5 text-xs text-slate-700 hover:bg-white hover:border-slate-300 focus:bg-white focus:border-red-500 focus:outline-hidden"
+        } ${isOpen ? "bg-white border-blue-500 ring-2 ring-blue-500/20" : ""} ${
+          disabled ? "opacity-50 cursor-not-allowed" : ""
+        }`}
       >
-        <div className="flex items-center gap-1.5 min-w-0">
-          <CalendarDays className="h-3.5 w-3.5 text-slate-400 group-hover:text-red-500 transition-colors shrink-0" />
-          <span className={`truncate ${displayText ? "font-medium text-slate-800" : "text-slate-400 font-normal"}`}>
+        <div className="flex items-center gap-2 min-w-0">
+          <CalendarDays className="h-4 w-4 text-slate-400 group-hover:text-blue-500 transition-colors shrink-0" />
+          <span
+            className={`truncate ${
+              displayText ? "font-medium text-slate-800" : "text-slate-400 font-normal"
+            }`}
+          >
             {displayText || placeholder}
           </span>
         </div>
@@ -195,7 +226,7 @@ export function VietnameseDatePicker({
             onClick={handleClear}
             className="p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition cursor-pointer shrink-0"
           >
-            <X className="h-3 w-3" />
+            <X className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
@@ -205,7 +236,9 @@ export function VietnameseDatePicker({
         <div
           role="dialog"
           aria-label="Lịch chọn ngày"
-          className="absolute right-0 sm:left-0 z-50 mt-1.5 w-[280px] rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xl shadow-slate-900/10 animate-in fade-in zoom-in-95 duration-100"
+          className={`absolute ${alignClass} ${
+            openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          } z-50 w-[280px] rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xl shadow-slate-900/15 animate-in fade-in zoom-in-95 duration-100`}
         >
           {/* Calendar Header with Vietnamese Month and Year */}
           <div className="flex items-center justify-between gap-1 pb-2.5 border-b border-slate-100">
@@ -224,7 +257,7 @@ export function VietnameseDatePicker({
                 aria-label="Chọn tháng"
                 value={viewMonth}
                 onChange={(e) => setViewMonth(parseInt(e.target.value, 10))}
-                className="appearance-none bg-transparent py-1 px-1.5 text-xs font-bold text-slate-800 hover:bg-slate-100 rounded-md cursor-pointer focus:outline-hidden"
+                className="appearance-none bg-slate-50 border border-slate-200 py-1 px-1.5 text-xs font-bold text-slate-800 hover:bg-white rounded-lg cursor-pointer focus:outline-hidden"
               >
                 {MONTH_NAMES.map((name, idx) => (
                   <option key={idx} value={idx}>
@@ -237,7 +270,7 @@ export function VietnameseDatePicker({
                 aria-label="Chọn năm"
                 value={viewYear}
                 onChange={(e) => setViewYear(parseInt(e.target.value, 10))}
-                className="appearance-none bg-transparent py-1 px-1.5 text-xs font-bold text-slate-800 hover:bg-slate-100 rounded-md cursor-pointer focus:outline-hidden"
+                className="appearance-none bg-slate-50 border border-slate-200 py-1 px-1.5 text-xs font-bold text-slate-800 hover:bg-white rounded-lg cursor-pointer focus:outline-hidden max-h-48"
               >
                 {YEARS.map((y) => (
                   <option key={y} value={y}>
@@ -301,9 +334,9 @@ export function VietnameseDatePicker({
                   onClick={() => handleSelectDay(cell.day)}
                   className={`flex h-8 items-center justify-center rounded-lg text-xs font-medium transition cursor-pointer ${
                     isSelected
-                      ? "bg-red-600 text-white font-bold shadow-xs hover:bg-red-700"
+                      ? "bg-blue-600 text-white font-bold shadow-xs hover:bg-blue-700"
                       : isToday
-                      ? "border border-red-500 font-bold text-red-600 hover:bg-red-50"
+                      ? "border border-blue-500 font-bold text-blue-600 hover:bg-blue-50"
                       : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
                   }`}
                 >
@@ -313,12 +346,12 @@ export function VietnameseDatePicker({
             })}
           </div>
 
-          {/* Footer Actions: Hôm nay, Xóa, Đóng */}
+          {/* Footer Actions: Hôm nay, Xóa lọc, Đóng */}
           <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-xs">
             <button
               type="button"
               onClick={handleToday}
-              className="text-xs font-semibold text-red-600 hover:text-red-700 transition cursor-pointer"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition cursor-pointer"
             >
               Hôm nay
             </button>
@@ -329,7 +362,7 @@ export function VietnameseDatePicker({
                   onClick={handleClear}
                   className="text-xs text-slate-500 hover:text-slate-700 transition cursor-pointer"
                 >
-                  Xóa lọc
+                  Xóa
                 </button>
               )}
               <button

@@ -31,6 +31,7 @@ import { EmployeeNode, UserProfile, TrainingCourse } from "../../types";
 import { authService, getAccessToken } from "../../services/authService";
 import { toast } from "../../pages/Toast";
 import { ConfirmDialog } from "../common/ConfirmDialog";
+import { VietnameseDatePicker } from "../common/VietnameseDatePicker";
 import { getApiErrorMessage } from "../../utils/errorMessage";
 import { filterOrgChartEmployees, getManagerForEmployee } from "./orgChartUtils";
 import { useIsMobile } from "../../hooks/useMediaQuery";
@@ -1717,11 +1718,14 @@ export default function OrgChartTab({
                     </div>
                     <div>
                       <label className="block font-bold text-gray-500 mb-1">Ngày sinh</label>
-                      <input
-                        type="date"
+                      <VietnameseDatePicker
+                        ariaLabel="Ngày sinh"
                         value={editBirthDate}
-                        onChange={(e) => setEditBirthDate(e.target.value)}
-                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                        onChange={(val) => setEditBirthDate(val)}
+                        placeholder="Chọn ngày sinh..."
+                        className="w-full"
+                        buttonClassName="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white text-xs font-normal"
+                        align="right"
                       />
                     </div>
                   </div>
@@ -2108,11 +2112,14 @@ export default function OrgChartTab({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-gray-500 mb-1">Ngày sinh</label>
-                  <input
-                    type="date"
+                  <VietnameseDatePicker
+                    ariaLabel="Ngày sinh"
                     value={addBirthDate}
-                    onChange={(e) => setAddBirthDate(e.target.value)}
-                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+                    onChange={(val) => setAddBirthDate(val)}
+                    placeholder="Chọn ngày sinh..."
+                    className="w-full"
+                    buttonClassName="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 text-xs font-normal"
+                    align="right"
                   />
                 </div>
                 <div>

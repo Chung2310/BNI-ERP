@@ -17,6 +17,7 @@ import { CompanyProfile, UserProfile } from "../../types";
 import { BranchRecord } from "../../services/branchService";
 import { authService } from "../../services/authService";
 import { toast } from "../../pages/Toast";
+import { VietnameseDatePicker } from "../common/VietnameseDatePicker";
 
 export interface UserFormModalProps {
   open: boolean;
@@ -390,15 +391,15 @@ export function UserFormModal({
                   <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
                     Ngày sinh
                   </label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
-                    <input
-                      type="date"
-                      value={userBirthDate}
-                      onChange={(e) => setUserBirthDate(e.target.value)}
-                      className="w-full pl-10 pr-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
-                    />
-                  </div>
+                  <VietnameseDatePicker
+                    ariaLabel="Ngày sinh"
+                    value={userBirthDate}
+                    onChange={(val) => setUserBirthDate(val)}
+                    placeholder="Chọn ngày sinh..."
+                    className="w-full"
+                    buttonClassName="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                    align="right"
+                  />
                 </div>
               </div>
 
