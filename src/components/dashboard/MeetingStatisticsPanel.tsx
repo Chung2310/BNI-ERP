@@ -276,6 +276,11 @@ export function MeetingStatisticsPanel() {
   const [attendeeRoleFilter, setAttendeeRoleFilter] = useState<"all" | "present" | "absent" | "guest" | "lucky">("all");
   const [attendeeSearch, setAttendeeSearch] = useState("");
 
+  // Animation & Interactive Hover States
+  const [isAnimated, setIsAnimated] = useState(false);
+  const [hoveredBarId, setHoveredBarId] = useState<string | null>(null);
+  const [hoveredSegment, setHoveredSegment] = useState<"present" | "guest" | "absent" | null>(null);
+
   const fetchData = async () => {
     setIsLoading(true);
     setError(null);
@@ -366,6 +371,12 @@ export function MeetingStatisticsPanel() {
       return true;
     });
   }, [meetings, selectedMeetingId, searchQuery, selectedDate, quickFilter, statusFilter]);
+
+  useEffect(() => {
+    setIsAnimated(false);
+    const timer = setTimeout(() => setIsAnimated(true), 60);
+    return () => clearTimeout(timer);
+  }, [filteredMeetings, selectedMeetingId]);
 
   // Aggregate metrics
   const metrics = useMemo(() => {
@@ -743,34 +754,34 @@ export function MeetingStatisticsPanel() {
         </div>
       )}
 
-      {/* 2. CHỈ SỐ TỔNG QUAN GỌN GÀNG (6 Compact Metrics Cards với màu tươi sáng tương phản rõ) */}
+      {/* 2. CHỈ SỐ TỔNG QUAN GỌN GÀNG (6 Compact Metrics Cards với animation & hover mượt mà) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* Tổng số cuộc họp */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <div className="flex items-center justify-between text-slate-500 text-xs">
             <span>Tổng cuộc họp</span>
             <CalendarDays className="h-4 w-4 text-slate-400" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-semibold tracking-tight text-slate-800">{metrics.totalMeetings}</span>
+            <span className="text-2xl font-bold tracking-tight text-slate-800">{metrics.totalMeetings}</span>
             <span className="text-xs text-slate-400">buổi</span>
           </div>
           <div className="mt-1.5 text-[11px] text-slate-500 flex items-center gap-1.5">
             <span>Xong: {metrics.completedCount}</span>
             <span>•</span>
             <span>Sắp tới: {metrics.scheduledCount}</span>
-            {metrics.liveCount > 0 && <span className="text-rose-600 font-medium">Live: {metrics.liveCount}</span>}
+            {metrics.liveCount > 0 && <span className="text-rose-600 font-medium animate-pulse">Live: {metrics.liveCount}</span>}
           </div>
         </div>
 
         {/* Tổng lượt tham dự */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <div className="flex items-center justify-between text-slate-500 text-xs">
             <span>Lượt tham dự</span>
             <Users className="h-4 w-4 text-slate-400" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-semibold tracking-tight text-slate-800">{metrics.totalAttendees}</span>
+            <span className="text-2xl font-bold tracking-tight text-slate-800">{metrics.totalAttendees}</span>
             <span className="text-xs text-slate-400">lượt</span>
           </div>
           <div className="mt-1.5 text-[11px] text-slate-500">
@@ -779,61 +790,70 @@ export function MeetingStatisticsPanel() {
         </div>
 
         {/* Thành viên có mặt (Màu Đỏ tươi BNI #ef4444) */}
-        <div className="rounded-2xl border border-rose-100 bg-rose-50/25 p-3.5 shadow-2xs">
+        <div className="rounded-2xl border border-rose-100 bg-rose-50/25 p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <div className="flex items-center justify-between text-rose-700 text-xs">
             <span>Thành viên có mặt</span>
             <span className="h-2 w-2 rounded-full bg-rose-500" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-semibold tracking-tight text-rose-600">{metrics.totalMembersPresent}</span>
+            <span className="text-2xl font-bold tracking-tight text-rose-600">{metrics.totalMembersPresent}</span>
             <span className="text-xs text-rose-400">lượt</span>
-            <span className="ml-auto text-xs font-medium text-rose-600">{metrics.memberPresentRate}%</span>
+            <span className="ml-auto text-xs font-semibold text-rose-600">{metrics.memberPresentRate}%</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-rose-100 overflow-hidden">
-            <div className="h-full rounded-full bg-rose-500 transition-all duration-300" style={{ width: `${metrics.memberPresentRate}%` }} />
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-rose-500 to-rose-600 transition-all duration-1000 ease-out"
+              style={{ width: isAnimated ? `${metrics.memberPresentRate}%` : "0%" }}
+            />
           </div>
         </div>
 
         {/* Thành viên vắng mặt (Màu Cam cảnh báo #f97316) */}
-        <div className="rounded-2xl border border-orange-100 bg-orange-50/25 p-3.5 shadow-2xs">
+        <div className="rounded-2xl border border-orange-100 bg-orange-50/25 p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <div className="flex items-center justify-between text-orange-700 text-xs">
             <span>Thành viên vắng mặt</span>
             <span className="h-2 w-2 rounded-full bg-orange-500" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-semibold tracking-tight text-orange-600">{metrics.totalMembersAbsent}</span>
+            <span className="text-2xl font-bold tracking-tight text-orange-600">{metrics.totalMembersAbsent}</span>
             <span className="text-xs text-orange-400">lượt</span>
-            <span className="ml-auto text-xs font-medium text-orange-600">{metrics.absentRate}%</span>
+            <span className="ml-auto text-xs font-semibold text-orange-600">{metrics.absentRate}%</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-orange-100 overflow-hidden">
-            <div className="h-full rounded-full bg-orange-500 transition-all duration-300" style={{ width: `${metrics.absentRate}%` }} />
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-500 transition-all duration-1000 ease-out"
+              style={{ width: isAnimated ? `${metrics.absentRate}%` : "0%" }}
+            />
           </div>
         </div>
 
         {/* Khách mời (Màu Xanh da trời tươi sáng #0ea5e9 tương phản hoàn hảo) */}
-        <div className="rounded-2xl border border-sky-100 bg-sky-50/25 p-3.5 shadow-2xs">
+        <div className="rounded-2xl border border-sky-100 bg-sky-50/25 p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <div className="flex items-center justify-between text-sky-700 text-xs">
             <span>Khách mời</span>
             <span className="h-2 w-2 rounded-full bg-sky-500" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-semibold tracking-tight text-sky-600">{metrics.totalGuests}</span>
+            <span className="text-2xl font-bold tracking-tight text-sky-600">{metrics.totalGuests}</span>
             <span className="text-xs text-sky-400">người</span>
-            <span className="ml-auto text-xs font-medium text-sky-600">{metrics.guestRate}%</span>
+            <span className="ml-auto text-xs font-semibold text-sky-600">{metrics.guestRate}%</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-sky-100 overflow-hidden">
-            <div className="h-full rounded-full bg-sky-500 transition-all duration-300" style={{ width: `${metrics.guestRate}%` }} />
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-sky-400 to-sky-500 transition-all duration-1000 ease-out"
+              style={{ width: isAnimated ? `${metrics.guestRate}%` : "0%" }}
+            />
           </div>
         </div>
 
         {/* Người trúng giải quay thưởng (Màu Vàng Amber sang trọng #f59e0b) */}
-        <div className="rounded-2xl border border-amber-200/80 bg-amber-50/30 p-3.5 shadow-2xs">
+        <div className="rounded-2xl border border-amber-200/80 bg-amber-50/30 p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <div className="flex items-center justify-between text-amber-700 text-xs">
             <span>Trúng giải quay</span>
             <Gift className="h-4 w-4 text-amber-500" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-semibold tracking-tight text-amber-600">{metrics.totalWinners}</span>
+            <span className="text-2xl font-bold tracking-tight text-amber-600">{metrics.totalWinners}</span>
             <span className="text-xs text-amber-500/80">lượt</span>
           </div>
           <div className="mt-2 text-[11px] text-amber-700/80 font-medium truncate flex items-center gap-1">
@@ -843,7 +863,7 @@ export function MeetingStatisticsPanel() {
         </div>
       </div>
 
-      {/* 3. BIỂU ĐỒ (Màu sắc tươi sáng, tương phản cao, thể hiện Thành viên có mặt, vắng mặt & khách mời) */}
+      {/* 3. BIỂU ĐỒ (Màu sắc tươi sáng, tương phản cao, hoạt ảnh mọc cột & tương tác 2 chiều) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Biểu đồ cột: Lượt tham dự theo từng cuộc họp */}
         <div className="lg:col-span-2 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs flex flex-col justify-between">
@@ -868,15 +888,23 @@ export function MeetingStatisticsPanel() {
               </div>
             </div>
 
-            {/* Cột hiển thị */}
-            <div className="mt-4 min-h-[190px] flex flex-col justify-end">
+            {/* Cột hiển thị với Animation & Gridlines */}
+            <div className="mt-4 min-h-[200px] relative flex flex-col justify-end">
+              {/* Gridlines mờ phía sau */}
+              <div className="absolute inset-x-0 bottom-6 top-2 flex flex-col justify-between pointer-events-none px-2 z-0">
+                <div className="border-b border-dashed border-slate-100 w-full" />
+                <div className="border-b border-dashed border-slate-100 w-full" />
+                <div className="border-b border-dashed border-slate-100 w-full" />
+                <div className="border-b border-slate-200/60 w-full" />
+              </div>
+
               {chartMeetings.length === 0 ? (
-                <div className="flex h-44 items-center justify-center text-xs text-slate-400">
+                <div className="flex h-44 items-center justify-center text-xs text-slate-400 z-10">
                   Không có cuộc họp trong khoảng lọc này.
                 </div>
               ) : (
-                <div className="flex items-end justify-between gap-3 sm:gap-6 h-48 pt-4 px-1">
-                  {chartMeetings.map((item) => {
+                <div className="flex items-end justify-between gap-3 sm:gap-6 h-48 pt-4 px-2 z-10">
+                  {chartMeetings.map((item, idx) => {
                     const totalBarVal = item.membersPresent + item.guests + item.membersAbsent;
                     const totalH = Math.min(100, Math.round((totalBarVal / (maxValInChart || 1)) * 100));
 
@@ -884,34 +912,71 @@ export function MeetingStatisticsPanel() {
                     const guestShare = totalBarVal > 0 ? (item.guests / totalBarVal) * 100 : 0;
                     const absentShare = totalBarVal > 0 ? (item.membersAbsent / totalBarVal) * 100 : 0;
 
+                    const isHovered = hoveredBarId === item.id;
+                    const isOtherHovered = hoveredBarId !== null && !isHovered;
+
                     return (
                       <div
                         key={item.id}
+                        onMouseEnter={() => setHoveredBarId(item.id)}
+                        onMouseLeave={() => setHoveredBarId(null)}
                         onClick={() => setSelectedMeetingId(item.id)}
-                        className="flex flex-1 flex-col items-center gap-1.5 h-full justify-end group cursor-pointer"
+                        className={`flex flex-1 flex-col items-center gap-1.5 h-full justify-end group cursor-pointer transition-all duration-300 ${
+                          isOtherHovered ? "opacity-45 scale-95" : isHovered ? "scale-105" : "opacity-100"
+                        }`}
                         title={`${item.title} (${item.dateStr}):\n• Thành viên có mặt: ${item.membersPresent}\n• Khách mời: ${item.guests}\n• Thành viên vắng: ${item.membersAbsent}\n• Tổng check-in: ${item.totalCheckedIn}`}
                       >
-                        <div className="flex items-center gap-1 text-[11px] font-medium text-slate-600 group-hover:text-rose-600 transition-colors">
-                          <span className="text-slate-800">{item.totalCheckedIn}</span>
+                        {/* Tooltip / Badge số nổi lên khi hover */}
+                        <div
+                          className={`flex items-center gap-1 text-[11px] font-medium transition-all duration-300 rounded-full px-1.5 py-0.5 ${
+                            isHovered
+                              ? "bg-slate-900 text-white shadow-md -translate-y-1 scale-110"
+                              : "text-slate-600 group-hover:text-rose-600"
+                          }`}
+                        >
+                          <span className={isHovered ? "font-bold text-white" : "text-slate-800"}>
+                            {item.totalCheckedIn}
+                          </span>
                           {item.membersAbsent > 0 && (
-                            <span className="text-[10px] text-orange-500 font-normal">(-{item.membersAbsent})</span>
+                            <span className={isHovered ? "text-orange-300 text-[10px]" : "text-[10px] text-orange-500 font-normal"}>
+                              (-{item.membersAbsent})
+                            </span>
                           )}
                         </div>
 
-                        {/* Stacked Bar with 3 contrasting colors */}
+                        {/* Stacked Bar with 3 contrasting vibrant colors & smooth growth animation */}
                         <div
-                          className="w-full max-w-10 rounded-t-md overflow-hidden flex flex-col-reverse transition-all group-hover:brightness-95"
-                          style={{ height: `${Math.max(totalH, 8)}%` }}
+                          className="w-full max-w-10 rounded-t-md overflow-hidden flex flex-col-reverse shadow-xs transition-all duration-700 ease-out group-hover:shadow-md"
+                          style={{
+                            height: isAnimated ? `${Math.max(totalH, 8)}%` : "0%",
+                            transitionDelay: `${idx * 60}ms`,
+                          }}
                         >
-                          {/* Member Present: Vibrant Rose/Red */}
-                          <div className="bg-rose-500 transition-all" style={{ height: `${presentShare}%` }} title={`Có mặt: ${item.membersPresent}`} />
-                          {/* Guest: Bright Sky Blue */}
-                          <div className="bg-sky-500 transition-all" style={{ height: `${guestShare}%` }} title={`Khách mời: ${item.guests}`} />
-                          {/* Member Absent: Bright Coral/Orange */}
-                          <div className="bg-orange-400 transition-all" style={{ height: `${absentShare}%` }} title={`Vắng mặt: ${item.membersAbsent}`} />
+                          {/* Member Present: Vibrant Rose Gradient */}
+                          <div
+                            className="bg-gradient-to-t from-rose-600 to-rose-400 transition-all duration-500"
+                            style={{ height: `${presentShare}%` }}
+                            title={`Có mặt: ${item.membersPresent}`}
+                          />
+                          {/* Guest: Bright Sky Blue Gradient */}
+                          <div
+                            className="bg-gradient-to-t from-sky-600 to-sky-400 transition-all duration-500"
+                            style={{ height: `${guestShare}%` }}
+                            title={`Khách mời: ${item.guests}`}
+                          />
+                          {/* Member Absent: Bright Coral/Amber Gradient */}
+                          <div
+                            className="bg-gradient-to-t from-orange-500 to-amber-400 transition-all duration-500"
+                            style={{ height: `${absentShare}%` }}
+                            title={`Vắng mặt: ${item.membersAbsent}`}
+                          />
                         </div>
 
-                        <span className="text-[11px] font-normal text-slate-500 group-hover:text-rose-600 transition-colors truncate max-w-full">
+                        <span
+                          className={`text-[11px] font-normal transition-all duration-200 truncate max-w-full ${
+                            isHovered ? "font-bold text-rose-600 scale-105" : "text-slate-500 group-hover:text-rose-600"
+                          }`}
+                        >
                           {item.dateStr}
                         </span>
                       </div>
@@ -928,7 +993,7 @@ export function MeetingStatisticsPanel() {
           </div>
         </div>
 
-        {/* Biểu đồ Donut: Cơ cấu người tham dự & Vắng mặt */}
+        {/* Biểu đồ Donut: Cơ cấu người tham dự & Vắng mặt với tương tác 2 chiều */}
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="pb-3 border-b border-slate-100">
@@ -938,8 +1003,8 @@ export function MeetingStatisticsPanel() {
             </div>
 
             <div className="flex flex-col items-center justify-center my-4">
-              <div className="relative h-36 w-36">
-                <svg className="h-full w-full -rotate-90" viewBox="0 0 180 180" aria-label="Cơ cấu tham dự và vắng mặt">
+              <div className="relative h-40 w-40">
+                <svg className="h-full w-full -rotate-90 overflow-visible" viewBox="0 0 180 180" aria-label="Cơ cấu tham dự và vắng mặt">
                   <circle cx="90" cy="90" r="66" fill="none" stroke="#f1f5f9" strokeWidth="20" />
                   {metrics.totalMembersPresent + metrics.totalGuests + metrics.totalMembersAbsent > 0 ? (
                     <>
@@ -950,9 +1015,17 @@ export function MeetingStatisticsPanel() {
                         r="66"
                         fill="none"
                         stroke="#f43f5e"
-                        strokeWidth="20"
-                        strokeDasharray={`${(metrics.memberPresentRate / 100) * 414.69} ${414.69}`}
+                        strokeWidth={hoveredSegment === "present" ? 25 : 20}
+                        opacity={hoveredSegment && hoveredSegment !== "present" ? 0.4 : 1}
+                        strokeDasharray={
+                          isAnimated
+                            ? `${(metrics.memberPresentRate / 100) * 414.69} ${414.69}`
+                            : `0 ${414.69}`
+                        }
                         strokeDashoffset="0"
+                        className="transition-all duration-700 ease-out cursor-pointer"
+                        onMouseEnter={() => setHoveredSegment("present")}
+                        onMouseLeave={() => setHoveredSegment(null)}
                       />
                       {/* Segment 2: Khách mời (Sky Blue) */}
                       <circle
@@ -961,9 +1034,17 @@ export function MeetingStatisticsPanel() {
                         r="66"
                         fill="none"
                         stroke="#0ea5e9"
-                        strokeWidth="20"
-                        strokeDasharray={`${(metrics.guestRate / 100) * 414.69} ${414.69}`}
+                        strokeWidth={hoveredSegment === "guest" ? 25 : 20}
+                        opacity={hoveredSegment && hoveredSegment !== "guest" ? 0.4 : 1}
+                        strokeDasharray={
+                          isAnimated
+                            ? `${(metrics.guestRate / 100) * 414.69} ${414.69}`
+                            : `0 ${414.69}`
+                        }
                         strokeDashoffset={`-${(metrics.memberPresentRate / 100) * 414.69}`}
+                        className="transition-all duration-700 ease-out cursor-pointer"
+                        onMouseEnter={() => setHoveredSegment("guest")}
+                        onMouseLeave={() => setHoveredSegment(null)}
                       />
                       {/* Segment 3: Thành viên vắng mặt (Orange) */}
                       <circle
@@ -972,9 +1053,17 @@ export function MeetingStatisticsPanel() {
                         r="66"
                         fill="none"
                         stroke="#f97316"
-                        strokeWidth="20"
-                        strokeDasharray={`${(metrics.absentRate / 100) * 414.69} ${414.69}`}
+                        strokeWidth={hoveredSegment === "absent" ? 25 : 20}
+                        opacity={hoveredSegment && hoveredSegment !== "absent" ? 0.4 : 1}
+                        strokeDasharray={
+                          isAnimated
+                            ? `${(metrics.absentRate / 100) * 414.69} ${414.69}`
+                            : `0 ${414.69}`
+                        }
                         strokeDashoffset={`-${((metrics.memberPresentRate + metrics.guestRate) / 100) * 414.69}`}
+                        className="transition-all duration-700 ease-out cursor-pointer"
+                        onMouseEnter={() => setHoveredSegment("absent")}
+                        onMouseLeave={() => setHoveredSegment(null)}
                       />
                     </>
                   ) : (
@@ -982,43 +1071,84 @@ export function MeetingStatisticsPanel() {
                   )}
                 </svg>
 
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wide">Tổng lượt</span>
-                  <span className="text-xl font-semibold text-slate-800">
-                    {metrics.totalAttendees}
-                  </span>
-                  <span className="text-[10px] text-slate-400">check-in</span>
+                {/* Tâm Donut: Hiển thị thông số động khi hover */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none transition-all duration-300">
+                  {hoveredSegment === "present" ? (
+                    <div className="animate-fadeIn">
+                      <span className="text-[10px] text-rose-500 font-bold uppercase tracking-wide">Có mặt</span>
+                      <span className="text-2xl font-extrabold text-rose-600 block">{metrics.totalMembersPresent}</span>
+                      <span className="text-[10px] text-rose-500 font-medium">{metrics.memberPresentRate}% tổng lượt</span>
+                    </div>
+                  ) : hoveredSegment === "guest" ? (
+                    <div className="animate-fadeIn">
+                      <span className="text-[10px] text-sky-500 font-bold uppercase tracking-wide">Khách mời</span>
+                      <span className="text-2xl font-extrabold text-sky-600 block">{metrics.totalGuests}</span>
+                      <span className="text-[10px] text-sky-500 font-medium">{metrics.guestRate}% tổng lượt</span>
+                    </div>
+                  ) : hoveredSegment === "absent" ? (
+                    <div className="animate-fadeIn">
+                      <span className="text-[10px] text-orange-500 font-bold uppercase tracking-wide">Vắng mặt</span>
+                      <span className="text-2xl font-extrabold text-orange-600 block">{metrics.totalMembersAbsent}</span>
+                      <span className="text-[10px] text-orange-500 font-medium">{metrics.absentRate}% tổng lượt</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wide font-medium">Tổng lượt</span>
+                      <span className="text-2xl font-extrabold text-slate-800 block">
+                        {metrics.totalAttendees}
+                      </span>
+                      <span className="text-[10px] text-slate-400">check-in</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Chú thích 3 màu tương phản rõ rệt */}
-              <div className="w-full space-y-1.5 pt-1">
-                <div className="flex items-center justify-between text-xs">
+              {/* Chú thích 3 màu tương phản rõ rệt - Hover kích hoạt tương tác Donut */}
+              <div className="w-full space-y-1.5 pt-2">
+                <div
+                  onMouseEnter={() => setHoveredSegment("present")}
+                  onMouseLeave={() => setHoveredSegment(null)}
+                  className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${
+                    hoveredSegment === "present" ? "bg-rose-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
+                  }`}
+                >
                   <span className="flex items-center gap-1.5 text-slate-600">
                     <span className="h-2 w-2 rounded-full bg-rose-500" />
                     Thành viên có mặt
                   </span>
-                  <span className="font-medium text-slate-800">
+                  <span className={`font-semibold ${hoveredSegment === "present" ? "text-rose-600" : "text-slate-800"}`}>
                     {metrics.totalMembersPresent} ({metrics.memberPresentRate}%)
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs">
+                <div
+                  onMouseEnter={() => setHoveredSegment("guest")}
+                  onMouseLeave={() => setHoveredSegment(null)}
+                  className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${
+                    hoveredSegment === "guest" ? "bg-sky-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
+                  }`}
+                >
                   <span className="flex items-center gap-1.5 text-slate-600">
                     <span className="h-2 w-2 rounded-full bg-sky-500" />
                     Khách mời
                   </span>
-                  <span className="font-medium text-slate-800">
+                  <span className={`font-semibold ${hoveredSegment === "guest" ? "text-sky-600" : "text-slate-800"}`}>
                     {metrics.totalGuests} ({metrics.guestRate}%)
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs">
+                <div
+                  onMouseEnter={() => setHoveredSegment("absent")}
+                  onMouseLeave={() => setHoveredSegment(null)}
+                  className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${
+                    hoveredSegment === "absent" ? "bg-orange-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
+                  }`}
+                >
                   <span className="flex items-center gap-1.5 text-slate-600">
                     <span className="h-2 w-2 rounded-full bg-orange-500" />
                     Thành viên vắng mặt
                   </span>
-                  <span className="font-medium text-slate-800">
+                  <span className={`font-semibold ${hoveredSegment === "absent" ? "text-orange-600" : "text-slate-800"}`}>
                     {metrics.totalMembersAbsent} ({metrics.absentRate}%)
                   </span>
                 </div>
