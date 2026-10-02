@@ -8,6 +8,9 @@ import { createMemberFees, getFee, receiveFee, serializeFee, voidFeePayment } fr
 import { feeBalance } from "../../server/modules/member-fees/member-fee.rules";
 import { createFeeInput, feePaymentInput } from "../../server/modules/member-fees/member-fee.validation";
 
+import { companyEmailService } from "../../server/service/company-email.service";
+vi.mock("../../server/service/company-email.service", () => ({ companyEmailService: { send: vi.fn(), getSmtp: vi.fn() } }));
+
 let database: MongoMemoryServer;
 let memberId: string;
 let foreignId: string;
@@ -21,6 +24,8 @@ beforeAll(async () => {
 afterAll(async () => { await mongoose.disconnect(); if (database) await database.stop(); });
 afterEach(() => vi.unstubAllEnvs());
 beforeEach(async () => {
+  vi.mocked(companyEmailService.send).mockReset().mockResolvedValue({ messageId: "test-message" });
+  vi.mocked(companyEmailService.getSmtp).mockReset().mockResolvedValue({ hasPassword: true } as any);
   vi.stubEnv("SEPAY_ENABLED", "false");
   await Promise.all([MemberFeeModel.deleteMany({}), UserModel.deleteMany({}), SePayTransactionModel.deleteMany({}), NotificationModel.deleteMany({})]);
   const [member, foreign] = await UserModel.create([
@@ -255,4 +260,79 @@ it("does not allow admin HTTP requests to overwrite environment settings", async
     body: JSON.stringify({...settings, accountNumber:"999999"}) });
   expect(response.status).toBe(405);
   expect((await getSePayConfig("A")).accountNumber).toBe("123456789");
+});
+
+
+describe("Fee reminder email", () => {
+  it("uses the current member email and outstanding balance, escapes HTML and sends once per day", async () => {
+    const id = await setupFee();
+    configureSePay(settings);
+    await UserModel.updateOne({ _id: memberId }, { $set: { email: "updated@fee.test", displayName: "<b>An</b>" } });
+    await receiveFee("A", id, "admin", receipt(40));
+    await notifyFee("A", id);
+    await Promise.all([notifyFee("A", id), notifyFee("A", id)]);
+    expect(companyEmailService.send).toHaveBeenCalledTimes(1);
+    const [company, message] = vi.mocked(companyEmailService.send).mock.calls[0];
+    expect(company).toBe("A");
+    expect(message.to).toBe("updated@fee.test");
+    expect(message.text).toContain("60 VND");
+    expect(message.text).toContain("31/12/2026");
+    expect(message.html).toContain("&lt;b&gt;An&lt;/b&gt;");
+    expect(message.html).not.toContain("<b>An</b>");
+    expect(message.html).toContain("amount=60");
+    const fee = await getFee("A", id);
+    expect(message.text).toContain(fee.paymentCode);
+    expect(fee.emailNotifiedAt).toBeInstanceOf(Date);
+    expect(await NotificationModel.countDocuments({ companyCode: "A" })).toBe(1);
+    await MemberFeeModel.updateOne({ _id: id }, { $set: { emailNotifiedDay: "2000-01-01" } });
+    await notifyFee("A", id);
+    expect(companyEmailService.send).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries failed SMTP without duplicating the in-app notification", async () => {
+    const id = await setupFee();
+    configureSePay(settings);
+    vi.mocked(companyEmailService.send).mockRejectedValueOnce(new Error("SMTP unavailable"));
+    await expect(notifyFee("A", id)).rejects.toMatchObject({ status: 502 });
+    expect((await getFee("A", id)).emailNotifiedAt).toBeUndefined();
+    await notifyFee("A", id);
+    expect(companyEmailService.send).toHaveBeenCalledTimes(2);
+    expect(await NotificationModel.countDocuments({ companyCode: "A" })).toBe(1);
+  });
+
+  it("reports missing SMTP and invalid recipient without marking email as sent", async () => {
+    const id = await setupFee();
+    configureSePay(settings);
+    vi.mocked(companyEmailService.getSmtp).mockResolvedValueOnce(null);
+    await expect(notifyFee("A", id)).rejects.toMatchObject({ status: 400 });
+    await UserModel.updateOne({ _id: memberId }, { $set: { email: "invalid" } });
+    await expect(notifyFee("A", id)).rejects.toMatchObject({ status: 400 });
+    expect(companyEmailService.send).not.toHaveBeenCalled();
+    expect((await getFee("A", id)).emailNotifiedAt).toBeUndefined();
+  });
+
+  it("allows only one concurrent SMTP send and recovers an expired claim", async () => {
+    const id = await setupFee();
+    configureSePay(settings);
+    let release!: (value: { messageId: string }) => void;
+    vi.mocked(companyEmailService.send).mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+    const first = notifyFee("A", id);
+    await vi.waitFor(() => expect(companyEmailService.send).toHaveBeenCalledTimes(1));
+    try { await expect(notifyFee("A", id)).rejects.toMatchObject({ status: 409 }); }
+    finally { release({ messageId: "first" }); }
+    await first;
+    await MemberFeeModel.updateOne({ _id: id }, { $set: { emailNotifiedDay: "2000-01-01", emailClaimToken: "stale", emailClaimUntil: new Date(0) } });
+    await notifyFee("A", id);
+    expect(companyEmailService.send).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not send for settled fees or members outside the organization", async () => {
+    const id = await setupFee();
+    configureSePay(settings);
+    await UserModel.updateOne({ _id: memberId }, { $set: { companyCode: "B" } });
+    await expect(notifyFee("A", id)).rejects.toMatchObject({ status: 400 });
+    await receiveFee("A", id, "admin", receipt(100));
+    await expect(notifyFee("A", id)).rejects.toMatchObject({ status: 400 });
+    expect(companyEmailService.send).not.toHaveBeenCalled();
+  });
 });
