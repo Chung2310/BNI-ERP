@@ -347,11 +347,6 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
             {!followsSpeaker && !(canManage && onDeferSpeaker) && <input type="checkbox" aria-label={`Chiếu ${s.name}`} checked={!excluded.has(s.id)} disabled={!!draft} onChange={e => setExcluded(old => { const next = new Set(old); if (e.target.checked) next.delete(s.id); else next.add(s.id); return next; })} />}
             <button className="min-w-0 flex-1 text-left text-sm disabled:opacity-50" aria-pressed={selected?.id === s.id} disabled={navigationBusy || (followsSpeaker && !canManage) || excluded.has(s.id) || ["ended", "cancelled"].includes(meeting.status)} onClick={() => setSelectedId(s.id)}>
               <span className="block truncate font-semibold">{s.name}</span><span className="text-xs text-slate-500">{s.kind === "member" ? "Thành viên" : "Khách mời"}</span>
-              {meeting.speakers.find(person => person.id === s.id)?.deferred && (
-                <span title="Đã để cuối lượt" className="inline-flex items-center justify-center h-5 w-5 rounded bg-amber-50 text-amber-700 border border-amber-200/80 shrink-0">
-                  <ArrowDownToLine className="h-3 w-3" />
-                </span>
-              )}
             </button>
             {canManage && onDeferSpeaker && ["scheduled", "live", "paused"].includes(meeting.status) && meeting.speakers.findIndex(person => person.id === s.id) >= (meeting.status === "scheduled" ? 0 : Math.max(0, meeting.currentIndex)) && (
               <button
