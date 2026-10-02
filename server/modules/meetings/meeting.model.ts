@@ -85,6 +85,7 @@ const meeting = new Schema(
     latitude: Number,
     longitude: Number,
     gpsRadiusMeters: { type: Number, default: 200 },
+    allowDirectCheckIn: { type: Boolean, default: false },
     checkInQrTokenHash: String,
     checkInQrTokenEncrypted: { type: String, select: false },
     checkInQrExpiresAt: Date,

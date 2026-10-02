@@ -1,18 +1,21 @@
 // @vitest-environment jsdom
 import React from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import MeetingTab from "./MeetingTab";
 vi.mock("../components/meetings/profileSlideRenderer", () => ({
   SLIDE_WIDTH: 1920, SLIDE_HEIGHT: 1080, loadSlideImage: vi.fn().mockResolvedValue(null),
   renderProfileSlide: vi.fn(async () => ({ canvas: document.createElement("canvas"), warnings: [] })),
 }));
-vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ hasPermission: () => true }) }));
+const auth = vi.hoisted(() => ({ manage: true }));
+vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ hasPermission: () => auth.manage, userProfile: { uid: "member1" } }) }));
 vi.mock("../services/socketService", () => ({ socketService: { on: () => () => {} } }));
 vi.mock("../components/meetings/LuckyDrawTab", () => ({ LuckyDrawTab: () => <div>Quay thưởng đang mở</div> }));
 vi.mock("./Toast", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 const meeting = { _id: "a", title: "Buổi họp A", startsAt: "2026-10-10T08:00:00Z", status: "scheduled", speakers: [], tiers: [{count:10,seconds:30}], fallbackSeconds:20, reminderDays:0, currentIndex:-1, elapsedSeconds:0, __v:0 };
 beforeEach(() => {
+  auth.manage = true;
+  Object.defineProperty(navigator, "geolocation", { configurable: true, value: { getCurrentPosition: vi.fn((success) => success({ coords: { latitude: 10, longitude: 106 } })) } });
   sessionStorage.clear();
   localStorage.clear();
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok:true, json:async () => ({data:[meeting]}) }));
@@ -450,4 +453,144 @@ it("opening a paused presentation resumes the countdown from its remaining time"
     await act(async () => { vi.advanceTimersByTime(18000); });
     expect(screen.getAllByRole("timer").every(node => node.textContent?.includes("Hết giờ"))).toBe(true);
   } finally { vi.useRealTimers(); vi.restoreAllMocks(); }
+});
+
+it("shows the member's own check-in and speaking information without operating controls", async () => {
+  auth.manage = false;
+  const speakers = [
+    { id: "other", userId: "other-user", name: "Thành viên khác", seconds: 30 },
+    { id: "mine", userId: "member1", name: "Thành viên hiện tại", seconds: 45, checkedInAt: "2026-10-10T07:00:00Z" },
+  ];
+  vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, status: "live", speakers, currentIndex: 1, location: "Hội trường A" }] }) } as Response);
+  render(<MeetingTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
+  const dialog = screen.getByRole("dialog");
+  expect(within(dialog).getByText("Đã check-in")).toBeTruthy();
+  expect(within(dialog).getByText("45 giây")).toBeTruthy();
+  expect(within(dialog).getByText("Đang đến lượt phát biểu của bạn")).toBeTruthy();
+  expect(within(dialog).getByText("Hội trường A")).toBeTruthy();
+  expect(within(dialog).queryByText("Thành viên khác")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Tiếp tục điều hành" })).toBeNull();
+  expect(screen.queryByTitle("Sửa cuộc họp")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Tạo cuộc họp mới" })).toBeNull();
+  fireEvent.keyDown(dialog, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("keeps upcoming meetings visible and filters attendance by account ID", async () => {
+  auth.manage = false;
+  vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ data: [
+    { ...meeting, speakers: [{ id: "guest", name: "Thành viên hiện tại", seconds: 30 }] },
+    { ...meeting, _id: "b", title: "Buổi đã tham dự", status: "ended", speakers: [{ id: "mine", userId: "member1", name: "Tôi", seconds: 20 }] },
+  ] }) } as Response);
+  render(<MeetingTab />);
+  const buttons = await screen.findAllByRole("button", { name: "Xem chi tiết cuộc họp" });
+  expect(buttons).toHaveLength(2);
+  fireEvent.click(buttons[0]);
+  expect(within(screen.getByRole("dialog")).getByText("Chưa check-in")).toBeTruthy();
+  expect(screen.getByText(/Để check-in, hãy quét mã QR/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Đóng chi tiết cuộc họp" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Chỉ buổi đã check-in" }));
+  expect(screen.queryByText("Buổi họp A")).toBeNull();
+  expect(screen.getByText("Buổi đã tham dự")).toBeTruthy();
+});
+
+it.each(["ended", "cancelled"])("does not invite a member to check in to a %s meeting", async status => {
+  auth.manage = false;
+  vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, status }] }) } as Response);
+  render(<MeetingTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
+  const dialog = screen.getByRole("dialog");
+  expect(within(dialog).getByText("Buổi họp đã đóng check-in.")).toBeTruthy();
+  expect(within(dialog).getByText(status === "ended" ? "Không có ghi nhận tham dự" : "Buổi họp đã hủy")).toBeTruthy();
+  expect(screen.queryByText(/Để check-in, hãy quét mã QR/)).toBeNull();
+});
+
+it("shows a retryable loading error instead of an empty meetings list", async () => {
+  auth.manage = false;
+  vi.mocked(fetch).mockRejectedValueOnce(new Error("Lỗi tải cuộc họp"));
+  render(<MeetingTab />);
+  expect(await screen.findByRole("alert")).toBeTruthy();
+  expect(screen.queryByText("Chưa tìm thấy cuộc họp nào")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Thử lại" }));
+  expect(await screen.findByText("Buổi họp A")).toBeTruthy();
+});
+
+it("allows direct member attendance and immediately updates their status", async () => {
+  auth.manage = false;
+  const item = { ...meeting, allowDirectCheckIn: true };
+  const fetchMock = vi.fn(async (url, options) => {
+    if (String(url).endsWith("/checkin")) {
+      expect(options.method).toBe("POST");
+      expect(JSON.parse(options.body)).toEqual({ latitude: 10, longitude: 106 });
+      return { ok: true, json: async () => ({ data: { ...item, speakers: [{ id: "mine", userId: "member1", name: "Tôi", seconds: 30 }] } }) };
+    }
+    return { ok: true, json: async () => ({ data: [item] }) };
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MeetingTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
+  fireEvent.click(screen.getByRole("button", { name: "Điểm danh" }));
+  await waitFor(() => expect(within(screen.getByRole("dialog")).getByText("Đã check-in")).toBeTruthy());
+  expect(screen.queryByRole("button", { name: "Điểm danh" })).toBeNull();
+  expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/checkin"))).toHaveLength(1);
+});
+it("shows a direct check-in error and lets the member retry", async () => {
+  auth.manage = false;
+  vi.stubGlobal("fetch", vi.fn(async url => String(url).endsWith("/checkin")
+    ? { ok: false, json: async () => ({ message: "Cuộc họp đã dừng check-in." }) }
+    : { ok: true, json: async () => ({ data: [{ ...meeting, allowDirectCheckIn: true }] }) }));
+  render(<MeetingTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
+  fireEvent.click(screen.getByRole("button", { name: "Điểm danh" }));
+  expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Cuộc họp đã dừng check-in.");
+  expect((screen.getByRole("button", { name: "Điểm danh" }) as HTMLButtonElement).disabled).toBe(false);
+});
+it.each([["scheduled", false], ["ended", true], ["cancelled", true]])("disables direct attendance for %s with setting %s", async (status, allowDirectCheckIn) => {
+  auth.manage = false;
+  vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, status, allowDirectCheckIn }] }) } as Response);
+  render(<MeetingTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
+  expect((screen.getByRole("button", { name: "Điểm danh" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByRole("button", { name: "Điểm danh" }).getAttribute("aria-describedby")).toBe("member-checkin-hint");
+});
+it("loads and saves the direct attendance option in meeting settings", async () => {
+  const fetchMock = vi.fn(async (_url, options) => ({ ok: true, json: async () => ({ data: options?.method === "PUT" ? meeting : [meeting] }) }));
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MeetingTab />);
+  fireEvent.click((await screen.findAllByTitle("Sửa cuộc họp"))[0]);
+  const checkbox = screen.getByRole("checkbox", { name: /Cho phép điểm danh trực tiếp trước khi cuộc họp bắt đầu/ });
+  expect((checkbox as HTMLInputElement).checked).toBe(false);
+  fireEvent.click(checkbox);
+  fireEvent.submit(checkbox.closest("form")!);
+  await waitFor(() => expect(fetchMock.mock.calls.some(([, options]) => options?.method === "PUT" && JSON.parse(options.body).allowDirectCheckIn === true)).toBe(true));
+});
+
+it("requires GPS permission before submitting member attendance from the detail popup", async () => {
+  auth.manage = false;
+  Object.defineProperty(navigator, "geolocation", { configurable: true, value: {
+    getCurrentPosition: vi.fn((_success, failure) => failure({ code: 1 }))
+  } });
+  vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, allowDirectCheckIn: true }] }) } as Response);
+  render(<MeetingTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
+  expect(screen.queryByTitle("Sửa cuộc họp")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Điểm danh" }));
+  expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Bạn chưa cho phép truy cập vị trí. Hãy bật quyền vị trí trong trình duyệt rồi thử lại.");
+  expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/checkin"))).toBe(false);
+});
+
+it.each(["live", "paused"])("enables member attendance once the meeting is %s without opting in", async status => {
+  auth.manage = false;
+  const item = { ...meeting, status, allowDirectCheckIn: false };
+  vi.stubGlobal("fetch", vi.fn(async (url) => ({
+    ok: true, json: async () => ({ data: String(url).endsWith("/checkin")
+      ? { ...item, speakers: [{ id: "mine", userId: "member1", name: "Tôi", seconds: 30 }] }
+      : [item] })
+  })));
+  render(<MeetingTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
+  expect((screen.getByRole("button", { name: "Điểm danh" }) as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Điểm danh" }));
+  expect(await screen.findByRole("button", { name: "Đã điểm danh" })).toBeTruthy();
 });

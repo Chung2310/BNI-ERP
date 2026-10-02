@@ -5,7 +5,7 @@ import { MeetingModel } from './meeting.model';
 import {
   MeetingError,
   assertVersion,
-  checkIn,
+  checkInFromModule,
   controlMeeting,
   startMeetingPresentation,
   reorderMeetingSpeakers,
@@ -123,8 +123,7 @@ meetingRouter.post('/:id/checkin', requirePermission(['meetings:read', 'meetings
       await getEffectivePermissions(req.user.id, req.user.role, req.user.companyCode),
       ['meetings:manage', 'access:manage']
     );
-    if (!canManage) throw new MeetingError(403, "Vui lòng quét QR của buổi họp để xác nhận vị trí và check-in.");
-    res.json({ data: await checkIn(item, value, req.user.id, canManage) });
+    res.json({ data: await checkInFromModule(item, value, req.user.id, canManage) });
   } catch (e) {
     sendError(res, e);
   }

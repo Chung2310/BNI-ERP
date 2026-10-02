@@ -21,7 +21,7 @@ import {
   Upload,
   Eye,
   CalendarDays,
-  List,
+  LayoutGrid,
   Network,
   Camera,
   Image as ImageIcon
@@ -345,9 +345,9 @@ export default function OrgChartTab({
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [activeDropdownCardId, setActiveDropdownCardId] = useState<string | null>(null);
   const [selectedLeaveBalance, setSelectedLeaveBalance] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<"tree" | "list">("tree");
+  const [viewMode, setViewMode] = useState<"tree" | "list">("list");
   const [listPage, setListPage] = useState<number>(1);
-  const listLimit = 10;
+  const listLimit = 15;
 
   useEffect(() => {
     setListPage(1);
@@ -418,13 +418,11 @@ export default function OrgChartTab({
   const [editBirthDate, setEditBirthDate] = useState("");
   const [editPhotoURL, setEditPhotoURL] = useState("");
   const [editCoverImage, setEditCoverImage] = useState("");
-  const [editParentId, setEditParentId] = useState("");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingEditCover, setUploadingEditCover] = useState(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const editCoverFileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isSavingLeader, setIsSavingLeader] = useState(false);
 
   // Reset editing state when selected employee changes
   useEffect(() => {
@@ -441,7 +439,6 @@ export default function OrgChartTab({
     setEditDepartment(raw?.department || selectedEmp.department || "");
     setEditEmail(raw?.email || selectedEmp.email || "");
     setEditPhone(raw?.phone && raw.phone !== "Chưa cập nhật" ? raw.phone : (selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : ""));
-    setEditParentId(raw?.parentId || selectedEmp.parentId || "");
     setEditPhotoURL(raw?.photoURL || selectedEmp.avatar || "");
     setEditCoverImage(raw?.coverImage || selectedEmp.coverImage || "");
     setEditBirthDate(
@@ -540,27 +537,6 @@ export default function OrgChartTab({
     }
   };
 
-  const handleToggleLeader = async () => {
-    if (!selectedEmp) return;
-    try {
-      setIsSavingLeader(true);
-      const newLeaderState = !selectedEmp.isLeader;
-      await authService.updateUser(selectedEmp.id, { isLeader: newLeaderState });
-      toast.success(
-        newLeaderState
-          ? `Đã đặt ${selectedEmp.name} làm Trưởng nhóm (Leader) phòng ban!`
-          : `Đã hủy chức vụ Trưởng nhóm (Leader) của ${selectedEmp.name}!`
-      );
-      setSelectedEmp(prev => prev ? { ...prev, isLeader: newLeaderState } : null);
-      await fetchUsers();
-    } catch (err) {
-      console.error("Lỗi cập nhật chức danh leader:", err);
-      toast.error(getApiErrorMessage(err, "Không thể cập nhật chức vụ Trưởng nhóm."));
-    } finally {
-      setIsSavingLeader(false);
-    }
-  };
-
   const handleEditEmployeeSave = async () => {
     if (!selectedEmp) return;
 
@@ -587,7 +563,6 @@ export default function OrgChartTab({
         industry: editIndustry.trim(),
         department: editDepartment.trim(),
         phone: editPhone.trim() || "",
-        parentId: editParentId || null,
         photoURL: editPhotoURL.trim() || "",
         coverImage: editCoverImage.trim() || "",
         birthDate: editBirthDate || undefined,
@@ -607,7 +582,6 @@ export default function OrgChartTab({
         industry: updateData.industry,
         department: updateData.department,
         phone: updateData.phone || "Chưa cập nhật",
-        parentId: updateData.parentId || undefined,
         avatar: updateData.photoURL || prev.avatar,
         coverImage: updateData.coverImage || prev.coverImage,
         birthDate: updateData.birthDate,
@@ -1329,9 +1303,9 @@ export default function OrgChartTab({
 
   return (
     <>
-      {/* Division filter and search bar for Org Chart tab */}
+      {/* Search bar and actions for Org Chart tab */}
       <div data-testid="org-chart-toolbar" className="flex shrink-0 flex-col gap-3 border-b border-gray-200 bg-slate-50 p-3 md:p-4 min-[1200px]:flex-row min-[1200px]:items-center min-[1200px]:justify-between">
-        <div data-testid="org-chart-filters" className="grid w-full flex-1 grid-cols-1 items-stretch gap-2 min-[640px]:grid-cols-2 min-[1200px]:max-w-md">
+        <div data-testid="org-chart-filters" className="w-full flex-1 min-[1200px]:max-w-md">
           <div className="relative w-full">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
@@ -1342,153 +1316,122 @@ export default function OrgChartTab({
               className="w-full pl-9 pr-4 py-2 border border-gray-200 bg-white rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
             />
           </div>
-
         </div>
 
-        <div data-testid="org-chart-actions" className="grid w-full grid-cols-1 items-center gap-2 min-[420px]:grid-cols-2 min-[768px]:grid-cols-3 min-[1200px]:flex min-[1200px]:w-auto">
-          <div data-testid="org-chart-view-toggle" className="flex w-full items-center rounded-xl border border-gray-200 bg-white p-1 min-[1200px]:w-auto">
-            <button type="button" onClick={() => setViewMode("tree")} className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold cursor-pointer ${viewMode === "tree" ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"}`}><Network className="h-3.5 w-3.5" /> Cây</button>
-            <button type="button" onClick={() => setViewMode("list")} className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold cursor-pointer ${viewMode === "list" ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"}`}><List className="h-3.5 w-3.5" /> Danh sách</button>
-          </div>
-
-          <div data-testid="org-chart-zoom-control" className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1.5 min-[1200px]:w-auto min-[1200px]:border-0 min-[1200px]:bg-transparent min-[1200px]:px-0">
-            <div className="hidden h-6 w-px bg-gray-200 mx-1 min-[1200px]:block" />
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Thu Phóng:</span>
-            <input
-              type="range"
-              min="0.5"
-              max="1.5"
-              step="0.1"
-              value={zoomLevel}
-              onChange={(e) => {
-                setZoomLevel(parseFloat(e.target.value));
-                setIsFitted(false);
-              }}
-              className="w-20 accent-indigo-600 cursor-pointer"
-            />
-            <span className="w-10 text-right text-[10px] font-bold text-slate-655 mr-1">{Math.round(zoomLevel * 100)}%</span>
-          </div>
-
+        <div data-testid="org-chart-actions" className="flex w-full items-center justify-end gap-2 min-[1200px]:w-auto">
           {isManager && (
-            <>
-              <div className="hidden h-6 w-px bg-gray-200 mx-1 min-[1200px]:block" />
-              <button
-                data-testid="org-chart-add-button"
-                type="button"
-                onClick={() => setIsAddModalOpen(true)}
-                className="col-span-full flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-blue-700 active:scale-95 cursor-pointer min-[768px]:col-span-1 min-[1200px]:w-auto"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Thêm thành viên</span>
-              </button>
-            </>
+            <button
+              data-testid="org-chart-add-button"
+              type="button"
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-blue-700 active:scale-95 cursor-pointer min-[640px]:w-auto"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Thêm thành viên</span>
+            </button>
           )}
         </div>
       </div>
 
       {/* Primary Sub Tab Layout View */}
       <div className="flex-1 p-3 md:p-6 overflow-y-auto" id="hr_tab_content">
-        <div className="grid grid-cols-1 gap-6 h-full min-h-[500px]" id="org_chart_block">
+        <div className="grid grid-cols-1 content-start gap-6" id="org_chart_block">
 
-          {viewMode === "list" && (
-            <div className="col-span-1 bg-white border border-gray-200 rounded-2xl overflow-hidden min-h-[500px] flex flex-col justify-between">
-              {isMobile ? (
-                <div className="divide-y divide-slate-100 p-2">
+          <div className="col-span-1 flex min-w-0 flex-col gap-4">
+
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                <h3 className="text-sm font-bold text-slate-800">Danh sách thành viên</h3>
+                <p className="text-xs text-slate-500">{visibleEmployees.length} thành viên · Bấm vào thẻ để xem hồ sơ</p>
+              </div>
+              {loading ? (
+                <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500"><RefreshCw className="h-4 w-4 animate-spin" />Đang tải thành viên...</div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 min-[1200px]:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5">
                   {paginatedEmployees.map((employee) => {
                     const manager = getManagerForEmployee(employee, employees);
                     return (
-                      <div
+                      <button
                         key={employee.id}
+                        type="button"
+                        aria-label={"Xem hồ sơ " + employee.name}
                         onClick={() => setSelectedEmp(employee)}
-                        className="p-3 hover:bg-indigo-50/30 active:bg-indigo-50/60 cursor-pointer flex items-center justify-between gap-3 text-xs transition-all"
+                        className="group flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3.5 text-left shadow-xs transition hover:border-cyan-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 cursor-pointer"
                       >
-                        <div className="flex items-center gap-3 min-w-0">
-                          {renderAvatar(employee.avatar, "w-10 h-10 shrink-0", "text-sm")}
-                          <div className="min-w-0">
-                            <div className="font-bold text-slate-800 truncate">{employee.name || missingValue}</div>
-                            <div className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
-                              {employee.companyName ? `${employee.companyName} • ` : ""}{employee.department || missingValue}
+                        {/* Top: Avatar + Name + Role + Status */}
+                        <div className="flex items-start gap-3">
+                          <div className="relative shrink-0">
+                            {renderAvatar(employee.avatar, "w-11 h-11", "text-sm", employee.name)}
+                            <span
+                              className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${
+                                employee.status === "online" ? "bg-emerald-500" : "bg-slate-300"
+                              }`}
+                              title={employee.status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="truncate text-sm font-bold text-slate-900 group-hover:text-cyan-700 transition-colors">
+                                {employee.name || missingValue}
+                              </span>
+                              <span
+                                className={
+                                  "shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold " +
+                                  (employee.status === "online"
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                    : "bg-slate-100 text-slate-500")
+                                }
+                              >
+                                {employee.status === "online" ? "Online" : "Offline"}
+                              </span>
                             </div>
-                            {manager && (
-                              <div className="text-[9px] text-slate-400 mt-0.5">
-                                QL: <span className="font-semibold text-slate-655">{manager.name}</span>
-                              </div>
-                            )}
+                            <p className="truncate text-xs font-medium text-cyan-700 mt-0.5">
+                              {employee.role && employee.role.trim().toLowerCase() !== "nhân viên"
+                                ? employee.role
+                                : "Thành viên"}
+                            </p>
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-bold ${employee.status === "online"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-250 animate-pulse"
-                              : "bg-slate-50 text-slate-500 border border-slate-200"
-                            }`}>
-                            {employee.status === "online" ? "Online" : "Offline"}
-                          </span>
+
+                        {/* Middle: Compact metadata */}
+                        <div className="mt-2.5 flex flex-1 flex-col gap-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2">
+                          {(() => {
+                            const dept =
+                              employee.department &&
+                              !employee.department.toLowerCase().includes("ban giám đốc")
+                                ? employee.department
+                                : null;
+                            const companyOrDept = [employee.companyName, dept].filter(Boolean).join(" · ");
+                            if (!companyOrDept) return null;
+                            return (
+                              <div className="flex items-center gap-1.5 min-w-0 text-slate-600">
+                                <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                <span className="truncate text-[11px]">{companyOrDept}</span>
+                              </div>
+                            );
+                          })()}
+                          {employee.email && (
+                            <div className="flex items-center gap-1.5 min-w-0 text-slate-500">
+                              <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                              <span className="truncate text-[11px]">{employee.email}</span>
+                            </div>
+                          )}
+                          {employee.phone && employee.phone !== "Chưa cập nhật" && (
+                            <div className="flex items-center gap-1.5 min-w-0 text-slate-500">
+                              <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                              <span className="truncate text-[11px]">{employee.phone}</span>
+                            </div>
+                          )}
+                          {manager && (
+                            <div className="flex items-center gap-1.5 min-w-0 text-slate-500">
+                              <Users className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                              <span className="truncate text-[11px]">Quản lý: {manager.name}</span>
+                            </div>
+                          )}
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
-                  {visibleEmployees.length === 0 && (
-                    <div className="py-16 text-center text-sm text-slate-400">Không tìm thấy thành viên</div>
-                  )}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[980px] text-left text-xs">
-                    <thead className="bg-slate-50 border-b border-gray-200 text-[10px] uppercase tracking-wide text-slate-500">
-                      <tr>
-                        <th className="px-4 py-3">Thành viên</th>
-                        <th className="px-4 py-3">Chức danh</th>
-                        <th className="px-4 py-3">Phòng ban</th>
-                        <th className="px-4 py-3">Khối</th>
-                        <th className="px-4 py-3">Quản lý trực tiếp</th>
-                        <th className="px-4 py-3">Liên hệ</th>
-                        <th className="px-4 py-3">Trạng thái</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginatedEmployees.map((employee) => {
-                        const manager = getManagerForEmployee(employee, employees);
-                        return (
-                          <tr
-                            key={employee.id}
-                            onClick={() => setSelectedEmp(employee)}
-                            className="border-b border-slate-100 hover:bg-indigo-50/50 cursor-pointer"
-                          >
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2.5">
-                                {renderAvatar(employee.avatar, "w-8 h-8", "text-xs")}
-                                <div>
-                                  <div className="font-bold text-slate-800">{employee.name || missingValue}</div>
-                                  <div className="text-[10px] text-slate-400">{employee.id}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">{employee.role || missingValue}</td>
-                            <td className="px-4 py-3">{employee.department || missingValue}</td>
-                            <td className="px-4 py-3">{employee.division || missingValue}</td>
-                            <td className="px-4 py-3">{manager?.name || missingValue}</td>
-                            <td className="px-4 py-3">
-                              {employee.email || missingValue}
-                              <div className="text-[10px] text-slate-400">{employee.phone || missingValue}</div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span
-                                className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${employee.status === "online"
-                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                    : "bg-slate-50 text-slate-500 border border-slate-200"
-                                  }`}
-                              >
-                                {employee.status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {visibleEmployees.length === 0 && (
-                    <div className="py-16 text-center text-sm text-slate-400">Không tìm thấy thành viên</div>
-                  )}
+                  {!visibleEmployees.length && <div className="col-span-full rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-16 text-center text-sm text-slate-500">{employees.length ? "Không tìm thấy thành viên phù hợp." : "Chưa có thành viên."}</div>}
                 </div>
               )}
 
@@ -1571,61 +1514,6 @@ export default function OrgChartTab({
                 </div>
               )}
             </div>
-          )}
-
-          {/* Interactive Tree viewport diagram - full width */}
-          <div className={`col-span-1 bg-slate-50 border border-gray-250 rounded-2xl relative overflow-hidden flex flex-col min-h-[500px] ${viewMode === "tree" ? "" : "hidden"}`} id="tree_viewport">
-
-
-            {/* Nút icon Vừa khung hình / Mở rộng đặt góc trên bên phải trong khung sơ đồ */}
-            <button
-              type="button"
-              onClick={toggleFitScreen}
-              className="absolute top-4 right-4 z-20 flex h-8 w-8 items-center justify-center rounded-xl bg-white/90 border border-gray-200 text-slate-700 shadow-2xs hover:bg-white hover:text-indigo-655 active:scale-95 transition-all cursor-pointer"
-              title={isFitted ? "Phóng to (Mặc định)" : "Vừa khung hình"}
-            >
-              {isFitted ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
-            </button>
-            <div
-              ref={containerRef}
-              onMouseDown={isMobile ? undefined : handleMouseDown}
-              onMouseLeave={isMobile ? undefined : handleMouseLeaveOrUp}
-              onMouseUp={isMobile ? undefined : handleMouseLeaveOrUp}
-              onMouseMove={isMobile ? undefined : handleMouseMove}
-              className={`flex-1 overflow-auto flex items-start justify-start min-h-[440px] select-none overscroll-none p-4 sm:p-12 ${isMobile ? "" : "cursor-grab"
-                } ${isDragging && !isMobile ? "cursor-grabbing" : ""}`}
-              id="interactive_org_chart"
-            >
-              <div
-                style={
-                  isSafari
-                    ? {
-                      transform: `scale(${zoomLevel})`,
-                      transformOrigin: "top center",
-                      transition: "transform 0.2s ease-out",
-                    }
-                    : {
-                      zoom: zoomLevel,
-                      transition: "zoom 0.2s ease-out",
-                    }
-                }
-                className="flex flex-col items-center mx-auto min-w-max"
-              >
-                {employees.length === 0 ? (
-                  <div className="text-center py-20 text-gray-400">
-                    <Users className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-sm font-bold">Chưa có cơ cấu thành viên</p>
-                    <p className="text-xs mt-1">Vui lòng thêm thành viên mới đầu tiên</p>
-                  </div>
-                ) : (
-                  rootEmployees.map(root => renderBranch(root))
-                )}
-              </div>
-            </div>
-
-            {/* Chart footer notification guide */}
-
-          </div>
         </div>
       </div>
 
@@ -1635,7 +1523,9 @@ export default function OrgChartTab({
         const memberAvatar = rawUser?.photoURL || selectedEmp.avatar;
         const memberCover = rawUser?.coverImage || selectedEmp.coverImage;
         const memberName = rawUser?.displayName || selectedEmp.name;
-        const memberRole = rawUser?.jobTitle || selectedEmp.role;
+        const memberRole = (rawUser?.jobTitle && rawUser.jobTitle.trim().toLowerCase() !== "nhân viên")
+          ? rawUser.jobTitle
+          : (selectedEmp.role && selectedEmp.role.trim().toLowerCase() !== "nhân viên" ? selectedEmp.role : "Thành viên");
         const memberCompany = rawUser?.companyName || selectedEmp.companyName || "Chưa cập nhật";
         const memberIndustry = rawUser?.industry || selectedEmp.industry || "Chưa cập nhật";
         const memberDept = rawUser?.department || selectedEmp.department || "Ban Thành viên";
@@ -1845,23 +1735,6 @@ export default function OrgChartTab({
                     />
                   </div>
 
-                  {/* Direct Manager / Connector */}
-                  <div>
-                    <label className="block font-bold text-gray-500 mb-1">Người kết nối / Báo cáo cho</label>
-                    <select
-                      value={editParentId}
-                      onChange={(e) => setEditParentId(e.target.value)}
-                      className="w-full p-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer text-slate-700"
-                    >
-                      <option value="">Không phân công (Gốc sơ đồ)</option>
-                      {employees
-                        .filter(emp => emp.id !== selectedEmp.id)
-                        .map(emp => (
-                          <option key={emp.id} value={emp.id}>{emp.name} ({emp.role}{emp.companyName ? ` · ${emp.companyName}` : ""})</option>
-                        ))
-                      }
-                    </select>
-                  </div>
                 </div>
 
                 <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 text-xs font-bold">
@@ -1983,22 +1856,6 @@ export default function OrgChartTab({
                       </div>
                     </div>
 
-                    {/* Direct Manager / Connector */}
-                    {selectedEmp.parentId && (() => {
-                      const manager = employees.find(e => e.id === selectedEmp.parentId);
-                      return (
-                        <div className="p-3 rounded-2xl bg-indigo-50/50 border border-indigo-100 flex items-center gap-3">
-                          <Users className="w-4.5 h-4.5 text-indigo-600 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <span className="block text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Người kết nối / Quản lý</span>
-                            <strong className="text-slate-800 text-xs font-bold truncate block">
-                              {manager ? `${manager.name} (${manager.role})` : "Quản lý cấp trên"}
-                            </strong>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
                     {/* Subordinates */}
                     {(() => {
                       const directSubs = getDirectSubordinates(selectedEmp.id);
@@ -2041,26 +1898,6 @@ export default function OrgChartTab({
                       >
                         <Edit className="w-3.5 h-3.5" />
                         Chỉnh sửa thông tin
-                      </button>
-                    )}
-
-                    {isManager && usersList.find(u => u.uid === selectedEmp.id)?.role === "user" && (
-                      <button
-                        type="button"
-                        onClick={handleToggleLeader}
-                        disabled={isSavingLeader}
-                        className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-95 disabled:opacity-50 ${selectedEmp.isLeader
-                            ? "bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-800"
-                            : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"
-                          }`}
-                      >
-                        {isSavingLeader ? (
-                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        ) : selectedEmp.isLeader ? (
-                          "Hủy Trưởng ban"
-                        ) : (
-                          "👑 Đặt làm Trưởng ban"
-                        )}
                       </button>
                     )}
 

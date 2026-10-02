@@ -61,10 +61,10 @@ export default function HRTab() {
     .map((usr) => ({
       id: usr.uid,
       name: usr.displayName,
-      role: usr.jobTitle || (
-        usr.role === "manager" ? "Quản lý" : "Thành viên"
-      ),
-    department: usr.department || "Ban Giám đốc",
+      role: (usr.jobTitle && usr.jobTitle.trim().toLowerCase() !== "nhân viên")
+        ? usr.jobTitle
+        : (usr.role === "manager" ? "Quản lý" : "Thành viên"),
+    department: usr.department || "",
     email: usr.email,
     phone: usr.phone || "Chưa cập nhật",
     avatar:

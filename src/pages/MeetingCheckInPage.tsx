@@ -1,19 +1,10 @@
+import { locate } from "../components/meetings/locateForCheckIn";
 import React, { useEffect, useState } from "react";
 import { CheckCircle2, MapPin, CalendarDays, ArrowRight } from "lucide-react";
 
 type MeetingInfo = { title: string; startsAt: string; location?: string; expiresAt: string };
 type Mode = "member" | "guest";
 const fieldClass = "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 disabled:bg-slate-50";
-function locate(): Promise<{ latitude: number; longitude: number }> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) { reject(new Error("Trình duyệt không hỗ trợ vị trí. Hãy mở liên kết bằng Chrome hoặc Safari.")); return; }
-    navigator.geolocation.getCurrentPosition(
-      p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
-      e => reject(new Error(e.code === 1 ? "Bạn chưa cho phép truy cập vị trí. Hãy bật quyền vị trí trong trình duyệt rồi thử lại." : "Chưa lấy được GPS. Hãy đến nơi thoáng hơn và thử lại.")),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-  });
-}
 export default function MeetingCheckInPage() {
   const token = window.location.pathname.split("/").filter(Boolean).pop() || "";
   const [meeting, setMeeting] = useState<MeetingInfo | null>(null);

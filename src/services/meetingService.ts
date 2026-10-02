@@ -63,6 +63,7 @@ export interface LuckyDrawConfig {
 export interface Meeting {
   _id: string;
   companyCode: string;
+  allowDirectCheckIn?: boolean;
   title: string;
   description?: string;
   location?: string;
@@ -115,6 +116,7 @@ export const meetingService = {
     location?: string;
     coverImage?: string;
     startsAt: string;
+    allowDirectCheckIn?: boolean;
     reminderMinutes?: number;
     tiers: Array<{ count: number; seconds: number }>;
     fallbackSeconds: number;
@@ -138,6 +140,7 @@ export const meetingService = {
       coverImage: string;
       startsAt: string;
       reminderDays: number;
+      allowDirectCheckIn: boolean;
       tiers: Array<{ count: number; seconds: number }>;
       fallbackSeconds: number;
     }>
@@ -164,7 +167,7 @@ export const meetingService = {
 
   async checkIn(
     meetingId: string,
-    payload: { userId?: string; name?: string; email?: string; photoURL?: string; coverImage?: string }
+    payload: { latitude?: number; longitude?: number; userId?: string; name?: string; email?: string; photoURL?: string; coverImage?: string }
   ): Promise<Meeting> {
     const res = await fetch(`/api/v1/meetings/${meetingId}/checkin`, {
       method: "POST",

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import MemberMeetingDetail, { memberAttendance, memberAttendanceLabel } from "../components/meetings/MemberMeetingDetail";
 import { SpeechesCompleteDialog } from "../components/meetings/SpeechesCompleteDialog";
 import { SlideTransitionDelayInput } from "../components/meetings/SlideTransitionDelayInput";
 import { MeetingSlides } from "../components/meetings/MeetingSlides";
@@ -83,6 +84,7 @@ type Meeting = {
   longitude?: number;
   gpsRadiusMeters?: number;
   checkInQrExpiresAt?: string;
+  allowDirectCheckIn?: boolean;
   coverImage?: string;
   startsAt: string;
   reminderDays: number;
@@ -140,12 +142,15 @@ const dateText = (s: string) => {
 };
 
 export default function MeetingTab() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, userProfile } = useAuth();
   const canManage = hasPermission("meetings:manage") || hasPermission("access:manage");
 
   const [items, setItems] = useState<Meeting[]>([]);
   const [detailMeetingId, setDetailMeetingId] = useState<string | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<"checkin" | "speakers" | "luckyDraw" | "slides">("checkin");
+  const [attendedOnly, setAttendedOnly] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "scheduled" | "live" | "ended">("all");
   const [tick, setTick] = useState(Date.now());
@@ -221,6 +226,8 @@ export default function MeetingTab() {
   const [startsAt, setStartsAt] = useState("");
   const [location, setLocation] = useState("");
   const [gpsPoint, setGpsPoint] = useState<{latitude:number;longitude:number}|null>(null);
+  const [allowDirectCheckIn, setAllowDirectCheckIn] = useState(false);
+  const [editAllowDirectCheckIn, setEditAllowDirectCheckIn] = useState(false);
   const [gpsRadiusMeters, setGpsRadiusMeters] = useState(200);
   const [coverImage, setCoverImage] = useState("");
   const [reminderDays, setReminderDays] = useState(1);
@@ -287,9 +294,11 @@ export default function MeetingTab() {
     try {
       const next: Meeting[] = await api("");
       setItems(next);
+      setLoadError("");
     } catch (e: any) {
-      toast.error(e.message || "Không thể tải danh sách cuộc họp");
+      setLoadError(e.message || "Không thể tải danh sách cuộc họp");
     }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -368,6 +377,7 @@ export default function MeetingTab() {
         location,
         ...(gpsPoint || {}),
         gpsRadiusMeters,
+        allowDirectCheckIn,
         coverImage,
         reminderDays,
         tiers,
@@ -377,6 +387,7 @@ export default function MeetingTab() {
       setStartsAt("");
       setLocation("");
       setGpsPoint(null);
+      setAllowDirectCheckIn(false);
       setCoverImage("");
       setShowCreateModal(false);
       toast.success("Tạo cuộc họp mới thành công!");
@@ -391,6 +402,7 @@ export default function MeetingTab() {
     setPrioritySpeakerId("");
     setPriorityPosition(1);
     setEditTitle(m.title);
+    setEditAllowDirectCheckIn(m.allowDirectCheckIn === true);
     setEditLocation(m.location || "");
     setEditGpsPoint(typeof m.latitude === "number" && typeof m.longitude === "number" ? { latitude: m.latitude, longitude: m.longitude } : null);
     setEditGpsRadiusMeters(m.gpsRadiusMeters || 200);
@@ -428,6 +440,7 @@ export default function MeetingTab() {
         latitude: editGpsPoint?.latitude ?? null,
         longitude: editGpsPoint?.longitude ?? null,
         gpsRadiusMeters: editGpsRadiusMeters,
+        allowDirectCheckIn: editAllowDirectCheckIn,
         coverImage: editCoverImage,
         reminderDays: editReminderDays,
         tiers: editTiers,
@@ -651,6 +664,7 @@ export default function MeetingTab() {
       (m.location && m.location.toLowerCase().includes(searchQuery.toLowerCase()));
 
     if (!matchesSearch) return false;
+    if (!canManage && attendedOnly && !memberAttendance(m, userProfile?.uid)) return false;
     if (statusFilter === "all") return true;
     if (statusFilter === "scheduled") return m.status === "scheduled";
     if (statusFilter === "live") return m.status === "live" || m.status === "paused";
@@ -669,10 +683,10 @@ export default function MeetingTab() {
             </div>
             <div>
               <h1 className="font-extrabold text-slate-900 text-xl md:text-2xl tracking-tight">
-                Quản lý buổi họp
+                {canManage ? "Quản lý buổi họp" : "Cuộc họp"}
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                Lên lịch → Đón tiếp & check-in → Điều hành phát biểu → Quay thưởng
+                {canManage ? "Lên lịch → Đón tiếp & check-in → Điều hành phát biểu → Quay thưởng" : "Theo dõi lịch họp và thông tin tham dự của bạn"}
               </p>
             </div>
           </div>
@@ -740,6 +754,7 @@ export default function MeetingTab() {
             </button>
           </div>
 
+          {!canManage && <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={attendedOnly} onChange={event => setAttendedOnly(event.target.checked)} />Chỉ buổi đã check-in</label>}
           {/* Search Box */}
           <div className="relative min-w-[240px]">
             <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -755,7 +770,7 @@ export default function MeetingTab() {
       </div>
 
       {/* Grid of Meeting Cards (Dạng danh sách / Thẻ hiển thị) */}
-      {filteredItems.length > 0 ? (
+      {loading ? <p role="status" className="p-8 text-center text-sm text-slate-500">Đang tải cuộc họp...</p> : loadError ? <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{loadError}<button type="button" onClick={() => { setLoading(true); void refresh(); }} className="ml-3 font-bold">Thử lại</button></div> : filteredItems.length > 0 ? (
         <div className="grid grid-cols-1 @min-[32rem]:grid-cols-2 @min-[48rem]:grid-cols-3 @min-[64rem]:grid-cols-4 gap-3">
           {filteredItems.map((m) => {
             const s = statusMap[m.status] || {
@@ -883,8 +898,9 @@ export default function MeetingTab() {
                     )}
                   </div>
 
+                  {!canManage && <p className="rounded-lg bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-800">{memberAttendanceLabel(m, userProfile?.uid)}</p>}
                   {/* Stats Bar */}
-                  <div className="pt-2.5 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
+                  {canManage && <div className="pt-2.5 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
                     <div className="flex items-center gap-1.5 text-slate-600 font-medium">
                       <Users className="h-4 w-4 text-cyan-600 shrink-0" />
                       <span>{m.speakers?.length || 0} check-in</span>
@@ -896,18 +912,18 @@ export default function MeetingTab() {
                         {winnerCount > 0 ? `${winnerCount} đã trúng` : `${prizeCount} giải quay`}
                       </span>
                     </div>
-                  </div>
+                  </div>}
                 </div>
 
                 {/* Card Footer: Action Button */}
                 <div className="px-3 pb-3 pt-0 flex items-center gap-2">
                   <button
                     type="button"
-                    aria-label={isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}
+                    aria-label={!canManage ? "Xem chi tiết cuộc họp" : isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}
                     onClick={(event) => { event.stopPropagation(); setDetailMeetingId(m._id); setActiveSubTab(m.status === "scheduled" ? "checkin" : "speakers"); }}
                     className="flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-lg bg-slate-50 group-hover:bg-cyan-600 text-slate-700 group-hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap"
                   >
-                    <span className="truncate">{isLive ? "Điều hành" : m.status === "scheduled" ? "Check-in" : "Xem cuộc họp"}</span>
+                    <span className="truncate">{!canManage ? "Xem chi tiết" : isLive ? "Điều hành" : m.status === "scheduled" ? "Check-in" : "Xem cuộc họp"}</span>
                     <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
                   </button>
 
@@ -950,7 +966,7 @@ export default function MeetingTab() {
           <CalendarDays className="mx-auto h-12 w-12 text-slate-300" />
           <h3 className="mt-3 text-sm font-bold text-slate-700">Chưa tìm thấy cuộc họp nào</h3>
           <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
-            Không có cuộc họp nào phù hợp với bộ lọc hiện tại. Bấm nút bên dưới để tạo cuộc họp mới.
+            {canManage ? "Không có cuộc họp nào phù hợp với bộ lọc hiện tại. Bấm nút bên dưới để tạo cuộc họp mới." : "Chưa có cuộc họp phù hợp. Bạn có thể đổi bộ lọc để xem các buổi họp khác."}
           </p>
           {canManage && (
             <button
@@ -966,7 +982,8 @@ export default function MeetingTab() {
       )}
 
       {/* POPUP CHI TIẾT CUỘC HỌP (Meeting Detail Modal) */}
-      {activeMeeting && (
+      {!canManage && activeMeeting && <MemberMeetingDetail key={activeMeeting._id} onCheckIn={async (location) => { const updated = await api("/" + activeMeeting._id + "/checkin", "POST", location); setItems(previous => previous.map(item => item._id === updated._id ? updated : item)); }} meeting={activeMeeting} userId={userProfile?.uid} onClose={() => setDetailMeetingId(null)} />}
+      {canManage && activeMeeting && (
         <div className={`fixed inset-0 z-50 ${isModalFullscreen ? "bg-slate-900 overflow-hidden" : "flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto"}`}>
           <div className={`${isModalFullscreen ? "w-full h-full max-w-none max-h-none rounded-none border-0" : "w-full max-w-6xl max-h-[94vh] rounded-3xl border border-slate-200 shadow-2xl"} flex flex-col bg-slate-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150`}>
             {/* Modal Top Header Bar */}
@@ -1752,6 +1769,7 @@ export default function MeetingTab() {
                 </div>
               </div>
 
+              <label className="block rounded-xl border border-cyan-100 bg-cyan-50 p-4 text-sm"><span className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={allowDirectCheckIn} onChange={event => setAllowDirectCheckIn(event.target.checked)} />Cho phép điểm danh trực tiếp trước khi cuộc họp bắt đầu</span><span className="mt-2 block text-xs text-slate-600">Khi cuộc họp bắt đầu, thành viên có thể bấm Điểm danh trực tiếp. Bật tùy chọn này để cho phép điểm danh trước giờ bắt đầu. Luôn yêu cầu GPS trong bán kính địa điểm họp.</span></label>
               <MeetingLocationFields value={gpsPoint} onChange={setGpsPoint} radius={gpsRadiusMeters} onRadiusChange={setGpsRadiusMeters} />
 
               <MeetingCoverImageField value={coverImage} onChange={setCoverImage} />
@@ -1916,6 +1934,7 @@ export default function MeetingTab() {
                 </div>
               </div>
 
+              <label className="block rounded-xl border border-cyan-100 bg-cyan-50 p-4 text-sm"><span className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={editAllowDirectCheckIn} onChange={event => setEditAllowDirectCheckIn(event.target.checked)} />Cho phép điểm danh trực tiếp trước khi cuộc họp bắt đầu</span><span className="mt-2 block text-xs text-slate-600">Khi cuộc họp bắt đầu, thành viên có thể bấm Điểm danh trực tiếp. Bật tùy chọn này để cho phép điểm danh trước giờ bắt đầu. Luôn yêu cầu GPS trong bán kính địa điểm họp.</span></label>
               <MeetingLocationFields value={editGpsPoint} onChange={setEditGpsPoint} radius={editGpsRadiusMeters} onRadiusChange={setEditGpsRadiusMeters} />
 
               <MeetingCoverImageField value={editCoverImage} onChange={setEditCoverImage} />
@@ -2053,7 +2072,7 @@ export default function MeetingTab() {
         </div>
       )}
 
-      {completionKey && dismissedCompletion !== completionKey && <SpeechesCompleteDialog onClose={dismissCompletion} />}
+      {canManage && completionKey && dismissedCompletion !== completionKey && <SpeechesCompleteDialog onClose={dismissCompletion} />}
       <ConfirmDialog isOpen={finishRequested} title="Kết thúc buổi họp?" description="Sau khi kết thúc, buổi họp ngừng nhận check-in và điều hành phát biểu." confirmLabel="Kết thúc buổi họp" isSubmitting={saving} onClose={() => setFinishRequested(false)} onConfirm={async () => { await control("finish"); setFinishRequested(false); }} />
       {/* POPUP XÁC NHẬN BẮT ĐẦU CUỘC HỌP */}
       <ConfirmDialog

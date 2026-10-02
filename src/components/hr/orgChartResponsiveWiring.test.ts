@@ -13,11 +13,8 @@ describe("Org chart responsive header wiring", () => {
   });
 
   it("gives compact-screen controls enough width without overflowing", () => {
-    expect(source).toContain('data-testid="org-chart-department-filter"');
-    expect(source).toContain('data-testid="org-chart-view-toggle"');
-    expect(source).toContain('data-testid="org-chart-zoom-control"');
     expect(source).toContain('data-testid="org-chart-add-button"');
-    expect(source).toContain("grid w-full grid-cols-1");
-    expect(source).toContain("min-[420px]:grid-cols-2");
+    expect(source).toContain('data-testid="org-chart-filters"');
+    expect(source).toContain('data-testid="org-chart-actions"');
   });
 });
