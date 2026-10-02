@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Download, ChevronLeft, ChevronRight, Play, RefreshCw, Pencil } from "lucide-react";
+import { Download, ChevronLeft, ChevronRight, Play, RefreshCw, Pencil, ArrowDownToLine } from "lucide-react";
 import { renderProfileSlide, loadSlideImage, SLIDE_WIDTH, SLIDE_HEIGHT } from "./profileSlideRenderer";
 import { drawSlideTimer, getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
 import { SlideTransitionDelayInput } from "./SlideTransitionDelayInput";
@@ -11,6 +11,8 @@ type Props = {
   meeting: SlideTimerMeeting & { _id: string; __v: number };
   canManage: boolean;
   startFromFirst?: boolean;
+  initialSpeakerId?: string;
+  onDeferSpeaker?: (speakerId: string | string[]) => Promise<void>;
   autoAdvance?: boolean;
   onMoveSpeaker?: (direction: number) => Promise<void>;
   controlBusy?: boolean;
@@ -26,7 +28,7 @@ type Props = {
 const button = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40";
 const fieldClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
 
-export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false }: Props) {
+export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -39,6 +41,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   const [selectedId, setSelectedId] = useState("");
+  const [checkedSpeakerIds, setCheckedSpeakerIds] = useState<string[]>([]);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const mode = autoAdvance ? "auto" : "manual";
   const changeMode = useCallback((next: "manual" | "auto") => {
@@ -89,11 +92,13 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
 
   const queue = useMemo(() => deck.slides.filter(s => !excluded.has(s.id)), [deck.slides, excluded]);
   const currentSpeakerId = ["live", "paused"].includes(meeting.status) ? meeting.speakers[meeting.currentIndex]?.id : undefined;
-  // Both operating modes share the meeting's current speaker. Only scheduled meetings use local previews.
+  // Selection previews a profile; fullscreen follows the shared speaker after starting it.
   const followsSpeaker = meeting.status !== "scheduled";
-  const selected = followsSpeaker
+  const chosen = (!followsSpeaker || !presenting || startingSpeech) ? queue.find(s => s.id === selectedId) : undefined;
+  const selected = chosen || (followsSpeaker
     ? deck.slides.find(s => s.id === currentSpeakerId)
-    : queue.find(s => s.id === selectedId) || queue[0];
+    : queue[0]);
+  useEffect(() => { setSelectedId(""); setCheckedSpeakerIds([]); }, [currentSpeakerId]);
   const active = draft || selected;
   const speechesComplete = !!meeting.speechesCompletedAt && ["live", "paused"].includes(meeting.status);
   const timer = useMemo(() => getSlideTimer(meeting, active?.id, now), [meeting, active?.id, now]);
@@ -111,12 +116,22 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       return;
     }
     if (!canManage || !onMoveSpeaker || autoAdvance || !currentSpeakerId || (direction < 0 && meeting.currentIndex <= 0)) return;
+    setSelectedId("");
     speechRequest.current = true;
     setStartingSpeech(true); setError("");
     void onMoveSpeaker(direction).catch(error => {
       setError(error instanceof Error ? error.message : "Không chuyển được lượt. Vui lòng thử lại.");
     }).finally(() => { speechRequest.current = false; if (mounted.current) setStartingSpeech(false); });
   }, [queue, index, followsSpeaker, canManage, onMoveSpeaker, autoAdvance, currentSpeakerId, meeting.currentIndex, controlBusy, draft, loading]);
+
+  const deferSpeaker = async (speakerId: string | string[]) => {
+    if (!canManage || !onDeferSpeaker || speechRequest.current || navigationBusy) return;
+    speechRequest.current = true;
+    setStartingSpeech(true); setError("");
+    try { await onDeferSpeaker(speakerId); setSelectedId(""); setCheckedSpeakerIds([]); }
+    catch (error) { setError(error instanceof Error ? error.message : "Không hoãn được lượt."); }
+    finally { speechRequest.current = false; if (mounted.current) setStartingSpeech(false); }
+  };
 
 
 
@@ -242,16 +257,16 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
 
   useEffect(() => {
     if (!startFromFirst || loading || error || !deck.slides.length) return;
-    beginPresentation(deck.slides.find(slide => slide.id === currentSpeakerId) || deck.slides[0]);
+    beginPresentation(deck.slides.find(slide => slide.id === initialSpeakerId) || deck.slides.find(slide => slide.id === currentSpeakerId) || deck.slides[0]);
     onPresentationStarted?.();
-  }, [startFromFirst, loading, error, deck.slides, currentSpeakerId, beginPresentation, onPresentationStarted]);
+  }, [startFromFirst, loading, error, deck.slides, initialSpeakerId, currentSpeakerId, beginPresentation, onPresentationStarted]);
 
   async function save(reset = false) {
     if (!active || saving) return;
     setSaving(true); setError("");
     try {
       const id = active.id;
-      const profile = { name: active.name, company: active.company, photoURL: active.photoURL, coverImage: active.coverImage, phone: active.phone, industry: active.industry, bio: active.bio };
+      const profile = { name: active.name, company: active.company, photoURL: active.photoURL, coverImage: active.coverImage, phone: active.phone, ...(active.email !== undefined ? { email: active.email } : {}), industry: active.industry, bio: active.bio };
       const data = await api(`/${meeting._id}/slides/${id}`, "PUT", { version: draft ? draftVersion.current : deck.version, profile: reset ? null : profile });
       setDeck(data); setDraft(null);
     } catch (e) { setError(e instanceof Error ? e.message : "Không lưu được slide."); }
@@ -280,7 +295,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
 
   const ready = !!active && !drawing && !drawError && !loading && !error;
   const canvas = (ref: React.RefObject<HTMLCanvasElement>) => <canvas ref={ref} width={SLIDE_WIDTH} height={SLIDE_HEIGHT}
-    role="img" aria-label={active ? `Slide ${active.kind === "member" ? "thành viên" : "khách mời"}: ${active.name}, ${active.company}, ${active.kind === "member" ? [active.phone, active.industry].filter(Boolean).join(", ") : active.industry}, ${active.bio}` : "Chưa chọn người"}
+    role="img" aria-label={active ? `Slide ${active.kind === "member" ? "thành viên" : "khách mời"}: ${active.name}, ${active.company}, ${[active.phone, active.email, active.industry].filter(Boolean).join(", ")}, ${active.bio}` : "Chưa chọn người"}
     style={{ width: "100%", height: "100%", objectFit: "contain", visibility: drawing || !active || drawError ? "hidden" : "visible" }} />;
 
   return <section aria-label="Slide giới thiệu" className="space-y-4">
@@ -292,21 +307,56 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       {mode === "auto" && <label className="flex items-center gap-2 text-sm">Chờ sau khi hết giờ <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={value => onAutoAdvanceDelayChange?.(value)} disabled={!canManage} /> giây rồi chuyển slide</label>}
       <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={16} /> Làm mới hồ sơ</button>
       <button className={button} disabled={!ready} onClick={download}><Download size={16} /> Tải PNG</button>
-      <button ref={launchButton} className={button} disabled={startingSpeech || loading || !!error || !selected || !!draft} onClick={() => { if (selected) beginPresentation(selected); }}><Play size={16} /> Bắt đầu thuyết trình</button>
+      <button ref={launchButton} className={button} disabled={navigationBusy || !!error || !selected} onClick={() => { if (selected) beginPresentation(selected); }}><Play size={16} /> Bắt đầu thuyết trình</button>
     </div>
     <p className="text-xs text-slate-500">Toàn màn hình: dùng phím ← → để chuyển lượt ở chế độ thủ công; Esc để trở về Điều hành.</p>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error} <button className="underline" onClick={() => setRevision(v => v + 1)}>Tải lại dữ liệu</button></p>}
     <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
       <aside className="space-y-2 rounded-xl border bg-white p-3">
         <p className="text-sm font-bold">Danh sách chiếu ({queue.length}/{deck.slides.length})</p>
-        <p className="text-xs text-slate-500">Khi đang họp, slide luôn đồng bộ với người phát biểu. Chế độ thủ công cho phép chuyển lượt tại đây hoặc tab Điều hành.</p>
-        {!followsSpeaker && <button className="text-xs text-red-700 underline" disabled={!!draft} onClick={() => setExcluded(new Set())}>Chọn tất cả</button>}
+        {canManage && onDeferSpeaker && ["scheduled", "live", "paused"].includes(meeting.status) && checkedSpeakerIds.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-xs py-1">
+            <button
+              type="button"
+              title="Chuyển xuống cuối lượt"
+              aria-label="Chuyển xuống cuối lượt"
+              disabled={navigationBusy}
+              className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-40 transition cursor-pointer shadow-2xs"
+              onClick={() => void deferSpeaker(checkedSpeakerIds)}
+            >
+              <ArrowDownToLine className="h-3.5 w-3.5" />
+              <span className="font-bold">({checkedSpeakerIds.length})</span>
+            </button>
+            <button
+              type="button"
+              className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
+              disabled={navigationBusy}
+              onClick={() => setCheckedSpeakerIds([])}
+            >
+              Bỏ chọn
+            </button>
+          </div>
+        )}
+        {!followsSpeaker && !(canManage && onDeferSpeaker) && <button className="text-xs text-red-700 underline" disabled={!!draft} onClick={() => setExcluded(new Set())}>Chọn tất cả</button>}
         <div className="max-h-80 space-y-1 overflow-auto">
-          {deck.slides.map(s => <div key={s.id} className={`flex items-center gap-2 rounded-lg p-2 ${selected?.id === s.id ? "bg-red-50" : ""}`}>
-            {!followsSpeaker && <input type="checkbox" aria-label={`Chiếu ${s.name}`} checked={!excluded.has(s.id)} disabled={!!draft} onChange={e => setExcluded(old => { const next = new Set(old); if (e.target.checked) next.delete(s.id); else next.add(s.id); return next; })} />}
-            <button className="min-w-0 text-left text-sm disabled:opacity-50" disabled={!!draft || followsSpeaker || excluded.has(s.id)} onClick={() => setSelectedId(s.id)}>
+          {deck.slides.map(s => <div key={s.id} className={`flex flex-wrap items-center gap-2 rounded-lg p-2 ${selected?.id === s.id ? "bg-red-50" : ""}`}>
+            {canManage && onDeferSpeaker && ["scheduled", "live", "paused"].includes(meeting.status) && <input type="checkbox" aria-label={`Chọn ${s.name}`} checked={checkedSpeakerIds.includes(s.id)} disabled={navigationBusy || (meeting.status !== "scheduled" && meeting.speakers.findIndex(person => person.id === s.id) < meeting.currentIndex)} onChange={e => setCheckedSpeakerIds(ids => e.target.checked ? [...ids, s.id] : ids.filter(id => id !== s.id))} />}
+            {!followsSpeaker && !(canManage && onDeferSpeaker) && <input type="checkbox" aria-label={`Chiếu ${s.name}`} checked={!excluded.has(s.id)} disabled={!!draft} onChange={e => setExcluded(old => { const next = new Set(old); if (e.target.checked) next.delete(s.id); else next.add(s.id); return next; })} />}
+            <button className="min-w-0 flex-1 text-left text-sm disabled:opacity-50" aria-pressed={selected?.id === s.id} disabled={navigationBusy || (followsSpeaker && !canManage) || excluded.has(s.id) || ["ended", "cancelled"].includes(meeting.status)} onClick={() => setSelectedId(s.id)}>
               <span className="block truncate font-semibold">{s.name}</span><span className="text-xs text-slate-500">{s.kind === "member" ? "Thành viên" : "Khách mời"}</span>
             </button>
+            {canManage && onDeferSpeaker && ["scheduled", "live", "paused"].includes(meeting.status) && meeting.speakers.findIndex(person => person.id === s.id) >= (meeting.status === "scheduled" ? 0 : Math.max(0, meeting.currentIndex)) && (
+              <button
+                type="button"
+                title="Để cuối lượt"
+                aria-label={`Để cuối lượt: ${s.name}`}
+                className="p-1.5 rounded-lg border border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100 disabled:opacity-40 transition cursor-pointer"
+                disabled={navigationBusy || meeting.speakers.at(-1)?.id === s.id}
+                onClick={() => void deferSpeaker(s.id)}
+              >
+                <ArrowDownToLine className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>)}
         </div>
       </aside>
@@ -332,9 +382,9 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
           <div className="grid gap-3 sm:grid-cols-2">
             {([
               ["name", "Họ và tên", "text", 150], ["company", "Công ty / thương hiệu", "text", 150],
-              ["phone", "Số điện thoại", "tel", 40], ["industry", "Lĩnh vực / dịch vụ", "text", 150],
+              ["phone", "Số điện thoại", "tel", 40], ["email", "Email", "email", 254], ["industry", "Lĩnh vực / dịch vụ", "text", 150],
               ["photoURL", "URL ảnh đại diện", "url", 2000], ["coverImage", "URL ảnh bìa", "url", 2000],
-            ] as const).filter(([key]) => draft.kind === "member" || key !== "phone").map(([key, label, type, max]) => <label key={key} className="space-y-1 text-xs font-semibold">{label}<input className={fieldClass} type={type} maxLength={max} required={key === "name"} value={draft[key]} disabled={saving} onChange={e => setDraft({ ...draft, [key]: e.target.value })} /></label>)}
+            ] as const).map(([key, label, type, max]) => <label key={key} className="space-y-1 text-xs font-semibold">{label}<input className={fieldClass} type={type} maxLength={max} required={key === "name"} value={draft[key] ?? ""} disabled={saving} onChange={e => setDraft({ ...draft, [key]: e.target.value })} /></label>)}
           </div>
           <label className="block text-xs font-semibold">Bio / giới thiệu ngắn<textarea className={fieldClass} rows={3} maxLength={1000} value={draft.bio} disabled={saving} onChange={e => setDraft({ ...draft, bio: e.target.value })} /></label>
           <div className="flex flex-wrap gap-2">

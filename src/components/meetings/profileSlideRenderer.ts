@@ -72,6 +72,7 @@ function textBox(ctx: CanvasRenderingContext2D, value: string, x: number, y: num
   }
   ctx.fillStyle = color;
   lines.forEach((line, i) => ctx.fillText(line, x, y + i * chosen * 1.35));
+  return lines.length * chosen * 1.35;
 }
 
 function cover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number, top = false) {
@@ -122,25 +123,24 @@ export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas:
   ctx.fillStyle = "#fff"; font(ctx, 25, 800); ctx.fillText(member ? "THÀNH VIÊN BNI" : "KHÁCH MỜI", 503, badgeY + 12);
   const nameY = member ? 532 : 441;
   textBox(ctx, slide.name.toLocaleUpperCase("vi-VN"), 480, nameY, 1380, 1, 62, 33, "#242424", 800);
-  if (slide.company?.trim()) textBox(ctx, slide.company.trim(), 480, nameY + 79, 1380, 1, 37, 25, RED, 700);
-
-  const cardsY = member ? 671 : 601;
-  function card(x: number, label: string, value: string) {
-    ctx.fillStyle = "#f5f5f5"; ctx.strokeStyle = "#dddddd"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(x, cardsY, 670, 135, 18); ctx.fill(); ctx.stroke();
-    textBox(ctx, label, x + 30, cardsY + 22, 610, 1, 23, 23, "#858585", 700);
-    textBox(ctx, value, x + 30, cardsY + 65, 610, 1, 37, 23, "#252525", 700);
+  let contentY = nameY + 79;
+  if (slide.company?.trim()) {
+    textBox(ctx, slide.company.trim(), 480, contentY, 1380, 1, 37, 25, RED, 700);
+    contentY += 55;
   }
-  let cardCount = 0;
-  for (const [label, value] of [["SỐ ĐIỆN THOẠI", member ? slide.phone : ""], [member ? "LOẠI HÌNH DỊCH VỤ" : "LĨNH VỰC", slide.industry]]) {
+  const contact = [slide.phone, slide.email].map(value => value?.trim()).filter(Boolean).join(" • ");
+  for (const value of [slide.industry, contact]) {
     if (!value?.trim()) continue;
-    card(480 + cardCount * 710, label, value.trim());
-    cardCount++;
+    contentY += textBox(ctx, value.trim(), 480, contentY, 1380, 2, 30, 20, "#454545") + 14;
   }
   if (slide.bio?.trim()) {
-    const bioY = member ? (cardCount ? 843 : 700) : (cardCount ? 773 : 635);
-    textBox(ctx, "BIO / GIỚI THIỆU NGẮN", 480, bioY, 1380, 1, 30, 30, RED, 700);
-    textBox(ctx, slide.bio.trim(), 480, bioY + 50, 1380, member && cardCount ? 3 : 4, 30, 25, "#646464");
+    const availableHeight = 990 - contentY;
+    let size = 30;
+    for (; size > 16; size--) {
+      font(ctx, size);
+      if (wrapSlideText(ctx, slide.bio.trim(), 1380).length * size * 1.35 <= availableHeight) break;
+    }
+    textBox(ctx, slide.bio.trim(), 480, contentY, 1380, Math.max(1, Math.floor(availableHeight / (size * 1.35))), size, size, "#646464");
   }
   textBox(ctx, member ? "THÀNH VIÊN BNI" : "KHÁCH MỜI BNI", 65, 993, 380, 1, 18, 18, "#888", 700);
   const warnings: string[] = [];

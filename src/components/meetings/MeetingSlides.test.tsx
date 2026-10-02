@@ -17,6 +17,45 @@ const meeting = { _id: "m", __v: 1, currentIndex: 1, status: "live", speakers: s
 beforeEach(() => vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn() } as any));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
+it("checks multiple attendees and submits one batch while preserving the selection on failure", async () => {
+  const defer = vi.fn().mockRejectedValueOnce(new Error("Thử lại" )).mockResolvedValue(undefined);
+  const deck = [...slides, { ...slides[1], id: "c", name: "Người thứ ba" }];
+  render(<MeetingSlides meeting={{ ...meeting, currentIndex: 0, speakers: deck }} canManage api={vi.fn().mockResolvedValue({ slides: deck, version: 1 })} onDeferSpeaker={defer} />);
+  await screen.findByText("Nguyễn An");
+  fireEvent.click(screen.getByLabelText("Chọn Nguyễn An"));
+  fireEvent.click(screen.getByLabelText("Chọn Trần Bình"));
+  fireEvent.click(screen.getByRole("button", { name: "Chuyển xuống cuối lượt" }));
+  await screen.findByRole("alert");
+  expect(defer).toHaveBeenCalledExactlyOnceWith(["a", "b"]);
+  expect((screen.getByLabelText("Chọn Nguyễn An") as HTMLInputElement).checked).toBe(true);
+  await waitFor(() => expect((screen.getByRole("button", { name: "Chuyển xuống cuối lượt" }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: "Chuyển xuống cuối lượt" }));
+  await waitFor(() => expect((screen.getByLabelText("Chọn Nguyễn An") as HTMLInputElement).checked).toBe(false));
+});
+
+it.each([0, 1])("previews selected attendee %s without changing the live turn until starting", async target => {
+  const api = vi.fn().mockResolvedValue({ slides, version: 1 });
+  const start = vi.fn().mockResolvedValue(undefined);
+  const initial = { ...meeting, currentIndex: target === 0 ? 1 : 0 };
+  const view = render(<MeetingSlides meeting={initial} canManage api={api} onStartPresentation={start} />);
+  fireEvent.click(await screen.findByText(slides[target].name));
+  expect((await screen.findByRole("img")).getAttribute("aria-label")).toContain(slides[target].name);
+  expect(start).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
+  await waitFor(() => expect(start).toHaveBeenCalledExactlyOnceWith(slides[target].id));
+  view.rerender(<MeetingSlides meeting={{ ...meeting, currentIndex: target }} canManage api={api} onStartPresentation={start} />);
+  expect((await within(screen.getByRole("dialog")).findByRole("img")).getAttribute("aria-label")).toContain(slides[target].name);
+});
+
+it("defers a waiting speaker and disables deferral for the last attendee", async () => {
+  const defer = vi.fn().mockResolvedValue(undefined);
+  render(<MeetingSlides meeting={{ ...meeting, currentIndex: 0 }} canManage api={vi.fn().mockResolvedValue({ slides, version: 1 })} onDeferSpeaker={defer} />);
+  await screen.findByText("Nguyễn An");
+  expect((screen.getByRole("button", { name: "Để cuối lượt: Trần Bình" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Để cuối lượt: Nguyễn An" }));
+  await waitFor(() => expect(defer).toHaveBeenCalledExactlyOnceWith("a"));
+});
+
 it("manual mode follows MC changes and has exactly two shared modes", async () => {
   const api = vi.fn().mockResolvedValue({ slides, version: 1 });
   const onAutoAdvanceChange = vi.fn();
@@ -40,7 +79,7 @@ it("manual arrows request one shared speaker change and wait for server state", 
   fireEvent.keyDown(document, { key: "ArrowRight" });
   fireEvent.keyDown(document, { key: "ArrowRight" });
   expect(onMoveSpeaker).toHaveBeenCalledExactlyOnceWith(1);
-  expect(within(screen.getByRole("dialog")).getByRole("img").getAttribute("aria-label")).toContain("Nguyễn An");
+  expect((await within(screen.getByRole("dialog")).findByRole("img")).getAttribute("aria-label")).toContain("Nguyễn An");
   await act(async () => finish());
   view.rerender(<MeetingSlides meeting={meeting} canManage api={api} onMoveSpeaker={onMoveSpeaker} />);
   expect((await within(screen.getByRole("dialog")).findByRole("img")).getAttribute("aria-label")).toContain("Trần Bình");

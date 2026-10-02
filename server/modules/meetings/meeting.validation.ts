@@ -7,6 +7,7 @@ export const slideProfileInput = Joi.object({
     photoURL: Joi.string().uri({ scheme: ['http', 'https'] }).max(2000).allow('').required(),
     coverImage: Joi.string().uri({ scheme: ['http', 'https'] }).max(2000).allow('').required(),
     phone: Joi.string().trim().max(40).allow('').required(),
+    email: Joi.string().trim().email().max(254).allow(''),
     industry: Joi.string().trim().max(150).allow('').required(),
     bio: Joi.string().trim().max(1000).allow('').required(),
   }).allow(null).required(),
