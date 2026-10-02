@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useState } from "react";
-import { LayoutDashboard, TrendingUp } from "lucide-react";
+import { LayoutDashboard, Users } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { isModuleEnabled } from "../config/modules";
 import { dashboardService } from "../services/dashboardService";
@@ -96,10 +96,10 @@ export default function DashboardTab() {
           <div className="flex gap-1.5 overflow-x-auto select-none pb-1">
             <button
               onClick={() => setActiveView("overview")}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs transition-all duration-200 cursor-pointer shrink-0 rounded-xl ${
+              className={`flex items-center gap-2 px-3.5 py-2 text-xs transition-all duration-150 cursor-pointer shrink-0 rounded-xl ${
                 activeView === "overview"
-                  ? "bg-cyan-600 text-white font-bold shadow-sm"
-                  : "text-slate-600 hover:text-cyan-600 hover:bg-cyan-50 font-semibold"
+                  ? "bg-cyan-600 text-white font-medium shadow-2xs"
+                  : "text-slate-600 hover:text-cyan-600 hover:bg-cyan-50 font-normal"
               }`}
             >
               <LayoutDashboard className={`h-4 w-4 ${activeView === "overview" ? "text-white" : "text-slate-400"}`} />
@@ -107,14 +107,14 @@ export default function DashboardTab() {
             </button>
             <button
               onClick={() => setActiveView("revenue")}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs transition-all duration-200 cursor-pointer shrink-0 rounded-xl ${
+              className={`flex items-center gap-2 px-3.5 py-2 text-xs transition-all duration-150 cursor-pointer shrink-0 rounded-xl ${
                 activeView === "revenue"
-                  ? "bg-cyan-600 text-white font-bold shadow-sm"
-                  : "text-slate-600 hover:text-cyan-600 hover:bg-cyan-50 font-semibold"
+                  ? "bg-red-600 text-white font-medium shadow-2xs"
+                  : "text-slate-600 hover:text-red-600 hover:bg-red-50 font-normal"
               }`}
             >
-              <TrendingUp className={`h-4 w-4 ${activeView === "revenue" ? "text-white" : "text-slate-400"}`} />
-              <span>Phân tích doanh thu</span>
+              <Users className={`h-4 w-4 ${activeView === "revenue" ? "text-white" : "text-slate-400"}`} />
+              <span>Thống kê cuộc họp</span>
             </button>
           </div>
         </div>

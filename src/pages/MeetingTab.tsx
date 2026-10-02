@@ -502,9 +502,9 @@ export default function MeetingTab() {
     },
     live: {
       label: "Đang diễn ra",
-      badge: "bg-emerald-50 text-emerald-700 border-emerald-200/70",
-      dot: "bg-emerald-500 animate-pulse",
-      border: "border-emerald-300 hover:border-emerald-400 shadow-emerald-500/10",
+      badge: "bg-green-50 text-green-700 border-green-300",
+      dot: "bg-green-500 animate-pulse",
+      border: "border-green-400 hover:border-green-500 shadow-green-500/15",
     },
     paused: {
       label: "Đang tạm dừng",
@@ -524,6 +524,13 @@ export default function MeetingTab() {
       dot: "bg-rose-500",
       border: "border-rose-200 hover:border-rose-300",
     },
+  };
+
+  const getLiveElapsedMinutes = (startsAt: string | Date): number => {
+    const startTime = new Date(startsAt).getTime();
+    const diffMs = Date.now() - startTime;
+    if (diffMs <= 0) return 1;
+    return Math.floor(diffMs / 60000);
   };
 
   const filteredItems = items.filter((m) => {
@@ -592,11 +599,11 @@ export default function MeetingTab() {
               type="button"
               onClick={() => setStatusFilter("live")}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer ${statusFilter === "live"
-                ? "bg-emerald-600 text-white shadow-xs"
+                ? "bg-green-600 text-white shadow-xs"
                 : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
             >
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
               Đang diễn ra ({items.filter((m) => m.status === "live" || m.status === "paused").length})
             </button>
             <button
@@ -676,12 +683,42 @@ export default function MeetingTab() {
 
                   {/* Status Badge */}
                   <div className="absolute top-2 left-2">
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold border backdrop-blur-md ${s.badge}`}
-                    >
-                      <span className={`h-2 w-2 rounded-full ${s.dot}`} />
-                      {s.label}
-                    </span>
+                    {m.status === "live" ? (
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border backdrop-blur-md shadow-md"
+                        style={{
+                          backgroundColor: "rgba(5, 20, 10, 0.9)",
+                          borderColor: "#22c55e",
+                          color: "#22c55e",
+                        }}
+                      >
+                        <span className="relative flex h-2 w-2 shrink-0">
+                          <span
+                            className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-80"
+                            style={{ backgroundColor: "#4ade80" }}
+                          />
+                          <span
+                            className="relative inline-flex rounded-full h-2 w-2"
+                            style={{ backgroundColor: "#22c55e" }}
+                          />
+                        </span>
+                        <span className="animate-pulse tracking-tight font-extrabold" style={{ color: "#22c55e" }}>
+                          Đang diễn ra {getLiveElapsedMinutes(m.startsAt)} phút
+                        </span>
+                      </span>
+                    ) : m.status === "paused" ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-sky-400/80 bg-slate-950/85 text-sky-400 shadow-md shadow-sky-500/25 backdrop-blur-md">
+                        <span className="h-2 w-2 rounded-full bg-sky-400" />
+                        <span>Tạm dừng • {getLiveElapsedMinutes(m.startsAt)} phút</span>
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold border backdrop-blur-md ${s.badge}`}
+                      >
+                        <span className={`h-2 w-2 rounded-full ${s.dot}`} />
+                        {s.label}
+                      </span>
+                    )}
                   </div>
 
                   {/* Top Action Icons (Sửa, Xóa) */}
@@ -828,13 +865,25 @@ export default function MeetingTab() {
                     <h2 className="font-extrabold text-slate-900 text-base sm:text-lg truncate">
                       {activeMeeting.title}
                     </h2>
-                    <span
-                      className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold border shrink-0 ${statusMap[activeMeeting.status]?.badge || "bg-slate-100 text-slate-600"
-                        }`}
-                    >
-                      <span className={`h-1.5 w-1.5 rounded-full ${statusMap[activeMeeting.status]?.dot}`} />
-                      {statusMap[activeMeeting.status]?.label || activeMeeting.status}
-                    </span>
+                    {activeMeeting.status === "live" ? (
+                      <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-green-400 bg-green-50 text-green-700 shadow-xs shrink-0">
+                        <span className="relative flex h-2 w-2 shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-80" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                        </span>
+                        <span className="animate-pulse text-green-600 font-bold">
+                          Đang diễn ra {getLiveElapsedMinutes(activeMeeting.startsAt)} phút
+                        </span>
+                      </span>
+                    ) : (
+                      <span
+                        className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold border shrink-0 ${statusMap[activeMeeting.status]?.badge || "bg-slate-100 text-slate-600"
+                          }`}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${statusMap[activeMeeting.status]?.dot}`} />
+                        {statusMap[activeMeeting.status]?.label || activeMeeting.status}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                     <span className="flex items-center gap-1">

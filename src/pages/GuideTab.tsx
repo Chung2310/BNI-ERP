@@ -57,8 +57,8 @@ export default function GuideTab() {
           desc: "Ngay khi đăng nhập, bạn sẽ thấy các ô thẻ hiển thị tổng doanh thu, số nhân viên đi làm hôm nay, số hàng hóa trong kho và học viên mới. Các con số này được cập nhật liên tục theo thời gian thực."
         },
         {
-          title: "Xem phân tích doanh thu chi tiết",
-          desc: "Nhấp vào mục 'Phân tích doanh thu' để xem biểu đồ dạng cột. Bạn có thể chọn xem theo Ngày, Tháng, Năm hoặc tự chọn khoảng thời gian cụ thể (ví dụ từ ngày 1 đến ngày 15) bằng công cụ lịch chọn ngày."
+          title: "Xem thống kê cuộc họp & người tham dự",
+          desc: "Nhấp vào mục 'Thống kê cuộc họp BNI' để theo dõi tổng số cuộc họp, tỷ lệ Thành viên BNI và Khách mời, kèm biểu đồ trực quan và bộ lọc theo từng buổi họp, tên hoặc ngày diễn ra."
         },
         {
           title: "Đọc và xử lý các đề xuất của Trợ lý AI",
