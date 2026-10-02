@@ -22,6 +22,7 @@ const speaker = new Schema(
     checkedInAt: { type: Date, required: true },
     seconds: { type: Number, required: true },
     spokenSeconds: Number,
+    deferred: Boolean,
   },
   { _id: false }
 );

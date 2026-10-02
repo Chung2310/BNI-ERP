@@ -9,6 +9,7 @@ import {
   controlMeeting,
   startMeetingPresentation,
   reorderMeetingSpeakers,
+  deferMeetingSpeaker,
   createMeeting,
   updateMeeting,
   deleteMeeting,
@@ -146,6 +147,15 @@ meetingRouter.post('/:id/control', manage, async (req: any, res) => {
   } catch (e) {
     sendError(res, e);
   }
+});
+
+meetingRouter.post('/:id/defer', manage, async (req: any, res) => {
+  if (typeof req.body?.speakerId !== 'string' || !req.body.speakerId) return res.status(400).json({ message: 'Chọn người cần để cuối lượt.' });
+  try {
+    const item = await getMeeting(company(req), req.params.id);
+    assertVersion(item, req.body.version);
+    res.json({ data: await deferMeetingSpeaker(item, req.body.speakerId) });
+  } catch (e) { sendError(res, e); }
 });
 
 meetingRouter.put('/:id/order', manage, async (req: any, res) => {

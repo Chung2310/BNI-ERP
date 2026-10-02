@@ -19,6 +19,45 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+it("defers from the operation list and starts fullscreen from the selected attendee", async () => {
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
+  const people = [
+    { id: "first", kind: "member", name: "An đang bận", company: "", seconds: 60, deferred: false },
+    { id: "second", kind: "guest", name: "Bình khách mời", company: "", seconds: 30, deferred: false },
+    { id: "third", kind: "guest", name: "Chi khách mời", company: "", seconds: 30, deferred: false },
+  ];
+  let item = { ...meeting, status: "live", currentIndex: 0, speakers: people };
+  const fetchMock = vi.fn(async (url, options) => {
+    if (String(url).endsWith("/defer")) {
+      expect(JSON.parse(options.body)).toEqual({ speakerId: "first", version: 0 });
+      item = { ...item, __v: 1, speakers: [people[1], people[2], { ...people[0], deferred: true }] };
+      return { ok: true, json: async () => ({ data: item }) };
+    }
+    if (String(url).endsWith("/presentation")) {
+      expect(JSON.parse(options.body)).toEqual({ speakerId: "third", version: 1 });
+      item = { ...item, __v: 2, currentIndex: 1 };
+      return { ok: true, json: async () => ({ data: item }) };
+    }
+    return { ok: true, json: async () => ({ data: String(url).endsWith("/slides") ? { slides: item.speakers, version: item.__v } : [item] }) };
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    render(<MeetingTab />);
+    fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+    fireEvent.click(screen.getByRole("button", { name: "Để cuối lượt: An đang bận" }));
+    await waitFor(() => expect(item.__v).toBe(1));
+    await waitFor(() => expect((screen.getByLabelText("Bắt đầu từ Chi khách mời") as HTMLInputElement).disabled).toBe(false));
+    await waitFor(() => expect((screen.getByRole("button", { name: "Để cuối lượt: An đang bận" }) as HTMLButtonElement).disabled).toBe(true));
+    fireEvent.click(screen.getByLabelText("Bắt đầu từ Chi khách mời"));
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/presentation"))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
+    await screen.findByRole("dialog", { name: "Trình chiếu hồ sơ" });
+    await waitFor(() => expect(screen.getAllByRole("img").filter(element => element.tagName === "CANVAS").some(element => element.getAttribute("aria-label")?.includes("Chi khách mời"))).toBe(true));
+    expect(item.currentIndex).toBe(1);
+    expect(item.speakers[2].id).toBe("first");
+  } finally { cleanup(); await act(async () => {}); vi.restoreAllMocks(); }
+});
+
 it.each(["Escape", "fullscreen"])("returns to the same meeting's operation tab after exiting presentation via %s", async exit => {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
   const people = [{ id: "first", kind: "guest", name: "Khách đang nói", company: "", seconds: 30 }];

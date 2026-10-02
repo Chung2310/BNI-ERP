@@ -217,6 +217,27 @@ export async function reorderMeetingSpeakers(item: any, speakerIds: unknown) {
   return item;
 }
 
+export async function deferMeetingSpeaker(item: any, speakerId: string, now = new Date()) {
+  if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp không còn nhận điều hành phát biểu.');
+  const index = item.speakers.findIndex((speaker: any) => speaker.id === speakerId);
+  if (index < 0) throw new MeetingError(404, 'Không tìm thấy người phát biểu.');
+  if (item.status !== 'scheduled' && index < item.currentIndex) throw new MeetingError(409, 'Không thể hoãn lượt đã hoàn tất.');
+  if (index === item.speakers.length - 1) throw new MeetingError(409, 'Người này đã ở cuối danh sách.');
+  const isCurrent = item.status !== 'scheduled' && index === item.currentIndex;
+  // Preserve identity and allocated time; deferral is not a completed speech.
+  const [person] = item.speakers.splice(index, 1);
+  person.deferred = true;
+  item.speakers.push(person);
+  if (isCurrent) {
+    item.elapsedSeconds = 0;
+    item.speakerStartedAt = item.status === 'live' ? now : undefined;
+    item.speakers[item.currentIndex].deferred = false;
+  }
+  await saveMeeting(item);
+  await notifyNextSpeaker(item);
+  return item;
+}
+
 export async function startMeetingPresentation(item: any, speakerId: string, now = new Date()) {
   if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp hiện không thể bắt đầu thuyết trình.');
   const index = item.speakers.findIndex((speaker: any) => speaker.id === speakerId);
@@ -235,6 +256,7 @@ export async function startMeetingPresentation(item: any, speakerId: string, now
     item.speakerStartedAt = now;
   }
   item.status = 'live';
+  item.speakers[index].deferred = false;
   item.speechesCompletedAt = undefined;
   await saveMeeting(item);
   await notifyNextSpeaker(item);
@@ -264,6 +286,7 @@ export async function controlMeeting(item: any, action: string, now = new Date()
     item.status = 'live';
     item.speechesCompletedAt = undefined;
   } else if (action === 'start_speaker' && ['live', 'paused'].includes(status)) {
+    item.speakers[item.currentIndex].deferred = false;
     item.speakerStartedAt = now;
     item.elapsedSeconds = 0;
     item.status = 'live';
@@ -290,6 +313,7 @@ export async function controlMeeting(item: any, action: string, now = new Date()
     if (item.currentIndex <= 0) throw new MeetingError(409, 'Đang ở người phát biểu đầu tiên.');
     item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
     item.currentIndex--;
+    item.speakers[item.currentIndex].deferred = false;
     item.elapsedSeconds = 0;
     item.speakers[item.currentIndex].spokenSeconds = undefined;
     item.speakerStartedAt = status === 'live' ? now : undefined;
@@ -304,6 +328,7 @@ export async function controlMeeting(item: any, action: string, now = new Date()
       item.speakerStartedAt = undefined;
     } else {
       item.currentIndex++;
+      item.speakers[item.currentIndex].deferred = false;
       item.elapsedSeconds = 0;
       item.speakerStartedAt = status === 'live' ? now : undefined;
     }

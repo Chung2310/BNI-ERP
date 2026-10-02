@@ -28,6 +28,7 @@ import {
   Trophy,
   Filter,
   RotateCcw,
+  ArrowDownToLine,
 } from "lucide-react";
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
@@ -44,6 +45,7 @@ type Speaker = {
   coverImage?: string;
   seconds: number;
   spokenSeconds?: number;
+  deferred?: boolean;
   checkedInAt?: string;
 };
 
@@ -149,6 +151,7 @@ export default function MeetingTab() {
   const [finishRequested, setFinishRequested] = useState(false);
   const [dismissedCompletion, setDismissedCompletion] = useState("");
   const [startPresentation, setStartPresentation] = useState(false);
+  const [presentationSpeakerId, setPresentationSpeakerId] = useState("");
   const presentationFullscreen = useRef<Promise<boolean> | null>(null);
   const presentationStarted = useCallback(() => setStartPresentation(false), []);
   const presentationClosed = useCallback(() => {
@@ -245,6 +248,7 @@ export default function MeetingTab() {
   }, [refresh]);
 
   const activeMeeting = items.find((m) => m._id === detailMeetingId) || null;
+  useEffect(() => { setPresentationSpeakerId(""); }, [activeMeeting?._id, activeMeeting?.speakers[activeMeeting.currentIndex]?.id]);
 
   const completionKey = activeMeeting?.speechesCompletedAt && ["live", "paused"].includes(activeMeeting.status)
     ? activeMeeting._id + ":" + activeMeeting.speechesCompletedAt : "";
@@ -410,6 +414,20 @@ export default function MeetingTab() {
     try {
       const updated: Meeting = await api(`/${activeMeeting._id}/control`, "POST", { action, version: activeMeeting.__v });
       setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
+    } finally {
+      meetingControlPending.current = false;
+      setSaving(false);
+    }
+  };
+
+  const deferSpeaker = async (speakerId: string): Promise<void> => {
+    if (!activeMeeting || !canManage || meetingControlPending.current) return;
+    meetingControlPending.current = true;
+    setSaving(true);
+    try {
+      const updated: Meeting = await api(`/${activeMeeting._id}/defer`, "POST", { speakerId, version: activeMeeting.__v });
+      setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
+      setPresentationSpeakerId("");
     } finally {
       meetingControlPending.current = false;
       setSaving(false);
@@ -965,7 +983,7 @@ export default function MeetingTab() {
 
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} onPresentationClosed={presentationClosed} onStartPresentation={canManage ? startPresentationTimer : undefined} onMoveSpeaker={direction => requestMeetingControl(direction > 0 ? "next" : "previous")} controlBusy={saving} autoAdvance={autoAdvance} autoAdvanceDelay={autoAdvanceDelay} onAutoAdvanceChange={updateAutoAdvance} onAutoAdvanceDelayChange={updateAutoAdvanceDelay} fullscreenRequest={presentationFullscreen.current} />}
+              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} initialSpeakerId={presentationSpeakerId} onDeferSpeaker={deferSpeaker} onPresentationStarted={presentationStarted} onPresentationClosed={presentationClosed} onStartPresentation={canManage ? startPresentationTimer : undefined} onMoveSpeaker={direction => requestMeetingControl(direction > 0 ? "next" : "previous")} controlBusy={saving} autoAdvance={autoAdvance} autoAdvanceDelay={autoAdvanceDelay} onAutoAdvanceChange={updateAutoAdvance} onAutoAdvanceDelayChange={updateAutoAdvanceDelay} fullscreenRequest={presentationFullscreen.current} />}
               {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
               {(activeSubTab === "speakers" || activeSubTab === "checkin") && (
                 <div className="space-y-4">
@@ -1028,7 +1046,7 @@ export default function MeetingTab() {
 
                       {/* Operation Control Buttons */}
                       <div className="flex flex-wrap items-center gap-2">
-                        <button type="button" disabled={!activeMeeting.speakers.length}
+                        <button type="button" disabled={saving || !activeMeeting.speakers.length}
                           onClick={() => {
                             presentationFullscreen.current = document.documentElement.requestFullscreen && !document.fullscreenElement
                               ? document.documentElement.requestFullscreen().then(() => true).catch(() => false)
@@ -1038,6 +1056,7 @@ export default function MeetingTab() {
                           className="flex items-center gap-1.5 rounded-xl bg-cyan-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-40">
                           <Play className="h-3.5 w-3.5" /> Bắt đầu thuyết trình
                         </button>
+                        {presentationSpeakerId && <span className="text-xs text-cyan-800">Bắt đầu từ: {activeMeeting.speakers.find(s => s.id === presentationSpeakerId)?.name}</span>}
                   {canManage && activeMeeting.status === "scheduled" && (
                     <button
                       type="button"
@@ -1342,6 +1361,7 @@ export default function MeetingTab() {
                             <span className="w-6 text-center font-mono text-xs font-bold text-slate-400">
                               {i + 1}
                             </span>
+                            {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && <input type="radio" name="presentation-speaker" aria-label={`Bắt đầu từ ${p.name}`} checked={presentationSpeakerId === p.id} disabled={saving} onChange={() => setPresentationSpeakerId(p.id)} />}
 
                             {p.coverImage || p.photoURL ? (
                               <img
@@ -1367,8 +1387,26 @@ export default function MeetingTab() {
                                 <Megaphone className="h-3 w-3 animate-bounce" /> Đang nói
                               </span>
                             )}
-
-
+                            {p.deferred && (
+                              <span
+                                title="Đã để cuối lượt"
+                                className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-amber-50 text-amber-700 border border-amber-200/80 shrink-0"
+                              >
+                                <ArrowDownToLine className="h-3.5 w-3.5" />
+                              </span>
+                            )}
+                            {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (activeMeeting.status === "scheduled" || i >= activeMeeting.currentIndex) && (
+                              <button
+                                type="button"
+                                title="Để cuối lượt"
+                                aria-label={`Để cuối lượt: ${p.name}`}
+                                disabled={saving || i === activeMeeting.speakers.length - 1}
+                                onClick={() => void deferSpeaker(p.id).catch(error => toast.error(error.message || "Không hoãn được lượt."))}
+                                className="shrink-0 p-1.5 rounded-lg border border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100 disabled:opacity-40 transition cursor-pointer"
+                              >
+                                <ArrowDownToLine className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </div>
                         );
                       })}

@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { setRateLimitRedisClientForTesting } from "../../infrastructure/rate-limit-redis";
 setRateLimitRedisClientForTesting({ eval: async () => [1, 1000], decr: async () => 0, del: async () => 0 });
-const { reorderMeetingSpeakers, controlMeeting, checkIn, startMeetingPresentation } = await import("./meeting.service");
+const { reorderMeetingSpeakers, controlMeeting, checkIn, startMeetingPresentation, deferMeetingSpeaker } = await import("./meeting.service");
 import { allocateSpeakers } from "./meeting.rules";
+import { MeetingModel } from "./meeting.model";
 
 const now = new Date("2026-10-01T08:00:30Z");
 function meeting(): any {
@@ -29,6 +30,59 @@ test("previous speaker resets the target timer and preserves live or paused stat
     assert.equal(item.speakers[1].spokenSeconds, status === "live" ? 30 : 12);
     await assert.rejects(controlMeeting(item, "previous", now), { status: 409 });
   }
+});
+
+test("deferring the current speaker moves them to the end and starts the next allocated turn", async () => {
+  const item = meeting();
+  await deferMeetingSpeaker(item, "early", now);
+  assert.deepEqual(item.speakers.map((s: any) => s.id), ["second", "chair", "early"]);
+  assert.deepEqual(item.speakers.map((s: any) => s.seconds), [20, 20, 60]);
+  assert.equal(item.currentIndex, 0);
+  assert.equal(item.speakerStartedAt, now);
+  assert.equal(item.elapsedSeconds, 0);
+  assert.equal(item.speakers[2].deferred, true);
+  assert.equal(item.speakers[2].spokenSeconds, undefined);
+  await controlMeeting(item, "next", now);
+  await controlMeeting(item, "next", now);
+  assert.equal(item.speakers[item.currentIndex].id, "early");
+  assert.equal(item.speakers[item.currentIndex].deferred, false);
+});
+
+test("deferred order and marker survive Mongoose serialization", async t => {
+  const item = new MeetingModel({ ...meeting(), _id: "507f1f77bcf86cd799439011" });
+  t.mock.method(item, "save", async () => item);
+  await deferMeetingSpeaker(item, "early", now);
+  const restored = new MeetingModel(item.toObject());
+  assert.deepEqual(restored.speakers.map(s => s.id), ["second", "chair", "early"]);
+  assert.equal(restored.speakers[2].deferred, true);
+  assert.equal(restored.speakers[2].seconds, 60);
+});
+
+test("deferring a waiting person preserves the active speaker and clock; multiple deferrals remain queued", async () => {
+  const item = meeting(); const started = item.speakerStartedAt;
+  await deferMeetingSpeaker(item, "second", now);
+  assert.equal(item.speakers[0].id, "early");
+  assert.equal(item.speakerStartedAt, started);
+  assert.equal(item.speakers[2].deferred, true);
+  await deferMeetingSpeaker(item, "early", now);
+  assert.deepEqual(item.speakers.map((s: any) => s.id), ["chair", "second", "early"]);
+  assert.equal(item.speakers[1].deferred, true);
+  assert.equal(item.speakers[2].deferred, true);
+});
+
+test("deferral preserves paused/scheduled state and rejects completed, last or missing attendees", async () => {
+  const paused = meeting(); paused.status = "paused"; paused.speakerStartedAt = undefined; paused.elapsedSeconds = 12;
+  await deferMeetingSpeaker(paused, "early", now);
+  assert.equal(paused.status, "paused"); assert.equal(paused.speakerStartedAt, undefined); assert.equal(paused.elapsedSeconds, 0);
+  const scheduled = meeting(); scheduled.status = "scheduled"; scheduled.currentIndex = -1; scheduled.speakerStartedAt = undefined;
+  await deferMeetingSpeaker(scheduled, "early", now);
+  assert.equal(scheduled.currentIndex, -1); assert.equal(scheduled.speakerStartedAt, undefined);
+  const item = meeting(); item.currentIndex = 1;
+  await assert.rejects(deferMeetingSpeaker(item, "early", now), { status: 409 });
+  await assert.rejects(deferMeetingSpeaker(item, "chair", now), { status: 409 });
+  await assert.rejects(deferMeetingSpeaker(item, "missing", now), { status: 404 });
+  item.status = "ended";
+  await assert.rejects(deferMeetingSpeaker(item, "second", now), { status: 409 });
 });
 
 test("priority insertion shifts waiting speakers down without changing current speaker or allocations", async () => {
