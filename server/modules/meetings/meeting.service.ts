@@ -138,6 +138,8 @@ export async function checkIn(item: any, input: any, actorId: string, canManage:
     email: (person?.email || input.email || '').toLowerCase(),
     phone: person?.phone || input.phone,
     company: person?.companyName || input.company,
+    industry: person?.industry || input.industry,
+    bio: input.bio,
     photoURL: person?.photoURL || input.photoURL,
     coverImage: person?.coverImage || input.coverImage,
     checkedInAt: new Date(),
@@ -635,45 +637,55 @@ export async function qrCheckInMember(token: string, input: any) {
   return { success: true, name: person.displayName };
 }
 
-export async function qrCheckInGuest(token: string, input: any, avatar?: GuestAvatarFile) {
+export async function qrCheckInGuest(token: string, input: any, avatar?: GuestAvatarFile, coverImage?: GuestAvatarFile) {
   const hash = createHash('sha256').update(token).digest('hex');
   const query = { checkInQrTokenHash: hash, checkInQrExpiresAt: { $gt: new Date() } };
   let item: any = await MeetingModel.findOne(query);
   if (!item) throw new MeetingError(410, 'Mã QR đã hết hạn hoặc không còn hiệu lực.');
   validateQrAndLocation(item, input);
-  let uploaded: PublicMediaAsset | undefined;
-  if (avatar) {
-    const error = guestAvatarError(avatar);
-    if (error) throw new MeetingError(400, error);
-    if (item.speakers.length >= 1000) throw new MeetingError(400, 'Tối đa 1.000 người mỗi cuộc họp.');
-    if (input.email && item.speakers.some((p: any) => p.email === input.email.toLowerCase())) {
-      throw new MeetingError(409, 'Email này đã check-in.');
-    }
-    try {
-      uploaded = await cloudinaryService.uploadMediaAsset(
-        `data:${avatar.mimetype};base64,${avatar.buffer.toString('base64')}`,
-        `meetings/${item._id}/guests`
-      );
-    } catch {
-      throw new MeetingError(502, 'Chưa tải được ảnh đại diện. Vui lòng thử lại hoặc bỏ ảnh để check-in.');
-    }
+  const uploads: { field: 'photoURL' | 'coverImage'; asset: PublicMediaAsset }[] = [];
+  for (const file of [avatar, coverImage]) {
+    if (!file) continue;
+    const error = guestAvatarError(file);
+    if (error) throw new MeetingError(400, error.replace('Ảnh đại diện', 'Ảnh'));
+  }
+  if (item.speakers.length >= 1000) throw new MeetingError(400, 'Tối đa 1.000 người mỗi cuộc họp.');
+  if (input.email && item.speakers.some((p: any) => p.email === input.email.toLowerCase())) {
+    throw new MeetingError(409, 'Email này đã check-in.');
   }
   try {
-    if (uploaded) {
-      if (uploaded.resourceType !== 'image') throw new MeetingError(400, 'Tệp tải lên không phải ảnh hợp lệ.');
+    for (const [field, file] of [['photoURL', avatar], ['coverImage', coverImage]] as const) {
+      if (!file) continue;
+      let asset: PublicMediaAsset;
+      try {
+        asset = await cloudinaryService.uploadMediaAsset(
+          `data:${file.mimetype};base64,${file.buffer.toString('base64')}`,
+          `meetings/${item._id}/guests`
+        );
+      } catch {
+        throw new MeetingError(502, 'Chưa tải được ảnh. Vui lòng thử lại hoặc bỏ ảnh để check-in.');
+      }
+      uploads.push({ field, asset });
+      if (asset.resourceType !== 'image') throw new MeetingError(400, 'Tệp tải lên không phải ảnh hợp lệ.');
+    }
+    if (uploads.length) {
       // Upload may take time: recheck QR, location and the latest attendee list before saving.
       item = await MeetingModel.findOne({ ...query, checkInQrExpiresAt: { $gt: new Date() } });
       if (!item) throw new MeetingError(410, 'Mã QR đã hết hạn hoặc bị thay thế. Hãy quét mã mới.');
       validateQrAndLocation(item, input);
     }
-    await checkIn(item, { name: input.name, email: input.email, phone: input.phone, company: input.company, photoURL: uploaded?.secureUrl }, 'public-qr', true);
+    await checkIn(item, {
+      name: input.name, email: input.email, phone: input.phone, company: input.company,
+      industry: input.industry, bio: input.bio,
+      ...Object.fromEntries(uploads.map(({ field, asset }) => [field, asset.secureUrl])),
+    }, 'public-qr', true);
     return { success: true, name: input.name };
   } catch (error) {
-    if (uploaded) {
+    for (const { field, asset } of uploads) {
       // Do not delete an image already persisted if a later notification fails.
       try {
-        const saved = await MeetingModel.exists({ 'speakers.photoURL': uploaded.secureUrl });
-        if (!saved) await cloudinaryService.deletePublicMedia(uploaded.publicId, uploaded.resourceType);
+        const saved = await MeetingModel.exists({ [`speakers.${field}`]: asset.secureUrl });
+        if (!saved) await cloudinaryService.deletePublicMedia(asset.publicId, asset.resourceType);
       } catch { /* Preserve the original check-in error if cleanup is unavailable. */ }
     }
     throw error;

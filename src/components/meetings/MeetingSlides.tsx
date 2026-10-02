@@ -292,7 +292,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
 
   const ready = !!active && !drawing && !drawError && !loading && !error;
   const canvas = (ref: React.RefObject<HTMLCanvasElement>) => <canvas ref={ref} width={SLIDE_WIDTH} height={SLIDE_HEIGHT}
-    role="img" aria-label={active ? `Slide ${active.kind === "member" ? "thành viên" : "khách mời"}: ${active.name}, ${active.company}, ${active.kind === "member" ? [active.phone, active.industry].filter(Boolean).join(", ") : ""}, ${active.bio}` : "Chưa chọn người"}
+    role="img" aria-label={active ? `Slide ${active.kind === "member" ? "thành viên" : "khách mời"}: ${active.name}, ${active.company}, ${active.kind === "member" ? [active.phone, active.industry].filter(Boolean).join(", ") : active.industry}, ${active.bio}` : "Chưa chọn người"}
     style={{ width: "100%", height: "100%", objectFit: "contain", visibility: drawing || !active || drawError ? "hidden" : "visible" }} />;
 
   return <section aria-label="Slide giới thiệu" className="space-y-4">
@@ -346,7 +346,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
               ["name", "Họ và tên", "text", 150], ["company", "Công ty / thương hiệu", "text", 150],
               ["phone", "Số điện thoại", "tel", 40], ["industry", "Lĩnh vực / dịch vụ", "text", 150],
               ["photoURL", "URL ảnh đại diện", "url", 2000], ["coverImage", "URL ảnh bìa", "url", 2000],
-            ] as const).filter(([key]) => draft.kind === "member" || (key !== "phone" && key !== "industry")).map(([key, label, type, max]) => <label key={key} className="space-y-1 text-xs font-semibold">{label}<input className={fieldClass} type={type} maxLength={max} required={key === "name"} value={draft[key]} disabled={saving} onChange={e => setDraft({ ...draft, [key]: e.target.value })} /></label>)}
+            ] as const).filter(([key]) => draft.kind === "member" || key !== "phone").map(([key, label, type, max]) => <label key={key} className="space-y-1 text-xs font-semibold">{label}<input className={fieldClass} type={type} maxLength={max} required={key === "name"} value={draft[key]} disabled={saving} onChange={e => setDraft({ ...draft, [key]: e.target.value })} /></label>)}
           </div>
           <label className="block text-xs font-semibold">Bio / giới thiệu ngắn<textarea className={fieldClass} rows={3} maxLength={1000} value={draft.bio} disabled={saving} onChange={e => setDraft({ ...draft, bio: e.target.value })} /></label>
           <div className="flex flex-wrap gap-2">

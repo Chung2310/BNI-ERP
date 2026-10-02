@@ -9,6 +9,7 @@ const { meetingCheckInRouter } = await import("./meeting-checkin.router");
 import { guestAvatarError, MAX_GUEST_AVATAR_BYTES } from "./meeting-guest-avatar";
 import { MeetingModel } from "./meeting.model";
 import { cloudinaryService } from "../../service/cloudinary.service";
+const { buildProfileSlide } = await import("./meeting-slides.service");
 
 const buffer = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1kAAAAASUVORK5CYII=", "base64");
 const avatar = { buffer, size: buffer.length, mimetype: "image/png" };
@@ -72,13 +73,57 @@ test("multipart guest endpoint accepts optional avatar and enforces 5 MB limit",
   const endpoint = `http://127.0.0.1:${port}/checkin/token/guest`;
   const form = new FormData();
   for (const [key, value] of Object.entries(input)) form.append(key, String(value));
+  form.append("industry", "Thiết kế");
+  form.append("bio", "ấ".repeat(1000));
   form.append("avatar", new Blob([buffer], { type: "image/png" }), "avatar.png");
+  form.append("coverImage", new Blob([buffer], { type: "image/png" }), "cover.png");
   const res = await fetch(endpoint, { method: "POST", body: form });
   assert.equal(res.status, 200, JSON.stringify(await res.json()));
   assert.equal(item.speakers[0].photoURL, asset.secureUrl);
+  assert.equal(item.speakers[0].coverImage, asset.secureUrl);
+  assert.equal(buildProfileSlide(item.speakers[0]).industry, "Thiết kế");
+  assert.equal(buildProfileSlide(item.speakers[0]).bio, "ấ".repeat(1000));
   const oversized = new FormData();
   oversized.append("avatar", new Blob([new Uint8Array(MAX_GUEST_AVATAR_BYTES + 1)], { type: "image/png" }), "large.png");
   const invalid = await fetch(endpoint, { method: "POST", body: oversized });
   assert.equal(invalid.status, 413);
-  assert.equal(upload.mock.callCount(), 1);
+  assert.equal(upload.mock.callCount(), 2);
+});
+
+test("cover-only check-in persists optional profile fields through Mongoose", async t => {
+  const item = meeting();
+  t.mock.method(MeetingModel, "findOne", async () => item);
+  t.mock.method(cloudinaryService, "uploadMediaAsset", async () => asset);
+  await qrCheckInGuest("token", { ...input, industry: "Design", bio: "Short bio" }, undefined, avatar);
+  const reloaded = new MeetingModel({ speakers: item.speakers });
+  const slide = buildProfileSlide(reloaded.speakers[0]);
+  assert.equal(slide.photoURL, "");
+  assert.equal(slide.coverImage, asset.secureUrl);
+  assert.equal(slide.industry, "Design");
+  assert.equal(slide.bio, "Short bio");
+});
+
+test("cleans up the first image when uploading the second image fails", async t => {
+  t.mock.method(MeetingModel, "findOne", async () => meeting());
+  t.mock.method(MeetingModel, "exists", async () => null);
+  let calls = 0;
+  t.mock.method(cloudinaryService, "uploadMediaAsset", async () => {
+    if (++calls === 2) throw new Error("Upload failed");
+    return asset;
+  });
+  const remove = t.mock.method(cloudinaryService, "deletePublicMedia", async () => {});
+  await assert.rejects(qrCheckInGuest("token", input, avatar, avatar), { status: 502 });
+  assert.equal(remove.mock.callCount(), 1);
+});
+
+test("guest may omit all optional profile fields", async t => {
+  const item = meeting();
+  t.mock.method(MeetingModel, "findOne", async () => item);
+  const upload = t.mock.method(cloudinaryService, "uploadMediaAsset", async () => asset);
+  await qrCheckInGuest("token", input);
+  const slide = buildProfileSlide(item.speakers[0]);
+  assert.equal(slide.industry, "");
+  assert.equal(slide.bio, "");
+  assert.equal(slide.coverImage, "");
+  assert.equal(upload.mock.callCount(), 0);
 });
