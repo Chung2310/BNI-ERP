@@ -104,6 +104,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   const speechesComplete = !!meeting.speechesCompletedAt && ["live", "paused"].includes(meeting.status);
   const timer = useMemo(() => getSlideTimer(meeting, active?.id, now), [meeting, active?.id, now]);
   const index = queue.findIndex(s => s.id === selected?.id);
+  const isSpeakingLive = (meeting.status === "live" && Boolean(meeting.speakerStartedAt)) || (presenting && meeting.status !== "paused");
 
   const navigationBusy = startingSpeech || controlBusy || !!draft || loading;
   const canMove = (direction: number) => !navigationBusy && (followsSpeaker
@@ -339,39 +340,36 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       <div className="hidden sm:block w-px h-5 bg-slate-200" />
       <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={14} /> Làm mới hồ sơ</button>
       <button className={button} disabled={!ready} onClick={download}><Download size={14} /> Tải PNG</button>
-      <button
-        ref={launchButton}
-        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 px-3.5 py-2 text-xs font-medium text-white transition disabled:opacity-40 cursor-pointer"
-        disabled={navigationBusy || !!error || !selected}
-        onClick={() => {
-          const target = (checkedSpeakerIds.length > 0 ? deck.slides.find(s => s.id === checkedSpeakerIds[checkedSpeakerIds.length - 1] || checkedSpeakerIds.includes(s.id)) : null) || selected;
-          if (target) beginPresentation(target);
-        }}
-      >
-        <Play size={14} /> Bắt đầu thuyết trình
-      </button>
-
-      {canManage && ["live", "paused"].includes(meeting.status) && (
+      {canManage && isSpeakingLive ? (
         <button
+          ref={launchButton}
           type="button"
-          disabled={controlBusy}
+          disabled={controlBusy || navigationBusy}
           onClick={() => onTogglePause?.()}
-          className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-medium transition disabled:opacity-40 cursor-pointer ${
-            meeting.status === "paused"
-              ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-              : "border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800"
-          }`}
-          title={meeting.status === "paused" ? "Tiếp tục đếm ngược thời gian phát biểu" : "Tạm dừng đếm ngược thời gian phát biểu"}
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 px-3.5 py-2 text-xs font-medium text-amber-800 transition disabled:opacity-40 cursor-pointer shadow-xs"
+          title="Tạm dừng đếm ngược thời gian phát biểu"
         >
-          {meeting.status === "paused" ? (
-            <>
-              <Play size={14} className="fill-current" /> Tiếp tục phát biểu
-            </>
-          ) : (
-            <>
-              <Pause size={14} className="fill-current" /> Tạm dừng
-            </>
-          )}
+          <Pause size={14} className="fill-current" /> Tạm dừng
+        </button>
+      ) : (
+        <button
+          ref={launchButton}
+          type="button"
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 px-3.5 py-2 text-xs font-medium text-white transition disabled:opacity-40 cursor-pointer shadow-xs"
+          disabled={navigationBusy || !!error || !selected || controlBusy}
+          onClick={() => {
+            const target =
+              (checkedSpeakerIds.length > 0
+                ? deck.slides.find(
+                    (s) =>
+                      s.id === checkedSpeakerIds[checkedSpeakerIds.length - 1] ||
+                      checkedSpeakerIds.includes(s.id)
+                  )
+                : null) || selected;
+            if (target) beginPresentation(target);
+          }}
+        >
+          <Play size={14} /> Bắt đầu thuyết trình
         </button>
       )}
     </div>
