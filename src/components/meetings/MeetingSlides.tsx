@@ -93,7 +93,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   const queue = useMemo(() => deck.slides.filter(s => !excluded.has(s.id)), [deck.slides, excluded]);
   const currentSpeakerId = ["live", "paused"].includes(meeting.status) ? meeting.speakers[meeting.currentIndex]?.id : undefined;
   // Selection previews a profile; fullscreen follows the shared speaker after starting it.
-  const followsSpeaker = meeting.status !== "scheduled";
+  const followsSpeaker = ["live", "paused"].includes(meeting.status);
   const chosen = (!followsSpeaker || !presenting || startingSpeech) ? queue.find(s => s.id === selectedId) : undefined;
   const selected = chosen || (followsSpeaker
     ? deck.slides.find(s => s.id === currentSpeakerId)
@@ -311,11 +311,20 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     </div>
     <p className="text-xs text-slate-500">Toàn màn hình: dùng phím ← → để chuyển lượt ở chế độ thủ công; Esc để trở về Điều hành.</p>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error} <button className="underline" onClick={() => setRevision(v => v + 1)}>Tải lại dữ liệu</button></p>}
-    <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
-      <aside className="space-y-2 rounded-xl border bg-white p-3">
-        <p className="text-sm font-bold">Danh sách chiếu ({queue.length}/{deck.slides.length})</p>
+    <div className="grid gap-4 lg:grid-cols-[280px_1fr] items-stretch">
+      <aside className="flex flex-col h-full rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">
+        <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            Danh sách chiếu ({queue.length}/{deck.slides.length})
+          </p>
+          {!followsSpeaker && !(canManage && onDeferSpeaker) && meeting.status === "scheduled" && (
+            <button className="text-xs text-cyan-700 font-semibold underline cursor-pointer" disabled={!!draft} onClick={() => setExcluded(new Set())}>
+              Chọn tất cả
+            </button>
+          )}
+        </div>
         {canManage && onDeferSpeaker && ["scheduled", "live", "paused"].includes(meeting.status) && checkedSpeakerIds.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-xs py-1">
+          <div className="flex flex-wrap items-center gap-2 text-xs py-1 mt-1">
             <button
               type="button"
               title="Chuyển xuống cuối lượt"
@@ -337,27 +346,75 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
             </button>
           </div>
         )}
-        {!followsSpeaker && !(canManage && onDeferSpeaker) && <button className="text-xs text-red-700 underline" disabled={!!draft} onClick={() => setExcluded(new Set())}>Chọn tất cả</button>}
-        <div className="max-h-80 space-y-1 overflow-auto">
-          {deck.slides.map(s => <div key={s.id} className={`flex flex-wrap items-center gap-2 rounded-lg p-2 ${selected?.id === s.id ? "bg-red-50" : ""}`}>
-            {canManage && onDeferSpeaker && ["scheduled", "live", "paused"].includes(meeting.status) && <input type="checkbox" aria-label={`Chọn ${s.name}`} checked={checkedSpeakerIds.includes(s.id)} disabled={navigationBusy || (meeting.status !== "scheduled" && meeting.speakers.findIndex(person => person.id === s.id) < meeting.currentIndex)} onChange={e => setCheckedSpeakerIds(ids => e.target.checked ? [...ids, s.id] : ids.filter(id => id !== s.id))} />}
-            {!followsSpeaker && !(canManage && onDeferSpeaker) && <input type="checkbox" aria-label={`Chiếu ${s.name}`} checked={!excluded.has(s.id)} disabled={!!draft} onChange={e => setExcluded(old => { const next = new Set(old); if (e.target.checked) next.delete(s.id); else next.add(s.id); return next; })} />}
-            <button className="min-w-0 flex-1 text-left text-sm disabled:opacity-50" aria-pressed={selected?.id === s.id} disabled={navigationBusy || (followsSpeaker && !canManage) || excluded.has(s.id) || ["ended", "cancelled"].includes(meeting.status)} onClick={() => setSelectedId(s.id)}>
-              <span className="block truncate font-semibold">{s.name}</span><span className="text-xs text-slate-500">{s.kind === "member" ? "Thành viên" : "Khách mời"}</span>
-            </button>
-            {canManage && onDeferSpeaker && ["scheduled", "live", "paused"].includes(meeting.status) && meeting.speakers.findIndex(person => person.id === s.id) >= (meeting.status === "scheduled" ? 0 : Math.max(0, meeting.currentIndex)) && (
-              <button
-                type="button"
-                title="Để cuối lượt"
-                aria-label={`Để cuối lượt: ${s.name}`}
-                className="p-1.5 rounded-lg border border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100 disabled:opacity-40 transition cursor-pointer"
-                disabled={navigationBusy || meeting.speakers.at(-1)?.id === s.id}
-                onClick={() => void deferSpeaker(s.id)}
+        <div className="flex-1 min-h-[360px] max-h-[540px] lg:max-h-none space-y-1 overflow-y-auto pr-1 mt-2">
+          {deck.slides.map(s => {
+            const isSelected = selected?.id === s.id;
+            return (
+              <div
+                key={s.id}
+                className={`flex flex-wrap items-center gap-2 rounded-xl p-2.5 transition-colors ${
+                  isSelected
+                    ? "bg-cyan-50/90 border border-cyan-300 text-cyan-950 font-medium shadow-2xs"
+                    : "hover:bg-slate-50 border border-transparent text-slate-800"
+                }`}
               >
-                <ArrowDownToLine className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>)}
+                {canManage && onDeferSpeaker && ["scheduled", "live", "paused"].includes(meeting.status) && (
+                  <input
+                    type="checkbox"
+                    aria-label={`Chọn ${s.name}`}
+                    checked={checkedSpeakerIds.includes(s.id)}
+                    disabled={navigationBusy || (meeting.status !== "scheduled" && meeting.speakers.findIndex(person => person.id === s.id) < meeting.currentIndex)}
+                    onChange={e => setCheckedSpeakerIds(ids => e.target.checked ? [...ids, s.id] : ids.filter(id => id !== s.id))}
+                  />
+                )}
+                {!followsSpeaker && !(canManage && onDeferSpeaker) && meeting.status === "scheduled" && (
+                  <input
+                    type="checkbox"
+                    aria-label={`Chiếu ${s.name}`}
+                    checked={!excluded.has(s.id)}
+                    disabled={!!draft}
+                    onChange={e => setExcluded(old => {
+                      const next = new Set(old);
+                      if (e.target.checked) next.delete(s.id);
+                      else next.add(s.id);
+                      return next;
+                    })}
+                  />
+                )}
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left text-xs disabled:opacity-50 cursor-pointer"
+                  aria-pressed={isSelected}
+                  disabled={navigationBusy || (followsSpeaker && !canManage) || excluded.has(s.id)}
+                  onClick={() => setSelectedId(s.id)}
+                >
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="truncate font-bold text-slate-800">{s.name}</span>
+                    <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                      s.kind === "member"
+                        ? "bg-cyan-50 text-cyan-700 border border-cyan-200/80"
+                        : "bg-amber-50 text-amber-700 border border-amber-200/80"
+                    }`}>
+                      {s.kind === "member" ? "Thành viên" : "Khách mời"}
+                    </span>
+                  </div>
+                  {s.company && <span className="block truncate text-[11px] text-slate-400 mt-0.5">{s.company}</span>}
+                </button>
+                {canManage && onDeferSpeaker && ["scheduled", "live", "paused"].includes(meeting.status) && meeting.speakers.findIndex(person => person.id === s.id) >= (meeting.status === "scheduled" ? 0 : Math.max(0, meeting.currentIndex)) && (
+                  <button
+                    type="button"
+                    title="Để cuối lượt"
+                    aria-label={`Để cuối lượt: ${s.name}`}
+                    className="p-1.5 rounded-lg border border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100 disabled:opacity-40 transition cursor-pointer"
+                    disabled={navigationBusy || meeting.speakers.at(-1)?.id === s.id}
+                    onClick={() => void deferSpeaker(s.id)}
+                  >
+                    <ArrowDownToLine className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </aside>
       <div className="min-w-0 space-y-3">
