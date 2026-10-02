@@ -43,10 +43,12 @@ const CompanySmtpConfigSchema = new Schema({
 
 const CelebrationTemplateSchema = new Schema({ subject: { type: String, default: "" }, html: { type: String, default: "" } }, { _id: false });
 const CompanyCelebrationConfigSchema = new Schema({
+  vietnameseHolidaysEnabled: { type: Boolean, default: true },
+  disabledVietnameseHolidays: { type: [String], default: () => [] },
   birthdayEnabled: { type: Boolean, default: false }, holidayEnabled: { type: Boolean, default: false }, sendTime: { type: String, default: "08:00" },
   birthdayTemplate: { type: CelebrationTemplateSchema, default: () => ({ subject: "Chúc mừng sinh nhật {{employeeName}}", html: "<p>Chúc mừng sinh nhật {{employeeName}}!</p>" }) },
   holidayTemplate: { type: CelebrationTemplateSchema, default: () => ({ subject: "Chúc mừng {{holidayName}}", html: "<p>{{companyName}} kính chúc bạn một kỳ nghỉ vui vẻ.</p>" }) },
-  holidayOverrides: { type: [{ date: String, enabled: { type: Boolean, default: true }, subject: String, html: String }], default: () => [] },
+  holidayOverrides: { type: [new Schema({ name: { type: String, trim: true, maxlength: 150 }, date: String, enabled: { type: Boolean, default: true }, subject: String, html: String }, { _id: false })], default: () => [] },
 }, { _id: false });
 
 const CompanyVietqrConfigSchema = new Schema(

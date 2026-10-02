@@ -1,7 +1,7 @@
 import type { TemplateVariableConfig } from "../template-editor/templateEditorTypes";
 
 export const HR_BIRTHDAY_TEMPLATE_VARIABLES: TemplateVariableConfig[] = [
-  { key: "employeeName", label: "Tên nhân sự", sample: "Nguyễn Minh Anh" },
+  { key: "employeeName", label: "Tên thành viên", sample: "Nguyễn Minh Anh" },
   { key: "companyName", label: "Tên công ty", sample: "Công ty iGen" },
 ];
 

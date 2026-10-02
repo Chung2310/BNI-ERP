@@ -4,12 +4,12 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({
 
 export type CelebrationVariables = { employeeName: string; companyName: string; holidayName: string };
 
-export function renderCelebrationTemplate(template: string, variables: CelebrationVariables): string {
+export function renderCelebrationTemplate(template: string, variables: CelebrationVariables, escapeValues = true): string {
   const unknown = [...template.matchAll(/{{\s*([^}]+)\s*}}/g)]
     .map((match) => match[1].trim())
     .filter((key) => !(key in variables));
   if (unknown.length) throw new Error("Bien mau khong duoc ho tro");
-  return template.replace(/{{\s*(employeeName|companyName|holidayName)\s*}}/g, (_, key: keyof CelebrationVariables) => variables[key]);
+  return template.replace(/{{\s*(employeeName|companyName|holidayName)\s*}}/g, (_, key: keyof CelebrationVariables) => escapeValues ? escapeHtml(variables[key]) : variables[key]);
 }
 
 export function vietnamDateParts(now: Date) {

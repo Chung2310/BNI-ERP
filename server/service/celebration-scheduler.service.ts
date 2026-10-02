@@ -1,3 +1,4 @@
+import { resolveCelebrationHolidays } from "../../src/utils/vietnameseHolidays";
 import { CompanyModel } from "../model/company.model";
 import { UserModel } from "../model/user.model";
 import { CelebrationDeliveryModel } from "../model/celebration-delivery.model";
@@ -6,7 +7,7 @@ import { isCompanySendTime, renderCelebrationTemplate, vietnamDateParts } from "
 
 async function deliver(company: any, eventType: "birthday" | "holiday", eventDate: string, eventKey: string, user: any, template: any, holidayName = "") {
   const variables = { employeeName: user.displayName || user.email, companyName: company.name, holidayName };
-  const subject = renderCelebrationTemplate(template.subject, variables);
+  const subject = renderCelebrationTemplate(template.subject, variables, false);
   const html = renderCelebrationTemplate(template.html, variables);
   let row: any;
   try {
@@ -40,8 +41,8 @@ export async function runCelebrationScan(now = new Date()) {
         if (month === local.month && day === local.day && await deliver(company, "birthday", local.date, `birthday:${user._id}`, user, config.birthdayTemplate)) queued++;
       }
     }
-    if (config.holidayEnabled && config.holidayOverrides) {
-      const override = config.holidayOverrides.find((item: any) => item.date === local.date && item.enabled !== false);
+    if (config.holidayEnabled) {
+      const override = resolveCelebrationHolidays(Number(local.date.slice(0, 4)), config).find((item) => item.date === local.date);
       if (override) {
         const template = { subject: override.subject || config.holidayTemplate?.subject, html: override.html || config.holidayTemplate?.html };
         for (const user of users) if (await deliver(company, "holiday", local.date, override.date, user, template, override.name || "Ngày lễ")) queued++;
