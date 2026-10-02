@@ -319,7 +319,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         <Play size={16} /> Bắt đầu thuyết trình
       </button>
     </div>
-    <p className="text-xs text-slate-500">Toàn màn hình: dùng phím ← → để chuyển lượt ở chế độ thủ công; Esc để trở về Điều hành.</p>
+    <p className="text-xs text-slate-500">Toàn màn hình: dùng phím ← → để chuyển lượt ở chế độ thủ công; Esc để thoát toàn màn hình.</p>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error} <button className="underline" onClick={() => setRevision(v => v + 1)}>Tải lại dữ liệu</button></p>}
     <div className="grid gap-4 lg:grid-cols-[280px_1fr] items-stretch">
       <aside className="flex flex-col h-full rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">
