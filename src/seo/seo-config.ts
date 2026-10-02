@@ -1,4 +1,4 @@
-import { BRAND_LOGO_URL, BRAND_NAME } from "../config/brand";
+import { BRAND_LOGO_URL, BRAND_NAME, SERVICE_WEBSITE_URL } from "../config/brand";
 import type { TabType } from "../types";
 
 export type SeoMeta = {
@@ -13,7 +13,7 @@ export type SeoMeta = {
   changeFrequency?: "daily" | "weekly" | "monthly";
 };
 
-export const SEO_BASE_URL = "https://erp.igentechsolutions.com";
+export const SEO_BASE_URL = SERVICE_WEBSITE_URL;
 export const SEO_DEFAULT_IMAGE = BRAND_LOGO_URL;
 export const SEO_DEFAULT_LOCALE = "vi_VN";
 
@@ -172,17 +172,6 @@ export const TAB_SEO_MAP: Partial<Record<TabType, SeoMeta>> & Record<string, Seo
     priority: "0.5",
     changeFrequency: "weekly",
   },
-  "HƯỚNG DẪN": {
-    title: "Hướng dẫn sử dụng - Cẩm nang thao tác hệ thống",
-    description:
-      "Hướng dẫn sử dụng chi tiết từng phân hệ trong iGen Connect bằng ngôn ngữ giản dị, trực quan dành cho người dùng không chuyên.",
-    keywords:
-      "hướng dẫn sử dụng, cẩm nang erp, tài liệu hướng dẫn, igen connect, igen erp, hỗ trợ sử dụng",
-    path: "/huong-dan",
-    robots: "noindex, nofollow",
-    priority: "0.5",
-    changeFrequency: "weekly",
-  },
 };
 
 export const PUBLIC_SEO_PAGES: SeoMeta[] = [
@@ -206,7 +195,7 @@ export function getSeoForTab(tab: TabType): SeoMeta {
 
 export function getSeoForPath(requestPath: string): SeoMeta {
   const normalized = requestPath.startsWith("/") ? requestPath.toLowerCase() : `/${requestPath.toLowerCase()}`;
-  if (normalized === AUTH_SEO.path.toLowerCase()) {
+  if (["/", "/landing", "/landing.html", AUTH_SEO.path.toLowerCase()].includes(normalized)) {
     return AUTH_SEO;
   }
   if (normalized === "/privacy-policy" || normalized === "/privacy-policy.html") {

@@ -9,7 +9,6 @@ import {
   Settings,
   Shield,
   Users,
-  BookOpen,
   Lock,
 } from "lucide-react";
 import {
@@ -121,13 +120,6 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, onMobileC
     label: "CÀI ĐẶT",
     title: "Cài đặt hệ thống",
     icon: Settings,
-    group: "system",
-  });
-
-  menuItems.push({
-    label: "HƯỚNG DẪN",
-    title: "Hướng dẫn sử dụng",
-    icon: BookOpen,
     group: "system",
   });
 
