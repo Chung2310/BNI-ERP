@@ -18,7 +18,6 @@ import {
   Share2,
   Users,
   Hash,
-  ShieldCheck,
   Download,
   Calendar,
   Layers,
@@ -436,7 +435,7 @@ export function LuckyDrawTab({
       className={`space-y-6 ${isFullscreen ? "fixed inset-0 z-50 bg-slate-950 p-6 overflow-y-auto text-white" : ""}`}
     >
       {/* Top Banner Alert: CHỈ QUAY KHI CUỘC HỌP ĐÃ BẮT ĐẦU */}
-      {!isMeetingStarted ? (
+      {!isMeetingStarted && (
         <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="p-2 bg-amber-100 text-amber-600 rounded-xl shrink-0 mt-0.5">
@@ -462,29 +461,6 @@ export function LuckyDrawTab({
               Bắt đầu cuộc họp
             </button>
           )}
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 shadow-xs flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <h4 className="text-sm text-emerald-900 font-semibold">
-                  Cuộc họp đang diễn ra — Sẵn sàng quay thưởng
-                </h4>
-              </div>
-              <p className="text-xs text-emerald-700 mt-0.5">
-                {meeting.speakers?.length || 0} thành viên đã điểm danh check-in.
-              </p>
-            </div>
-          </div>
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-medium">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Đã xác thực
-          </span>
         </div>
       )}
 
