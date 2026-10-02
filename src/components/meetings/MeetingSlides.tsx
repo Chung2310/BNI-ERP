@@ -200,13 +200,15 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
 
   useEffect(() => {
     const onFullscreen = () => {
-      if (!document.fullscreenElement && fullScreenOwned.current) closePresentation();
+      if (!document.fullscreenElement && (fullScreenOwned.current || presentationActive.current || presenting)) {
+        closePresentation();
+      }
     };
     document.addEventListener("fullscreenchange", onFullscreen);
     return () => {
       document.removeEventListener("fullscreenchange", onFullscreen);
     };
-  }, [closePresentation]);
+  }, [closePresentation, presenting]);
 
   useEffect(() => {
     if (!presenting) return;
@@ -222,8 +224,8 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         move(e.key === "ArrowRight" ? 1 : -1);
       }
     };
-    document.addEventListener("keydown", keydown);
-    return () => document.removeEventListener("keydown", keydown);
+    document.addEventListener("keydown", keydown, true);
+    return () => document.removeEventListener("keydown", keydown, true);
   }, [presenting, move, closePresentation, mode]);
 
   useEffect(() => {
@@ -238,6 +240,8 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         if (mounted.current && presentationActive.current) fullScreenOwned.current = true;
         else if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
       }).catch(() => {});
+    } else if (document.fullscreenElement) {
+      fullScreenOwned.current = true;
     }
   }, [fullscreenRequest, startFromFirst]);
 
