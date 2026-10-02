@@ -1349,31 +1349,28 @@ export default function MeetingTab() {
                       {activeSubTab === "checkin" ? "Người đã check-in · thứ tự phát biểu" : "Danh sách thuyết trình"} ({activeMeeting.speakers.length})
                     </h3>
 
-                    {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
-                      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-                        {checkedSpeakerIds.length > 0 && <span className="font-medium text-slate-600">Đã chọn {checkedSpeakerIds.length}</span>}
+                    {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && checkedSpeakerIds.length > 0 && (
+                      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs py-1">
+                        <span className="font-medium text-slate-600">Đã chọn {checkedSpeakerIds.length}</span>
                         <button
                           type="button"
                           title="Chuyển xuống cuối lượt"
                           aria-label="Chuyển xuống cuối lượt"
-                          disabled={saving || !checkedSpeakerIds.length}
+                          disabled={saving}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-40 transition cursor-pointer shadow-2xs"
                           onClick={() => void deferSpeaker(checkedSpeakerIds).catch(error => toast.error(error.message || "Không hoãn được lượt."))}
                         >
                           <ArrowDownToLine className="h-3.5 w-3.5" />
-                          {checkedSpeakerIds.length > 0 && <span className="font-bold">({checkedSpeakerIds.length})</span>}
+                          <span className="font-bold">({checkedSpeakerIds.length})</span>
                         </button>
-                        {checkedSpeakerIds.length > 0 && (
-                          <button
-                            type="button"
-                            className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
-                            disabled={saving}
-                            onClick={() => setCheckedSpeakerIds([])}
-                          >
-                            Bỏ chọn
-                          </button>
-                        )}
-                        <span className="text-slate-400 text-[11px]">Chọn ô để hoãn lượt; bấm tên để chọn người bắt đầu.</span>
+                        <button
+                          type="button"
+                          className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                          disabled={saving}
+                          onClick={() => setCheckedSpeakerIds([])}
+                        >
+                          Bỏ chọn
+                        </button>
                       </div>
                     )}
                     <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">

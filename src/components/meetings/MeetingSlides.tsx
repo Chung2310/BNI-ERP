@@ -314,30 +314,27 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
       <aside className="space-y-2 rounded-xl border bg-white p-3">
         <p className="text-sm font-bold">Danh sách chiếu ({queue.length}/{deck.slides.length})</p>
-        <p className="text-xs text-slate-500">Chọn tên rồi bấm Bắt đầu thuyết trình để bắt đầu từ người đó. Người đang bận có thể để cuối lượt.</p>
-        {canManage && onDeferSpeaker && ["scheduled", "live", "paused"].includes(meeting.status) && (
-          <div className="flex flex-wrap items-center gap-2 text-xs">
+        {canManage && onDeferSpeaker && ["scheduled", "live", "paused"].includes(meeting.status) && checkedSpeakerIds.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-xs py-1">
             <button
               type="button"
               title="Chuyển xuống cuối lượt"
               aria-label="Chuyển xuống cuối lượt"
-              disabled={navigationBusy || !checkedSpeakerIds.length}
+              disabled={navigationBusy}
               className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-40 transition cursor-pointer shadow-2xs"
               onClick={() => void deferSpeaker(checkedSpeakerIds)}
             >
               <ArrowDownToLine className="h-3.5 w-3.5" />
-              {checkedSpeakerIds.length > 0 && <span className="font-bold">({checkedSpeakerIds.length})</span>}
+              <span className="font-bold">({checkedSpeakerIds.length})</span>
             </button>
-            {checkedSpeakerIds.length > 0 && (
-              <button
-                type="button"
-                className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
-                disabled={navigationBusy}
-                onClick={() => setCheckedSpeakerIds([])}
-              >
-                Bỏ chọn
-              </button>
-            )}
+            <button
+              type="button"
+              className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
+              disabled={navigationBusy}
+              onClick={() => setCheckedSpeakerIds([])}
+            >
+              Bỏ chọn
+            </button>
           </div>
         )}
         {!followsSpeaker && !(canManage && onDeferSpeaker) && <button className="text-xs text-red-700 underline" disabled={!!draft} onClick={() => setExcluded(new Set())}>Chọn tất cả</button>}
