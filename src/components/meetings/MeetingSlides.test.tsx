@@ -86,7 +86,7 @@ it("read-only users can choose attendees but cannot edit; empty selection disabl
   fireEvent.click(screen.getByLabelText("Chiếu Nguyễn An"));
   expect((await screen.findByRole("img")).getAttribute("aria-label")).toContain("Trần Bình");
   fireEvent.click(screen.getByLabelText("Chiếu Trần Bình"));
-  expect((screen.getByText("Trình chiếu").closest("button") as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByText("Bắt đầu thuyết trình").closest("button") as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByText("Chọn ít nhất một người để trình chiếu.")).toBeTruthy();
 });
 
@@ -94,7 +94,7 @@ it("automatic slides follow the speaker instead of advancing on a separate inter
   const api = vi.fn().mockResolvedValue({ slides, version: 1 });
   const view = render(<MeetingSlides meeting={meeting} canManage api={api} autoAdvance />);
   await screen.findByText("Nguyễn An");
-  await waitFor(() => expect((screen.getByText("Trình chiếu").closest("button") as HTMLButtonElement).disabled).toBe(false));
+  await waitFor(() => expect((screen.getByText("Bắt đầu thuyết trình").closest("button") as HTMLButtonElement).disabled).toBe(false));
   vi.useFakeTimers();
   for (let i = 0; i < 33; i++) {
     await act(async () => { vi.advanceTimersByTime(250); });
@@ -154,6 +154,7 @@ it("opens the current slide after data loads when launched from operation contro
 it("clean manual presentation uses only arrow keys, traps focus and exits with Escape", async () => {
   render(<MeetingSlides meeting={{ ...meeting, status: "scheduled" }} canManage api={vi.fn().mockResolvedValue({ slides, version: 1 })} />);
   await screen.findByText("Nguyễn An");
+  expect(screen.queryByRole("button", { name: "Trình chiếu" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
   const dialog = screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" });
   expect(within(dialog).queryAllByRole("button")).toHaveLength(0);
