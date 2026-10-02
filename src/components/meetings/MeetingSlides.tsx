@@ -25,8 +25,8 @@ type Props = {
   onPresentationClosed?: () => void;
   api: (path: string, method?: string, body?: unknown) => Promise<SlideDeck>;
 };
-const button = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40";
-const fieldClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
+const button = "inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition disabled:opacity-40 cursor-pointer";
+const fieldClass = "w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none transition";
 
 export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker }: Props) {
   const [now, setNow] = useState(Date.now);
@@ -301,34 +301,50 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   return <section aria-label="Slide giới thiệu" className="space-y-4">
     {timer && <p className="sr-only" role="timer" aria-live="off">#{timer.arrivalOrder}: {timer.time}. {timer.label}</p>}
     <div className="flex flex-wrap items-center gap-2">
-      <label className="text-sm font-semibold">Chế độ <select aria-label="Chế độ trình chiếu" className="ml-2 rounded-lg border p-2" value={mode} disabled={!!draft || !canManage || !onAutoAdvanceChange || navigationBusy} onChange={e => changeMode(e.target.value as typeof mode)}>
-        <option value="manual">Thủ công</option><option value="auto">Tự động</option>
-      </select></label>
-      {mode === "auto" && <label className="flex items-center gap-2 text-sm">Chờ sau khi hết giờ <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={value => onAutoAdvanceDelayChange?.(value)} disabled={!canManage} /> giây rồi chuyển slide</label>}
-      <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={16} /> Làm mới hồ sơ</button>
-      <button className={button} disabled={!ready} onClick={download}><Download size={16} /> Tải PNG</button>
+      <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600">
+        Chế độ
+        <div className="relative">
+          <select
+            aria-label="Chế độ trình chiếu"
+            className="appearance-none rounded-xl border border-slate-200 bg-slate-50/80 pl-3 pr-8 py-2 text-xs font-medium text-slate-700 hover:bg-white hover:border-slate-300 focus:border-cyan-500 focus:bg-white focus:outline-none transition cursor-pointer disabled:opacity-40"
+            value={mode}
+            disabled={!!draft || !canManage || !onAutoAdvanceChange || navigationBusy}
+            onChange={e => changeMode(e.target.value as typeof mode)}
+          >
+            <option value="manual">Thủ công</option>
+            <option value="auto">Tự động</option>
+          </select>
+          <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </label>
+      {mode === "auto" && <label className="inline-flex items-center gap-1.5 text-xs text-slate-500">Chờ sau khi hết giờ <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={value => onAutoAdvanceDelayChange?.(value)} disabled={!canManage} /> giây rồi chuyển slide</label>}
+      <div className="hidden sm:block w-px h-5 bg-slate-200" />
+      <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={14} /> Làm mới hồ sơ</button>
+      <button className={button} disabled={!ready} onClick={download}><Download size={14} /> Tải PNG</button>
       <button
         ref={launchButton}
-        className={button}
+        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 px-3.5 py-2 text-xs font-medium text-white transition disabled:opacity-40 cursor-pointer"
         disabled={navigationBusy || !!error || !selected}
         onClick={() => {
           const target = (checkedSpeakerIds.length > 0 ? deck.slides.find(s => s.id === checkedSpeakerIds[checkedSpeakerIds.length - 1] || checkedSpeakerIds.includes(s.id)) : null) || selected;
           if (target) beginPresentation(target);
         }}
       >
-        <Play size={16} /> Bắt đầu thuyết trình
+        <Play size={14} /> Bắt đầu thuyết trình
       </button>
     </div>
-    <p className="text-xs text-slate-500">Toàn màn hình: dùng phím ← → để chuyển lượt ở chế độ thủ công; Esc để thoát toàn màn hình.</p>
-    {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error} <button className="underline" onClick={() => setRevision(v => v + 1)}>Tải lại dữ liệu</button></p>}
+    <p className="text-[11px] text-slate-400">Toàn màn hình: phím ← → chuyển lượt (thủ công) · Esc thoát</p>
+    {error && <p role="alert" className="rounded-xl bg-red-50 border border-red-200/80 p-3 text-xs text-red-700">{error} <button className="underline hover:text-red-900 transition cursor-pointer" onClick={() => setRevision(v => v + 1)}>Tải lại dữ liệu</button></p>}
     <div className="grid gap-4 lg:grid-cols-[280px_1fr] items-stretch">
-      <aside className="flex flex-col h-full rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">
+      <aside className="flex flex-col h-full rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
         <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
             Danh sách chiếu ({queue.length}/{deck.slides.length})
           </p>
           {!followsSpeaker && !(canManage && onDeferSpeaker) && meeting.status === "scheduled" && (
-            <button className="text-xs text-cyan-700 font-semibold underline cursor-pointer" disabled={!!draft} onClick={() => setExcluded(new Set())}>
+            <button className="text-[11px] text-cyan-600 font-medium hover:text-cyan-700 transition-colors cursor-pointer" disabled={!!draft} onClick={() => setExcluded(new Set())}>
               Chọn tất cả
             </button>
           )}
@@ -344,7 +360,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
               onClick={() => void deferSpeaker(checkedSpeakerIds)}
             >
               <ArrowDownToLine className="h-3.5 w-3.5" />
-              <span className="font-bold">({checkedSpeakerIds.length})</span>
+              <span className="font-medium">({checkedSpeakerIds.length})</span>
             </button>
             <button
               type="button"
@@ -415,7 +431,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
                   onClick={() => setSelectedId(s.id)}
                 >
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="truncate font-bold text-slate-800">{s.name}</span>
+                    <span className="truncate font-medium text-slate-800">{s.name}</span>
                     <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold ${
                       s.kind === "member"
                         ? "bg-cyan-50 text-cyan-700 border border-cyan-200/80"
@@ -444,23 +460,23 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         </div>
       </aside>
       <div className="min-w-0 space-y-3">
-        <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-900">
+        <div className="relative aspect-video overflow-hidden rounded-2xl bg-slate-900 shadow-sm">
           {canvas(preview)}
-          {(drawing || !active || drawError) && <div className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-white">
+          {(drawing || !active || drawError) && <div className="absolute inset-0 grid place-items-center p-6 text-center text-xs text-white/90">
             {speechesComplete && followsSpeaker ? <div className="rounded-2xl bg-white p-8"><SpeechesCompleteMessage /></div> : drawError || (loading ? "Đang tải hồ sơ…" : active ? "Đang chuẩn bị ảnh và font…" : followsSpeaker ? "Chưa có người đang phát biểu." : deck.slides.length ? "Chọn ít nhất một người để trình chiếu." : "Chưa có người check-in. Hãy check-in thành viên hoặc khách mời trước.")}
           </div>}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <button aria-label="Slide trước" className={button} disabled={!canMove(-1)} onClick={() => move(-1)}><ChevronLeft size={16} /></button>
-            <span className="text-sm text-slate-500">{followsSpeaker ? "Đồng bộ diễn giả" : `${index < 0 ? 0 : index + 1} / ${queue.length}`}</span>
-            <button aria-label="Slide tiếp" className={button} disabled={!canMove(1)} onClick={() => move(1)}><ChevronRight size={16} /></button>
+          <div className="flex items-center gap-1.5">
+            <button aria-label="Slide trước" className={button} disabled={!canMove(-1)} onClick={() => move(-1)}><ChevronLeft size={14} /></button>
+            <span className="text-xs text-slate-400 min-w-[80px] text-center">{followsSpeaker ? "Đồng bộ diễn giả" : `${index < 0 ? 0 : index + 1} / ${queue.length}`}</span>
+            <button aria-label="Slide tiếp" className={button} disabled={!canMove(1)} onClick={() => move(1)}><ChevronRight size={14} /></button>
           </div>
-          {canManage && active && !draft && <button className={button} disabled={loading || !!error} onClick={() => { setSelectedId(active.id); draftVersion.current = deck.version; setDraft({ ...active }); }}><Pencil size={16} /> Bổ sung thông tin slide</button>}
+          {canManage && active && !draft && <button className={button} disabled={loading || !!error} onClick={() => { setSelectedId(active.id); draftVersion.current = deck.version; setDraft({ ...active }); }}><Pencil size={14} /> Bổ sung thông tin slide</button>}
         </div>
         {warnings.map(w => <p key={w} role="status" className="text-sm text-amber-700">{w}</p>)}
-        {draft && <form className="space-y-3 rounded-xl border bg-white p-4" onSubmit={e => { e.preventDefault(); void save(); }}>
-          <p className="text-sm font-bold">Thông tin riêng cho slide trong cuộc họp này</p>
+        {draft && <form className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs" onSubmit={e => { e.preventDefault(); void save(); }}>
+          <p className="text-sm font-medium text-slate-800">Thông tin riêng cho slide trong cuộc họp này</p>
           <p className="text-xs text-slate-500">Tự điền từ hồ sơ khi chưa có bản chỉnh riêng. Bio có thể nhập tại đây. Lưu sẽ giữ bản thông tin hiện tại cho slide; dùng “Dùng lại hồ sơ” để lấy thông tin hồ sơ mới nhất.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {([

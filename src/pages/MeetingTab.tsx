@@ -1044,7 +1044,7 @@ export default function MeetingTab() {
                               </>
                             )}
                           </div>
-                          <h2 className="mt-1 text-xl md:text-2xl font-black text-white">{activeMeeting.title}</h2>
+                          <h2 className="mt-1 text-xl md:text-2xl font-semibold text-white">{activeMeeting.title}</h2>
                         </div>
                       </div>
                     ) : (
@@ -1061,7 +1061,7 @@ export default function MeetingTab() {
                             </>
                           )}
                         </div>
-                        <h2 className="mt-1 text-xl font-extrabold text-slate-800">{activeMeeting.title}</h2>
+                        <h2 className="mt-1 text-xl font-semibold text-slate-800">{activeMeeting.title}</h2>
                       </div>
                     )}
 
@@ -1069,7 +1069,7 @@ export default function MeetingTab() {
                     <div className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 bg-white">
                       <div className="flex items-center gap-2">
                         <span
-                          className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold border ${statusMap[activeMeeting.status]?.badge || "bg-slate-100 text-slate-600"
+                          className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-medium border ${statusMap[activeMeeting.status]?.badge || "bg-slate-100 text-slate-600"
                             }`}
                         >
                           <span className={`h-2 w-2 rounded-full ${statusMap[activeMeeting.status]?.dot}`} />
@@ -1092,7 +1092,7 @@ export default function MeetingTab() {
                               : null;
                             setStartPresentation(true); setActiveSubTab("slides");
                           }}
-                          className="flex items-center gap-1.5 rounded-xl bg-cyan-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-40">
+                          className="flex items-center gap-1.5 rounded-xl bg-cyan-700 px-4 py-2 text-xs font-medium text-white disabled:opacity-40 hover:bg-cyan-800 transition cursor-pointer">
                           <Play className="h-3.5 w-3.5" /> Bắt đầu thuyết trình
                         </button>
                   {canManage && activeMeeting.status === "scheduled" && (
@@ -1100,7 +1100,7 @@ export default function MeetingTab() {
                       type="button"
                       onClick={() => setStartingMeeting(activeMeeting)}
                       disabled={saving}
-                      className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-bold shadow-sm shadow-emerald-600/20 transition cursor-pointer"
+                      className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-medium shadow-sm shadow-emerald-600/20 transition cursor-pointer"
                     >
                       <Play className="h-3.5 w-3.5" fill="currentColor" />
                       Bắt đầu cuộc họp
@@ -1113,7 +1113,7 @@ export default function MeetingTab() {
                               type="button"
                               disabled={saving}
                               onClick={() => control("pause")}
-                              className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 px-3.5 py-2 text-xs font-bold transition cursor-pointer"
+                              className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 px-3.5 py-2 text-xs font-medium transition cursor-pointer"
                             >
                               <Pause className="h-3.5 w-3.5" />
                               Tạm dừng
@@ -1123,13 +1123,13 @@ export default function MeetingTab() {
                               type="button"
                               disabled={saving || !current}
                               onClick={() => control("next")}
-                              className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm shadow-cyan-600/20 transition cursor-pointer"
+                              className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3.5 py-2 text-xs font-medium shadow-sm shadow-cyan-600/20 transition cursor-pointer"
                             >
                               {upcoming ? "Người tiếp theo ❯" : "Hoàn tất phát biểu"}
                             </button>
 
                             {autoAdvance && (
-                              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-cyan-50 border border-cyan-200/80 text-[11px] font-bold text-cyan-800">
+                              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-cyan-50 border border-cyan-200/80 text-[11px] font-medium text-cyan-700">
                                 <Sparkles className="h-3 w-3 text-cyan-600" />
                                 Hết giờ → chờ {autoAdvanceDelay}s → chuyển người & slide
                               </span>
@@ -1138,7 +1138,7 @@ export default function MeetingTab() {
                             <button
                               type="button"
                               onClick={() => setFinishRequested(true)}
-                              className="flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 text-xs font-bold transition cursor-pointer"
+                              className="flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 text-xs font-medium transition cursor-pointer"
                             >
                               <Square className="h-3 w-3" fill="currentColor" />
                               Kết thúc
@@ -1152,7 +1152,7 @@ export default function MeetingTab() {
                               type="button"
                               disabled={saving}
                               onClick={() => control("resume")}
-                              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm transition cursor-pointer"
+                              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 text-xs font-medium shadow-sm transition cursor-pointer"
                             >
                               <Play className="h-3.5 w-3.5" fill="currentColor" />
                               Tiếp tục
@@ -1162,11 +1162,11 @@ export default function MeetingTab() {
                               type="button"
                               disabled={saving || !current}
                               onClick={() => control("next")}
-                              className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3.5 py-2 text-xs font-bold transition cursor-pointer"
+                              className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3.5 py-2 text-xs font-medium transition cursor-pointer"
                             >
                               {upcoming ? "Người tiếp theo ❯" : "Hoàn tất phát biểu"}
                             </button>
-                            <button type="button" disabled={saving} onClick={() => setFinishRequested(true)} className="rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-white">Kết thúc</button>
+                            <button type="button" disabled={saving} onClick={() => setFinishRequested(true)} className="rounded-xl bg-slate-800 hover:bg-slate-900 px-4 py-2 text-xs font-medium text-white transition cursor-pointer">Kết thúc</button>
                           </>
                         )}
                       </div>
@@ -1180,12 +1180,12 @@ export default function MeetingTab() {
                     {/* Current Speaker Card */}
                     <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs flex flex-col justify-between">
                       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
+                        <span className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-slate-500">
                           <Megaphone className="h-4 w-4 text-cyan-600" />
                           Diễn giả hiện tại
                         </span>
                         {current && (
-                          <span className="text-[11px] font-mono text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded-md font-bold">
+                          <span className="text-[11px] font-mono text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded-md font-medium">
                             {fmt(current.seconds)} mục tiêu
                           </span>
                         )}
@@ -1200,15 +1200,15 @@ export default function MeetingTab() {
                               className="h-16 w-16 rounded-2xl object-cover ring-2 ring-cyan-500/30"
                             />
                           ) : (
-                            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-cyan-100 font-extrabold text-cyan-800 text-xl">
+                            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-cyan-50 font-semibold text-cyan-700 text-xl">
                               {current.name.slice(0, 1).toUpperCase()}
                             </div>
                           )}
 
                           <div className="min-w-0 flex-1">
-                            <h3 className="truncate font-extrabold text-base text-slate-800">{current.name}</h3>
+                            <h3 className="truncate font-semibold text-base text-slate-800">{current.name}</h3>
                             <p className="truncate text-xs text-slate-500">{current.email || "Khách mời"}</p>
-                            <span className="mt-1 inline-block text-[11px] font-bold text-cyan-700 bg-cyan-50/80 px-2 py-0.5 rounded-md">
+                            <span className="mt-1 inline-block text-[11px] font-medium text-cyan-600 bg-cyan-50/80 px-2 py-0.5 rounded-md">
                               Lượt thứ {activeMeeting.currentIndex + 1} / {activeMeeting.speakers.length}
                             </span>
                           </div>
@@ -1230,7 +1230,7 @@ export default function MeetingTab() {
                               {upcoming ? "Chuyển người tiếp theo" : "Hoàn tất phát biểu"} sau {Math.max(0, Math.ceil(autoAdvanceDelay - Math.abs(remaining)))}s
                             </p>}
                           </div>
-                          <span className={`font-mono text-2xl font-black ${remaining <= 0 ? "text-rose-600" : "text-slate-800"}`}>
+                          <span className={`font-mono text-2xl font-semibold ${remaining <= 0 ? "text-rose-600" : "text-slate-800"}`}>
                             {remaining <= 0 ? "Hết giờ" : fmt(remaining)}
                           </span>
                         </div>}
@@ -1250,7 +1250,7 @@ export default function MeetingTab() {
                                   type="button"
                                   disabled={saving}
                                   onClick={() => control("start_speaker")}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium shadow-xs transition cursor-pointer"
                                 >
                                   <Play className="h-3.5 w-3.5" fill="currentColor" />
                                   <span>Bắt đầu tính giờ ({current.seconds}s)</span>
@@ -1260,7 +1260,7 @@ export default function MeetingTab() {
                                   type="button"
                                   disabled={saving}
                                   onClick={() => control("start_speaker")}
-                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition cursor-pointer"
                                   title="Bấm giờ lại từ đầu cho diễn giả này"
                                 >
                                   <RotateCcw className="h-3.5 w-3.5" />
@@ -1274,7 +1274,7 @@ export default function MeetingTab() {
                         {/* Auto-Advance Setting Box */}
                         {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
                           <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50/90 border border-slate-200/80 text-xs">
-                            <label className="flex items-center gap-2 font-bold text-slate-700">Chế độ
+                            <label className="flex items-center gap-2 font-medium text-slate-700">Chế độ
                               <select aria-label="Chế độ điều hành" value={autoAdvance ? "auto" : "manual"} disabled={saving} onChange={e => updateAutoAdvance(e.target.value === "auto")} className="rounded-lg border border-slate-300 bg-white p-2">
                                 <option value="manual">Thủ công</option><option value="auto">Tự động</option>
                               </select>
@@ -1296,12 +1296,12 @@ export default function MeetingTab() {
                     {/* Upcoming Speaker Card */}
                     <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs flex flex-col justify-between">
                       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
+                        <span className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-slate-500">
                           <Clock3 className="h-4 w-4 text-slate-400" />
                           Diễn giả tiếp theo
                         </span>
                         {upcoming && (
-                          <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md font-bold">
+                          <span className="text-[11px] font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md font-medium">
                             {fmt(upcoming.seconds)}
                           </span>
                         )}
@@ -1316,13 +1316,13 @@ export default function MeetingTab() {
                               className="h-16 w-16 rounded-2xl object-cover ring-1 ring-slate-200"
                             />
                           ) : (
-                            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-100 font-extrabold text-slate-600 text-xl">
+                            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-50 font-semibold text-slate-500 text-xl">
                               {upcoming.name.slice(0, 1).toUpperCase()}
                             </div>
                           )}
 
                           <div className="min-w-0 flex-1">
-                            <h3 className="truncate font-extrabold text-base text-slate-800">{upcoming.name}</h3>
+                            <h3 className="truncate font-semibold text-base text-slate-800">{upcoming.name}</h3>
                             <p className="truncate text-xs text-slate-500">{upcoming.email || "Khách mời"}</p>
                             <span className="mt-1 inline-block text-[11px] font-medium text-slate-500">
                               Hãy chuẩn bị tài liệu và micro!
@@ -1339,7 +1339,7 @@ export default function MeetingTab() {
 
                       <div className="rounded-xl bg-slate-50 p-3.5 flex items-center justify-between text-xs text-slate-500">
                         <span>Tổng số người check-in:</span>
-                        <span className="font-bold text-slate-700">{activeMeeting.speakers.length} người</span>
+                        <span className="font-semibold text-slate-700">{activeMeeting.speakers.length} người</span>
                       </div>
                     </div>
                   </div>}
@@ -1352,7 +1352,7 @@ export default function MeetingTab() {
                       onSubmit={addGuest}
                       className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs flex flex-wrap items-center gap-3"
                     >
-                      <span className="font-bold text-xs text-slate-700 shrink-0">MC ghi nhận khách tại chỗ:</span>
+                      <span className="font-medium text-xs text-slate-600 shrink-0">MC ghi nhận khách tại chỗ:</span>
                       <input
                         required
                         value={guestName}
@@ -1371,7 +1371,7 @@ export default function MeetingTab() {
                         type="submit"
                         disabled={!canManage || saving}
                         title={!canManage ? "Chỉ MC/Admin có quyền check-in khách mời" : ""}
-                        className="rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 text-xs font-bold transition cursor-pointer disabled:opacity-40"
+                        className="rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 text-xs font-medium transition cursor-pointer disabled:opacity-40"
                       >
                         Check-in khách
                       </button>
@@ -1383,7 +1383,7 @@ export default function MeetingTab() {
                     <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-cyan-600" />
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                        <h3 className="text-[11px] font-medium uppercase tracking-wider text-slate-600">
                           {activeSubTab === "checkin" ? "Người đã check-in · thứ tự phát biểu" : "Danh sách thuyết trình"} ({filteredSpeakers.length}{filteredSpeakers.length !== activeMeeting.speakers.length ? `/${activeMeeting.speakers.length}` : ""})
                         </h3>
                       </div>
@@ -1396,7 +1396,7 @@ export default function MeetingTab() {
                             onClick={() => setSpeakerTypeFilter("all")}
                             className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
                               speakerTypeFilter === "all"
-                                ? "bg-white text-slate-800 font-bold shadow-2xs"
+                                ? "bg-white text-slate-800 font-semibold shadow-2xs"
                                 : "hover:text-slate-900"
                             }`}
                           >
@@ -1407,7 +1407,7 @@ export default function MeetingTab() {
                             onClick={() => setSpeakerTypeFilter("guest")}
                             className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
                               speakerTypeFilter === "guest"
-                                ? "bg-cyan-600 text-white font-bold shadow-2xs"
+                                ? "bg-cyan-600 text-white font-semibold shadow-2xs"
                                 : "hover:text-cyan-700 text-slate-600"
                             }`}
                           >
@@ -1418,7 +1418,7 @@ export default function MeetingTab() {
                             onClick={() => setSpeakerTypeFilter("member")}
                             className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
                               speakerTypeFilter === "member"
-                                ? "bg-cyan-600 text-white font-bold shadow-2xs"
+                                ? "bg-cyan-600 text-white font-semibold shadow-2xs"
                                 : "hover:text-cyan-700 text-slate-600"
                             }`}
                           >
@@ -1462,7 +1462,7 @@ export default function MeetingTab() {
                           onClick={() => void deferSpeaker(checkedSpeakerIds).catch(error => toast.error(error.message || "Không hoãn được lượt."))}
                         >
                           <ArrowDownToLine className="h-3.5 w-3.5" />
-                          <span className="font-bold">({checkedSpeakerIds.length})</span>
+                          <span className="font-medium">({checkedSpeakerIds.length})</span>
                         </button>
                         <button
                           type="button"
@@ -1509,7 +1509,7 @@ export default function MeetingTab() {
                                 : "border border-slate-200/60 bg-slate-50/50 hover:bg-slate-50"
                                 }`}
                             >
-                              <span className="w-6 text-center font-mono text-xs font-bold text-slate-400">
+                              <span className="w-6 text-center font-mono text-xs font-medium text-slate-400">
                                 {i + 1}
                               </span>
                               {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
@@ -1536,14 +1536,14 @@ export default function MeetingTab() {
                                   className="h-9 w-9 rounded-full object-cover ring-1 ring-slate-200"
                                 />
                               ) : (
-                                <span className="grid h-9 w-9 place-items-center rounded-full bg-cyan-100 font-bold text-xs text-cyan-700">
+                                <span className="grid h-9 w-9 place-items-center rounded-full bg-cyan-50 font-medium text-xs text-cyan-600">
                                   {p.name.slice(0, 1).toUpperCase()}
                                 </span>
                               )}
 
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <button type="button" aria-label={`Bắt đầu từ ${p.name}`} aria-pressed={presentationSpeakerId === p.id} disabled={saving || !canManage || !["scheduled", "live", "paused"].includes(activeMeeting.status)} onClick={() => setPresentationSpeakerId(p.id)} className="block truncate text-left text-xs font-bold text-slate-800 aria-pressed:text-cyan-700 aria-pressed:underline">{p.name}</button>
+                                  <button type="button" aria-label={`Bắt đầu từ ${p.name}`} aria-pressed={presentationSpeakerId === p.id} disabled={saving || !canManage || !["scheduled", "live", "paused"].includes(activeMeeting.status)} onClick={() => setPresentationSpeakerId(p.id)} className="block truncate text-left text-xs font-medium text-slate-800 aria-pressed:text-cyan-700 aria-pressed:underline">{p.name}</button>
                                   {isGuest ? (
                                     <span className="shrink-0 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80">
                                       Khách mời
@@ -1560,7 +1560,7 @@ export default function MeetingTab() {
                               </div>
 
                               {isSpeaking && (
-                                <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                                   <Megaphone className="h-3 w-3 animate-bounce" /> Đang nói
                                 </span>
                               )}
