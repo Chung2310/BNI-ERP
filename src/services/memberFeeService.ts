@@ -14,7 +14,7 @@ async function request<T>(path: string, method = "GET", body?: unknown, signal?:
   if (!response.ok) throw new Error(payload.message || "Không thể tải dữ liệu phí thành viên.");
   return payload.data;
 }
-export type FeeSePayConfig = { enabled: boolean; bank: string; accountNumber: string; accountName: string; hasApiKey: boolean; webhookPath: string };
+export type FeeSePayConfig = { enabled: boolean; bank: string; accountNumber: string; accountName: string; hasApiKey: boolean; issues?: string[]; webhookPath: string };
 export type FeeSePayTransaction = { _id: string; transactionId: number; status: "pending" | "review" | "applied" | "ignored"; reason: string; feeId?: string; payload: { transferAmount: number; transactionDate: string; gateway: string; accountNumber: string; content: string } };
 export const memberFeeService = {
   sepayConfig: () => request<FeeSePayConfig>("/sepay/config"),
