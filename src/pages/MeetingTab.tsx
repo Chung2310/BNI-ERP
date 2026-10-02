@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SpeechesCompleteDialog } from "../components/meetings/SpeechesCompleteDialog";
 import { SlideTransitionDelayInput } from "../components/meetings/SlideTransitionDelayInput";
 import { MeetingSlides } from "../components/meetings/MeetingSlides";
@@ -206,6 +206,10 @@ export default function MeetingTab() {
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
 
+  // Speaker search & filter state inside detail modal
+  const [speakerSearch, setSpeakerSearch] = useState("");
+  const [speakerTypeFilter, setSpeakerTypeFilter] = useState<"all" | "guest" | "member">("all");
+
   // Auto-advance speaker and slide when time runs out
   const [autoAdvance, setAutoAdvance] = useState(() => {
     return localStorage.getItem("bni_auto_advance_speaker") === "true";
@@ -249,7 +253,43 @@ export default function MeetingTab() {
   }, [refresh]);
 
   const activeMeeting = items.find((m) => m._id === detailMeetingId) || null;
-  useEffect(() => { setPresentationSpeakerId(""); setCheckedSpeakerIds([]); }, [activeMeeting?._id, activeMeeting?.speakers[activeMeeting.currentIndex]?.id]);
+  useEffect(() => {
+    setPresentationSpeakerId("");
+    setCheckedSpeakerIds([]);
+    setSpeakerSearch("");
+    setSpeakerTypeFilter("all");
+  }, [activeMeeting?._id, activeMeeting?.speakers[activeMeeting.currentIndex]?.id]);
+
+  const speakersWithIndex = useMemo(() => {
+    if (!activeMeeting?.speakers) return [];
+    return activeMeeting.speakers.map((s, idx) => ({ ...s, originalIndex: idx }));
+  }, [activeMeeting?.speakers]);
+
+  const filteredSpeakers = useMemo(() => {
+    let list = speakersWithIndex;
+    if (speakerTypeFilter === "guest") {
+      list = list.filter((s) => !s.userId);
+    } else if (speakerTypeFilter === "member") {
+      list = list.filter((s) => Boolean(s.userId));
+    }
+
+    const q = speakerSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter((s) =>
+        s.name.toLowerCase().includes(q) ||
+        (s.email && s.email.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [speakersWithIndex, speakerTypeFilter, speakerSearch]);
+
+  const guestSpeakerCount = useMemo(() => {
+    return activeMeeting?.speakers.filter((s) => !s.userId).length || 0;
+  }, [activeMeeting?.speakers]);
+
+  const memberSpeakerCount = useMemo(() => {
+    return activeMeeting?.speakers.filter((s) => Boolean(s.userId)).length || 0;
+  }, [activeMeeting?.speakers]);
 
   const completionKey = activeMeeting?.speechesCompletedAt && ["live", "paused"].includes(activeMeeting.status)
     ? activeMeeting._id + ":" + activeMeeting.speechesCompletedAt : "";
@@ -1310,7 +1350,7 @@ export default function MeetingTab() {
                   </>)}
                   {activeSubTab === "checkin" && <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} onRefresh={refresh} onConfigure={() => openEditModal(activeMeeting)} onOperate={() => setActiveSubTab("speakers")} />}
                   {/* Guest Checkin Form (MC / Admin) */}
-                  {canManage && activeSubTab === "checkin" && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
+                  {canManage && (activeSubTab === "checkin" || activeSubTab === "speakers") && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
                     <form
                       onSubmit={addGuest}
                       className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs flex flex-wrap items-center gap-3"
@@ -1343,10 +1383,75 @@ export default function MeetingTab() {
 
                   {/* Speakers Queue Table */}
                   <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
-                    <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
-                      <Users className="h-4 w-4 text-cyan-600" />
-                      {activeSubTab === "checkin" ? "Người đã check-in · thứ tự phát biểu" : "Danh sách thuyết trình"} ({activeMeeting.speakers.length})
-                    </h3>
+                    <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-cyan-600" />
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                          {activeSubTab === "checkin" ? "Người đã check-in · thứ tự phát biểu" : "Danh sách thuyết trình"} ({filteredSpeakers.length}{filteredSpeakers.length !== activeMeeting.speakers.length ? `/${activeMeeting.speakers.length}` : ""})
+                        </h3>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* Quick filter pills */}
+                        <div className="flex items-center rounded-lg bg-slate-100 p-0.5 text-xs font-medium text-slate-600">
+                          <button
+                            type="button"
+                            onClick={() => setSpeakerTypeFilter("all")}
+                            className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                              speakerTypeFilter === "all"
+                                ? "bg-white text-slate-800 font-bold shadow-2xs"
+                                : "hover:text-slate-900"
+                            }`}
+                          >
+                            Tất cả ({activeMeeting.speakers.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSpeakerTypeFilter("guest")}
+                            className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                              speakerTypeFilter === "guest"
+                                ? "bg-cyan-600 text-white font-bold shadow-2xs"
+                                : "hover:text-cyan-700 text-slate-600"
+                            }`}
+                          >
+                            Khách mời ({guestSpeakerCount})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSpeakerTypeFilter("member")}
+                            className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                              speakerTypeFilter === "member"
+                                ? "bg-cyan-600 text-white font-bold shadow-2xs"
+                                : "hover:text-cyan-700 text-slate-600"
+                            }`}
+                          >
+                            Thành viên ({memberSpeakerCount})
+                          </button>
+                        </div>
+
+                        {/* Search input with clear button */}
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Tìm kiếm khách..."
+                            value={speakerSearch}
+                            onChange={(e) => setSpeakerSearch(e.target.value)}
+                            className="w-40 sm:w-52 pl-8 pr-7 py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:border-cyan-500 focus:outline-none transition shadow-2xs"
+                          />
+                          {speakerSearch && (
+                            <button
+                              type="button"
+                              onClick={() => setSpeakerSearch("")}
+                              className="absolute right-1.5 top-1 p-0.5 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
+                              title="Xóa tìm kiếm"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
                     {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && checkedSpeakerIds.length > 0 && (
                       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs py-1">
@@ -1373,76 +1478,106 @@ export default function MeetingTab() {
                       </div>
                     )}
                     <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                      {activeMeeting.speakers.map((p, i) => {
-                        const isSpeaking = i === activeMeeting.currentIndex && ["live", "paused"].includes(activeMeeting.status);
-                        return (
-                          <div
-                            key={p.id}
-                            className={`flex items-center gap-3 rounded-xl p-3 transition-colors ${isSpeaking
-                              ? "border border-cyan-300 bg-cyan-50/70 shadow-2xs"
-                              : "border border-slate-200/60 bg-slate-50/50 hover:bg-slate-50"
-                              }`}
-                          >
-                            <span className="w-6 text-center font-mono text-xs font-bold text-slate-400">
-                              {i + 1}
-                            </span>
-                            {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && <input type="checkbox" aria-label={`Chọn ${p.name}`} checked={checkedSpeakerIds.includes(p.id)} disabled={saving || (activeMeeting.status !== "scheduled" && i < activeMeeting.currentIndex)} onChange={e => setCheckedSpeakerIds(ids => e.target.checked ? [...ids, p.id] : ids.filter(id => id !== p.id))} />}
-
-                            {p.photoURL ? (
-                              <img
-                                src={p.photoURL}
-                                alt={p.name}
-                                className="h-9 w-9 rounded-full object-cover ring-1 ring-slate-200"
-                              />
-                            ) : (
-                              <span className="grid h-9 w-9 place-items-center rounded-full bg-cyan-100 font-bold text-xs text-cyan-700">
-                                {p.name.slice(0, 1).toUpperCase()}
-                              </span>
-                            )}
-
-                            <div className="min-w-0 flex-1">
-                              <button type="button" aria-label={`Bắt đầu từ ${p.name}`} aria-pressed={presentationSpeakerId === p.id} disabled={saving || !canManage || !["scheduled", "live", "paused"].includes(activeMeeting.status)} onClick={() => setPresentationSpeakerId(p.id)} className="block max-w-full truncate text-left text-xs font-bold text-slate-800 aria-pressed:text-cyan-700 aria-pressed:underline">{p.name}</button>
-                              <span className="text-[11px] text-slate-500">
-                                {p.email || "Khách mời"} • {p.seconds} giây
-                              </span>
-                            </div>
-
-                            {isSpeaking && (
-                              <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                                <Megaphone className="h-3 w-3 animate-bounce" /> Đang nói
-                              </span>
-                            )}
-                            {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (activeMeeting.status === "scheduled" || i >= activeMeeting.currentIndex) ? (
-                              <button
-                                type="button"
-                                title={i === activeMeeting.speakers.length - 1 ? (p.deferred ? "Đã chuyển cuối lượt" : "Người cuối danh sách") : "Chuyển xuống cuối lượt"}
-                                aria-label={`Để cuối lượt: ${p.name}`}
-                                disabled={saving || i === activeMeeting.speakers.length - 1}
-                                onClick={() => void deferSpeaker(p.id).catch(error => toast.error(error.message || "Không hoãn được lượt."))}
-                                className={`shrink-0 p-1.5 rounded-lg border transition cursor-pointer ${
-                                  p.deferred
-                                    ? "border-amber-300 bg-amber-100/90 text-amber-800"
-                                    : "border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100"
-                                } disabled:opacity-40 disabled:cursor-not-allowed`}
-                              >
-                                <ArrowDownToLine className="h-3.5 w-3.5" />
-                              </button>
-                            ) : p.deferred ? (
-                              <span
-                                title="Đã chuyển cuối lượt"
-                                className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-amber-50 text-amber-700 border border-amber-200/80 shrink-0"
-                              >
-                                <ArrowDownToLine className="h-3.5 w-3.5" />
-                              </span>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-
-                      {!activeMeeting.speakers.length && (
+                      {filteredSpeakers.length === 0 ? (
                         <div className="py-8 text-center text-xs text-slate-400">
-                          Chưa có ai check-in vào cuộc họp này.
+                          <Search className="h-6 w-6 text-slate-300 mx-auto mb-2" />
+                          <p>
+                            {!activeMeeting.speakers.length
+                              ? "Chưa có ai check-in vào cuộc họp này."
+                              : "Không tìm thấy khách mời hoặc diễn giả nào phù hợp."}
+                          </p>
+                          {(speakerSearch || speakerTypeFilter !== "all") && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSpeakerSearch("");
+                                setSpeakerTypeFilter("all");
+                              }}
+                              className="mt-2 text-cyan-600 hover:text-cyan-800 font-semibold cursor-pointer underline"
+                            >
+                              Xóa bộ lọc tìm kiếm
+                            </button>
+                          )}
                         </div>
+                      ) : (
+                        filteredSpeakers.map((p) => {
+                          const i = p.originalIndex;
+                          const isSpeaking = i === activeMeeting.currentIndex && ["live", "paused"].includes(activeMeeting.status);
+                          const isGuest = !p.userId;
+                          return (
+                            <div
+                              key={p.id}
+                              className={`flex items-center gap-3 rounded-xl p-3 transition-colors ${isSpeaking
+                                ? "border border-cyan-300 bg-cyan-50/70 shadow-2xs"
+                                : "border border-slate-200/60 bg-slate-50/50 hover:bg-slate-50"
+                                }`}
+                            >
+                              <span className="w-6 text-center font-mono text-xs font-bold text-slate-400">
+                                {i + 1}
+                              </span>
+                              {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && <input type="checkbox" aria-label={`Chọn ${p.name}`} checked={checkedSpeakerIds.includes(p.id)} disabled={saving || (activeMeeting.status !== "scheduled" && i < activeMeeting.currentIndex)} onChange={e => setCheckedSpeakerIds(ids => e.target.checked ? [...ids, p.id] : ids.filter(id => id !== p.id))} />}
+
+                              {p.photoURL ? (
+                                <img
+                                  src={p.photoURL}
+                                  alt={p.name}
+                                  className="h-9 w-9 rounded-full object-cover ring-1 ring-slate-200"
+                                />
+                              ) : (
+                                <span className="grid h-9 w-9 place-items-center rounded-full bg-cyan-100 font-bold text-xs text-cyan-700">
+                                  {p.name.slice(0, 1).toUpperCase()}
+                                </span>
+                              )}
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <button type="button" aria-label={`Bắt đầu từ ${p.name}`} aria-pressed={presentationSpeakerId === p.id} disabled={saving || !canManage || !["scheduled", "live", "paused"].includes(activeMeeting.status)} onClick={() => setPresentationSpeakerId(p.id)} className="block truncate text-left text-xs font-bold text-slate-800 aria-pressed:text-cyan-700 aria-pressed:underline">{p.name}</button>
+                                  {isGuest ? (
+                                    <span className="shrink-0 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80">
+                                      Khách mời
+                                    </span>
+                                  ) : (
+                                    <span className="shrink-0 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200/80">
+                                      Thành viên
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[11px] text-slate-500">
+                                  {p.email || (isGuest ? "Khách mời" : "")} • {p.seconds} giây
+                                </span>
+                              </div>
+
+                              {isSpeaking && (
+                                <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                  <Megaphone className="h-3 w-3 animate-bounce" /> Đang nói
+                                </span>
+                              )}
+                              {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (activeMeeting.status === "scheduled" || i >= activeMeeting.currentIndex) ? (
+                                <button
+                                  type="button"
+                                  title={i === activeMeeting.speakers.length - 1 ? (p.deferred ? "Đã chuyển cuối lượt" : "Người cuối danh sách") : "Chuyển xuống cuối lượt"}
+                                  aria-label={`Để cuối lượt: ${p.name}`}
+                                  disabled={saving || i === activeMeeting.speakers.length - 1}
+                                  onClick={() => void deferSpeaker(p.id).catch(error => toast.error(error.message || "Không hoãn được lượt."))}
+                                  className={`shrink-0 p-1.5 rounded-lg border transition cursor-pointer ${
+                                    p.deferred
+                                      ? "border-amber-300 bg-amber-100/90 text-amber-800"
+                                      : "border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100"
+                                  } disabled:opacity-40 disabled:cursor-not-allowed`}
+                                >
+                                  <ArrowDownToLine className="h-3.5 w-3.5" />
+                                </button>
+                              ) : p.deferred ? (
+                                <span
+                                  title="Đã chuyển cuối lượt"
+                                  className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-amber-50 text-amber-700 border border-amber-200/80 shrink-0"
+                                >
+                                  <ArrowDownToLine className="h-3.5 w-3.5" />
+                                </span>
+                              ) : null}
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </div>
