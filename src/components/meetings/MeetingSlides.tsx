@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Download, ChevronLeft, ChevronRight, Play, RefreshCw, Pencil, ArrowDownToLine } from "lucide-react";
+import { Download, ChevronLeft, ChevronRight, Play, Pause, RefreshCw, Pencil, ArrowDownToLine } from "lucide-react";
 import { renderProfileSlide, loadSlideImage, SLIDE_WIDTH, SLIDE_HEIGHT } from "./profileSlideRenderer";
 import { drawSlideTimer, getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
 import { SlideTransitionDelayInput } from "./SlideTransitionDelayInput";
@@ -24,11 +24,12 @@ type Props = {
   onPresentationStarted?: () => void;
   onPresentationClosed?: () => void;
   api: (path: string, method?: string, body?: unknown) => Promise<SlideDeck>;
+  onTogglePause?: () => void | Promise<void>;
 };
 const button = "inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition disabled:opacity-40 cursor-pointer";
 const fieldClass = "w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none transition";
 
-export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker }: Props) {
+export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker, onTogglePause }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -103,6 +104,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   const speechesComplete = !!meeting.speechesCompletedAt && ["live", "paused"].includes(meeting.status);
   const timer = useMemo(() => getSlideTimer(meeting, active?.id, now), [meeting, active?.id, now]);
   const index = queue.findIndex(s => s.id === selected?.id);
+  const isSpeakingLive = (meeting.status === "live" && Boolean(meeting.speakerStartedAt)) || (presenting && meeting.status !== "paused");
 
   const navigationBusy = startingSpeech || controlBusy || !!draft || loading;
   const canMove = (direction: number) => !navigationBusy && (followsSpeaker
@@ -200,13 +202,15 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
 
   useEffect(() => {
     const onFullscreen = () => {
-      if (!document.fullscreenElement && fullScreenOwned.current) closePresentation();
+      if (!document.fullscreenElement && (fullScreenOwned.current || presentationActive.current || presenting)) {
+        closePresentation();
+      }
     };
     document.addEventListener("fullscreenchange", onFullscreen);
     return () => {
       document.removeEventListener("fullscreenchange", onFullscreen);
     };
-  }, [closePresentation]);
+  }, [closePresentation, presenting]);
 
   useEffect(() => {
     if (!presenting) return;
@@ -216,14 +220,19 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       if (e.key === "Tab") {
         e.preventDefault(); presentationDialog.current?.focus(); return;
       }
+      if (e.key === "p" || e.key === "P") {
+        e.preventDefault();
+        onTogglePause?.();
+        return;
+      }
       if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
         if (mode !== "manual") return;
         move(e.key === "ArrowRight" ? 1 : -1);
       }
     };
-    document.addEventListener("keydown", keydown);
-    return () => document.removeEventListener("keydown", keydown);
+    document.addEventListener("keydown", keydown, true);
+    return () => document.removeEventListener("keydown", keydown, true);
   }, [presenting, move, closePresentation, mode]);
 
   useEffect(() => {
@@ -238,6 +247,8 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         if (mounted.current && presentationActive.current) fullScreenOwned.current = true;
         else if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
       }).catch(() => {});
+    } else if (document.fullscreenElement) {
+      fullScreenOwned.current = true;
     }
   }, [fullscreenRequest, startFromFirst]);
 
@@ -329,19 +340,40 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       <div className="hidden sm:block w-px h-5 bg-slate-200" />
       <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={14} /> Làm mới hồ sơ</button>
       <button className={button} disabled={!ready} onClick={download}><Download size={14} /> Tải PNG</button>
-      <button
-        ref={launchButton}
-        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 px-3.5 py-2 text-xs font-medium text-white transition disabled:opacity-40 cursor-pointer"
-        disabled={navigationBusy || !!error || !selected}
-        onClick={() => {
-          const target = (checkedSpeakerIds.length > 0 ? deck.slides.find(s => s.id === checkedSpeakerIds[checkedSpeakerIds.length - 1] || checkedSpeakerIds.includes(s.id)) : null) || selected;
-          if (target) beginPresentation(target);
-        }}
-      >
-        <Play size={14} /> Bắt đầu thuyết trình
-      </button>
+      {canManage && isSpeakingLive ? (
+        <button
+          ref={launchButton}
+          type="button"
+          disabled={controlBusy || navigationBusy}
+          onClick={() => onTogglePause?.()}
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 px-3.5 py-2 text-xs font-medium text-amber-800 transition disabled:opacity-40 cursor-pointer shadow-xs"
+          title="Tạm dừng đếm ngược thời gian phát biểu"
+        >
+          <Pause size={14} className="fill-current" /> Tạm dừng
+        </button>
+      ) : (
+        <button
+          ref={launchButton}
+          type="button"
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 px-3.5 py-2 text-xs font-medium text-white transition disabled:opacity-40 cursor-pointer shadow-xs"
+          disabled={navigationBusy || !!error || !selected || controlBusy}
+          onClick={() => {
+            const target =
+              (checkedSpeakerIds.length > 0
+                ? deck.slides.find(
+                    (s) =>
+                      s.id === checkedSpeakerIds[checkedSpeakerIds.length - 1] ||
+                      checkedSpeakerIds.includes(s.id)
+                  )
+                : null) || selected;
+            if (target) beginPresentation(target);
+          }}
+        >
+          <Play size={14} /> Bắt đầu thuyết trình
+        </button>
+      )}
     </div>
-    <p className="text-[11px] text-slate-400">Toàn màn hình: phím ← → chuyển lượt (thủ công) · Esc thoát</p>
+    <p className="text-[11px] text-slate-400">Toàn màn hình: phím ← → chuyển lượt (thủ công) · phím P tạm dừng · Esc thoát</p>
     {error && <p role="alert" className="rounded-xl bg-red-50 border border-red-200/80 p-3 text-xs text-red-700">{error} <button className="underline hover:text-red-900 transition cursor-pointer" onClick={() => setRevision(v => v + 1)}>Tải lại dữ liệu</button></p>}
     <div className="grid gap-4 lg:grid-cols-[280px_1fr] items-stretch">
       <aside className="flex flex-col h-full rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">

@@ -124,7 +124,7 @@ it("defers from the operation list and starts fullscreen from the selected atten
   } finally { cleanup(); await act(async () => {}); vi.restoreAllMocks(); }
 });
 
-it.each(["Escape", "fullscreen"])("returns to the same meeting's operation tab after exiting presentation via %s", async exit => {
+it.each(["Escape", "fullscreen"])("returns to the slides presentation tab after exiting presentation via %s", async exit => {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
   const people = [{ id: "first", kind: "guest", name: "Khách đang nói", company: "", seconds: 30 }];
   const live = { ...meeting, status: "live", currentIndex: 0, speakers: people };
@@ -144,7 +144,7 @@ it.each(["Escape", "fullscreen"])("returns to the same meeting's operation tab a
     if (exit === "Escape") fireEvent.keyDown(document, { key: "Escape" });
     else { fullscreen = null; fireEvent(document, new Event("fullscreenchange")); }
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Trình chiếu hồ sơ" })).toBeNull());
-    expect(screen.getByText("Diễn giả hiện tại")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Bắt đầu thuyết trình" })).toBeTruthy();
     expect(screen.getByTitle("Đóng popup")).toBeTruthy();
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/control"))).toBe(false);
   } finally {
