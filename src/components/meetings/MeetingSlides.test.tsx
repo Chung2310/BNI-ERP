@@ -24,12 +24,12 @@ it("checks multiple attendees and submits one batch while preserving the selecti
   await screen.findByText("Nguyễn An");
   fireEvent.click(screen.getByLabelText("Chọn Nguyễn An"));
   fireEvent.click(screen.getByLabelText("Chọn Trần Bình"));
-  fireEvent.click(screen.getByRole("button", { name: "Để cuối lượt (2)" }));
+  fireEvent.click(screen.getByRole("button", { name: "Chuyển xuống cuối lượt" }));
   await screen.findByRole("alert");
   expect(defer).toHaveBeenCalledExactlyOnceWith(["a", "b"]);
   expect((screen.getByLabelText("Chọn Nguyễn An") as HTMLInputElement).checked).toBe(true);
-  await waitFor(() => expect((screen.getByRole("button", { name: "Để cuối lượt (2)" }) as HTMLButtonElement).disabled).toBe(false));
-  fireEvent.click(screen.getByRole("button", { name: "Để cuối lượt (2)" }));
+  await waitFor(() => expect((screen.getByRole("button", { name: "Chuyển xuống cuối lượt" }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: "Chuyển xuống cuối lượt" }));
   await waitFor(() => expect((screen.getByLabelText("Chọn Nguyễn An") as HTMLInputElement).checked).toBe(false));
 });
 

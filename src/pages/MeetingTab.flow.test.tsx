@@ -37,8 +37,8 @@ it("checks multiple people in operations and submits their IDs in one request", 
   fireEvent.click(screen.getByLabelText("Chọn Bình"));
   expect((screen.getByLabelText("Chọn An") as HTMLInputElement).checked).toBe(true);
   expect((screen.getByLabelText("Chọn Bình") as HTMLInputElement).checked).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "Để cuối lượt (2)" }));
-  await waitFor(() => expect(screen.getByText("Đã chọn 0 người")).toBeTruthy());
+  fireEvent.click(screen.getByRole("button", { name: "Chuyển xuống cuối lượt" }));
+  await waitFor(() => expect((screen.getByLabelText("Chọn An") as HTMLInputElement).checked).toBe(false));
   expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/defer"))).toHaveLength(1);
   expect(item.speakers.map(person => person.id)).toEqual(["c", "a", "b"]);
 });
