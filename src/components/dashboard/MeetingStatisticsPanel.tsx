@@ -460,7 +460,7 @@ export function MeetingStatisticsPanel() {
       const matchPrize = w.prizeName?.toLowerCase().includes(q);
       const matchReward = w.reward?.toLowerCase().includes(q);
       const matchMeeting = w.meetingTitle?.toLowerCase().includes(q);
-      return matchName || matchPrize || matchReward || matchMeeting;
+      return matchName || matchPrize || matchReward || matchMeeting || drawSourceLabels[w.source].toLowerCase().includes(q);
     });
   }, [allFilteredLuckyWinners, winnerSearch]);
 

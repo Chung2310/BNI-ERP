@@ -21,6 +21,8 @@ export interface Speaker {
 }
 
 export interface LuckyDrawWinner {
+  source?: "wheel" | "bingo" | "draw";
+  reward?: string;
   id: string;
   prizeId: string;
   prizeName: string;
@@ -76,10 +78,19 @@ export interface Meeting {
   elapsedSeconds?: number;
   endedAt?: string;
   luckyDraw?: LuckyDrawConfig;
+  gameWinners?: LuckyDrawWinner[];
   __v: number;
 }
 
 export const meetingService = {
+  async recordGameWinner(meetingId: string, winner: Pick<LuckyDrawWinner, "id" | "winnerId" | "name" | "prizeName" | "photoURL" | "ticketNumber" | "wonAt"> & { source: "wheel" | "bingo" }): Promise<LuckyDrawWinner> {
+    const res = await fetch(`/api/v1/meetings/${meetingId}/lucky-draw/results`, {
+      method: "POST", headers: getAuthHeaders(), body: JSON.stringify(winner),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Không thể lưu kết quả quay thưởng.");
+    return data.data;
+  },
   async listMeetings(): Promise<Meeting[]> {
     const res = await fetch("/api/v1/meetings", {
       headers: getAuthHeaders(),

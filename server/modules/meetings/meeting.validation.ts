@@ -1,4 +1,14 @@
 import Joi from 'joi';
+export const gameWinnerInput = Joi.object({
+  id: Joi.string().max(100).required(),
+  winnerId: Joi.string().max(150).required(),
+  source: Joi.string().valid('wheel', 'bingo').required(),
+  name: Joi.string().trim().max(150).required(),
+  prizeName: Joi.string().trim().max(200).required(),
+  photoURL: Joi.string().uri({ scheme: ['http', 'https'] }).max(2000).allow(''),
+  ticketNumber: Joi.number().integer().min(1),
+  wonAt: Joi.date().iso().required(),
+});
 export const slideProfileInput = Joi.object({
   version: Joi.number().integer().min(0).required(),
   profile: Joi.object({

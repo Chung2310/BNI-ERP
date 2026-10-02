@@ -33,6 +33,8 @@ const luckyDrawWinner = new Schema(
     prizeId: { type: String, required: true },
     prizeName: { type: String, required: true },
     winnerId: { type: String, required: true },
+    source: { type: String, enum: ['wheel', 'bingo', 'draw'], default: 'draw' },
+    reward: String,
     userId: String,
     name: { type: String, required: true },
     email: String,
@@ -113,6 +115,7 @@ const meeting = new Schema(
     speechesCompletedAt: Date,
     elapsedSeconds: { type: Number, default: 0 },
     endedAt: Date,
+    gameWinners: { type: [luckyDrawWinner], default: [] },
     luckyDraw: {
       type: luckyDrawConfig,
       default: () => ({

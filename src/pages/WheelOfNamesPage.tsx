@@ -2309,12 +2309,12 @@ export default function WheelOfNamesPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử trúng giải?")) {
+                      if (window.confirm("Ẩn lịch sử trên màn hình này? Kết quả đã lưu vẫn được giữ trong thống kê cuộc họp.")) {
                         setWinners([]);
                       }
                     }}
                     className="p-1 text-slate-400 hover:text-rose-600 transition cursor-pointer"
-                    title="Xóa lịch sử"
+                    title="Ẩn lịch sử trên màn hình"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
