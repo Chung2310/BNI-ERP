@@ -412,7 +412,7 @@ export function MeetingStatisticsPanel() {
     const completedCount = filteredMeetings.filter((m) => m.status === "ended").length;
     const liveCount = filteredMeetings.filter((m) => ["live", "paused"].includes(m.status)).length;
     const scheduledCount = filteredMeetings.filter((m) => m.status === "scheduled").length;
-    const avgPerMeeting = filteredMeetings.length > 0 ? (totalAttendees / filteredMeetings.length).toFixed(1) : "0";
+    const avgPerMeeting = filteredMeetings.length > 0 ? Math.ceil(totalAttendees / filteredMeetings.length) : 0;
 
     // For rates and donut distribution:
     // Total pool = total checked in + total absent across the selected meetings
@@ -962,10 +962,6 @@ export function MeetingStatisticsPanel() {
           <div className="mt-1 flex items-baseline gap-1.5">
             <span className="text-2xl font-bold tracking-tight text-amber-600">{metrics.totalWinners}</span>
             <span className="text-xs text-amber-500/80">lượt</span>
-          </div>
-          <div className="mt-2 text-[11px] text-amber-700/80 font-medium truncate flex items-center gap-1">
-            <Trophy className="h-3 w-3 text-amber-500 shrink-0" />
-            <span>{metrics.totalWinners > 0 ? "Vòng quay, bingo và bốc thăm" : "Chưa có lượt quay"}</span>
           </div>
         </div>
       </div>

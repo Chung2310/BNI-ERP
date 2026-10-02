@@ -319,7 +319,13 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
           </svg>
         </div>
       </label>
-      {mode === "auto" && <label className="inline-flex items-center gap-1.5 text-xs text-slate-500">Chờ sau khi hết giờ <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={value => onAutoAdvanceDelayChange?.(value)} disabled={!canManage} /> giây rồi chuyển slide</label>}
+      {mode === "auto" && (
+        <label className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
+          Thời gian chuyển slide
+          <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={value => onAutoAdvanceDelayChange?.(value)} disabled={!canManage} />
+          <span className="text-slate-400 font-normal">giây</span>
+        </label>
+      )}
       <div className="hidden sm:block w-px h-5 bg-slate-200" />
       <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={14} /> Làm mới hồ sơ</button>
       <button className={button} disabled={!ready} onClick={download}><Download size={14} /> Tải PNG</button>

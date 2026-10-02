@@ -29,6 +29,8 @@ import {
   Filter,
   RotateCcw,
   ArrowDownToLine,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
@@ -158,10 +160,60 @@ export default function MeetingTab() {
   const presentationClosed = useCallback(() => {
     setStartPresentation(false);
     presentationFullscreen.current = null;
-    setActiveSubTab("slides");
+    setActiveSubTab("speakers");
   }, []);
   const [prioritySpeakerId, setPrioritySpeakerId] = useState("");
   const [priorityPosition, setPriorityPosition] = useState(1);
+
+  // Fullscreen state for Meeting Detail Modal
+  const [isModalFullscreen, setIsModalFullscreen] = useState(false);
+
+  const toggleModalFullscreen = useCallback(() => {
+    if (!isModalFullscreen) {
+      setIsModalFullscreen(true);
+      if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    } else {
+      setIsModalFullscreen(false);
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+  }, [isModalFullscreen]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && isModalFullscreen) {
+        setIsModalFullscreen(false);
+      }
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, [isModalFullscreen]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isModalFullscreen) {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+        setIsModalFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isModalFullscreen]);
+
+  const handleCloseDetailModal = useCallback(() => {
+    if (isModalFullscreen) {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setIsModalFullscreen(false);
+    }
+    setDetailMeetingId(null);
+  }, [isModalFullscreen]);
 
   // Create Meeting Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -915,8 +967,8 @@ export default function MeetingTab() {
 
       {/* POPUP CHI TIẾT CUỘC HỌP (Meeting Detail Modal) */}
       {activeMeeting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
-          <div className="w-full max-w-6xl max-h-[94vh] flex flex-col rounded-3xl bg-slate-50 shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className={`fixed inset-0 z-50 ${isModalFullscreen ? "bg-slate-900 overflow-hidden" : "flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto"}`}>
+          <div className={`${isModalFullscreen ? "w-full h-full max-w-none max-h-none rounded-none border-0" : "w-full max-w-6xl max-h-[94vh] rounded-3xl border border-slate-200 shadow-2xl"} flex flex-col bg-slate-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150`}>
             {/* Modal Top Header Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 bg-white px-5 py-3.5 shrink-0">
               <div className="flex items-center gap-3 min-w-0">
@@ -965,13 +1017,15 @@ export default function MeetingTab() {
 
               {/* Sub-tab Switcher & Actions */}
               <div className="flex items-center justify-between sm:justify-end gap-2">
-                <div className="flex overflow-x-auto bg-slate-100 p-1 rounded-xl"><button type="button" onClick={() => setActiveSubTab("slides")} aria-pressed={activeSubTab === "slides"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700">Thuyết trình</button><button type="button" onClick={() => setActiveSubTab("checkin")} aria-pressed={activeSubTab === "checkin"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700">Check-in ({activeMeeting.speakers.length})</button>
+                <div className="flex overflow-x-auto bg-slate-100 p-1 rounded-xl">
+                  <button type="button" onClick={() => setActiveSubTab("slides")} aria-pressed={activeSubTab === "slides"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700 aria-pressed:font-semibold">Thuyết trình</button>
+                  <button type="button" onClick={() => setActiveSubTab("checkin")} aria-pressed={activeSubTab === "checkin"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700 aria-pressed:font-semibold">Check-in ({activeMeeting.speakers.length})</button>
                   <button
                     type="button"
                     onClick={() => setActiveSubTab("speakers")}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-bold transition cursor-pointer ${activeSubTab === "speakers"
-                      ? "bg-white text-cyan-700 shadow-2xs"
-                      : "text-slate-600 hover:text-slate-900"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition cursor-pointer ${activeSubTab === "speakers"
+                      ? "bg-white text-cyan-700 shadow-2xs font-semibold"
+                      : "text-slate-600 hover:text-slate-900 font-medium"
                       }`}
                   >
                     <Users className="h-3.5 w-3.5" />
@@ -981,9 +1035,9 @@ export default function MeetingTab() {
                   <button
                     type="button"
                     onClick={() => setActiveSubTab("luckyDraw")}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-bold transition cursor-pointer ${activeSubTab === "luckyDraw"
-                      ? "bg-cyan-600 text-white shadow-2xs"
-                      : "text-slate-600 hover:text-slate-900"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition cursor-pointer ${activeSubTab === "luckyDraw"
+                      ? "bg-cyan-600 text-white shadow-2xs font-semibold"
+                      : "text-slate-600 hover:text-slate-900 font-medium"
                       }`}
                   >
                     <Gift className="h-3.5 w-3.5" />
@@ -1007,14 +1061,47 @@ export default function MeetingTab() {
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  title="Đóng popup"
-                  onClick={() => setDetailMeetingId(null)}
-                  className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer shrink-0"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+                {isModalFullscreen ? (
+                  <>
+                    <button
+                      type="button"
+                      title="Thoát toàn màn hình (Esc)"
+                      onClick={toggleModalFullscreen}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs transition cursor-pointer shrink-0"
+                    >
+                      <Minimize2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Thu nhỏ</span>
+                    </button>
+                    <button
+                      type="button"
+                      title="Thoát toàn màn hình (Esc)"
+                      onClick={toggleModalFullscreen}
+                      className="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      title="Toàn màn hình"
+                      onClick={toggleModalFullscreen}
+                      className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer shrink-0"
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      title="Đóng popup"
+                      onClick={handleCloseDetailModal}
+                      className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer shrink-0"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -1282,9 +1369,9 @@ export default function MeetingTab() {
 
                             {autoAdvance && (
                               <div className="flex items-center gap-1.5 ml-auto">
-                                <span className="text-slate-500 font-medium">Chờ sau khi hết giờ:</span>
+                                <span className="text-slate-500 font-medium">Thời gian chuyển slide:</span>
                                 <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={updateAutoAdvanceDelay} />
-                                <span className="text-slate-600 font-semibold">giây</span>
+                                <span className="text-slate-500 font-medium">giây</span>
                               </div>
                             )}
                             {autoAdvance && <p className="w-full text-xs text-slate-500">Khi hết thời gian phát biểu, chờ {autoAdvanceDelay} giây rồi chuyển người và slide. Đây là thời gian chờ chuyển lượt, không phải thời lượng phát biểu.</p>}
