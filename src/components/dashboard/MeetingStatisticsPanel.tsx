@@ -24,6 +24,7 @@ import { authService } from "../../services/authService";
 import { meetingService, Meeting, Speaker } from "../../services/meetingService";
 import { socketService } from "../../services/socketService";
 import { UserProfile } from "../../types/common";
+import { VietnameseDatePicker } from "../common/VietnameseDatePicker";
 
 type QuickTimeFilter = "all" | "month" | "quarter" | "year";
 type StatusFilter = "all" | "ended" | "live" | "scheduled";
@@ -771,19 +772,17 @@ export function MeetingStatisticsPanel() {
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           </div>
 
-          {/* Lọc ngày */}
-          <div className="relative">
-            <input
-              type="date"
-              aria-label="Lọc theo ngày"
-              value={selectedDate}
-              onChange={(e) => {
-                setSelectedDate(e.target.value);
-                if (e.target.value) setQuickFilter("all");
-              }}
-              className="rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-2.5 text-xs font-normal text-slate-700 focus:border-red-500 focus:bg-white focus:outline-hidden"
-            />
-          </div>
+          {/* Lọc ngày (Việt hóa) */}
+          <VietnameseDatePicker
+            ariaLabel="Lọc theo ngày"
+            value={selectedDate}
+            onChange={(val) => {
+              setSelectedDate(val);
+              if (val) setQuickFilter("all");
+            }}
+            placeholder="Lọc theo ngày..."
+            className="w-36 sm:w-40"
+          />
 
           {/* Nhóm nút thời gian */}
           <div className="flex rounded-xl bg-slate-100 p-0.5 text-xs">
