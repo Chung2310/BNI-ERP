@@ -904,7 +904,6 @@ export function LuckyDrawTab({
                     <th className="p-3">Người trúng</th>
                     <th className="p-3">Số vé</th>
                     <th className="p-3">Thời gian</th>
-                    <th className="p-3">Mã xác thực</th>
                     {canManage && <th className="p-3 pr-4 text-right">Thao tác</th>}
                   </tr>
                 </thead>
@@ -951,12 +950,6 @@ export function LuckyDrawTab({
                       <td className="p-3 font-mono text-[11px] text-slate-500">
                         {new Date(winner.wonAt).toLocaleTimeString("vi-VN")}{" "}
                         {new Date(winner.wonAt).toLocaleDateString("vi-VN")}
-                      </td>
-
-                      <td className="p-3">
-                        <div className="font-mono text-[10px] text-slate-400 truncate max-w-[140px]" title={winner.verificationHash}>
-                          {winner.verificationHash ? `${winner.verificationHash.slice(0, 16)}...` : "—"}
-                        </div>
                       </td>
 
                       {canManage && (
@@ -1030,12 +1023,6 @@ export function LuckyDrawTab({
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* Verification */}
-              <div className="mt-3 pt-3 border-t border-slate-200 text-[10px] font-mono text-slate-400 text-left space-y-0.5">
-                <div className="truncate">Seed: {activeWinnerModal.seed}</div>
-                <div className="truncate">Hash: {activeWinnerModal.verificationHash}</div>
               </div>
             </div>
 

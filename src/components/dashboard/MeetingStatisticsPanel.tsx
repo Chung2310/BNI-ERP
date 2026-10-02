@@ -17,7 +17,6 @@ import {
   Trophy,
   Award,
   Ticket,
-  CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { authService } from "../../services/authService";
@@ -116,7 +115,6 @@ function LuckyWinnersTable({
             <th className="py-2.5 px-3">Phần quà / Giá trị</th>
             <th className="py-2.5 px-3 text-center">Số vé</th>
             <th className="py-2.5 px-3">Thời gian</th>
-            <th className="py-2.5 px-3">Mã xác thực</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -223,19 +221,6 @@ function LuckyWinnersTable({
                     </div>
                   ) : (
                     <span className="text-slate-400">-</span>
-                  )}
-                </td>
-                <td className="py-2.5 px-3 whitespace-nowrap">
-                  {w.verificationHash ? (
-                    <span
-                      title={w.verificationHash}
-                      className="inline-flex items-center gap-1 font-mono text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 rounded-md"
-                    >
-                      <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                      {w.verificationHash.slice(0, 8)}...
-                    </span>
-                  ) : (
-                    <span className="text-slate-400 text-[11px]">-</span>
                   )}
                 </td>
               </tr>
