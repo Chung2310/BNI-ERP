@@ -52,6 +52,7 @@ interface Participant {
 }
 
 interface WinnerRecord {
+  source?: "wheel" | "bingo";
   id: string;
   name: string;
   prizeName: string;
@@ -214,6 +215,24 @@ export default function WheelOfNamesPage() {
   const [selectedGame, setSelectedGame] = useState<"wheel" | "bingo">(
     urlGame === "bingo" ? "bingo" : "wheel"
   );
+  const [resultMeetingId, setResultMeetingId] = useState<string | null>(urlMeetingId);
+  type PendingResult = { meetingId: string; winner: Parameters<typeof meetingService.recordGameWinner>[1] };
+  const [unsavedResults, setUnsavedResults] = useState<PendingResult[]>([]);
+  const saveResult = async (entry: PendingResult) => {
+    try {
+      await meetingService.recordGameWinner(entry.meetingId, entry.winner);
+      setUnsavedResults(previous => previous.filter(result => result.winner.id !== entry.winner.id));
+    } catch (error) { console.error("Không thể lưu kết quả quay thưởng:", error); }
+  };
+  const persistWinner = (record: WinnerRecord, participant: Participant, source: "wheel" | "bingo", ticketNumber?: number) => {
+    if (!resultMeetingId) return;
+    const entry: PendingResult = { meetingId: resultMeetingId, winner: {
+      id: record.id, winnerId: participant.id, name: participant.name, prizeName: record.prizeName,
+      photoURL: participant.avatar, source, ticketNumber, wonAt: record.wonAt,
+    } };
+    setUnsavedResults(previous => [...previous, entry]);
+    void saveResult(entry);
+  };
   const [meetingTitle, setMeetingTitle] = useState<string>("");
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [winners, setWinners] = useState<WinnerRecord[]>([]);
@@ -344,6 +363,11 @@ export default function WheelOfNamesPage() {
       }
 
       if (targetMeeting) {
+        setResultMeetingId(targetMeeting._id);
+        setWinners((targetMeeting.gameWinners || []).map((winner): WinnerRecord => ({
+          id: winner.id, name: winner.name, prizeName: winner.prizeName,
+          avatar: winner.photoURL, wonAt: winner.wonAt, source: (winner.source === "bingo" ? "bingo" : "wheel") as "wheel" | "bingo",
+        })).reverse());
         setMeetingTitle(targetMeeting.title);
         if (targetMeeting.luckyDraw?.prizes?.length) {
           const firstPrize = targetMeeting.luckyDraw.prizes[0];
@@ -1417,19 +1441,17 @@ export default function WheelOfNamesPage() {
         setIsSpinning(false);
 
         const record: WinnerRecord = {
-          id: `win-${Date.now()}`,
+          id: crypto.randomUUID(),
           name: winner.name,
           prizeName: currentPrize,
           avatar: winner.avatar,
           department: winner.department,
-          wonAt: new Date().toLocaleTimeString("vi-VN", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          }),
+          wonAt: new Date().toISOString(),
         };
 
+        record.source = "wheel";
         setWinners((prev) => [record, ...prev]);
+        persistWinner(record, winner, "wheel");
 
         if (soundEnabled) {
           playWinFanfare();
@@ -1578,19 +1600,17 @@ export default function WheelOfNamesPage() {
           setIsSpinning(false);
 
           const record: WinnerRecord = {
-            id: `win-${Date.now()}`,
+            id: crypto.randomUUID(),
             name: winningParticipant.name,
             prizeName: currentPrize,
             avatar: winningParticipant.avatar,
             department: winningParticipant.department,
-            wonAt: new Date().toLocaleTimeString("vi-VN", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            }),
+            wonAt: new Date().toISOString(),
           };
 
+          record.source = "bingo";
           setWinners((prev) => [record, ...prev]);
+          persistWinner(record, winningParticipant, "bingo", winningBallNumber);
 
           if (soundEnabled) {
             playWinFanfare();
@@ -1724,6 +1744,10 @@ export default function WheelOfNamesPage() {
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-100 via-[#fff9f9] to-[#fff4eb] font-sans text-slate-800 select-none">
+      {unsavedResults.length > 0 && <div role="status" className="absolute top-20 left-4 z-50 rounded-xl bg-amber-100 p-3 text-sm text-amber-900 shadow">
+        Có {unsavedResults.length} kết quả chưa lưu. Giữ trang mở cho đến khi lưu xong.
+        <button className="ml-3 font-bold underline" onClick={() => unsavedResults.forEach(entry => void saveResult(entry))}>Thử lưu lại</button>
+      </div>}
       {/* Background Ambient Glows & Celebration Rays */}
       <div className="pointer-events-none absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full bg-red-500/12 blur-[140px]" />
       <div className="pointer-events-none absolute -bottom-40 -right-40 h-[600px] w-[600px] rounded-full bg-amber-500/15 blur-[140px]" />
@@ -2317,7 +2341,7 @@ export default function WheelOfNamesPage() {
                       <div className="min-w-0">
                         <h4 className="truncate text-xs font-bold text-slate-900">{w.name}</h4>
                         <p className="text-[10px] text-amber-700 font-semibold truncate">{w.prizeName}</p>
-                        <p className="text-[9px] text-slate-400 font-mono">{w.wonAt}</p>
+                        <p className="text-[9px] text-slate-400 font-mono">{new Date(w.wonAt).toLocaleString("vi-VN")}</p>
                       </div>
                     </div>
                   </div>
