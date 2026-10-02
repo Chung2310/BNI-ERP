@@ -24,7 +24,6 @@ const AuthPage = lazy(() => import("./pages/AuthPage"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const UserDataDeletion = lazy(() => import("./pages/UserDataDeletion"));
-const LandingPage = lazy(() => import("./pages/LandingPage"));
 const SubmitProofPage = lazy(() => import("./pages/SubmitProofPage"));
 const PublicRegisterPage = lazy(() => import("./pages/PublicRegisterPage"));
 const WheelOfNamesPage = lazy(() => import("./pages/WheelOfNamesPage"));
@@ -34,8 +33,6 @@ function AppContent() {
   const { user, userProfile, loading } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   const currentPath = normalizePublicPath(window.location.pathname);
-  const isLandingPage = currentPath === "/" || currentPath === "/landing" || currentPath === "/landing.html";
-  const isLandingGuestPage = isLandingPage && !(user && userProfile);
   const isPrivacyPage = currentPath === "/privacy-policy" || currentPath === "/privacy-policy.html";
   const isTermsPage = currentPath === "/terms-of-service" || currentPath === "/terms-of-service.html";
   const isDeletionPage = currentPath === "/user-data-deletion" || currentPath === "/user-data-deletion.html";
@@ -52,7 +49,6 @@ function AppContent() {
     currentPath === "/bingo";
   const isLegalPublicPage = isPrivacyPage || isTermsPage || isDeletionPage;
   const isPublicPage =
-    isLandingGuestPage ||
     isLegalPublicPage ||
     isSubmitProofPage ||
     isPublicRegisterPage ||
@@ -143,14 +139,6 @@ function AppContent() {
     document.title = totalUnread > 0 ? `(${totalUnread > 99 ? "99+" : totalUnread}) ${rawTitle}` : rawTitle;
     void setFaviconBadge(totalUnread);
   }, [totalUnread, activeTab]);
-
-  if (isLandingGuestPage) {
-    return (
-      <Suspense fallback={<AuthLoader />}>
-        <LandingPage />
-      </Suspense>
-    );
-  }
 
   if (isSubmitProofPage) {
     return (

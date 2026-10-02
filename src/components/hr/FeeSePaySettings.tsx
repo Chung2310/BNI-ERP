@@ -21,7 +21,6 @@ export default function FeeSePaySettings({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
       <section role="dialog" aria-modal="true" aria-labelledby="sepay-title" className="max-h-[90dvh] w-full max-w-3xl overflow-auto rounded-2xl bg-white p-5">
         <div className="flex items-center justify-between">
-          <h3 id="sepay-title" className="text-lg font-bold text-slate-800">SePay & giao dịch</h3>
           <button aria-label="Đóng cấu hình" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer">
             <X className="h-5 w-5" />
           </button>

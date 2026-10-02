@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   Search,
@@ -6,7 +6,6 @@ import {
   Download,
   Wallet,
   Bell,
-  Settings2,
   RefreshCw,
   TrendingUp,
   CheckCircle2,
@@ -15,13 +14,13 @@ import {
   CreditCard,
   Banknote,
   ChevronRight,
-  ArrowLeft,
   Users,
   Send,
   UserCheck,
   UserX,
   Check,
   Calendar,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -291,10 +290,46 @@ export default function MemberFeesTab() {
   ).length;
 
   // Currently active campaign object
+  const campaignDialogRef = useRef<HTMLElement>(null);
+  const campaignChildOpen = creating || !!active || deleteTargets.length > 0;
+
   const selectedCampaign = useMemo(() => {
     if (!selectedCampaignKey) return null;
     return campaigns.find((c) => c.key === selectedCampaignKey) || null;
   }, [campaigns, selectedCampaignKey]);
+
+  useEffect(() => {
+    if (!selectedCampaign || campaignChildOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    campaignDialogRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setSelectedCampaignKey(null);
+      }
+      if (event.key === "Tab") {
+        const elements = Array.from(campaignDialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [tabindex="0"]'
+        ) || []);
+        const first = elements[0];
+        const last = elements[elements.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === campaignDialogRef.current)) {
+          event.preventDefault(); last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault(); first?.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [!!selectedCampaign, campaignChildOpen]);
+
 
   // Filter campaigns on main list
   const filteredCampaigns = useMemo(() => {
@@ -436,7 +471,7 @@ export default function MemberFeesTab() {
     setReload((v) => v + 1);
     setSendProgress(
       `Đã gửi ${sent} thành viên` +
-        (failed ? `; ${failed} lỗi: ${failure}` : ". Khoản đã gửi hôm nay sẽ không bị gửi trùng."),
+      (failed ? `; ${failed} lỗi: ${failure}` : ". Khoản đã gửi hôm nay sẽ không bị gửi trùng."),
     );
   };
 
@@ -474,11 +509,11 @@ export default function MemberFeesTab() {
       });
       toast.success(
         "Đã tạo " +
-          result.created +
-          " khoản phải đóng" +
-          (result.skipped
-            ? "; bỏ qua " + result.skipped + " khoản đã tồn tại."
-            : "."),
+        result.created +
+        " khoản phải đóng" +
+        (result.skipped
+          ? "; bỏ qua " + result.skipped + " khoản đã tồn tại."
+          : "."),
       );
       setCreating(false);
       setReload((value) => value + 1);
@@ -727,6 +762,7 @@ export default function MemberFeesTab() {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50">
+      <div inert={!!selectedCampaign} aria-hidden={selectedCampaign ? true : undefined}>
       {/* Top Header */}
       <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur-sm px-4 py-4 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -739,44 +775,20 @@ export default function MemberFeesTab() {
                 <h2 className="text-base font-bold text-slate-900">
                   Phí thường niên
                 </h2>
-                {selectedCampaign && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-cyan-50 px-2 py-0.5 text-xs font-semibold text-cyan-700">
-                    <ChevronRight className="h-3 w-3" />
-                    Chi tiết: {selectedCampaign.title}
-                        {selectedCampaign.campaignId && <span className="ml-2 text-xs font-normal text-slate-500">Đợt {selectedCampaign.campaignId.slice(0, 8)}</span>}
-                  </span>
-                )}
+
               </div>
-              <p className="text-xs text-slate-500">
-                {selectedCampaign
-                  ? `Quản lý danh sách thành viên đã đóng và chưa đóng của ${selectedCampaign.title}`
-                  : "Theo dõi số tiền đã đóng/phải đóng và số người đã đóng/phải đóng theo từng đợt"}
-              </p>
+
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {canManage && (
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(true)}
-                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 cursor-pointer shadow-xs"
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-                SePay &amp; giao dịch
-              </button>
-            )}
             <button
               type="button"
-              disabled={loading || (selectedCampaign ? !selectedCampaign.items.length : !campaigns.length)}
-              onClick={
-                selectedCampaign
-                  ? () => exportCampaignMembersCsv(selectedCampaign)
-                  : exportCampaignsCsv
-              }
+              disabled={loading || !campaigns.length}
+              onClick={exportCampaignsCsv}
               className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40 cursor-pointer shadow-xs"
             >
               <Download className="h-3.5 w-3.5" />
-              {selectedCampaign ? "Xuất CSV thành viên" : "Xuất CSV danh sách"}
+              Xuất CSV danh sách
             </button>
             {canManage && (
               <button
@@ -819,8 +831,303 @@ export default function MemberFeesTab() {
         {/* ========================================================================= */}
         {/* VIEW 1: CAMPAIGN DETAIL VIEW (CHI TIẾT PHÍ THƯỜNG NIÊN)                   */}
         {/* ========================================================================= */}
-        {selectedCampaign ? (
           <div className="space-y-5">
+            {/* Stat Cards */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {statCards.map((card) => (
+                <div
+                  key={card.label}
+                  className={`rounded-2xl border border-slate-200 border-l-4 bg-white p-5 shadow-xs ${card.border}`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        {card.label} · {year}
+                      </p>
+                      <p className="mt-2 text-2xl font-bold font-mono text-slate-900">
+                        {loading ? (
+                          <span className="inline-block h-7 w-28 animate-pulse rounded-lg bg-slate-100" />
+                        ) : (
+                          card.value
+                        )}
+                      </p>
+                    </div>
+                    <div
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl ${card.iconBg}`}
+                    >
+                      <card.Icon className={`h-4 w-4 ${card.iconColor}`} />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">{card.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Filters Bar */}
+            <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Năm
+                <select
+                  aria-label="Năm thu phí"
+                  value={year}
+                  onChange={(e) => setYear(+e.target.value)}
+                  className={inputClass}
+                  style={{ minWidth: 100 }}
+                >
+                  {Array.from({ length: 21 }, (_, i) => 2020 + i).map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="min-w-[240px] flex-1 text-xs font-bold uppercase tracking-wider text-slate-500">
+                Tìm tên khoản phí
+                <div className="relative mt-1">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 py-2.5 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 transition"
+                    placeholder="Tên khoản phí, ghi chú..."
+                  />
+                  {query && (
+                    <button
+                      type="button"
+                      onClick={() => setQuery("")}
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </label>
+
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Trạng thái đợt phí
+                <select
+                  value={campaignStatusFilter}
+                  onChange={(e) =>
+                    setCampaignStatusFilter(
+                      e.target.value as typeof campaignStatusFilter,
+                    )
+                  }
+                  className={inputClass}
+                  style={{ minWidth: 160 }}
+                >
+                  <option value="all">Tất cả trạng thái</option>
+                  <option value="in_progress">Đang thu</option>
+                  <option value="completed">Đã hoàn thành 100%</option>
+                  <option value="overdue">Quá hạn</option>
+                </select>
+              </label>
+            </div>
+
+            {/* Campaign Cards (Danh sách đợt phí) */}
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <RefreshCw className="h-8 w-8 animate-spin text-cyan-600 mb-3" />
+                <p className="text-sm font-semibold text-slate-500">
+                  Đang tải danh sách khoản phí...
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {filteredCampaigns.map((campaign) => (
+                  <article
+                    key={campaign.key}
+                    aria-label={campaign.title}
+                    className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-xs transition hover:border-cyan-200 hover:shadow-md"
+                  >
+                    {/* Title & Info */}
+                    <div className="p-5 pb-3">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="break-words font-bold text-slate-900 text-base">
+                            {campaign.title}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                          <span>
+                            Định mức:{" "}
+                            <strong className="text-slate-700 font-mono">
+                              {money(campaign.amount)}
+                            </strong>
+                            /người
+                          </span>
+                          {campaign.note && (
+                            <span className="break-words text-slate-400 italic">
+                              · {campaign.note}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Due Date */}
+                    <div className="px-5 pb-4 text-xs">
+                      <p className="mb-2 text-xs font-semibold text-slate-500">Hạn đóng</p>
+                      <div className="flex items-center gap-1.5 text-slate-700 font-mono">
+                        <Clock className="h-3.5 w-3.5 text-slate-400" />
+                        <span>{dateText(campaign.dueDate)}</span>
+                      </div>
+                      {campaign.dueDate < today() && campaign.totalRemaining > 0 && (
+                        <span className="mt-0.5 inline-block text-[11px] font-semibold text-rose-600">
+                          Đã quá hạn
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Money: Đã đóng / Phải đóng */}
+                    <div className="mx-5 rounded-xl bg-slate-50 p-3">
+                      <p className="mb-2 text-xs font-semibold text-slate-500">Số tiền (Đã đóng / Phải đóng)</p>
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs">
+                          <span className="font-mono font-bold text-emerald-700">
+                            {money(campaign.totalPaid)}
+                          </span>
+                          <span className="font-mono text-[11px] text-slate-400">
+                            / {money(campaign.totalExpected)}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className={`h-full transition-all duration-300 ${campaign.percentagePaid === 100
+                                ? "bg-emerald-500"
+                                : campaign.status === "overdue"
+                                  ? "bg-rose-500"
+                                  : "bg-cyan-500"
+                              }`}
+                            style={{ width: `${campaign.percentagePaid}%` }}
+                          />
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-1 text-[11px]">
+                          <span className="text-slate-500 font-medium">
+                            Đạt {campaign.percentagePaid}%
+                          </span>
+                          {campaign.totalRemaining > 0 ? (
+                            <span className="font-mono text-rose-600 font-medium">
+                              Còn thiếu: {money(campaign.totalRemaining)}
+                            </span>
+                          ) : (
+                            <span className="text-emerald-600 font-semibold">
+                              Đủ 100%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* People: Đã đóng / Phải đóng */}
+                    <div className="px-5 pt-4">
+                      <p className="mb-2 text-xs font-semibold text-slate-500">Số người (Đã đóng / Phải đóng)</p>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className="font-mono font-bold text-cyan-800">
+                            {campaign.paidMembers}
+                          </span>
+                          <span className="font-mono text-slate-400">
+                            / {campaign.totalMembers} người
+                          </span>
+                          <span className="ml-1 rounded-md bg-cyan-50 px-1.5 py-0.5 text-[10px] font-bold text-cyan-700 border border-cyan-100">
+                            {campaign.percentageMembers}%
+                          </span>
+                        </div>
+                        <div className="text-[11px]">
+                          {campaign.unpaidMembers > 0 ? (
+                            <span className="text-amber-700 font-medium">
+                              Còn {campaign.unpaidMembers} người chưa nộp
+                            </span>
+                          ) : (
+                            <span className="text-emerald-700 font-medium">
+                              Đã hoàn thành
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Status Badge */}
+                    <div className="px-5 py-4">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${campaign.status === "completed"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : campaign.status === "overdue"
+                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                              : "bg-sky-50 text-sky-700 border border-sky-200"
+                          }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${campaign.status === "completed"
+                              ? "bg-emerald-500"
+                              : campaign.status === "overdue"
+                                ? "bg-rose-500"
+                                : "bg-sky-500"
+                            }`}
+                        />
+                        {campaign.status === "completed"
+                          ? "Hoàn thành"
+                          : campaign.status === "overdue"
+                            ? "Quá hạn"
+                            : `Đang thu (${campaign.paidMembers}/${campaign.totalMembers})`}
+                      </span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="mt-auto border-t border-slate-100 p-4">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {canManage && campaign.items.some(item => item.payments.length === 0) && (
+                          <button
+                            type="button"
+                            onClick={() => requestDelete(campaign.items)}
+                            className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50/70 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition cursor-pointer"
+                            title="Xóa các khoản chưa có giao dịch thu tiền"
+                            aria-label="Xóa khoản chưa thu"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Xóa khoản chưa thu</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCampaignKey(campaign.key);
+                            setMemberFilterTab("all");
+                            setMemberSearchQuery("");
+                          }}
+                          className="inline-flex items-center gap-1 rounded-xl bg-cyan-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-cyan-700 transition cursor-pointer group"
+                        >
+                          <span>Xem chi tiết</span>
+                          <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+
+                {!filteredCampaigns.length && (
+                  <div className="col-span-full rounded-2xl border border-slate-200 bg-white px-5 py-14 text-center text-sm text-slate-400">
+                      {campaigns.length
+                        ? "Không có khoản phí nào phù hợp với bộ lọc."
+                        : "Chưa có khoản phí nào trong năm này. Nhấn 'Tạo khoản phí' để bắt đầu."}
+                    </div>
+                )}
+              </div>
+            )}
+          </div>
+      </div>
+      </div>
+        {selectedCampaign && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-3 backdrop-blur-sm sm:p-6"
+            onClick={(event) => { if (event.target === event.currentTarget) setSelectedCampaignKey(null); }}
+            aria-hidden={campaignChildOpen || undefined}
+            inert={campaignChildOpen}
+          >
+          <section ref={campaignDialogRef} role="dialog" aria-modal="true" aria-labelledby="campaign-detail-title"
+            tabIndex={-1}
+            className="max-h-[92dvh] w-full max-w-7xl space-y-5 overflow-y-auto rounded-2xl bg-slate-50 p-4 shadow-2xl sm:p-6">
+
             {/* Top Navigation Bar: Back button & Campaign info */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -829,26 +1136,22 @@ export default function MemberFeesTab() {
                     type="button"
                     onClick={() => setSelectedCampaignKey(null)}
                     className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition cursor-pointer shadow-xs"
-                    title="Quay lại danh sách khoản phí"
+                    aria-label="Đóng chi tiết khoản phí"
                   >
-                    <ArrowLeft className="h-4 w-4" />
+                    <X className="h-4 w-4" />
                   </button>
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-bold text-slate-900">
+                      <h3 id="campaign-detail-title" className="text-lg font-bold text-slate-900">
                         {selectedCampaign.title}
                       </h3>
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                        Năm {selectedCampaign.year}
-                      </span>
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          selectedCampaign.status === "completed"
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${selectedCampaign.status === "completed"
                             ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                             : selectedCampaign.status === "overdue"
                               ? "bg-rose-50 text-rose-700 border border-rose-200"
                               : "bg-sky-50 text-sky-700 border border-sky-200"
-                        }`}
+                          }`}
                       >
                         {selectedCampaign.status === "completed"
                           ? "Đã hoàn thành 100%"
@@ -882,6 +1185,11 @@ export default function MemberFeesTab() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => exportCampaignMembersCsv(selectedCampaign)} disabled={loading || !selectedCampaign.items.length}
+                    className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40">
+                    <Download className="h-3.5 w-3.5" />
+                    Xuất CSV thành viên
+                  </button>
                   {canManage && (
                     <button
                       type="button"
@@ -1017,11 +1325,10 @@ export default function MemberFeesTab() {
                   <button
                     type="button"
                     onClick={() => setMemberFilterTab("all")}
-                    className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
-                      memberFilterTab === "all"
+                    className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${memberFilterTab === "all"
                         ? "bg-white text-slate-900 shadow-xs"
                         : "text-slate-600 hover:text-slate-900"
-                    }`}
+                      }`}
                   >
                     <Users className="h-3.5 w-3.5" />
                     <span>Tất cả</span>
@@ -1033,11 +1340,10 @@ export default function MemberFeesTab() {
                   <button
                     type="button"
                     onClick={() => setMemberFilterTab("paid")}
-                    className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
-                      memberFilterTab === "paid"
+                    className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${memberFilterTab === "paid"
                         ? "bg-white text-emerald-700 shadow-xs"
                         : "text-slate-600 hover:text-emerald-700"
-                    }`}
+                      }`}
                   >
                     <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
                     <span>Đã đóng</span>
@@ -1049,11 +1355,10 @@ export default function MemberFeesTab() {
                   <button
                     type="button"
                     onClick={() => setMemberFilterTab("unpaid")}
-                    className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
-                      memberFilterTab === "unpaid"
+                    className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${memberFilterTab === "unpaid"
                         ? "bg-white text-rose-700 shadow-xs"
                         : "text-slate-600 hover:text-rose-700"
-                    }`}
+                      }`}
                   >
                     <UserX className="h-3.5 w-3.5 text-rose-500" />
                     <span>Chưa đóng</span>
@@ -1088,28 +1393,28 @@ export default function MemberFeesTab() {
             {/* Campaign Members Table */}
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-left text-sm">
+                <table className="w-full min-w-[940px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50/80">
-                      <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 min-w-[240px]">
                         Thành viên
                       </th>
-                      <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap w-[130px]">
                         Phải đóng
                       </th>
-                      <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap w-[130px]">
                         Đã đóng
                       </th>
-                      <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap w-[130px]">
                         Còn thiếu
                       </th>
-                      <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap w-[130px]">
                         Trạng thái
                       </th>
-                      <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap w-[130px]">
                         Lịch sử nộp
                       </th>
-                      <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 text-right">
+                      <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 text-right whitespace-nowrap w-[180px]">
                         Thao tác
                       </th>
                     </tr>
@@ -1197,10 +1502,18 @@ export default function MemberFeesTab() {
                           </td>
 
                           {/* Action Buttons */}
-                          <td className="px-4 py-3.5 whitespace-nowrap text-right">
+                          <td className="px-5 py-3.5 whitespace-nowrap text-right">
                             <div className="inline-flex items-center justify-end gap-1.5">
                               {canManage && item.payments.length === 0 && (
-                                <button type="button" onClick={() => requestDelete([item])} className="rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs text-rose-700">Xóa khoản của thành viên</button>
+                                <button
+                                  type="button"
+                                  onClick={() => requestDelete([item])}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50/60 px-2 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+                                  title="Xóa khoản chưa có lịch sử thu tiền của thành viên này"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <span>Xóa</span>
+                                </button>
                               )}
                               {canManage && item.remaining > 0 && (
                                 <button
@@ -1255,325 +1568,10 @@ export default function MemberFeesTab() {
                 </table>
               </div>
             </div>
-          </div>
-        ) : (
-          /* ========================================================================= */
-          /* VIEW 2: CAMPAIGN SUMMARY LIST (DANH SÁCH CÁC KHOẢN PHÍ THƯỜNG NIÊN)        */
-          /* ========================================================================= */
-          <div className="space-y-5">
-            {/* Stat Cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {statCards.map((card) => (
-                <div
-                  key={card.label}
-                  className={`rounded-2xl border border-slate-200 border-l-4 bg-white p-5 shadow-xs ${card.border}`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                        {card.label} · {year}
-                      </p>
-                      <p className="mt-2 text-2xl font-bold font-mono text-slate-900">
-                        {loading ? (
-                          <span className="inline-block h-7 w-28 animate-pulse rounded-lg bg-slate-100" />
-                        ) : (
-                          card.value
-                        )}
-                      </p>
-                    </div>
-                    <div
-                      className={`flex h-9 w-9 items-center justify-center rounded-xl ${card.iconBg}`}
-                    >
-                      <card.Icon className={`h-4 w-4 ${card.iconColor}`} />
-                    </div>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-500">{card.sub}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Filters Bar */}
-            <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Năm
-                <select
-                  aria-label="Năm thu phí"
-                  value={year}
-                  onChange={(e) => setYear(+e.target.value)}
-                  className={inputClass}
-                  style={{ minWidth: 100 }}
-                >
-                  {Array.from({ length: 21 }, (_, i) => 2020 + i).map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="min-w-[240px] flex-1 text-xs font-bold uppercase tracking-wider text-slate-500">
-                Tìm tên khoản phí
-                <div className="relative mt-1">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 py-2.5 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 transition"
-                    placeholder="Tên khoản phí, ghi chú..."
-                  />
-                  {query && (
-                    <button
-                      type="button"
-                      onClick={() => setQuery("")}
-                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </label>
-
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Trạng thái đợt phí
-                <select
-                  value={campaignStatusFilter}
-                  onChange={(e) =>
-                    setCampaignStatusFilter(
-                      e.target.value as typeof campaignStatusFilter,
-                    )
-                  }
-                  className={inputClass}
-                  style={{ minWidth: 160 }}
-                >
-                  <option value="all">Tất cả trạng thái</option>
-                  <option value="in_progress">Đang thu</option>
-                  <option value="completed">Đã hoàn thành 100%</option>
-                  <option value="overdue">Quá hạn</option>
-                </select>
-              </label>
-            </div>
-
-            {/* Campaign Table (Danh sách đợt phí) */}
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <RefreshCw className="h-8 w-8 animate-spin text-cyan-600 mb-3" />
-                <p className="text-sm font-semibold text-slate-500">
-                  Đang tải danh sách khoản phí...
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[920px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50/80">
-                        <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                          Khoản phí
-                        </th>
-                        <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                          Hạn đóng
-                        </th>
-                        <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                          Số tiền (Đã đóng / Phải đóng)
-                        </th>
-                        <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                          Số người (Đã đóng / Phải đóng)
-                        </th>
-                        <th className="px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                          Trạng thái
-                        </th>
-                        <th className="px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 text-right">
-                          Thao tác
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredCampaigns.map((campaign) => (
-                        <tr
-                          key={campaign.key}
-                          className="transition-colors hover:bg-slate-50/70"
-                        >
-                          {/* Title & Info */}
-                          <td className="px-5 py-4">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-900 text-sm">
-                                  {campaign.title}
-                                  {campaign.campaignId && <span className="ml-2 text-xs font-normal text-slate-500">Đợt {campaign.campaignId.slice(0, 8)}</span>}
-                                </span>
-                                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                                  {campaign.year}
-                                </span>
-                              </div>
-                              <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
-                                <span>
-                                  Định mức:{" "}
-                                  <strong className="text-slate-700 font-mono">
-                                    {money(campaign.amount)}
-                                  </strong>
-                                  /người
-                                </span>
-                                {campaign.note && (
-                                  <span className="truncate max-w-[200px] text-slate-400 italic">
-                                    · {campaign.note}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Due Date */}
-                          <td className="whitespace-nowrap px-4 py-4 text-xs">
-                            <div className="flex items-center gap-1.5 text-slate-600">
-                              <Clock className="h-3.5 w-3.5 text-slate-400" />
-                              <span className="font-mono">
-                                {dateText(campaign.dueDate)}
-                              </span>
-                            </div>
-                            {campaign.dueDate < today() && campaign.totalRemaining > 0 && (
-                              <span className="mt-0.5 inline-block text-[11px] font-semibold text-rose-600">
-                                Đã quá hạn
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Money: Đã đóng / Phải đóng */}
-                          <td className="px-4 py-4 min-w-[220px]">
-                            <div className="flex items-baseline justify-between gap-2">
-                              <span className="font-mono font-bold text-emerald-700 text-sm">
-                                {money(campaign.totalPaid)}
-                              </span>
-                              <span className="font-mono text-xs text-slate-400">
-                                / {money(campaign.totalExpected)}
-                              </span>
-                            </div>
-                            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                              <div
-                                className={`h-full transition-all duration-300 ${
-                                  campaign.percentagePaid === 100
-                                    ? "bg-emerald-500"
-                                    : campaign.status === "overdue"
-                                      ? "bg-rose-500"
-                                      : "bg-cyan-500"
-                                }`}
-                                style={{ width: `${campaign.percentagePaid}%` }}
-                              />
-                            </div>
-                            <div className="mt-1 flex items-center justify-between text-[11px]">
-                              <span className="text-slate-500">
-                                Đạt {campaign.percentagePaid}%
-                              </span>
-                              {campaign.totalRemaining > 0 ? (
-                                <span className="font-mono text-rose-600">
-                                  Còn thiếu: {money(campaign.totalRemaining)}
-                                </span>
-                              ) : (
-                                <span className="text-emerald-600 font-semibold">
-                                  Đã thu đủ 100%
-                                </span>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* People: Đã đóng / Phải đóng */}
-                          <td className="px-4 py-4 min-w-[200px]">
-                            <div className="flex items-baseline justify-between gap-2">
-                              <span className="font-mono font-bold text-cyan-700 text-sm">
-                                {campaign.paidMembers} người
-                              </span>
-                              <span className="font-mono text-xs text-slate-400">
-                                / {campaign.totalMembers} người
-                              </span>
-                            </div>
-                            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                              <div
-                                className="h-full bg-cyan-600 transition-all duration-300"
-                                style={{
-                                  width: `${campaign.percentageMembers}%`,
-                                }}
-                              />
-                            </div>
-                            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                              <span>
-                                {campaign.percentageMembers}% hoàn thành
-                              </span>
-                              {campaign.unpaidMembers > 0 && (
-                                <span className="text-amber-600">
-                                  Còn {campaign.unpaidMembers} người
-                                </span>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Status Badge */}
-                          <td className="whitespace-nowrap px-4 py-4">
-                            <span
-                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                campaign.status === "completed"
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                  : campaign.status === "overdue"
-                                    ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                    : "bg-sky-50 text-sky-700 border border-sky-200"
-                              }`}
-                            >
-                              <span
-                                className={`h-1.5 w-1.5 rounded-full ${
-                                  campaign.status === "completed"
-                                    ? "bg-emerald-500"
-                                    : campaign.status === "overdue"
-                                      ? "bg-rose-500"
-                                      : "bg-sky-500"
-                                }`}
-                              />
-                              {campaign.status === "completed"
-                                ? "Hoàn thành"
-                                : campaign.status === "overdue"
-                                  ? `Quá hạn (${campaign.unpaidMembers} người)`
-                                  : `Đang thu (${campaign.paidMembers}/${campaign.totalMembers})`}
-                            </span>
-                          </td>
-
-                          {/* Actions */}
-                          <td className="whitespace-nowrap px-5 py-4 text-right">
-                            {canManage && campaign.items.some(item => item.payments.length === 0) && (
-                              <button type="button" onClick={() => requestDelete(campaign.items)} className="mr-2 rounded-xl border border-rose-200 px-3.5 py-2 text-xs font-semibold text-rose-700">Xóa khoản chưa thu</button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedCampaignKey(campaign.key);
-                                setMemberFilterTab("all");
-                                setMemberSearchQuery("");
-                              }}
-                              className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-50 border border-cyan-200 px-3.5 py-2 text-xs font-bold text-cyan-800 transition hover:bg-cyan-600 hover:text-white hover:border-cyan-600 cursor-pointer shadow-xs group"
-                            >
-                              <span>Xem chi tiết</span>
-                              <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-
-                      {!filteredCampaigns.length && (
-                        <tr>
-                          <td
-                            colSpan={6}
-                            className="py-14 text-center text-sm text-slate-400"
-                          >
-                            {campaigns.length
-                              ? "Không có khoản phí nào phù hợp với bộ lọc."
-                              : "Chưa có khoản phí nào trong năm này. Nhấn 'Tạo khoản phí' để bắt đầu."}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+          </section>
           </div>
         )}
-      </div>
+
 
       {/* ========================================================================= */}
       {/* MODAL: TẠO KHOẢN PHÍ MỚI                                                  */}
@@ -2065,19 +2063,17 @@ export default function MemberFeesTab() {
                   {[...active.payments].reverse().map((payment) => (
                     <article
                       key={payment.id}
-                      className={`rounded-2xl border p-4 text-sm ${
-                        payment.voidedAt
+                      className={`rounded-2xl border p-4 text-sm ${payment.voidedAt
                           ? "bg-slate-50 border-slate-100 opacity-60"
                           : "bg-white border-slate-100 shadow-xs"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span
-                          className={`font-bold text-base font-mono ${
-                            payment.voidedAt
+                          className={`font-bold text-base font-mono ${payment.voidedAt
                               ? "line-through text-slate-400"
                               : "text-slate-800"
-                          }`}
+                            }`}
                         >
                           {money(payment.amount)}
                         </span>
