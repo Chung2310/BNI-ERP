@@ -2,8 +2,8 @@ import { getAccessToken } from "./authService";
 export type MemberFeeStatus = "unpaid" | "partial" | "overdue" | "paid";
 export type FeeMember = { id: string; name: string; email: string };
 export type FeePayment = { id: string; amount: number; paidOn: string; method: "cash" | "transfer"; reference: string; note: string; recordedBy: string; recordedAt: string; voidedAt?: string; voidReason?: string };
-export type MemberFee = { _id: string; memberId: string; memberName: string; memberEmail: string; year: number; title: string; amount: number; dueDate: string; note: string; paid: number; remaining: number; status: MemberFeeStatus; payments: FeePayment[]; overpaid?: number; notifiedAt?: string; emailNotifiedAt?: string; checkout?: { bank: string; accountNumber: string; accountName: string; paymentCode: string; amount: number; qrUrl: string } | null };
-export type CreateMemberFee = { year: number; title: string; amount: number; dueDate: string; note: string; memberIds: string[] };
+export type MemberFee = { _id: string; campaignId?: string; memberId: string; memberName: string; memberEmail: string; year: number; title: string; amount: number; dueDate: string; note: string; paid: number; remaining: number; status: MemberFeeStatus; payments: FeePayment[]; overpaid?: number; notifiedAt?: string; emailNotifiedAt?: string; checkout?: { bank: string; accountNumber: string; accountName: string; paymentCode: string; amount: number; qrUrl: string } | null };
+export type CreateMemberFee = { campaignId?: string; year: number; title: string; amount: number; dueDate: string; note: string; memberIds: string[] };
 export type ReceiveMemberFee = Pick<FeePayment, "id" | "amount" | "paidOn" | "method" | "reference" | "note">;
 async function request<T>(path: string, method = "GET", body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch("/api/v1/member-fees" + path, {

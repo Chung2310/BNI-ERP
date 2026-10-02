@@ -4,7 +4,7 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import { randomUUID } from "node:crypto";
 import { UserModel } from "../../server/model/user.model";
 import { MemberFeeModel } from "../../server/modules/member-fees/member-fee.model";
-import { createMemberFees, getFee, receiveFee, serializeFee, voidFeePayment } from "../../server/modules/member-fees/member-fee.service";
+import { deleteMemberFee, createMemberFees, getFee, receiveFee, serializeFee, voidFeePayment } from "../../server/modules/member-fees/member-fee.service";
 import { feeBalance } from "../../server/modules/member-fees/member-fee.rules";
 import { createFeeInput, feePaymentInput } from "../../server/modules/member-fees/member-fee.validation";
 
@@ -220,7 +220,7 @@ describe("fee HTTP authorization and SePay protocol", () => {
     expect((await fetch(baseUrl + "/fees/" + id)).status).toBe(200);
     // Even an otherwise privileged non-admin cannot mutate fees.
     for (const [method, path] of [["POST", "/"], ["GET", "/members"], ["GET", "/sepay/config"], ["PUT", "/sepay/config"],
-      ["GET", "/sepay/transactions"], ["POST", "/" + id + "/notify"], ["POST", "/" + id + "/payments"]]) {
+      ["DELETE", "/" + id], ["GET", "/sepay/transactions"], ["POST", "/" + id + "/notify"], ["POST", "/" + id + "/payments"]]) {
       expect((await fetch(baseUrl + "/fees" + path, {method})).status).toBe(403);
     }
     routeIdentity.user = { id: foreignId, role: "manager", companyCode: "A" };
@@ -335,4 +335,95 @@ describe("Fee reminder email", () => {
     await expect(notifyFee("A", id)).rejects.toMatchObject({ status: 400 });
     expect(companyEmailService.send).not.toHaveBeenCalled();
   });
+});
+
+
+describe("Collection rounds and fee deletion", () => {
+  it("supports identical titles in separate rounds and idempotent retries within a round", async () => {
+    const first = { ...assignment(), campaignId: randomUUID() };
+    const second = { ...assignment(), campaignId: randomUUID() };
+    expect(await createMemberFees("A", "admin", first)).toEqual({ created: 1, skipped: 0 });
+    expect(await createMemberFees("A", "admin", first)).toEqual({ created: 0, skipped: 1 });
+    expect(await createMemberFees("A", "admin", second)).toEqual({ created: 1, skipped: 0 });
+    expect(await MemberFeeModel.countDocuments()).toBe(2);
+    await expect(createMemberFees("A", "admin", { ...first, amount: 999 })).rejects.toMatchObject({ status: 409 });
+    expect(createFeeInput.validate(first).error).toBeUndefined();
+    expect(createFeeInput.validate({ ...first, campaignId: "invalid" }).error).toBeTruthy();
+  });
+
+  it("deletes only the requested unpaid fee within its organization", async () => {
+    const id = await setupFee();
+    await expect(deleteMemberFee("B", id)).rejects.toMatchObject({ status: 404 });
+    await deleteMemberFee("A", id);
+    await expect(getFee("A", id)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("retains payment history including voided receipts and blocks an active email claim", async () => {
+    const id = await setupFee();
+    await MemberFeeModel.updateOne({ _id: id }, { $set: { emailClaimUntil: new Date(Date.now() + 60000) } });
+    await expect(deleteMemberFee("A", id)).rejects.toMatchObject({ status: 409 });
+    const payment = receipt();
+    await receiveFee("A", id, "admin", payment);
+    await expect(deleteMemberFee("A", id)).rejects.toMatchObject({ status: 409 });
+    await voidFeePayment("A", id, payment.id, "admin", "Thu nhầm");
+    await MemberFeeModel.updateOne({ _id: id }, { $unset: { emailClaimUntil: 1 } });
+    await expect(deleteMemberFee("A", id)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("routes a bank transfer for a deleted fee to manual review", async () => {
+    const { id, fee } = await checkoutSetup();
+    await deleteMemberFee("A", id);
+    expect(await processSePay("A", bankTransfer(fee.paymentCode!))).toMatchObject({ status: "review" });
+  });
+
+  it("protects against a bank transfer arriving between lookup and deletion", async () => {
+    const { id, fee } = await checkoutSetup();
+    const original = MemberFeeModel.deleteOne.bind(MemberFeeModel);
+    const spy = vi.spyOn(MemberFeeModel, "deleteOne").mockImplementationOnce((...args: any[]) => ({
+      then: async (resolve: any, reject: any) => {
+        try { await processSePay("A", bankTransfer(fee.paymentCode!)); resolve(await original(...args as [any])); }
+        catch (e) { reject(e); }
+      }
+    }) as any);
+    try { await expect(deleteMemberFee("A", id)).rejects.toMatchObject({ status: 409 }); }
+    finally { spy.mockRestore(); }
+    expect((await getFee("A", id)).payments).toHaveLength(1);
+  });
+
+  it("exposes deletion to admins only and isolates organizations", async () => {
+    const id = await setupFee();
+    routeIdentity.user = { id: memberId, role: "admin", companyCode: "B" };
+    expect((await fetch(baseUrl + "/fees/" + id, { method: "DELETE" })).status).toBe(404);
+    routeIdentity.user = { id: memberId, role: "admin", companyCode: "A" };
+    expect((await fetch(baseUrl + "/fees/" + id, { method: "DELETE" })).status).toBe(200);
+    expect((await fetch(baseUrl + "/fees/" + id)).status).toBe(404);
+  });
+});
+
+
+it("credits only the matching round when two rounds have the same title", async () => {
+  configureSePay(settings);
+  await createMemberFees("A", "admin", { ...assignment(), campaignId: randomUUID() });
+  await createMemberFees("A", "admin", { ...assignment(), campaignId: randomUUID() });
+  const fees = await MemberFeeModel.find({ companyCode: "A" });
+  await Promise.all(fees.map(fee => notifyFee("A", String(fee._id))));
+  const first = await getFee("A", String(fees[0]._id));
+  const second = await getFee("A", String(fees[1]._id));
+  expect(first.paymentCode).not.toBe(second.paymentCode);
+  await processSePay("A", bankTransfer(first.paymentCode!));
+  expect(serializeFee(await getFee("A", String(first._id))).paid).toBe(40);
+  expect(serializeFee(await getFee("A", String(second._id))).paid).toBe(0);
+});
+
+it("reviews a transfer if its fee disappears after lookup but before credit", async () => {
+  const { id, fee } = await checkoutSetup();
+  const original = MemberFeeModel.updateOne.bind(MemberFeeModel);
+  const spy = vi.spyOn(MemberFeeModel, "updateOne").mockImplementationOnce((...args: any[]) => ({
+    then: async (resolve: any, reject: any) => {
+      try { await deleteMemberFee("A", id); resolve(await original(...args as [any, any])); }
+      catch (e) { reject(e); }
+    }
+  }) as any);
+  try { expect(await processSePay("A", bankTransfer(fee.paymentCode!))).toMatchObject({ status: "review" }); }
+  finally { spy.mockRestore(); }
 });

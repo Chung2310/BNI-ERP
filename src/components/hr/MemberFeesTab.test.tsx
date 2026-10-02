@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   members: vi.fn(),
   create: vi.fn(),
+  delete: vi.fn(),
   receive: vi.fn(),
   voidPayment: vi.fn(),
   manage: true
@@ -43,6 +44,7 @@ const fee = {
 };
 
 beforeEach(() => {
+  mocks.delete.mockReset().mockResolvedValue({ message: "Đã xóa khoản phí." });
   mocks.manage = true;
   window.history.replaceState(null, "", "/");
   mocks.get.mockReset().mockResolvedValue(fee);
@@ -56,8 +58,9 @@ afterEach(cleanup);
 
 it("creates a fee for selected members and the selected year", async () => {
   render(<MemberFeesTab />);
-  await screen.findByText("Nguyễn An");
+  await screen.findByText("Phí thường niên");
   fireEvent.click(screen.getByRole("button", { name: "Tạo khoản phí" }));
+  await screen.findByText("Nguyễn An");
   fireEvent.change(screen.getByLabelText("Số tiền mỗi thành viên (VND)"), { target: { value: "1000000" } });
   fireEvent.click(screen.getByRole("checkbox"));
   fireEvent.click(screen.getByRole("button", { name: "Tạo cho 1 thành viên" }));
@@ -68,8 +71,20 @@ it("creates a fee for selected members and the selected year", async () => {
   );
 });
 
+it("displays money paid/total and people paid/total on main list, not members list", async () => {
+  render(<MemberFeesTab />);
+  await screen.findByText("Phí thường niên");
+  // Main table shows money & people columns
+  expect(screen.getByText("Số tiền (Đã đóng / Phải đóng)")).toBeTruthy();
+  expect(screen.getByText("Số người (Đã đóng / Phải đóng)")).toBeTruthy();
+  // Member names should not be rendered on the main table
+  expect(screen.queryByText("an@example.com")).toBeNull();
+});
+
 it("records a partial payment and updates remaining balance without closing history", async () => {
   render(<MemberFeesTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết" }));
+  await screen.findByText("Nguyễn An");
   fireEvent.click(await screen.findByRole("button", { name: "Thanh toán" }));
   fireEvent.change(screen.getByLabelText("Số tiền thu (VND)"), { target: { value: "400000" } });
   fireEvent.click(screen.getByRole("button", { name: "Lưu phiếu thu" }));
@@ -83,8 +98,10 @@ it("records a partial payment and updates remaining balance without closing hist
 it("read-only users cannot create fees or record receipts", async () => {
   mocks.manage = false;
   render(<MemberFeesTab />);
-  await screen.findByText("Nguyễn An");
+  await screen.findByText("Phí thường niên");
   expect(screen.queryByRole("button", { name: "Tạo khoản phí" })).toBeNull();
+  fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết" }));
+  await screen.findByText("Nguyễn An");
   fireEvent.click(screen.getByRole("button", { name: "Thanh toán" }));
   expect(screen.queryByRole("button", { name: "Lưu phiếu thu" })).toBeNull();
 });
@@ -112,6 +129,8 @@ it("opens the fee QR from a notification deep link for an ordinary member", asyn
 
 it("lets admin send a fee notification and exposes the outstanding QR", async () => {
   render(<MemberFeesTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết" }));
+  await screen.findByText("Nguyễn An");
   fireEvent.click(await screen.findByRole("button", { name: "Thanh toán" }));
   fireEvent.click(await screen.findByRole("button", { name: "Gửi thông báo & email QR" }));
   await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith("fee1"));
@@ -134,4 +153,68 @@ it("shows environment config read-only without a secret input or save button", a
   expect(screen.getByText(/Cấu hình được quản lý trong .env/)).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Lưu cấu hình" })).toBeNull();
   expect(screen.queryByLabelText("API key xác thực webhook")).toBeNull();
+});
+
+
+it("keeps same-name collection rounds separate", async () => {
+  mocks.list.mockResolvedValue([{ ...fee, campaignId: "round-one" }, { ...fee, _id: "fee2", campaignId: "round-two" }]);
+  render(<MemberFeesTab />);
+  await waitFor(() => expect(screen.getAllByRole("button", { name: "Xem chi tiết" })).toHaveLength(2));
+});
+
+it("creates a fresh collection ID each time the create form opens", async () => {
+  render(<MemberFeesTab />);
+  for (let i = 0; i < 2; i++) {
+    fireEvent.click(await screen.findByRole("button", { name: "Tạo khoản phí" }));
+    fireEvent.change(screen.getByLabelText("Số tiền mỗi thành viên (VND)"), { target: { value: "1000" } });
+    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Tạo cho 1 thành viên" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  }
+  expect(mocks.create.mock.calls[0][0].campaignId).toBeTruthy();
+  expect(mocks.create.mock.calls[0][0].campaignId).not.toBe(mocks.create.mock.calls[1][0].campaignId);
+});
+
+it("confirms deletion and removes the empty collection from the list", async () => {
+  render(<MemberFeesTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Xóa khoản chưa thu" }));
+  expect(mocks.delete).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Xác nhận xóa" }));
+  await waitFor(() => expect(mocks.delete).toHaveBeenCalledWith("fee1"));
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Xem chi tiết" })).toBeNull());
+});
+
+it("keeps the row and shows a server deletion conflict", async () => {
+  mocks.delete.mockRejectedValue(new Error("Khoản phí vừa được thanh toán."));
+  render(<MemberFeesTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Xóa khoản chưa thu" }));
+  fireEvent.click(screen.getByRole("button", { name: "Xác nhận xóa" }));
+  expect(await screen.findByText("Khoản phí vừa được thanh toán.")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Xem chi tiết" })).toBeTruthy();
+});
+
+it("hides deletion for members and for fees with payment history", async () => {
+  mocks.manage = false;
+  render(<MemberFeesTab />);
+  await screen.findByRole("button", { name: "Xem chi tiết" });
+  expect(screen.queryByRole("button", { name: "Xóa khoản chưa thu" })).toBeNull();
+  cleanup();
+  mocks.manage = true;
+  mocks.list.mockResolvedValue([{ ...fee, payments: [{ id: "receipt" }] }]);
+  render(<MemberFeesTab />);
+  await screen.findByRole("button", { name: "Xem chi tiết" });
+  expect(screen.queryByRole("button", { name: "Xóa khoản chưa thu" })).toBeNull();
+});
+
+
+it("adds members to the existing round without reassigning its current members", async () => {
+  mocks.list.mockResolvedValue([{ ...fee, campaignId: "existing-round" }]);
+  mocks.members.mockResolvedValue([{ id: "member1", name: "Nguyễn An", email: "an@example.com" }, { id: "member2", name: "Nguyễn Bình", email: "binh@example.com" }]);
+  render(<MemberFeesTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết" }));
+  fireEvent.click(screen.getByRole("button", { name: "Thêm thành viên" }));
+  expect(screen.getAllByRole("checkbox")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("checkbox"));
+  fireEvent.click(screen.getByRole("button", { name: "Tạo cho 1 thành viên" }));
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ campaignId: "existing-round", memberIds: ["member2"] })));
 });

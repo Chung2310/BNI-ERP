@@ -120,10 +120,13 @@ export async function processSePay(companyCode: string, raw: unknown) {
   const paymentId = "sepay:" + id;
   // One atomic write handles concurrent delivery and recovery after a crash. Increment __v
   // so manual receipts loaded before this update cannot overwrite bank payments.
-  await MemberFeeModel.updateOne({ _id: fee._id, companyCode, "payments.id": { $ne: paymentId } },
+  const credited = await MemberFeeModel.updateOne({ _id: fee._id, companyCode, "payments.id": { $ne: paymentId } },
     { $push: { payments: { id: paymentId, amount: transferAmount, method: "transfer",
       paidOn: transactionDate.slice(0, 10), reference: referenceCode || String(id), note: "Tự động từ SePay",
       recordedBy: "sepay", recordedAt: new Date() } }, $inc: { __v: 1 } });
+  if (!credited.matchedCount && !await MemberFeeModel.exists({ _id: fee._id, companyCode, "payments.id": paymentId })) {
+    return finish("review", "Khoản phí đã bị xóa trước khi ghi nhận giao dịch", String(fee._id));
+  }
   // Preserve the full actual bank amount, including overpayments. The UI exposes the surplus.
   return finish("applied", "", String(fee._id));
 }
