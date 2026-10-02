@@ -1251,7 +1251,7 @@ export default function MeetingTab() {
                                 <span className="text-slate-600 font-semibold">giây</span>
                               </div>
                             )}
-                            <p className="w-full text-xs text-slate-500">{autoAdvance ? <>Khi hết thời gian phát biểu, chờ {autoAdvanceDelay} giây rồi chuyển người và slide. Đây là thời gian chờ chuyển lượt, không phải thời lượng phát biểu.</> : "Bấm chuyển người ở tab Điều hành hoặc trên slide. Người phát biểu, đồng hồ và slide luôn đồng bộ."}</p>
+                            {autoAdvance && <p className="w-full text-xs text-slate-500">Khi hết thời gian phát biểu, chờ {autoAdvanceDelay} giây rồi chuyển người và slide. Đây là thời gian chờ chuyển lượt, không phải thời lượng phát biểu.</p>}
                           </div>
                         )}
                       </div>
