@@ -165,7 +165,7 @@ export default function MeetingTab() {
   const presentationClosed = useCallback(() => {
     setStartPresentation(false);
     presentationFullscreen.current = null;
-    setActiveSubTab("speakers");
+    setActiveSubTab("slides");
   }, []);
   const [prioritySpeakerId, setPrioritySpeakerId] = useState("");
   const [priorityPosition, setPriorityPosition] = useState(1);
@@ -1124,7 +1124,28 @@ export default function MeetingTab() {
 
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} initialSpeakerId={presentationSpeakerId} onDeferSpeaker={deferSpeaker} onPresentationStarted={presentationStarted} onPresentationClosed={presentationClosed} onStartPresentation={canManage ? startPresentationTimer : undefined} onMoveSpeaker={direction => requestMeetingControl(direction > 0 ? "next" : "previous")} controlBusy={saving} autoAdvance={autoAdvance} autoAdvanceDelay={autoAdvanceDelay} onAutoAdvanceChange={updateAutoAdvance} onAutoAdvanceDelayChange={updateAutoAdvanceDelay} fullscreenRequest={presentationFullscreen.current} />}
+              {activeSubTab === "slides" && (
+                <MeetingSlides
+                  key={activeMeeting._id}
+                  meeting={activeMeeting}
+                  canManage={canManage}
+                  api={api}
+                  startFromFirst={startPresentation}
+                  initialSpeakerId={presentationSpeakerId}
+                  onDeferSpeaker={deferSpeaker}
+                  onPresentationStarted={presentationStarted}
+                  onPresentationClosed={presentationClosed}
+                  onStartPresentation={canManage ? startPresentationTimer : undefined}
+                  onMoveSpeaker={direction => requestMeetingControl(direction > 0 ? "next" : "previous")}
+                  onTogglePause={() => control(activeMeeting.status === "paused" ? "resume" : "pause")}
+                  controlBusy={saving}
+                  autoAdvance={autoAdvance}
+                  autoAdvanceDelay={autoAdvanceDelay}
+                  onAutoAdvanceChange={updateAutoAdvance}
+                  onAutoAdvanceDelayChange={updateAutoAdvanceDelay}
+                  fullscreenRequest={presentationFullscreen.current}
+                />
+              )}
               {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
               {(activeSubTab === "speakers" || activeSubTab === "checkin") && (
                 <div className="space-y-4">
