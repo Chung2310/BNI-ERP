@@ -67,6 +67,7 @@ jobs:
           df -h /
 
       - name: Set up Docker Buildx
+        id: buildx
         uses: docker/setup-buildx-action@v3
         
       - name: Log in to GitHub Container Registry
@@ -92,17 +93,16 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Registry cache trên GHCR (không tính vào giới hạn 10GB GHA cache).
-          # mode=max: export cả layer của builder stage — yarn.lock không đổi thì
-          # lần build sau nhảy qua bước cài node_modules + có thể tái dùng layer build
+          # Export final-image layers only to reduce registry cache size.
+          # Builder dependency layers may need rebuilding on fresh CI runners.
           cache-from: type=registry,ref=ghcr.io/${{ env.IMAGE_NAME }}:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          cache-to: type=registry,ref=ghcr.io/${{ env.IMAGE_NAME }}:buildcache,mode=min
 
       # Dọn dẹp dung lượng Docker ngay sau khi build/push image xong
       - name: Cleanup build cache
-        if: always()
+        if: always() && steps.buildx.outcome == 'success'
         run: |
-          docker builder prune -f
+          docker buildx prune --all --force
           docker image prune -f
 
   # BƯỚC 3: DEPLOY VPS (Chỉ chạy khi Step 2 thành công)

@@ -1,11 +1,35 @@
-node_modules
-dist
-build
+# Dependencies and generated build output
+**/node_modules
+/dist
+/dist-server
+/build
+/coverage
+**/*.tsbuildinfo
+
+# Local caches and runtime data
+**/.cache
+**/.vite
+**/.turbo
+/server/cache
+/uploads
+/logs
+/tmp
+/temp
+/scratch
+*.log
+
+# Repository and local tooling state
 .git
 .gitignore
+.github
 .agent
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+.agents
+.codex
+.superpowers
+.worktrees
+.claude
+
+# Runtime configuration is injected at deployment
 .env
+.env.*
+package-lock.json
