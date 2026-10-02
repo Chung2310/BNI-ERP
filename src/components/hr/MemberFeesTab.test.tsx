@@ -106,16 +106,16 @@ it("opens the fee QR from a notification deep link for an ordinary member", asyn
   render(<MemberFeesTab />);
   expect(await screen.findByAltText("QR chuyển khoản khoản phí")).toBeTruthy();
   expect(screen.getByText("BNI0123456789ABCDEF0123")).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Gửi thông báo & QR" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Gửi thông báo & email QR" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Lưu phiếu thu" })).toBeNull();
 });
 
 it("lets admin send a fee notification and exposes the outstanding QR", async () => {
   render(<MemberFeesTab />);
   fireEvent.click(await screen.findByRole("button", { name: "Thanh toán" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Gửi thông báo & QR" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Gửi thông báo & email QR" }));
   await waitFor(() => expect(mocks.notify).toHaveBeenCalledWith("fee1"));
-  await screen.findByText(/Đã gửi thông báo kèm liên kết mã QR/);
+  await screen.findByText(/Đã gửi thông báo trong ứng dụng và email kèm mã QR/);
 });
 
 it("shows environment config read-only without a secret input or save button", async () => {

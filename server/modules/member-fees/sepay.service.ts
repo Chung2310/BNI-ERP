@@ -6,6 +6,8 @@ import { getFee, MemberFeeError, serializeFee } from "./member-fee.service";
 import { notificationService } from "../../service/notification.service";
 import { NotificationModel } from "../../model/notification.model";
 
+import { sendFeeEmail } from "./member-fee-email.service";
+
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 const bankKey = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "");
 // Resolve on the server at call time so environment loading does not depend on import order.
@@ -70,6 +72,7 @@ export async function notifyFee(companyCode: string, id: string) {
   const notification = await NotificationModel.findOne({ companyCode, recipientUid: fee.memberId, idempotencyKey: key });
   await MemberFeeModel.updateOne({ _id: fee._id, companyCode },
     { $max: { notifiedAt: notification!.createdAt }, $inc: { __v: 1 } });
+  await sendFeeEmail(companyCode, id, day);
   return serializeFee(await getFee(companyCode, id));
 }
 const webhookInput = Joi.object({
