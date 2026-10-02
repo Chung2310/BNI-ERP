@@ -43,6 +43,22 @@ export async function saveMeeting(item: any) {
   return item;
 }
 
+export async function recordGameWinner(item: any, input: any, actorId: string) {
+  const existing = (item.gameWinners || []).find((winner: any) => winner.id === input.id);
+  if (existing) return existing;
+  const attendee = (item.speakers || []).find((speaker: any) => speaker.id === input.winnerId || speaker.userId === input.winnerId);
+  const prize = item.luckyDraw?.prizes?.find((prize: any) => prize.name === input.prizeName);
+  const record = { ...input, prizeId: input.id, drawnBy: actorId,
+    reward: prize?.reward,
+    name: attendee?.name || input.name, email: attendee?.email,
+    userId: attendee?.userId, photoURL: attendee?.photoURL || input.photoURL };
+  if (!item.gameWinners) item.gameWinners = [];
+  item.gameWinners.push(record);
+  await saveMeeting(item);
+  emitToCompany(item.companyCode, 'lucky_draw_spun', { meetingId: String(item._id), winner: record });
+  return record;
+}
+
 export async function createMeeting(companyCode: string, actorId: string, input: any) {
   if (new Date(input.startsAt) <= new Date()) {
     throw new MeetingError(400, 'Thời gian họp phải ở tương lai.');
@@ -546,6 +562,7 @@ export async function spinLuckyDraw(item: any, prizeId: string, actorId: string)
     .digest('hex');
 
   const winnerRecord = {
+    source: 'draw',
     id: randomUUID(),
     prizeId: prize.id,
     prizeName: prize.name,

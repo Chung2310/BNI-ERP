@@ -17,17 +17,21 @@ import {
   Trophy,
   Award,
   Ticket,
-  CheckCircle2,
+  Crown,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { authService } from "../../services/authService";
 import { meetingService, Meeting, Speaker } from "../../services/meetingService";
+import { socketService } from "../../services/socketService";
 import { UserProfile } from "../../types/common";
 
 type QuickTimeFilter = "all" | "month" | "quarter" | "year";
 type StatusFilter = "all" | "ended" | "live" | "scheduled";
 
+export const drawSourceLabels = { wheel: "Vòng quay may mắn", bingo: "Lồng cầu bingo", draw: "Bốc thăm" };
+
 export interface LuckyDrawWinnerRecord {
+  source: keyof typeof drawSourceLabels;
   id: string;
   name: string;
   email?: string;
@@ -59,12 +63,13 @@ const getLiveElapsedMinutes = (startsAt: string | Date): number => {
   return Math.floor(diffMs / 60000);
 };
 
-const extractLuckyWinners = (meeting: Meeting): LuckyDrawWinnerRecord[] => {
+export const extractLuckyWinners = (meeting: Meeting): LuckyDrawWinnerRecord[] => {
   const result: LuckyDrawWinnerRecord[] = [];
   const prizes = meeting.luckyDraw?.prizes || [];
   prizes.forEach((p) => {
     (p.winners || []).forEach((w) => {
       result.push({
+        source: w.source || "draw",
         id: w.id || `${p.id}-${w.name}-${w.wonAt || Math.random()}`,
         name: w.name,
         email: w.email,
@@ -83,6 +88,10 @@ const extractLuckyWinners = (meeting: Meeting): LuckyDrawWinnerRecord[] => {
       });
     });
   });
+  for (const w of meeting.gameWinners || []) {
+    result.push({ ...w, source: w.source || "draw", meetingId: meeting._id,
+      meetingTitle: meeting.title, meetingDate: meeting.startsAt ? new Date(meeting.startsAt).toISOString() : "" });
+  }
   return result;
 };
 
@@ -112,18 +121,18 @@ function LuckyWinnersTable({
             <th className="py-2.5 px-3 w-10">STT</th>
             <th className="py-2.5 px-3">Người trúng thưởng</th>
             {showMeetingInfo && <th className="py-2.5 px-3">Cuộc họp</th>}
+            <th className="py-2.5 px-3">Loại hình</th>
             <th className="py-2.5 px-3">Giải thưởng</th>
             <th className="py-2.5 px-3">Phần quà / Giá trị</th>
             <th className="py-2.5 px-3 text-center">Số vé</th>
             <th className="py-2.5 px-3">Thời gian</th>
-            <th className="py-2.5 px-3">Mã xác thực</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {winners.map((w, idx) => {
             const initial = (w.name || "?").trim().charAt(0).toUpperCase();
             return (
-              <tr key={w.id || idx} className="hover:bg-slate-50/70 transition-colors">
+              <tr key={`${w.meetingId}-${w.source}-${w.id || idx}`} className="hover:bg-slate-50/70 transition-colors">
                 <td className="py-2.5 px-3 text-slate-400">{idx + 1}</td>
                 <td className="py-2.5 px-3">
                   <div className="flex items-center gap-2.5">
@@ -173,6 +182,7 @@ function LuckyWinnersTable({
                     )}
                   </td>
                 )}
+                <td className="py-2.5 px-3 whitespace-nowrap">{drawSourceLabels[w.source]}</td>
                 <td className="py-2.5 px-3 whitespace-nowrap">
                   <span
                     className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold border shadow-2xs"
@@ -225,19 +235,6 @@ function LuckyWinnersTable({
                     <span className="text-slate-400">-</span>
                   )}
                 </td>
-                <td className="py-2.5 px-3 whitespace-nowrap">
-                  {w.verificationHash ? (
-                    <span
-                      title={w.verificationHash}
-                      className="inline-flex items-center gap-1 font-mono text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 rounded-md"
-                    >
-                      <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                      {w.verificationHash.slice(0, 8)}...
-                    </span>
-                  ) : (
-                    <span className="text-slate-400 text-[11px]">-</span>
-                  )}
-                </td>
               </tr>
             );
           })}
@@ -275,6 +272,11 @@ export function MeetingStatisticsPanel() {
   // Sub-filter for single meeting attendee list
   const [attendeeRoleFilter, setAttendeeRoleFilter] = useState<"all" | "present" | "absent" | "guest" | "lucky">("all");
   const [attendeeSearch, setAttendeeSearch] = useState("");
+
+  // Animation & Interactive Hover States
+  const [isAnimated, setIsAnimated] = useState(false);
+  const [hoveredBarId, setHoveredBarId] = useState<string | null>(null);
+  const [hoveredSegment, setHoveredSegment] = useState<"present" | "guest" | "absent" | null>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -314,6 +316,10 @@ export function MeetingStatisticsPanel() {
 
   useEffect(() => {
     fetchData();
+    const refreshWinners = () => { void meetingService.listMeetings().then(setMeetings).catch(console.error); };
+    const off = socketService.on("lucky_draw_spun", refreshWinners);
+    window.addEventListener("focus", refreshWinners);
+    return () => { off(); window.removeEventListener("focus", refreshWinners); };
   }, [userProfile?.companyCode]);
 
   // Distinct member ids across system
@@ -367,6 +373,12 @@ export function MeetingStatisticsPanel() {
     });
   }, [meetings, selectedMeetingId, searchQuery, selectedDate, quickFilter, statusFilter]);
 
+  useEffect(() => {
+    setIsAnimated(false);
+    const timer = setTimeout(() => setIsAnimated(true), 60);
+    return () => clearTimeout(timer);
+  }, [filteredMeetings, selectedMeetingId]);
+
   // Aggregate metrics
   const metrics = useMemo(() => {
     let totalAttendees = 0;
@@ -394,15 +406,13 @@ export function MeetingStatisticsPanel() {
     // Lucky draw winners across filtered meetings
     let totalLuckyWinners = 0;
     filteredMeetings.forEach((m) => {
-      (m.luckyDraw?.prizes || []).forEach((p) => {
-        totalLuckyWinners += (p.winners || []).length;
-      });
+      totalLuckyWinners += extractLuckyWinners(m).length;
     });
 
     const completedCount = filteredMeetings.filter((m) => m.status === "ended").length;
     const liveCount = filteredMeetings.filter((m) => ["live", "paused"].includes(m.status)).length;
     const scheduledCount = filteredMeetings.filter((m) => m.status === "scheduled").length;
-    const avgPerMeeting = filteredMeetings.length > 0 ? (totalAttendees / filteredMeetings.length).toFixed(1) : "0";
+    const avgPerMeeting = filteredMeetings.length > 0 ? Math.ceil(totalAttendees / filteredMeetings.length) : 0;
 
     // For rates and donut distribution:
     // Total pool = total checked in + total absent across the selected meetings
@@ -450,7 +460,7 @@ export function MeetingStatisticsPanel() {
       const matchPrize = w.prizeName?.toLowerCase().includes(q);
       const matchReward = w.reward?.toLowerCase().includes(q);
       const matchMeeting = w.meetingTitle?.toLowerCase().includes(q);
-      return matchName || matchPrize || matchReward || matchMeeting;
+      return matchName || matchPrize || matchReward || matchMeeting || drawSourceLabels[w.source].toLowerCase().includes(q);
     });
   }, [allFilteredLuckyWinners, winnerSearch]);
 
@@ -604,6 +614,114 @@ export function MeetingStatisticsPanel() {
     5
   );
 
+  // Ranking calculation for active members
+  const memberRankings = useMemo(() => {
+    const memberMap = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        email?: string;
+        photoURL?: string;
+        companyName?: string;
+        industry?: string;
+        attendedCount: number;
+        earlyCount: number;
+        totalEarlyMinutes: number;
+      }
+    >();
+
+    // Seed from chapterMembers
+    chapterMembers.forEach((u: any) => {
+      const uid = String(u.uid || u._id || u.id || "");
+      if (!uid) return;
+      memberMap.set(uid, {
+        id: uid,
+        name: u.displayName || u.fullName || u.email?.split("@")[0] || "Thành viên",
+        email: u.email,
+        photoURL: u.photoURL,
+        companyName: u.companyName,
+        industry: u.industry,
+        attendedCount: 0,
+        earlyCount: 0,
+        totalEarlyMinutes: 0,
+      });
+    });
+
+    // Aggregate attendance and early arrival across filteredMeetings
+    filteredMeetings.forEach((m) => {
+      const startsAtTime = new Date(m.startsAt).getTime();
+      const speakers = m.speakers || [];
+      speakers.forEach((s) => {
+        if (!s.userId) return; // Skip guests
+        const uid = String(s.userId);
+        let entry = memberMap.get(uid);
+        if (!entry) {
+          entry = {
+            id: uid,
+            name: s.name || s.email || "Thành viên",
+            email: s.email,
+            photoURL: s.photoURL,
+            companyName: "",
+            industry: "",
+            attendedCount: 0,
+            earlyCount: 0,
+            totalEarlyMinutes: 0,
+          };
+          memberMap.set(uid, entry);
+        }
+
+        entry.attendedCount += 1;
+        if (s.checkedInAt) {
+          const checkedInTime = new Date(s.checkedInAt).getTime();
+          if (!isNaN(checkedInTime) && !isNaN(startsAtTime)) {
+            const diffMinutes = Math.round((startsAtTime - checkedInTime) / 60000);
+            const clamped = Math.max(-30, Math.min(90, diffMinutes));
+            entry.totalEarlyMinutes += clamped;
+            if (diffMinutes >= 5) {
+              entry.earlyCount += 1;
+            }
+          }
+        }
+      });
+    });
+
+    const totalEligibleMeetings = filteredMeetings.length || 1;
+
+    const list = Array.from(memberMap.values()).map((mem) => {
+      const avgEarlyMinutes =
+        mem.attendedCount > 0 ? Math.round(mem.totalEarlyMinutes / mem.attendedCount) : 0;
+      const attendanceRate = Math.round((mem.attendedCount / totalEligibleMeetings) * 100);
+
+      // Score: attendance (max 60) + punctuality (max 40)
+      const attendanceScore = attendanceRate * 0.6;
+      const punctualityScore = Math.min(
+        40,
+        Math.max(0, avgEarlyMinutes * 1.5) + mem.earlyCount * 2
+      );
+      const score = Math.round(attendanceScore + punctualityScore);
+
+      return {
+        ...mem,
+        avgEarlyMinutes,
+        attendanceRate,
+        score,
+      };
+    });
+
+    // Sort descending by: attendedCount -> avgEarlyMinutes -> score
+    list.sort((a, b) => {
+      if (b.attendedCount !== a.attendedCount) return b.attendedCount - a.attendedCount;
+      if (b.avgEarlyMinutes !== a.avgEarlyMinutes) return b.avgEarlyMinutes - a.avgEarlyMinutes;
+      return b.score - a.score;
+    });
+
+    return list;
+  }, [chapterMembers, filteredMeetings]);
+
+  const topFiveMembers = useMemo(() => memberRankings.slice(0, 5), [memberRankings]);
+  const nextFiveMembers = useMemo(() => memberRankings.slice(5, 10), [memberRankings]);
+
   return (
     <div className="space-y-4 pb-8 text-slate-700">
       {/* 1. THANH ĐIỀU KHIỂN & BỘ LỌC GỌN GÀNG (Inline Compact Toolbar) */}
@@ -743,34 +861,34 @@ export function MeetingStatisticsPanel() {
         </div>
       )}
 
-      {/* 2. CHỈ SỐ TỔNG QUAN GỌN GÀNG (6 Compact Metrics Cards với màu tươi sáng tương phản rõ) */}
+      {/* 2. CHỈ SỐ TỔNG QUAN GỌN GÀNG (6 Compact Metrics Cards với animation & hover mượt mà) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* Tổng số cuộc họp */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <div className="flex items-center justify-between text-slate-500 text-xs">
             <span>Tổng cuộc họp</span>
             <CalendarDays className="h-4 w-4 text-slate-400" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-semibold tracking-tight text-slate-800">{metrics.totalMeetings}</span>
+            <span className="text-2xl font-bold tracking-tight text-slate-800">{metrics.totalMeetings}</span>
             <span className="text-xs text-slate-400">buổi</span>
           </div>
           <div className="mt-1.5 text-[11px] text-slate-500 flex items-center gap-1.5">
             <span>Xong: {metrics.completedCount}</span>
             <span>•</span>
             <span>Sắp tới: {metrics.scheduledCount}</span>
-            {metrics.liveCount > 0 && <span className="text-rose-600 font-medium">Live: {metrics.liveCount}</span>}
+            {metrics.liveCount > 0 && <span className="text-rose-600 font-medium animate-pulse">Live: {metrics.liveCount}</span>}
           </div>
         </div>
 
         {/* Tổng lượt tham dự */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <div className="flex items-center justify-between text-slate-500 text-xs">
             <span>Lượt tham dự</span>
             <Users className="h-4 w-4 text-slate-400" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-semibold tracking-tight text-slate-800">{metrics.totalAttendees}</span>
+            <span className="text-2xl font-bold tracking-tight text-slate-800">{metrics.totalAttendees}</span>
             <span className="text-xs text-slate-400">lượt</span>
           </div>
           <div className="mt-1.5 text-[11px] text-slate-500">
@@ -779,71 +897,76 @@ export function MeetingStatisticsPanel() {
         </div>
 
         {/* Thành viên có mặt (Màu Đỏ tươi BNI #ef4444) */}
-        <div className="rounded-2xl border border-rose-100 bg-rose-50/25 p-3.5 shadow-2xs">
+        <div className="rounded-2xl border border-rose-100 bg-rose-50/25 p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <div className="flex items-center justify-between text-rose-700 text-xs">
             <span>Thành viên có mặt</span>
             <span className="h-2 w-2 rounded-full bg-rose-500" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-semibold tracking-tight text-rose-600">{metrics.totalMembersPresent}</span>
+            <span className="text-2xl font-bold tracking-tight text-rose-600">{metrics.totalMembersPresent}</span>
             <span className="text-xs text-rose-400">lượt</span>
-            <span className="ml-auto text-xs font-medium text-rose-600">{metrics.memberPresentRate}%</span>
+            <span className="ml-auto text-xs font-semibold text-rose-600">{metrics.memberPresentRate}%</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-rose-100 overflow-hidden">
-            <div className="h-full rounded-full bg-rose-500 transition-all duration-300" style={{ width: `${metrics.memberPresentRate}%` }} />
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-rose-500 to-rose-600 transition-all duration-1000 ease-out"
+              style={{ width: isAnimated ? `${metrics.memberPresentRate}%` : "0%" }}
+            />
           </div>
         </div>
 
         {/* Thành viên vắng mặt (Màu Cam cảnh báo #f97316) */}
-        <div className="rounded-2xl border border-orange-100 bg-orange-50/25 p-3.5 shadow-2xs">
+        <div className="rounded-2xl border border-orange-100 bg-orange-50/25 p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <div className="flex items-center justify-between text-orange-700 text-xs">
             <span>Thành viên vắng mặt</span>
             <span className="h-2 w-2 rounded-full bg-orange-500" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-semibold tracking-tight text-orange-600">{metrics.totalMembersAbsent}</span>
+            <span className="text-2xl font-bold tracking-tight text-orange-600">{metrics.totalMembersAbsent}</span>
             <span className="text-xs text-orange-400">lượt</span>
-            <span className="ml-auto text-xs font-medium text-orange-600">{metrics.absentRate}%</span>
+            <span className="ml-auto text-xs font-semibold text-orange-600">{metrics.absentRate}%</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-orange-100 overflow-hidden">
-            <div className="h-full rounded-full bg-orange-500 transition-all duration-300" style={{ width: `${metrics.absentRate}%` }} />
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-500 transition-all duration-1000 ease-out"
+              style={{ width: isAnimated ? `${metrics.absentRate}%` : "0%" }}
+            />
           </div>
         </div>
 
         {/* Khách mời (Màu Xanh da trời tươi sáng #0ea5e9 tương phản hoàn hảo) */}
-        <div className="rounded-2xl border border-sky-100 bg-sky-50/25 p-3.5 shadow-2xs">
+        <div className="rounded-2xl border border-sky-100 bg-sky-50/25 p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <div className="flex items-center justify-between text-sky-700 text-xs">
             <span>Khách mời</span>
             <span className="h-2 w-2 rounded-full bg-sky-500" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-semibold tracking-tight text-sky-600">{metrics.totalGuests}</span>
+            <span className="text-2xl font-bold tracking-tight text-sky-600">{metrics.totalGuests}</span>
             <span className="text-xs text-sky-400">người</span>
-            <span className="ml-auto text-xs font-medium text-sky-600">{metrics.guestRate}%</span>
+            <span className="ml-auto text-xs font-semibold text-sky-600">{metrics.guestRate}%</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-sky-100 overflow-hidden">
-            <div className="h-full rounded-full bg-sky-500 transition-all duration-300" style={{ width: `${metrics.guestRate}%` }} />
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-sky-400 to-sky-500 transition-all duration-1000 ease-out"
+              style={{ width: isAnimated ? `${metrics.guestRate}%` : "0%" }}
+            />
           </div>
         </div>
 
         {/* Người trúng giải quay thưởng (Màu Vàng Amber sang trọng #f59e0b) */}
-        <div className="rounded-2xl border border-amber-200/80 bg-amber-50/30 p-3.5 shadow-2xs">
+        <div className="rounded-2xl border border-amber-200/80 bg-amber-50/30 p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <div className="flex items-center justify-between text-amber-700 text-xs">
             <span>Trúng giải quay</span>
             <Gift className="h-4 w-4 text-amber-500" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-semibold tracking-tight text-amber-600">{metrics.totalWinners}</span>
+            <span className="text-2xl font-bold tracking-tight text-amber-600">{metrics.totalWinners}</span>
             <span className="text-xs text-amber-500/80">lượt</span>
-          </div>
-          <div className="mt-2 text-[11px] text-amber-700/80 font-medium truncate flex items-center gap-1">
-            <Trophy className="h-3 w-3 text-amber-500 shrink-0" />
-            <span>{metrics.totalWinners > 0 ? "Vòng quay may mắn" : "Chưa có lượt quay"}</span>
           </div>
         </div>
       </div>
 
-      {/* 3. BIỂU ĐỒ (Màu sắc tươi sáng, tương phản cao, thể hiện Thành viên có mặt, vắng mặt & khách mời) */}
+      {/* 3. BIỂU ĐỒ (Màu sắc tươi sáng, tương phản cao, hoạt ảnh mọc cột & tương tác 2 chiều) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Biểu đồ cột: Lượt tham dự theo từng cuộc họp */}
         <div className="lg:col-span-2 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs flex flex-col justify-between">
@@ -868,15 +991,23 @@ export function MeetingStatisticsPanel() {
               </div>
             </div>
 
-            {/* Cột hiển thị */}
-            <div className="mt-4 min-h-[190px] flex flex-col justify-end">
+            {/* Cột hiển thị với Animation & Gridlines */}
+            <div className="mt-4 min-h-[200px] relative flex flex-col justify-end">
+              {/* Gridlines mờ phía sau */}
+              <div className="absolute inset-x-0 bottom-6 top-2 flex flex-col justify-between pointer-events-none px-2 z-0">
+                <div className="border-b border-dashed border-slate-100 w-full" />
+                <div className="border-b border-dashed border-slate-100 w-full" />
+                <div className="border-b border-dashed border-slate-100 w-full" />
+                <div className="border-b border-slate-200/60 w-full" />
+              </div>
+
               {chartMeetings.length === 0 ? (
-                <div className="flex h-44 items-center justify-center text-xs text-slate-400">
+                <div className="flex h-44 items-center justify-center text-xs text-slate-400 z-10">
                   Không có cuộc họp trong khoảng lọc này.
                 </div>
               ) : (
-                <div className="flex items-end justify-between gap-3 sm:gap-6 h-48 pt-4 px-1">
-                  {chartMeetings.map((item) => {
+                <div className="flex items-end justify-between gap-3 sm:gap-6 h-48 pt-4 px-2 z-10">
+                  {chartMeetings.map((item, idx) => {
                     const totalBarVal = item.membersPresent + item.guests + item.membersAbsent;
                     const totalH = Math.min(100, Math.round((totalBarVal / (maxValInChart || 1)) * 100));
 
@@ -884,34 +1015,71 @@ export function MeetingStatisticsPanel() {
                     const guestShare = totalBarVal > 0 ? (item.guests / totalBarVal) * 100 : 0;
                     const absentShare = totalBarVal > 0 ? (item.membersAbsent / totalBarVal) * 100 : 0;
 
+                    const isHovered = hoveredBarId === item.id;
+                    const isOtherHovered = hoveredBarId !== null && !isHovered;
+
                     return (
                       <div
                         key={item.id}
+                        onMouseEnter={() => setHoveredBarId(item.id)}
+                        onMouseLeave={() => setHoveredBarId(null)}
                         onClick={() => setSelectedMeetingId(item.id)}
-                        className="flex flex-1 flex-col items-center gap-1.5 h-full justify-end group cursor-pointer"
+                        className={`flex flex-1 flex-col items-center gap-1.5 h-full justify-end group cursor-pointer transition-all duration-300 ${
+                          isOtherHovered ? "opacity-45 scale-95" : isHovered ? "scale-105" : "opacity-100"
+                        }`}
                         title={`${item.title} (${item.dateStr}):\n• Thành viên có mặt: ${item.membersPresent}\n• Khách mời: ${item.guests}\n• Thành viên vắng: ${item.membersAbsent}\n• Tổng check-in: ${item.totalCheckedIn}`}
                       >
-                        <div className="flex items-center gap-1 text-[11px] font-medium text-slate-600 group-hover:text-rose-600 transition-colors">
-                          <span className="text-slate-800">{item.totalCheckedIn}</span>
+                        {/* Tooltip / Badge số nổi lên khi hover */}
+                        <div
+                          className={`flex items-center gap-1 text-[11px] font-medium transition-all duration-300 rounded-full px-1.5 py-0.5 ${
+                            isHovered
+                              ? "bg-slate-900 text-white shadow-md -translate-y-1 scale-110"
+                              : "text-slate-600 group-hover:text-rose-600"
+                          }`}
+                        >
+                          <span className={isHovered ? "font-bold text-white" : "text-slate-800"}>
+                            {item.totalCheckedIn}
+                          </span>
                           {item.membersAbsent > 0 && (
-                            <span className="text-[10px] text-orange-500 font-normal">(-{item.membersAbsent})</span>
+                            <span className={isHovered ? "text-orange-300 text-[10px]" : "text-[10px] text-orange-500 font-normal"}>
+                              (-{item.membersAbsent})
+                            </span>
                           )}
                         </div>
 
-                        {/* Stacked Bar with 3 contrasting colors */}
+                        {/* Stacked Bar with 3 contrasting vibrant colors & smooth growth animation */}
                         <div
-                          className="w-full max-w-10 rounded-t-md overflow-hidden flex flex-col-reverse transition-all group-hover:brightness-95"
-                          style={{ height: `${Math.max(totalH, 8)}%` }}
+                          className="w-full max-w-10 rounded-t-md overflow-hidden flex flex-col-reverse shadow-xs transition-all duration-700 ease-out group-hover:shadow-md"
+                          style={{
+                            height: isAnimated ? `${Math.max(totalH, 8)}%` : "0%",
+                            transitionDelay: `${idx * 60}ms`,
+                          }}
                         >
-                          {/* Member Present: Vibrant Rose/Red */}
-                          <div className="bg-rose-500 transition-all" style={{ height: `${presentShare}%` }} title={`Có mặt: ${item.membersPresent}`} />
-                          {/* Guest: Bright Sky Blue */}
-                          <div className="bg-sky-500 transition-all" style={{ height: `${guestShare}%` }} title={`Khách mời: ${item.guests}`} />
-                          {/* Member Absent: Bright Coral/Orange */}
-                          <div className="bg-orange-400 transition-all" style={{ height: `${absentShare}%` }} title={`Vắng mặt: ${item.membersAbsent}`} />
+                          {/* Member Present: Vibrant Rose Gradient */}
+                          <div
+                            className="bg-gradient-to-t from-rose-600 to-rose-400 transition-all duration-500"
+                            style={{ height: `${presentShare}%` }}
+                            title={`Có mặt: ${item.membersPresent}`}
+                          />
+                          {/* Guest: Bright Sky Blue Gradient */}
+                          <div
+                            className="bg-gradient-to-t from-sky-600 to-sky-400 transition-all duration-500"
+                            style={{ height: `${guestShare}%` }}
+                            title={`Khách mời: ${item.guests}`}
+                          />
+                          {/* Member Absent: Bright Coral/Amber Gradient */}
+                          <div
+                            className="bg-gradient-to-t from-orange-500 to-amber-400 transition-all duration-500"
+                            style={{ height: `${absentShare}%` }}
+                            title={`Vắng mặt: ${item.membersAbsent}`}
+                          />
                         </div>
 
-                        <span className="text-[11px] font-normal text-slate-500 group-hover:text-rose-600 transition-colors truncate max-w-full">
+                        <span
+                          className={`text-[11px] font-normal transition-all duration-200 truncate max-w-full ${
+                            isHovered ? "font-bold text-rose-600 scale-105" : "text-slate-500 group-hover:text-rose-600"
+                          }`}
+                        >
                           {item.dateStr}
                         </span>
                       </div>
@@ -928,7 +1096,7 @@ export function MeetingStatisticsPanel() {
           </div>
         </div>
 
-        {/* Biểu đồ Donut: Cơ cấu người tham dự & Vắng mặt */}
+        {/* Biểu đồ Donut: Cơ cấu người tham dự & Vắng mặt với tương tác 2 chiều */}
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="pb-3 border-b border-slate-100">
@@ -938,8 +1106,8 @@ export function MeetingStatisticsPanel() {
             </div>
 
             <div className="flex flex-col items-center justify-center my-4">
-              <div className="relative h-36 w-36">
-                <svg className="h-full w-full -rotate-90" viewBox="0 0 180 180" aria-label="Cơ cấu tham dự và vắng mặt">
+              <div className="relative h-40 w-40">
+                <svg className="h-full w-full -rotate-90 overflow-visible" viewBox="0 0 180 180" aria-label="Cơ cấu tham dự và vắng mặt">
                   <circle cx="90" cy="90" r="66" fill="none" stroke="#f1f5f9" strokeWidth="20" />
                   {metrics.totalMembersPresent + metrics.totalGuests + metrics.totalMembersAbsent > 0 ? (
                     <>
@@ -950,9 +1118,17 @@ export function MeetingStatisticsPanel() {
                         r="66"
                         fill="none"
                         stroke="#f43f5e"
-                        strokeWidth="20"
-                        strokeDasharray={`${(metrics.memberPresentRate / 100) * 414.69} ${414.69}`}
+                        strokeWidth={hoveredSegment === "present" ? 25 : 20}
+                        opacity={hoveredSegment && hoveredSegment !== "present" ? 0.4 : 1}
+                        strokeDasharray={
+                          isAnimated
+                            ? `${(metrics.memberPresentRate / 100) * 414.69} ${414.69}`
+                            : `0 ${414.69}`
+                        }
                         strokeDashoffset="0"
+                        className="transition-all duration-700 ease-out cursor-pointer"
+                        onMouseEnter={() => setHoveredSegment("present")}
+                        onMouseLeave={() => setHoveredSegment(null)}
                       />
                       {/* Segment 2: Khách mời (Sky Blue) */}
                       <circle
@@ -961,9 +1137,17 @@ export function MeetingStatisticsPanel() {
                         r="66"
                         fill="none"
                         stroke="#0ea5e9"
-                        strokeWidth="20"
-                        strokeDasharray={`${(metrics.guestRate / 100) * 414.69} ${414.69}`}
+                        strokeWidth={hoveredSegment === "guest" ? 25 : 20}
+                        opacity={hoveredSegment && hoveredSegment !== "guest" ? 0.4 : 1}
+                        strokeDasharray={
+                          isAnimated
+                            ? `${(metrics.guestRate / 100) * 414.69} ${414.69}`
+                            : `0 ${414.69}`
+                        }
                         strokeDashoffset={`-${(metrics.memberPresentRate / 100) * 414.69}`}
+                        className="transition-all duration-700 ease-out cursor-pointer"
+                        onMouseEnter={() => setHoveredSegment("guest")}
+                        onMouseLeave={() => setHoveredSegment(null)}
                       />
                       {/* Segment 3: Thành viên vắng mặt (Orange) */}
                       <circle
@@ -972,9 +1156,17 @@ export function MeetingStatisticsPanel() {
                         r="66"
                         fill="none"
                         stroke="#f97316"
-                        strokeWidth="20"
-                        strokeDasharray={`${(metrics.absentRate / 100) * 414.69} ${414.69}`}
+                        strokeWidth={hoveredSegment === "absent" ? 25 : 20}
+                        opacity={hoveredSegment && hoveredSegment !== "absent" ? 0.4 : 1}
+                        strokeDasharray={
+                          isAnimated
+                            ? `${(metrics.absentRate / 100) * 414.69} ${414.69}`
+                            : `0 ${414.69}`
+                        }
                         strokeDashoffset={`-${((metrics.memberPresentRate + metrics.guestRate) / 100) * 414.69}`}
+                        className="transition-all duration-700 ease-out cursor-pointer"
+                        onMouseEnter={() => setHoveredSegment("absent")}
+                        onMouseLeave={() => setHoveredSegment(null)}
                       />
                     </>
                   ) : (
@@ -982,43 +1174,84 @@ export function MeetingStatisticsPanel() {
                   )}
                 </svg>
 
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wide">Tổng lượt</span>
-                  <span className="text-xl font-semibold text-slate-800">
-                    {metrics.totalAttendees}
-                  </span>
-                  <span className="text-[10px] text-slate-400">check-in</span>
+                {/* Tâm Donut: Hiển thị thông số động khi hover */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none transition-all duration-300">
+                  {hoveredSegment === "present" ? (
+                    <div className="animate-fadeIn">
+                      <span className="text-[10px] text-rose-500 font-bold uppercase tracking-wide">Có mặt</span>
+                      <span className="text-2xl font-extrabold text-rose-600 block">{metrics.totalMembersPresent}</span>
+                      <span className="text-[10px] text-rose-500 font-medium">{metrics.memberPresentRate}% tổng lượt</span>
+                    </div>
+                  ) : hoveredSegment === "guest" ? (
+                    <div className="animate-fadeIn">
+                      <span className="text-[10px] text-sky-500 font-bold uppercase tracking-wide">Khách mời</span>
+                      <span className="text-2xl font-extrabold text-sky-600 block">{metrics.totalGuests}</span>
+                      <span className="text-[10px] text-sky-500 font-medium">{metrics.guestRate}% tổng lượt</span>
+                    </div>
+                  ) : hoveredSegment === "absent" ? (
+                    <div className="animate-fadeIn">
+                      <span className="text-[10px] text-orange-500 font-bold uppercase tracking-wide">Vắng mặt</span>
+                      <span className="text-2xl font-extrabold text-orange-600 block">{metrics.totalMembersAbsent}</span>
+                      <span className="text-[10px] text-orange-500 font-medium">{metrics.absentRate}% tổng lượt</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wide font-medium">Tổng lượt</span>
+                      <span className="text-2xl font-extrabold text-slate-800 block">
+                        {metrics.totalAttendees}
+                      </span>
+                      <span className="text-[10px] text-slate-400">check-in</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Chú thích 3 màu tương phản rõ rệt */}
-              <div className="w-full space-y-1.5 pt-1">
-                <div className="flex items-center justify-between text-xs">
+              {/* Chú thích 3 màu tương phản rõ rệt - Hover kích hoạt tương tác Donut */}
+              <div className="w-full space-y-1.5 pt-2">
+                <div
+                  onMouseEnter={() => setHoveredSegment("present")}
+                  onMouseLeave={() => setHoveredSegment(null)}
+                  className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${
+                    hoveredSegment === "present" ? "bg-rose-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
+                  }`}
+                >
                   <span className="flex items-center gap-1.5 text-slate-600">
                     <span className="h-2 w-2 rounded-full bg-rose-500" />
                     Thành viên có mặt
                   </span>
-                  <span className="font-medium text-slate-800">
+                  <span className={`font-semibold ${hoveredSegment === "present" ? "text-rose-600" : "text-slate-800"}`}>
                     {metrics.totalMembersPresent} ({metrics.memberPresentRate}%)
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs">
+                <div
+                  onMouseEnter={() => setHoveredSegment("guest")}
+                  onMouseLeave={() => setHoveredSegment(null)}
+                  className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${
+                    hoveredSegment === "guest" ? "bg-sky-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
+                  }`}
+                >
                   <span className="flex items-center gap-1.5 text-slate-600">
                     <span className="h-2 w-2 rounded-full bg-sky-500" />
                     Khách mời
                   </span>
-                  <span className="font-medium text-slate-800">
+                  <span className={`font-semibold ${hoveredSegment === "guest" ? "text-sky-600" : "text-slate-800"}`}>
                     {metrics.totalGuests} ({metrics.guestRate}%)
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs">
+                <div
+                  onMouseEnter={() => setHoveredSegment("absent")}
+                  onMouseLeave={() => setHoveredSegment(null)}
+                  className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${
+                    hoveredSegment === "absent" ? "bg-orange-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
+                  }`}
+                >
                   <span className="flex items-center gap-1.5 text-slate-600">
                     <span className="h-2 w-2 rounded-full bg-orange-500" />
                     Thành viên vắng mặt
                   </span>
-                  <span className="font-medium text-slate-800">
+                  <span className={`font-semibold ${hoveredSegment === "absent" ? "text-orange-600" : "text-slate-800"}`}>
                     {metrics.totalMembersAbsent} ({metrics.absentRate}%)
                   </span>
                 </div>
@@ -1032,6 +1265,268 @@ export function MeetingStatisticsPanel() {
               : `Tỷ lệ vắng mặt: ${metrics.absentRate}%`}
           </div>
         </div>
+      </div>
+
+      {/* 4. BẢNG XẾP HẠNG THÀNH VIÊN TÍCH CỰC (Top 5 bục podium cao thấp, Top 1 ở giữa, Top 6-10 danh sách) */}
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-amber-500" />
+              <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">
+                Bảng xếp hạng thành viên tích cực
+              </h3>
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                Top {Math.min(10, memberRankings.length)}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Xếp hạng theo số buổi điểm danh tham gia và thói quen đến sớm chuẩn giờ
+            </p>
+          </div>
+        </div>
+
+        {memberRankings.length === 0 || topFiveMembers.every((m) => m.attendedCount === 0) ? (
+          <div className="py-10 text-center text-xs text-slate-400">
+            <Trophy className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+            <p>Chưa có dữ liệu điểm danh thành viên trong khoảng thời gian đã chọn.</p>
+          </div>
+        ) : (
+          <div className="pt-6">
+            {/* Top 5 - Bục Podium 5 cột cao thấp, Top 1 ở chính giữa (#4 - #2 - #1 - #3 - #5) */}
+            {(() => {
+              const PODIUM_SLOTS = [
+                {
+                  rankIndex: 3, // #4 (ngoài cùng bên trái)
+                  rankNum: 4,
+                  heightClass: "h-28 sm:h-36",
+                  bgColor: "bg-blue-500",
+                  textColor: "text-white",
+                  dividerColor: "border-white/20",
+                  borderColor: "border-blue-400/50",
+                  badgeColor: "bg-blue-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-blue-400",
+                },
+                {
+                  rankIndex: 1, // #2 (trái giữa)
+                  rankNum: 2,
+                  heightClass: "h-44 sm:h-52",
+                  bgColor: "bg-red-500",
+                  textColor: "text-white",
+                  dividerColor: "border-white/20",
+                  borderColor: "border-red-400/50",
+                  badgeColor: "bg-red-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-red-400",
+                },
+                {
+                  rankIndex: 0, // #1 (CHÍNH GIỮA - TOP 1 QUÁN QUÂN)
+                  rankNum: 1,
+                  heightClass: "h-56 sm:h-64",
+                  bgColor: "bg-yellow-400",
+                  textColor: "text-slate-900",
+                  dividerColor: "border-slate-900/15",
+                  borderColor: "border-yellow-400 shadow-sm",
+                  badgeColor: "bg-amber-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-yellow-400",
+                  isTop1: true,
+                },
+                {
+                  rankIndex: 2, // #3 (phải giữa)
+                  rankNum: 3,
+                  heightClass: "h-36 sm:h-44",
+                  bgColor: "bg-green-500",
+                  textColor: "text-white",
+                  dividerColor: "border-white/20",
+                  borderColor: "border-green-400/50",
+                  badgeColor: "bg-green-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-green-400",
+                },
+                {
+                  rankIndex: 4, // #5 (ngoài cùng bên phải)
+                  rankNum: 5,
+                  heightClass: "h-22 sm:h-28",
+                  bgColor: "bg-orange-500",
+                  textColor: "text-white",
+                  dividerColor: "border-white/20",
+                  borderColor: "border-orange-400/50",
+                  badgeColor: "bg-orange-500 text-white font-semibold ring-2 ring-white shadow-2xs",
+                  ringColor: "ring-2 ring-orange-400",
+                },
+              ];
+
+              return (
+                <div className="grid grid-cols-5 gap-2 sm:gap-4 items-end min-h-[300px] sm:min-h-[340px] px-1 sm:px-4 pb-2 border-b border-slate-100">
+                  {PODIUM_SLOTS.map((slot) => {
+                    const m = topFiveMembers[slot.rankIndex];
+
+                    if (!m) {
+                      return (
+                        <div key={`empty-${slot.rankNum}`} className="flex flex-col items-center justify-end h-full opacity-40">
+                          <div className="flex flex-col items-center mb-2.5 w-full">
+                            <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-400 text-xs font-medium mb-1.5 bg-slate-50/50">
+                              #{slot.rankNum}
+                            </div>
+                            <p className="text-xs text-slate-400 text-center font-normal">Chờ thành viên</p>
+                            <p className="text-[10px] text-slate-300 text-center">-</p>
+                          </div>
+                          <div
+                            className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center py-2 px-1 text-slate-400 ${slot.heightClass}`}
+                          >
+                            <span className="text-xs font-normal text-slate-300">#{slot.rankNum}</span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={m.id || `rank-${slot.rankNum}`} className="flex flex-col items-center justify-end h-full group">
+                        {/* Header info above column: Avatar & Name */}
+                        <div className="flex flex-col items-center mb-2.5 w-full">
+                          {slot.isTop1 && (
+                            <Crown className="h-4 w-4 text-amber-500 fill-amber-400 drop-shadow-xs -mb-0.5" />
+                          )}
+                          <div className="relative mb-1.5">
+                            {m.photoURL ? (
+                              <img
+                                src={m.photoURL}
+                                alt={m.name}
+                                className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover shadow-2xs ${slot.ringColor}`}
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = "none";
+                                }}
+                              />
+                            ) : (
+                              <div
+                                className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-slate-100 font-semibold text-slate-600 text-xs sm:text-sm shadow-2xs ${slot.ringColor}`}
+                              >
+                                {(m.name || "?").trim().charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <span
+                              className={`absolute -bottom-1 -right-1 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full text-[10px] sm:text-xs ${slot.badgeColor}`}
+                            >
+                              #{slot.rankNum}
+                            </span>
+                          </div>
+
+                          <p
+                            className="text-xs font-medium text-slate-700 text-center truncate max-w-[70px] sm:max-w-[120px]"
+                            title={m.name}
+                          >
+                            {m.name}
+                          </p>
+                          {m.companyName && (
+                            <p
+                              className="text-[10px] text-slate-400 text-center truncate max-w-[70px] sm:max-w-[120px]"
+                              title={m.companyName}
+                            >
+                              {m.companyName}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* The Pillar / Column bar */}
+                        <div
+                          className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border flex flex-col items-center justify-between py-2.5 sm:py-3 px-1 transition-all duration-300 ease-out group-hover:scale-[1.02] ${slot.heightClass} ${slot.bgColor} ${slot.borderColor} ${slot.textColor}`}
+                        >
+                          <div className="text-center">
+                            <span className="block text-xs sm:text-sm font-semibold tracking-normal">
+                              {m.attendedCount} buổi
+                            </span>
+                            <span className="block text-[10px] font-normal opacity-90 mt-0.5">
+                              {m.attendanceRate}%
+                            </span>
+                          </div>
+
+                          <div className={`text-center border-t ${slot.dividerColor} pt-1.5 w-full`}>
+                            <span className="block text-[10px] font-medium opacity-90 truncate">
+                              {m.avgEarlyMinutes > 0
+                                ? `Sớm +${m.avgEarlyMinutes}p`
+                                : m.attendedCount > 0
+                                ? "Đúng giờ"
+                                : "Chưa họp"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* Top 6 to 10 - Danh sách dạng bảng gọn gàng */}
+            {nextFiveMembers.length > 0 && (
+              <div className="mt-5 pt-3">
+                <div className="flex items-center justify-between mb-2.5">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 text-slate-400" />
+                    Thành viên tiếp theo (Hạng 6 - 10)
+                  </p>
+                  <span className="text-[11px] text-slate-400">
+                    Hiển thị {nextFiveMembers.length} thành viên
+                  </span>
+                </div>
+                <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xs">
+                  {nextFiveMembers.map((m, idx) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between p-2.5 sm:px-4 hover:bg-slate-50/80 transition-colors text-xs"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 font-mono font-medium text-slate-500 text-xs">
+                          #{idx + 6}
+                        </span>
+                        {m.photoURL ? (
+                          <img
+                            src={m.photoURL}
+                            alt={m.name}
+                            className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 font-medium text-slate-600 text-xs shrink-0">
+                            {(m.name || "?").trim().charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800 truncate">{m.name}</p>
+                          {m.companyName && (
+                            <p className="text-[10px] text-slate-400 truncate">{m.companyName}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 sm:gap-6 text-right shrink-0">
+                        <div>
+                          <span className="font-semibold text-slate-700">{m.attendedCount}</span>
+                          <span className="text-slate-400 ml-1">buổi ({m.attendanceRate}%)</span>
+                        </div>
+                        <span
+                          className={`text-[11px] font-normal px-2 py-0.5 rounded-full ${
+                            m.avgEarlyMinutes > 0
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : m.attendedCount > 0
+                              ? "bg-sky-50 text-sky-700 border border-sky-200"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {m.avgEarlyMinutes > 0
+                            ? `Sớm +${m.avgEarlyMinutes}p`
+                            : m.attendedCount > 0
+                            ? "Đúng giờ"
+                            : "Chưa họp"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 4. DANH SÁCH CHI TIẾT */}
@@ -1287,10 +1782,7 @@ export function MeetingStatisticsPanel() {
                     const guestCount = speakers.length - memberCount;
                     const absentCount = Math.max(0, totalChapterMembersCount - memberCount);
                     const guestRatio = speakers.length > 0 ? Math.round((guestCount / speakers.length) * 100) : 0;
-                    const luckyCount = (m.luckyDraw?.prizes || []).reduce(
-                      (acc, p) => acc + (p.winners?.length || 0),
-                      0
-                    );
+                    const luckyCount = extractLuckyWinners(m).length;
 
                     return (
                       <tr

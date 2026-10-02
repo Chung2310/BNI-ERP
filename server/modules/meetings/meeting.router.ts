@@ -20,13 +20,14 @@ import {
   addOrUpdatePrize,
   deletePrize,
   spinLuckyDraw,
+  recordGameWinner,
   redrawPrizeWinner,
   resetLuckyDrawWinners,
   createCheckInQr,
   getCheckInQr,
   autoStartDueMeetings,
 } from './meeting.service';
-import { checkinInput, controlInput, meetingInput, updateMeetingInput, slideProfileInput } from './meeting.validation';
+import { checkinInput, controlInput, meetingInput, updateMeetingInput, slideProfileInput, gameWinnerInput } from './meeting.validation';
 import { getMeetingSlides, updateMeetingSlide } from './meeting-slides.service';
 
 
@@ -230,6 +231,15 @@ meetingRouter.delete('/:id/lucky-draw/prizes/:prizeId', manage, async (req: any,
 /**
  * QUAY THƯỞNG: Yêu cầu bắt buộc cuộc họp đã bắt đầu!
  */
+meetingRouter.post('/:id/lucky-draw/results', manage, async (req: any, res) => {
+  try {
+    const { error, value } = gameWinnerInput.validate(req.body);
+    if (error) return res.status(400).json({ message: error.message });
+    const item = await getMeeting(company(req), req.params.id);
+    res.json({ data: await recordGameWinner(item, value, req.user.id) });
+  } catch (e) { sendError(res, e); }
+});
+
 meetingRouter.post('/:id/lucky-draw/spin', manage, async (req: any, res) => {
   try {
     const item = await getMeeting(company(req), req.params.id);

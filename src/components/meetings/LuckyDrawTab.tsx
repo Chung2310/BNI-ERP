@@ -18,7 +18,6 @@ import {
   Share2,
   Users,
   Hash,
-  ShieldCheck,
   Download,
   Calendar,
   Layers,
@@ -436,7 +435,7 @@ export function LuckyDrawTab({
       className={`space-y-6 ${isFullscreen ? "fixed inset-0 z-50 bg-slate-950 p-6 overflow-y-auto text-white" : ""}`}
     >
       {/* Top Banner Alert: CHỈ QUAY KHI CUỘC HỌP ĐÃ BẮT ĐẦU */}
-      {!isMeetingStarted ? (
+      {!isMeetingStarted && (
         <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="p-2 bg-amber-100 text-amber-600 rounded-xl shrink-0 mt-0.5">
@@ -463,29 +462,6 @@ export function LuckyDrawTab({
             </button>
           )}
         </div>
-      ) : (
-        <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 shadow-xs flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <h4 className="text-sm text-emerald-900 font-semibold">
-                  Cuộc họp đang diễn ra — Sẵn sàng quay thưởng
-                </h4>
-              </div>
-              <p className="text-xs text-emerald-700 mt-0.5">
-                {meeting.speakers?.length || 0} thành viên đã điểm danh check-in.
-              </p>
-            </div>
-          </div>
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-medium">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Đã xác thực
-          </span>
-        </div>
       )}
 
       {/* ======================================================== */}
@@ -503,9 +479,6 @@ export function LuckyDrawTab({
                 <h3 className="text-base font-semibold text-slate-900">
                   Quay thưởng buổi họp
                 </h3>
-                <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-[#cf142b] ring-1 ring-inset ring-red-200">
-                  BNI Chapter
-                </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 {meeting.title} · {meeting.speakers?.length || 0} người đã check-in
@@ -928,7 +901,6 @@ export function LuckyDrawTab({
                     <th className="p-3">Người trúng</th>
                     <th className="p-3">Số vé</th>
                     <th className="p-3">Thời gian</th>
-                    <th className="p-3">Mã xác thực</th>
                     {canManage && <th className="p-3 pr-4 text-right">Thao tác</th>}
                   </tr>
                 </thead>
@@ -975,12 +947,6 @@ export function LuckyDrawTab({
                       <td className="p-3 font-mono text-[11px] text-slate-500">
                         {new Date(winner.wonAt).toLocaleTimeString("vi-VN")}{" "}
                         {new Date(winner.wonAt).toLocaleDateString("vi-VN")}
-                      </td>
-
-                      <td className="p-3">
-                        <div className="font-mono text-[10px] text-slate-400 truncate max-w-[140px]" title={winner.verificationHash}>
-                          {winner.verificationHash ? `${winner.verificationHash.slice(0, 16)}...` : "—"}
-                        </div>
                       </td>
 
                       {canManage && (
@@ -1054,12 +1020,6 @@ export function LuckyDrawTab({
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* Verification */}
-              <div className="mt-3 pt-3 border-t border-slate-200 text-[10px] font-mono text-slate-400 text-left space-y-0.5">
-                <div className="truncate">Seed: {activeWinnerModal.seed}</div>
-                <div className="truncate">Hash: {activeWinnerModal.verificationHash}</div>
               </div>
             </div>
 
