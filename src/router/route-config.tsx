@@ -55,10 +55,6 @@ export const APP_ROUTES: AppRoute[] = [
     tab: "CÀI ĐẶT",
     component: lazy(() => import("../pages/SettingsTab")),
   },
-  {
-    tab: "HƯỚNG DẪN",
-    component: lazy(() => import("../pages/GuideTab")),
-  },
 ];
 
 export const DEFAULT_APP_TAB: TabType = "TỔNG QUAN";

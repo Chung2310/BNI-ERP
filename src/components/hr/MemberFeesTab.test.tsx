@@ -3,6 +3,7 @@ import React from "react";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import MemberFeesTab from "./MemberFeesTab";
+import FeeSePaySettings from "./FeeSePaySettings";
 
 const mocks = vi.hoisted(() => ({
   sepayConfig: vi.fn(),
@@ -147,8 +148,7 @@ it("shows environment config read-only without a secret input or save button", a
     webhookPath: "/api/v1/webhook/sepay/A"
   });
   mocks.transactions.mockResolvedValue([]);
-  render(<MemberFeesTab />);
-  fireEvent.click(screen.getByRole("button", { name: "SePay & giao dịch" }));
+  render(<FeeSePaySettings onClose={() => {}} />);
   await screen.findByText("SePay đang bật");
   expect(screen.getByText(/Cấu hình được quản lý trong .env/)).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Lưu cấu hình" })).toBeNull();
