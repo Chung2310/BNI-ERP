@@ -65,6 +65,7 @@ export async function updateMeeting(companyCode: string, id: string, input: any)
     item.checkInQrTokenEncrypted = undefined;
     item.checkInQrExpiresAt = undefined;
   }
+  if (input.allowDirectCheckIn !== undefined) item.allowDirectCheckIn = input.allowDirectCheckIn;
   if (input.title !== undefined) item.title = input.title;
   if (input.description !== undefined) item.description = input.description;
   if (input.location !== undefined) item.location = input.location;
@@ -102,6 +103,14 @@ export async function deleteMeeting(companyCode: string, id: string) {
   return { success: true };
 }
 
+
+export async function checkInFromModule(item: any, input: any, actorId: string, canManage: boolean) {
+  if (!canManage && !["live", "paused"].includes(item.status) && item.allowDirectCheckIn !== true) {
+    throw new MeetingError(403, "Vui lòng quét QR của buổi họp để xác nhận vị trí và check-in.");
+  }
+  if (!canManage) validateCheckInLocation(item, input);
+  return checkIn(item, input, actorId, canManage);
+}
 
 export async function checkIn(item: any, input: any, actorId: string, canManage: boolean) {
   if (!['scheduled', 'live', 'paused'].includes(item.status)) {
@@ -656,8 +665,12 @@ export async function getCheckInQr(companyCode: string, id: string, legacyToken?
 function validateQrAndLocation(item: any, input: any) {
   if (!item.checkInQrTokenHash || !item.checkInQrExpiresAt || new Date(item.checkInQrExpiresAt).getTime() <= Date.now()) throw new MeetingError(410, 'Mã QR đã hết hạn hoặc bị thay thế. Hãy liên hệ ban tổ chức.');
   if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp hiện không nhận check-in.');
-  if (typeof item.latitude !== 'number' || typeof item.longitude !== 'number') throw new MeetingError(409, 'Cuộc họp chưa cấu hình tọa độ GPS.');
-  if (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude)) throw new MeetingError(400, 'Cần cho phép truy cập vị trí GPS để check-in.');
+  validateCheckInLocation(item, input);
+}
+
+function validateCheckInLocation(item: any, input: any) {
+  if (!Number.isFinite(item.latitude) || !Number.isFinite(item.longitude)) throw new MeetingError(409, 'Cuộc họp chưa cấu hình tọa độ GPS.');
+  if (!Number.isFinite(input.latitude) || Math.abs(input.latitude) > 90 || !Number.isFinite(input.longitude) || Math.abs(input.longitude) > 180) throw new MeetingError(400, 'Cần cho phép truy cập vị trí GPS để check-in.');
   const distance = distanceMeters(item.latitude, item.longitude, input.latitude, input.longitude);
   if (distance > (item.gpsRadiusMeters || 200)) throw new MeetingError(403, `Bạn đang cách địa điểm họp khoảng ${Math.round(distance)} m; phạm vi check-in là ${item.gpsRadiusMeters || 200} m.`);
 }

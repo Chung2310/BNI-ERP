@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import MemberFeesTab from "./MemberFeesTab";
 import FeeSePaySettings from "./FeeSePaySettings";
 
@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../context/AuthContext", () => ({
   useAuth: () => ({
-    userProfile: { role: mocks.manage ? "admin" : "user" },
+    userProfile: { uid: "member1", role: mocks.manage ? "admin" : "user" },
     hasPermission: () => true
   })
 }));
@@ -103,7 +103,6 @@ it("read-only users cannot create fees or record receipts", async () => {
   expect(screen.queryByRole("button", { name: "Tạo khoản phí" })).toBeNull();
   fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết" }));
   await screen.findByText("Nguyễn An");
-  fireEvent.click(screen.getByRole("button", { name: "Thanh toán" }));
   expect(screen.queryByRole("button", { name: "Lưu phiếu thu" })).toBeNull();
 });
 
@@ -217,4 +216,38 @@ it("adds members to the existing round without reassigning its current members",
   fireEvent.click(screen.getByRole("checkbox"));
   fireEvent.click(screen.getByRole("button", { name: "Tạo cho 1 thành viên" }));
   await waitFor(() => expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ campaignId: "existing-round", memberIds: ["member2"] })));
+});
+
+it("shows only the signed-in member's fees and personal balances", async () => {
+  mocks.manage = false;
+  mocks.list.mockResolvedValue([
+    { ...fee, title: "Phí đang đóng", paid: 400000, remaining: 600000, status: "partial" },
+    { ...fee, _id: "paid-fee", title: "Phí hoàn tất", paid: 1000000, remaining: 0, status: "paid" },
+    { ...fee, _id: "other-fee", memberId: "member2", title: "Phí thành viên khác", amount: 9000000 },
+  ]);
+  render(<MemberFeesTab />);
+  const pending = await screen.findByRole("region", { name: "Phí cần đóng" });
+  const completed = screen.getByRole("region", { name: "Phí đã đóng" });
+  expect(within(pending).getByText("Phí đang đóng")).toBeTruthy();
+  expect(within(pending).getByText("400.000 ₫")).toBeTruthy();
+  expect(within(completed).getByText("Phí hoàn tất")).toBeTruthy();
+  expect(screen.getByText("1.400.000 ₫")).toBeTruthy();
+  expect(screen.queryByText("Phí thành viên khác")).toBeNull();
+  expect(screen.queryByText(/Số người đã đóng/)).toBeNull();
+  expect(screen.queryByRole("button", { name: "Xuất CSV danh sách" })).toBeNull();
+  expect(mocks.members).not.toHaveBeenCalled();
+  fireEvent.click(within(pending).getByRole("button", { name: "Xem chi tiết" }));
+  expect(await screen.findByRole("dialog")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Lưu phiếu thu" })).toBeNull();
+});
+
+it("shows member empty states and reloads fees when the year changes", async () => {
+  mocks.manage = false;
+  mocks.list.mockResolvedValue([]);
+  render(<MemberFeesTab />);
+  expect(await screen.findByText("Bạn không có khoản phí cần đóng trong năm này.")).toBeTruthy();
+  expect(screen.getByText("Bạn chưa có khoản phí đã đóng đủ trong năm này.")).toBeTruthy();
+  const year = new Date().getFullYear() - 1;
+  fireEvent.change(screen.getByLabelText("Năm thu phí"), { target: { value: String(year) } });
+  await waitFor(() => expect(mocks.list).toHaveBeenLastCalledWith(year, expect.any(AbortSignal)));
 });

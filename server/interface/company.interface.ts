@@ -27,11 +27,11 @@ export interface ICompanyDashboardReportConfig {
 
 export interface ICompanySmtpConfig { host: string; port: number; secure: boolean; user: string; passwordEncrypted: string; fromEmail: string; fromName: string; updatedAt?: Date; }
 export interface ICelebrationTemplate { subject: string; html: string; }
-export interface ICompanyCelebrationConfig { birthdayEnabled: boolean; holidayEnabled: boolean; sendTime: string; birthdayTemplate: ICelebrationTemplate; holidayTemplate: ICelebrationTemplate; holidayOverrides?: Array<{ date: string; enabled: boolean; subject?: string; html?: string }>; }
+export interface ICompanyCelebrationConfig { vietnameseHolidaysEnabled?: boolean; disabledVietnameseHolidays?: string[]; birthdayEnabled: boolean; holidayEnabled: boolean; sendTime: string; birthdayTemplate: ICelebrationTemplate; holidayTemplate: ICelebrationTemplate; holidayOverrides?: Array<{ name?: string; date: string; enabled: boolean; subject?: string; html?: string }>; }
 
 export interface ICompanySmtpConfig { host: string; port: number; secure: boolean; user: string; passwordEncrypted: string; fromEmail: string; fromName: string; updatedAt?: Date; }
 export interface ICelebrationTemplate { subject: string; html: string; }
-export interface ICompanyCelebrationConfig { birthdayEnabled: boolean; holidayEnabled: boolean; sendTime: string; birthdayTemplate: ICelebrationTemplate; holidayTemplate: ICelebrationTemplate; holidayOverrides?: Array<{ date: string; enabled: boolean; subject?: string; html?: string }>; }
+export interface ICompanyCelebrationConfig { vietnameseHolidaysEnabled?: boolean; disabledVietnameseHolidays?: string[]; birthdayEnabled: boolean; holidayEnabled: boolean; sendTime: string; birthdayTemplate: ICelebrationTemplate; holidayTemplate: ICelebrationTemplate; holidayOverrides?: Array<{ name?: string; date: string; enabled: boolean; subject?: string; html?: string }>; }
 export interface ICompanyVietqrConfig {
   bankId: string;
   accountNo: string;
