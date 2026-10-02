@@ -20,12 +20,13 @@ type Props = {
   onAutoAdvanceDelayChange?: (seconds: number) => void;
   fullscreenRequest?: Promise<boolean> | null;
   onPresentationStarted?: () => void;
+  onPresentationClosed?: () => void;
   api: (path: string, method?: string, body?: unknown) => Promise<SlideDeck>;
 };
 const button = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40";
 const fieldClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
 
-export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false }: Props) {
+export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -161,13 +162,15 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   }, [queue, index]);
 
   const closePresentation = useCallback(() => {
+    if (!presentationActive.current) return;
     setPresenting(false);
     presentationActive.current = false;
     onPresentationStarted?.();
     if (fullScreenOwned.current && document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     fullScreenOwned.current = false;
+    onPresentationClosed?.();
     window.setTimeout(() => launchButton.current?.focus(), 0);
-  }, [onPresentationStarted]);
+  }, [onPresentationStarted, onPresentationClosed]);
 
   useEffect(() => {
     if (!fullscreenRequest) return;
@@ -199,7 +202,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     if (!presenting) return;
     const keydown = (e: KeyboardEvent) => {
       if (document.querySelector("[data-speeches-complete]")) return;
-      if (e.key === "Escape") { e.preventDefault(); closePresentation(); }
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closePresentation(); return; }
       if (e.key === "Tab") {
         if (cleanPresentation) { e.preventDefault(); presentationDialog.current?.focus(); return; }
         // The presentation is modal; keep keyboard focus on its controls.

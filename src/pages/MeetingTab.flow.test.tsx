@@ -19,6 +19,46 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+it.each(["Escape", "button", "fullscreen"])("returns to the same meeting's operation tab after exiting presentation via %s", async exit => {
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
+  const people = [{ id: "first", kind: "guest", name: "Khách đang nói", company: "", seconds: 30 }];
+  const live = { ...meeting, status: "live", currentIndex: 0, speakers: people };
+  const fetchMock = vi.fn(async url => ({ ok: true, json: async () => ({ data: String(url).endsWith("/slides") ? { slides: people, version: 0 } : String(url).endsWith("/presentation") ? live : [live] }) }));
+  vi.stubGlobal("fetch", fetchMock);
+  let fullscreen: Element | null = null;
+  const requestFullscreen = vi.fn(async () => { fullscreen = document.documentElement; });
+  Object.defineProperty(document.documentElement, "requestFullscreen", { configurable: true, value: requestFullscreen });
+  Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => fullscreen });
+  Object.defineProperty(document, "exitFullscreen", { configurable: true, value: vi.fn(async () => { fullscreen = null; }) });
+  try {
+    render(<MeetingTab />);
+    fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+    if (exit === "button") {
+      fireEvent.click(screen.getByRole("button", { name: "Thuyết trình" }));
+      await waitFor(() => expect((screen.getByRole("button", { name: "Trình chiếu" }) as HTMLButtonElement).disabled).toBe(false));
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Trình chiếu" })); });
+    } else {
+      fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
+    }
+    await screen.findByRole("dialog", { name: "Trình chiếu hồ sơ" });
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/presentation"))).toBe(true));
+    if (exit === "Escape") fireEvent.keyDown(document, { key: "Escape" });
+    else if (exit === "button") fireEvent.click(screen.getByRole("button", { name: "Thoát trình chiếu" }));
+    else { fullscreen = null; fireEvent(document, new Event("fullscreenchange")); }
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Trình chiếu hồ sơ" })).toBeNull());
+    expect(screen.getByText("Diễn giả hiện tại")).toBeTruthy();
+    expect(screen.getByTitle("Đóng popup")).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/control"))).toBe(false);
+  } finally {
+    cleanup();
+    await act(async () => {});
+    delete (document.documentElement as any).requestFullscreen;
+    delete (document as any).fullscreenElement;
+    delete (document as any).exitFullscreen;
+    vi.restoreAllMocks();
+  }
+});
+
 it("shares manual navigation and operating mode between slides and MC controls", async () => {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
   const people = [
