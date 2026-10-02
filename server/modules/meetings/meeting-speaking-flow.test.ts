@@ -17,6 +17,20 @@ function meeting(): any {
     ] };
 }
 
+test("previous speaker resets the target timer and preserves live or paused state", async () => {
+  for (const status of ["live", "paused"]) {
+    const item = meeting(); item.currentIndex = 1; item.status = status;
+    if (status === "paused") { item.speakerStartedAt = undefined; item.elapsedSeconds = 12; }
+    await controlMeeting(item, "previous", now);
+    assert.equal(item.currentIndex, 0);
+    assert.equal(item.status, status);
+    assert.equal(item.elapsedSeconds, 0);
+    assert.equal(item.speakerStartedAt, status === "live" ? now : undefined);
+    assert.equal(item.speakers[1].spokenSeconds, status === "live" ? 30 : 12);
+    await assert.rejects(controlMeeting(item, "previous", now), { status: 409 });
+  }
+});
+
 test("priority insertion shifts waiting speakers down without changing current speaker or allocations", async () => {
   const item = meeting();
   await reorderMeetingSpeakers(item, ["early", "chair", "second"]);

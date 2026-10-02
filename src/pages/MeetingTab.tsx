@@ -216,6 +216,7 @@ export default function MeetingTab() {
     localStorage.setItem("bni_auto_advance_delay", String(seconds));
   }, []);
   const autoAdvancedSpeakerRef = useRef<string | null>(null);
+  const meetingControlPending = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -397,6 +398,19 @@ export default function MeetingTab() {
     });
   };
 
+  const requestMeetingControl = async (action: string): Promise<void> => {
+    if (!activeMeeting || !canManage || meetingControlPending.current) return;
+    meetingControlPending.current = true;
+    setSaving(true);
+    try {
+      const updated: Meeting = await api(`/${activeMeeting._id}/control`, "POST", { action, version: activeMeeting.__v });
+      setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
+    } finally {
+      meetingControlPending.current = false;
+      setSaving(false);
+    }
+  };
+
   const control = async (action: string): Promise<void> => {
     if (!activeMeeting) return;
     const actionLabels: Record<string, string> = {
@@ -409,7 +423,7 @@ export default function MeetingTab() {
       finish: "Kết thúc cuộc họp",
     };
     await run(async () => {
-      await api(`/${activeMeeting._id}/control`, "POST", { action, version: activeMeeting.__v });
+      await requestMeetingControl(action);
       toast.success(actionLabels[action] || "Cập nhật trạng thái thành công");
     });
   };
@@ -431,9 +445,16 @@ export default function MeetingTab() {
   };
 
   const startPresentationTimer = useCallback(async (speakerId: string) => {
-    if (!activeMeeting || !canManage) return;
-    const updated: Meeting = await api('/' + activeMeeting._id + '/presentation', 'POST', { speakerId, version: activeMeeting.__v });
-    setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
+    if (!activeMeeting || !canManage || meetingControlPending.current) return;
+    meetingControlPending.current = true;
+    setSaving(true);
+    try {
+      const updated: Meeting = await api('/' + activeMeeting._id + '/presentation', 'POST', { speakerId, version: activeMeeting.__v });
+      setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
+    } finally {
+      meetingControlPending.current = false;
+      setSaving(false);
+    }
   }, [activeMeeting, canManage]);
 
   const current = activeMeeting && ["live", "paused"].includes(activeMeeting.status) ? activeMeeting.speakers[activeMeeting.currentIndex] : undefined;
@@ -459,7 +480,7 @@ export default function MeetingTab() {
         if (autoAdvancedSpeakerRef.current !== speakerKey) {
           autoAdvancedSpeakerRef.current = speakerKey;
           void run(async () => {
-            await api(`/${activeMeeting._id}/control`, "POST", { action: "next", version: activeMeeting.__v });
+            await requestMeetingControl("next");
             toast.success(upcoming ? `Hết giờ! Đã tự động chuyển sang: ${upcoming.name}` : "Đã hoàn tất phần phát biểu.");
           });
         }
@@ -882,7 +903,7 @@ export default function MeetingTab() {
 
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} onStartPresentation={canManage ? startPresentationTimer : undefined} autoAdvance={autoAdvance} autoAdvanceDelay={autoAdvanceDelay} onAutoAdvanceChange={updateAutoAdvance} onAutoAdvanceDelayChange={updateAutoAdvanceDelay} fullscreenRequest={presentationFullscreen.current} />}
+              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} onStartPresentation={canManage ? startPresentationTimer : undefined} onMoveSpeaker={direction => requestMeetingControl(direction > 0 ? "next" : "previous")} controlBusy={saving} autoAdvance={autoAdvance} autoAdvanceDelay={autoAdvanceDelay} onAutoAdvanceChange={updateAutoAdvance} onAutoAdvanceDelayChange={updateAutoAdvanceDelay} fullscreenRequest={presentationFullscreen.current} />}
               {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
               {(activeSubTab === "speakers" || activeSubTab === "checkin") && (
                 <div className="space-y-4">
@@ -1132,19 +1153,12 @@ export default function MeetingTab() {
                         )}
 
                         {/* Auto-Advance Setting Box */}
-                        {canManage && activeMeeting.status === "live" && (
+                        {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
                           <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50/90 border border-slate-200/80 text-xs">
-                            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 select-none">
-                              <input
-                                type="checkbox"
-                                checked={autoAdvance}
-                                onChange={e => updateAutoAdvance(e.target.checked)}
-                                className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 cursor-pointer"
-                              />
-                              <span className="flex items-center gap-1.5">
-                                <Sparkles className="h-3.5 w-3.5 text-cyan-600" />
-                                Tự động chuyển slide và người phát biểu tiếp theo
-                              </span>
+                            <label className="flex items-center gap-2 font-bold text-slate-700">Chế độ
+                              <select aria-label="Chế độ điều hành" value={autoAdvance ? "auto" : "manual"} disabled={saving} onChange={e => updateAutoAdvance(e.target.value === "auto")} className="rounded-lg border border-slate-300 bg-white p-2">
+                                <option value="manual">Thủ công</option><option value="auto">Tự động</option>
+                              </select>
                             </label>
 
                             {autoAdvance && (
@@ -1154,7 +1168,7 @@ export default function MeetingTab() {
                                 <span className="text-slate-600 font-semibold">giây</span>
                               </div>
                             )}
-                            <p className="w-full text-xs text-slate-500">Khi hết thời gian phát biểu, chờ {autoAdvanceDelay} giây rồi chuyển sang slide của thành viên hoặc khách mời tiếp theo. Đây là thời gian chờ chuyển lượt, không phải thời lượng phát biểu.</p>
+                            <p className="w-full text-xs text-slate-500">{autoAdvance ? <>Khi hết thời gian phát biểu, chờ {autoAdvanceDelay} giây rồi chuyển người và slide. Đây là thời gian chờ chuyển lượt, không phải thời lượng phát biểu.</> : "Bấm chuyển người ở tab Điều hành hoặc trên slide. Người phát biểu, đồng hồ và slide luôn đồng bộ."}</p>
                           </div>
                         )}
                       </div>

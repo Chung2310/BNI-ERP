@@ -243,7 +243,7 @@ export async function startMeetingPresentation(item: any, speakerId: string, now
 
 export async function controlMeeting(item: any, action: string, now = new Date()) {
   const status = item.status;
-  if (['start_speaker', 'reset_speaker', 'next'].includes(action) && !item.speakers[item.currentIndex]) {
+  if (['start_speaker', 'reset_speaker', 'next', 'previous'].includes(action) && !item.speakers[item.currentIndex]) {
     throw new MeetingError(409, 'Không có người đang chờ phát biểu.');
   }
   if (action === 'start' && status === 'scheduled') {
@@ -286,6 +286,13 @@ export async function controlMeeting(item: any, action: string, now = new Date()
     item.speakerStartedAt = undefined;
   } else if (action === 'finish') {
     throw new MeetingError(409, 'Cuộc họp phải đang diễn ra mới có thể kết thúc.');
+  } else if (action === 'previous' && ['live', 'paused'].includes(status)) {
+    if (item.currentIndex <= 0) throw new MeetingError(409, 'Đang ở người phát biểu đầu tiên.');
+    item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
+    item.currentIndex--;
+    item.elapsedSeconds = 0;
+    item.speakers[item.currentIndex].spokenSeconds = undefined;
+    item.speakerStartedAt = status === 'live' ? now : undefined;
   } else if (action === 'next' && ['live', 'paused'].includes(status)) {
     if (item.speakers[item.currentIndex]) {
       item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);

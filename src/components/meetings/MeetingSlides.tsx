@@ -12,6 +12,8 @@ type Props = {
   canManage: boolean;
   startFromFirst?: boolean;
   autoAdvance?: boolean;
+  onMoveSpeaker?: (direction: number) => Promise<void>;
+  controlBusy?: boolean;
   onStartPresentation?: (speakerId: string) => Promise<void>;
   autoAdvanceDelay?: number;
   onAutoAdvanceChange?: (enabled: boolean) => void;
@@ -23,7 +25,7 @@ type Props = {
 const button = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40";
 const fieldClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
 
-export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation }: Props) {
+export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -37,21 +39,16 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   const [revision, setRevision] = useState(0);
   const [selectedId, setSelectedId] = useState("");
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
-  const [mode, setMode] = useState<"manual" | "auto" | "live">(autoAdvance ? "auto" : "manual");
-  const changeMode = useCallback((next: "manual" | "auto" | "live") => {
-    if (next === "auto" && !canManage) return;
-    setMode(next);
+  const mode = autoAdvance ? "auto" : "manual";
+  const changeMode = useCallback((next: "manual" | "auto") => {
+    if (!canManage) return;
     onAutoAdvanceChange?.(next === "auto");
   }, [onAutoAdvanceChange, canManage]);
-  useEffect(() => {
-    setMode(previous => autoAdvance ? "auto" : previous === "auto" ? "manual" : previous);
-  }, [autoAdvance]);
   const [presenting, setPresenting] = useState(startFromFirst);
   const [cleanPresentation, setCleanPresentation] = useState(startFromFirst);
   const presentationActive = useRef(startFromFirst);
   presentationActive.current = presenting;
   const presentationDialog = useRef<HTMLDivElement>(null);
-  const [openingSlide, setOpeningSlide] = useState<{ slideId: string; speakerId: string | undefined } | null>(null);
   const [controls, setControls] = useState(true);
   const [draft, setDraft] = useState<ProfileSlide | null>(null);
   const [saving, setSaving] = useState(false);
@@ -95,24 +92,34 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
 
   const queue = useMemo(() => deck.slides.filter(s => !excluded.has(s.id)), [deck.slides, excluded]);
   const currentSpeakerId = ["live", "paused"].includes(meeting.status) ? meeting.speakers[meeting.currentIndex]?.id : undefined;
-  // Preview the first profile on launch, then follow the next MC speaker change.
-  const liveSlideId = openingSlide && openingSlide.speakerId === currentSpeakerId ? openingSlide.slideId : currentSpeakerId;
-  const followsSpeaker = mode !== "manual";
+  // Both operating modes share the meeting's current speaker. Only scheduled meetings use local previews.
+  const followsSpeaker = meeting.status !== "scheduled";
   const selected = followsSpeaker
-    ? deck.slides.find(s => s.id === liveSlideId)
+    ? deck.slides.find(s => s.id === currentSpeakerId)
     : queue.find(s => s.id === selectedId) || queue[0];
-  useEffect(() => {
-    if (openingSlide && openingSlide.speakerId !== currentSpeakerId) setOpeningSlide(null);
-  }, [currentSpeakerId, openingSlide]);
   const active = draft || selected;
   const speechesComplete = !!meeting.speechesCompletedAt && ["live", "paused"].includes(meeting.status);
   const timer = useMemo(() => getSlideTimer(meeting, active?.id, now), [meeting, active?.id, now]);
   const index = queue.findIndex(s => s.id === selected?.id);
 
+  const navigationBusy = startingSpeech || controlBusy || !!draft || loading;
+  const canMove = (direction: number) => !navigationBusy && (followsSpeaker
+    ? canManage && !!onMoveSpeaker && !autoAdvance && !!currentSpeakerId && (direction > 0 || meeting.currentIndex > 0)
+    : !!queue.length && index + direction >= 0 && index + direction < queue.length);
   const move = useCallback((direction: number) => {
-    setDraft(null);
-    if (queue.length) setSelectedId(queue[(Math.max(0, index) + direction + queue.length) % queue.length].id);
-  }, [queue, index]);
+    if (speechRequest.current || controlBusy || draft || loading) return;
+    if (!followsSpeaker) {
+      const next = queue[index + direction];
+      if (next) setSelectedId(next.id);
+      return;
+    }
+    if (!canManage || !onMoveSpeaker || autoAdvance || !currentSpeakerId || (direction < 0 && meeting.currentIndex <= 0)) return;
+    speechRequest.current = true;
+    setStartingSpeech(true); setError("");
+    void onMoveSpeaker(direction).catch(error => {
+      setError(error instanceof Error ? error.message : "Không chuyển được lượt. Vui lòng thử lại.");
+    }).finally(() => { speechRequest.current = false; if (mounted.current) setStartingSpeech(false); });
+  }, [queue, index, followsSpeaker, canManage, onMoveSpeaker, autoAdvance, currentSpeakerId, meeting.currentIndex, controlBusy, draft, loading]);
 
 
 
@@ -154,13 +161,13 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   }, [queue, index]);
 
   const closePresentation = useCallback(() => {
-    setPresenting(false); setMode(autoAdvance ? "auto" : "manual"); setOpeningSlide(null);
+    setPresenting(false);
     presentationActive.current = false;
     onPresentationStarted?.();
     if (fullScreenOwned.current && document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     fullScreenOwned.current = false;
     window.setTimeout(() => launchButton.current?.focus(), 0);
-  }, [onPresentationStarted, autoAdvance]);
+  }, [onPresentationStarted]);
 
   useEffect(() => {
     if (!fullscreenRequest) return;
@@ -205,7 +212,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
         if (cleanPresentation && mode !== "manual") return;
-        changeMode("manual"); move(e.key === "ArrowRight" ? 1 : -1);
+        move(e.key === "ArrowRight" ? 1 : -1);
       }
       if (!cleanPresentation && e.code === "Space" && !(document.activeElement instanceof HTMLButtonElement)) {
         e.preventDefault(); changeMode(mode === "auto" ? "manual" : "auto");
@@ -238,9 +245,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
 
   const beginPresentation = useCallback((slide: ProfileSlide, clean = true) => {
     if (speechRequest.current) return;
-    setOpeningSlide({ slideId: slide.id, speakerId: currentSpeakerId });
     setSelectedId(slide.id);
-    setMode(autoAdvance ? "auto" : "manual");
     present(clean);
     if (onStartPresentation) {
       speechRequest.current = true;
@@ -250,7 +255,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         setError(error instanceof Error ? error.message : "Không bắt đầu được bộ đếm. Vui lòng thử lại.");
       }).finally(() => { speechRequest.current = false; if (mounted.current) setStartingSpeech(false); });
     }
-  }, [currentSpeakerId, present, autoAdvance, onStartPresentation, closePresentation]);
+  }, [present, onStartPresentation, closePresentation]);
 
   useEffect(() => {
     if (!startFromFirst || loading || error || !deck.slides.length) return;
@@ -298,8 +303,8 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   return <section aria-label="Slide giới thiệu" className="space-y-4">
     {timer && <p className="sr-only" role="timer" aria-live="off">#{timer.arrivalOrder}: {timer.time}. {timer.label}</p>}
     <div className="flex flex-wrap items-center gap-2">
-      <label className="text-sm font-semibold">Chế độ <select aria-label="Chế độ trình chiếu" className="ml-2 rounded-lg border p-2" value={mode} disabled={!!draft} onChange={e => changeMode(e.target.value as typeof mode)}>
-        <option value="manual">Chuyển thủ công</option><option value="auto" disabled={!canManage}>Tự chuyển sau khi hết giờ</option><option value="live">Theo người đang phát biểu</option>
+      <label className="text-sm font-semibold">Chế độ <select aria-label="Chế độ trình chiếu" className="ml-2 rounded-lg border p-2" value={mode} disabled={!!draft || !canManage || !onAutoAdvanceChange || navigationBusy} onChange={e => changeMode(e.target.value as typeof mode)}>
+        <option value="manual">Thủ công</option><option value="auto">Tự động</option>
       </select></label>
       {mode === "auto" && <label className="flex items-center gap-2 text-sm">Chờ sau khi hết giờ <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={value => onAutoAdvanceDelayChange?.(value)} disabled={!canManage} /> giây rồi chuyển slide</label>}
       <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={16} /> Làm mới hồ sơ</button>
@@ -311,12 +316,12 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
       <aside className="space-y-2 rounded-xl border bg-white p-3">
         <p className="text-sm font-bold">Danh sách chiếu ({queue.length}/{deck.slides.length})</p>
-        <p className="text-xs text-slate-500">Theo thứ tự check-in / phát biểu. Chế độ theo diễn giả luôn hiển thị người đang nói.</p>
-        <button className="text-xs text-red-700 underline" disabled={!!draft} onClick={() => setExcluded(new Set())}>Chọn tất cả</button>
+        <p className="text-xs text-slate-500">Khi đang họp, slide luôn đồng bộ với người phát biểu. Chế độ thủ công cho phép chuyển lượt tại đây hoặc tab Điều hành.</p>
+        {!followsSpeaker && <button className="text-xs text-red-700 underline" disabled={!!draft} onClick={() => setExcluded(new Set())}>Chọn tất cả</button>}
         <div className="max-h-80 space-y-1 overflow-auto">
           {deck.slides.map(s => <div key={s.id} className={`flex items-center gap-2 rounded-lg p-2 ${selected?.id === s.id ? "bg-red-50" : ""}`}>
-            <input type="checkbox" aria-label={`Chiếu ${s.name}`} checked={!excluded.has(s.id)} disabled={!!draft || followsSpeaker} onChange={e => setExcluded(old => { const next = new Set(old); if (e.target.checked) next.delete(s.id); else next.add(s.id); return next; })} />
-            <button className="min-w-0 text-left text-sm disabled:opacity-50" disabled={!!draft || excluded.has(s.id)} onClick={() => { setSelectedId(s.id); changeMode("manual"); }}>
+            {!followsSpeaker && <input type="checkbox" aria-label={`Chiếu ${s.name}`} checked={!excluded.has(s.id)} disabled={!!draft} onChange={e => setExcluded(old => { const next = new Set(old); if (e.target.checked) next.delete(s.id); else next.add(s.id); return next; })} />}
+            <button className="min-w-0 text-left text-sm disabled:opacity-50" disabled={!!draft || followsSpeaker || excluded.has(s.id)} onClick={() => setSelectedId(s.id)}>
               <span className="block truncate font-semibold">{s.name}</span><span className="text-xs text-slate-500">{s.kind === "member" ? "Thành viên" : "Khách mời"}</span>
             </button>
           </div>)}
@@ -331,11 +336,11 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <button aria-label="Slide trước" className={button} disabled={!queue.length || !!draft || followsSpeaker} onClick={() => { changeMode("manual"); move(-1); }}><ChevronLeft size={16} /></button>
+            <button aria-label="Slide trước" className={button} disabled={!canMove(-1)} onClick={() => move(-1)}><ChevronLeft size={16} /></button>
             <span className="text-sm text-slate-500">{followsSpeaker ? "Đồng bộ diễn giả" : `${index < 0 ? 0 : index + 1} / ${queue.length}`}</span>
-            <button aria-label="Slide tiếp" className={button} disabled={!queue.length || !!draft || followsSpeaker} onClick={() => { changeMode("manual"); move(1); }}><ChevronRight size={16} /></button>
+            <button aria-label="Slide tiếp" className={button} disabled={!canMove(1)} onClick={() => move(1)}><ChevronRight size={16} /></button>
           </div>
-          {canManage && active && !draft && <button className={button} disabled={loading || !!error} onClick={() => { changeMode("manual"); setSelectedId(active.id); draftVersion.current = deck.version; setDraft({ ...active }); }}><Pencil size={16} /> Bổ sung thông tin slide</button>}
+          {canManage && active && !draft && <button className={button} disabled={loading || !!error} onClick={() => { setSelectedId(active.id); draftVersion.current = deck.version; setDraft({ ...active }); }}><Pencil size={16} /> Bổ sung thông tin slide</button>}
         </div>
         {warnings.map(w => <p key={w} role="status" className="text-sm text-amber-700">{w}</p>)}
         {draft && <form className="space-y-3 rounded-xl border bg-white p-4" onSubmit={e => { e.preventDefault(); void save(); }}>
@@ -361,10 +366,10 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       <div style={{ width: "min(100vw, 177.7778vh)", height: "min(100vh, 56.25vw)" }}>{canvas(screen)}</div>
       {(loading || error || drawing || !active || drawError) && <div role="status" className="absolute text-white">{speechesComplete && followsSpeaker ? <div className="max-w-2xl rounded-3xl bg-white p-12"><SpeechesCompleteMessage /></div> : error || drawError || (loading ? "Đang tải slide…" : active ? "Đang chuẩn bị slide…" : "Chờ người phát biểu…")}</div>}
       {!cleanPresentation && <div data-slide-controls className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-slate-900/90 p-3 text-white" style={{ opacity: controls ? 1 : 0 }} onFocus={() => setControls(true)}>
-        <button aria-label="Slide trước khi trình chiếu" className="rounded p-2" onClick={() => { changeMode("manual"); move(-1); }}><ChevronLeft /></button>
-        <button aria-label={mode === "auto" ? "Tạm dừng tự chạy" : "Bật tự chạy"} className="rounded p-2" onClick={() => changeMode(mode === "auto" ? "manual" : "auto")}>{mode === "auto" ? <Pause /> : <Play />}</button>
+        <button aria-label="Slide trước khi trình chiếu" disabled={!canMove(-1)} className="rounded p-2 disabled:opacity-40" onClick={() => move(-1)}><ChevronLeft /></button>
+        <button aria-label={mode === "auto" ? "Tạm dừng tự chạy" : "Bật tự chạy"} disabled={!canManage || !onAutoAdvanceChange || navigationBusy} className="rounded p-2 disabled:opacity-40" onClick={() => changeMode(mode === "auto" ? "manual" : "auto")}>{mode === "auto" ? <Pause /> : <Play />}</button>
         <span className="whitespace-nowrap text-sm">{followsSpeaker ? "Theo diễn giả" : `${index + 1} / ${queue.length}`}</span>
-        <button aria-label="Slide tiếp khi trình chiếu" className="rounded p-2" onClick={() => { changeMode("manual"); move(1); }}><ChevronRight /></button>
+        <button aria-label="Slide tiếp khi trình chiếu" disabled={!canMove(1)} className="rounded p-2 disabled:opacity-40" onClick={() => move(1)}><ChevronRight /></button>
         <button ref={exitButton} aria-label="Thoát trình chiếu" className="rounded p-2" onClick={closePresentation}><X /></button>
       </div>}
     </div>, document.body)}
