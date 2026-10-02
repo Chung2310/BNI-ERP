@@ -1058,7 +1058,6 @@ export default function MeetingTab() {
                           className="flex items-center gap-1.5 rounded-xl bg-cyan-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-40">
                           <Play className="h-3.5 w-3.5" /> Bắt đầu thuyết trình
                         </button>
-                        {presentationSpeakerId && <span className="text-xs text-cyan-800">Bắt đầu từ: {activeMeeting.speakers.find(s => s.id === presentationSpeakerId)?.name}</span>}
                   {canManage && activeMeeting.status === "scheduled" && (
                     <button
                       type="button"
@@ -1773,9 +1772,10 @@ export default function MeetingTab() {
                 <h4 className="font-bold text-slate-800">Sắp xếp thứ tự thuyết trình</h4>
                 <div className="flex flex-wrap items-end gap-3">
                   <label className="min-w-48 flex-1 text-xs font-semibold">Chọn người phát biểu
-                    <select aria-label="Chọn người để sắp xếp" disabled={saving || pendingStart >= orderingMeeting.speakers.length} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm"
+                    <select aria-label="Chọn người để sắp xếp" disabled={saving} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm"
                       value={orderingMeeting.speakers.slice(pendingStart).some(person => person.id === prioritySpeakerId) ? prioritySpeakerId : orderingMeeting.speakers[pendingStart]?.id || ""}
                       onChange={event => setPrioritySpeakerId(event.target.value)}>
+                      {pendingStart >= orderingMeeting.speakers.length && <option value="">Không còn người đang chờ phát biểu</option>}
                       {orderingMeeting.speakers.map((person, index) => <option key={person.id} value={person.id} disabled={index < pendingStart}>{person.name}{index < pendingStart ? index === orderingMeeting.currentIndex ? " — Đang phát biểu" : " — Đã phát biểu" : ""}</option>)}
                     </select>
                   </label>
@@ -1792,6 +1792,7 @@ export default function MeetingTab() {
                       if (target !== index) reorder(index, target - index);
                     }}>Áp dụng thứ tự</button>
                 </div>
+                {pendingStart >= orderingMeeting.speakers.length && <p role="status" className="text-xs text-slate-600">Danh sách check-in đã được tải. Các lượt đã hoàn tất hoặc đang phát biểu nên không thể đổi ưu tiên. Để thuyết trình lại, chọn người trong tab Thuyết trình rồi bấm Bắt đầu thuyết trình.</p>}
                 <ol className="list-inside list-decimal space-y-1 text-xs text-slate-600">
                   {orderingMeeting.speakers.map(person => <li key={person.id}>{person.name}</li>)}
                 </ol>
