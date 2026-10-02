@@ -23,6 +23,7 @@ export default function SettingsTab() {
   const scrollSubTabs = (direction: "left" | "right") => subTabsRef.current?.scrollBy({ left: direction === "left" ? -280 : 280, behavior: "smooth" });
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { userProfile, uploadAvatar } = useAuth();
+  const isAdmin = userProfile?.role === "admin";
   
   const [photoURL, setPhotoURL] = useState(userProfile?.photoURL || "");
   const [displayName, setDisplayName] = useState(userProfile?.displayName || "");
@@ -31,6 +32,11 @@ export default function SettingsTab() {
   // Sub-tabs in Settings
   const [activeSubTab, setActiveSubTab] = useSubTabRouter<SettingsSubTabType>(SETTINGS_SUB_TAB_ROUTES, "profile");
 
+
+  const visibleSubTab = activeSubTab === "erp" && !isAdmin ? "profile" : activeSubTab;
+  React.useEffect(() => {
+    if (userProfile && !isAdmin && activeSubTab === "erp") setActiveSubTab("profile");
+  }, [userProfile, isAdmin, activeSubTab, setActiveSubTab]);
 
   // Synchronize display name and photo url from context if it updates
   React.useEffect(() => {
@@ -109,7 +115,7 @@ export default function SettingsTab() {
             <h1 className="text-xl md:text-2xl font-black text-cyan-700 dark:text-cyan-400 tracking-tight">
               Cài đặt Hệ thống & Cá nhân
             </h1>
-            <p className="text-xs text-slate-500 font-medium">Tùy chỉnh thông tin tài khoản, bảo mật và kết nối ERP</p>
+            <p className="text-xs text-slate-500 font-medium">{isAdmin ? "Tùy chỉnh thông tin tài khoản, bảo mật và kết nối ERP" : "Tùy chỉnh thông tin tài khoản và bảo mật"}</p>
           </div>
         </div>
         <div className="flex min-w-0 flex-1 items-center gap-1 select-none">
@@ -118,9 +124,9 @@ export default function SettingsTab() {
             {[
               { id: "profile", label: "Hồ sơ cá nhân", icon: User },
               { id: "security", label: "Bảo mật", icon: Shield },
-              { id: "erp", label: "Cấu hình ERP", icon: Sliders },
+              ...(isAdmin ? [{ id: "erp", label: "Cấu hình ERP", icon: Sliders }] : []),
             ].map((tab) => {
-              const isActive = activeSubTab === tab.id;
+              const isActive = visibleSubTab === tab.id;
               const Icon = tab.icon;
               return (
                 <button
@@ -147,7 +153,7 @@ export default function SettingsTab() {
 
         {/* Left Column: Quick Profile Card */}
         <div className={`relative flex flex-col items-center gap-4 overflow-hidden rounded-2xl border border-gray-200/80 bg-white/80 p-4 text-center shadow-xs backdrop-blur-md sm:p-6 ${
-          activeSubTab !== "profile" ? "hidden lg:flex" : "flex"
+          visibleSubTab !== "profile" ? "hidden lg:flex" : "flex"
         }`}>
           <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-r from-blue-500 to-indigo-600 opacity-80" />
 
@@ -207,9 +213,9 @@ export default function SettingsTab() {
         {/* Right Columns: Settings Forms */}
         <div className="lg:col-span-2 space-y-6">
           <Suspense fallback={<TabLoader label="Đang tải cấu hình..." />}>
-            {activeSubTab === "profile" && <ProfileTab />}
-            {activeSubTab === "security" && <SecurityTab />}
-            {activeSubTab === "erp" && <ErpConfigTab />}
+            {visibleSubTab === "profile" && <ProfileTab />}
+            {visibleSubTab === "security" && <SecurityTab />}
+            {isAdmin && visibleSubTab === "erp" && <ErpConfigTab />}
           </Suspense>
         </div>
 

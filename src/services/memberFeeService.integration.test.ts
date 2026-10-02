@@ -427,3 +427,11 @@ it("reviews a transfer if its fee disappears after lookup but before credit", as
   try { expect(await processSePay("A", bankTransfer(fee.paymentCode!))).toMatchObject({ status: "review" }); }
   finally { spy.mockRestore(); }
 });
+
+it("returns only newly persisted fee IDs for automatic notifications", async () => {
+  const first = await createMemberFees("A", "admin", assignment(), true);
+  expect(first.createdIds).toHaveLength(1);
+  expect((await getFee("A", first.createdIds![0])).memberId).toBe(memberId);
+  const repeated = await createMemberFees("A", "admin", assignment(), true);
+  expect(repeated).toMatchObject({ created: 0, skipped: 1, createdIds: [] });
+});

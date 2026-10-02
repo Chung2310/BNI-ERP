@@ -1,3 +1,4 @@
+import MemberMessageButton from "./MemberMessageButton";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Users,
@@ -1397,7 +1398,8 @@ export default function OrgChartTab({
                           {(() => {
                             const dept =
                               employee.department &&
-                              !employee.department.toLowerCase().includes("ban giám đốc")
+                              !employee.department.toLowerCase().includes("ban giám đốc") &&
+                              normalizeString(employee.department) !== "nhan su"
                                 ? employee.department
                                 : null;
                             const companyOrDept = [employee.companyName, dept].filter(Boolean).join(" · ");
@@ -1890,6 +1892,7 @@ export default function OrgChartTab({
 
                   {/* Modal Actions */}
                   <div className="pt-4 mt-4 border-t border-slate-100 flex flex-wrap gap-2.5">
+                    <MemberMessageButton key={selectedEmp.id} memberId={selectedEmp.id} currentUserId={userProfile?.uid} onOpened={closeDetailModal} />
                     {canEditEmployee(selectedEmp.id) && (
                       <button
                         type="button"

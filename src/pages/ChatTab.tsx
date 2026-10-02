@@ -716,6 +716,19 @@ export default function ChatTab() {
       const sorted = sortRoomsList(data);
       setRooms(sorted);
 
+      // A member profile link takes priority over the last selected conversation.
+      const requestedRoomId = new URL(window.location.href).searchParams.get("room");
+      if (requestedRoomId) {
+        const requestedRoom = sorted.find(room => room._id === requestedRoomId)
+          || await internalChatService.getRoomById(requestedRoomId);
+        if (!sorted.some(room => room._id === requestedRoom._id)) setRooms(sortRoomsList([requestedRoom, ...sorted]));
+        setActiveRoom(requestedRoom);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("room");
+        window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+        return;
+      }
+
       // Tự động mở cuộc trò chuyện ở phiên trước hoặc mặc định mở Chatbot AI
       if (sorted.length > 0) {
         const savedRoomId = localStorage.getItem("lastActiveChatRoomId") || sessionStorage.getItem("activeRoomId");

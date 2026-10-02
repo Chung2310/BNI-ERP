@@ -517,6 +517,11 @@ export default function MemberFeesTab() {
           ? "; bỏ qua " + result.skipped + " khoản đã tồn tại."
           : "."),
       );
+      if (result.notificationFailures?.length) {
+        toast.warning("Đã tạo khoản phí, nhưng " + result.notificationFailures.length + " khoản chưa gửi đầy đủ thông báo/email. " + result.notificationFailures[0].message + " Bạn có thể dùng nút gửi thông báo để thử lại.");
+      } else if (result.notified) {
+        toast.success("Đã gửi thông báo và email đóng phí cho " + result.notified + " thành viên.");
+      }
       setCreating(false);
       setReload((value) => value + 1);
     } catch (e: any) {
@@ -1777,7 +1782,7 @@ export default function MemberFeesTab() {
                   {busy ? (
                     <span className="flex items-center justify-center gap-2">
                       <RefreshCw className="h-4 w-4 animate-spin" />
-                      Đang tạo...
+                      Đang tạo và gửi thông báo...
                     </span>
                   ) : (
                     `Tạo cho ${selected.length} thành viên`

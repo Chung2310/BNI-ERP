@@ -1,10 +1,11 @@
+import { createAndNotifyMemberFees } from "./member-fee-notification.service";
 import { Router } from "express";
 import { requireAuth, requirePermission, requireRole } from "../../middleware/auth";
 import { requireModule } from "../../middleware/require-module";
 import { UserModel } from "../../model/user.model";
 import { MemberFeeModel } from "./member-fee.model";
 import { createFeeInput, feePaymentInput, voidFeePaymentInput } from "./member-fee.validation";
-import { deleteMemberFee, createMemberFees, getFee, MemberFeeError, receiveFee, serializeFee, voidFeePayment } from "./member-fee.service";
+import { deleteMemberFee, getFee, MemberFeeError, receiveFee, serializeFee, voidFeePayment } from "./member-fee.service";
 
 import { getSePayConfig, notifyFee, feeCheckout } from "./sepay.service";
 import { SePayTransactionModel } from "./sepay.model";
@@ -35,7 +36,7 @@ memberFeeRouter.get("/", read, async (req: any, res) => {
 memberFeeRouter.post("/", requireRole(["admin"]) as any, manage, async (req: any, res) => {
   const { error, value } = createFeeInput.validate(req.body);
   if (error) return res.status(400).json({ message: "Vui lòng kiểm tra tên phí, số tiền, hạn đóng và danh sách thành viên." });
-  try { res.status(201).json({ data: await createMemberFees(company(req), req.user.id, value) }); }
+  try { res.status(201).json({ data: await createAndNotifyMemberFees(company(req), req.user.id, value) }); }
   catch (e) { fail(res, e); }
 });
 memberFeeRouter.get("/sepay/config", requireRole(["admin"]) as any, read, async (req: any, res) => {
