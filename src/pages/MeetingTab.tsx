@@ -1090,6 +1090,8 @@ export default function MeetingTab() {
                       <div className="flex flex-wrap items-center gap-2">
                         <button type="button" disabled={saving || !activeMeeting.speakers.length}
                           onClick={() => {
+                            const targetSpeakerId = (checkedSpeakerIds.length > 0 ? checkedSpeakerIds[checkedSpeakerIds.length - 1] : presentationSpeakerId) || "";
+                            if (targetSpeakerId) setPresentationSpeakerId(targetSpeakerId);
                             presentationFullscreen.current = document.documentElement.requestFullscreen && !document.fullscreenElement
                               ? document.documentElement.requestFullscreen().then(() => true).catch(() => false)
                               : null;
@@ -1469,7 +1471,7 @@ export default function MeetingTab() {
                         </button>
                         <button
                           type="button"
-                          className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                          className="text-xs text-slate-500 hover:text-cyan-700 transition-colors cursor-pointer"
                           disabled={saving}
                           onClick={() => setCheckedSpeakerIds([])}
                         >
@@ -1515,7 +1517,22 @@ export default function MeetingTab() {
                               <span className="w-6 text-center font-mono text-xs font-bold text-slate-400">
                                 {i + 1}
                               </span>
-                              {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && <input type="checkbox" aria-label={`Chọn ${p.name}`} checked={checkedSpeakerIds.includes(p.id)} disabled={saving || (activeMeeting.status !== "scheduled" && i < activeMeeting.currentIndex)} onChange={e => setCheckedSpeakerIds(ids => e.target.checked ? [...ids, p.id] : ids.filter(id => id !== p.id))} />}
+                              {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
+                                <input
+                                  type="checkbox"
+                                  aria-label={`Chọn ${p.name}`}
+                                  checked={checkedSpeakerIds.includes(p.id)}
+                                  disabled={saving || (activeMeeting.status !== "scheduled" && i < activeMeeting.currentIndex)}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setCheckedSpeakerIds(ids => [...ids, p.id]);
+                                      setPresentationSpeakerId(p.id);
+                                    } else {
+                                      setCheckedSpeakerIds(ids => ids.filter(id => id !== p.id));
+                                    }
+                                  }}
+                                />
+                              )}
 
                               {p.photoURL ? (
                                 <img

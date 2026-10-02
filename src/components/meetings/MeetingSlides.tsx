@@ -307,7 +307,17 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       {mode === "auto" && <label className="flex items-center gap-2 text-sm">Chờ sau khi hết giờ <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={value => onAutoAdvanceDelayChange?.(value)} disabled={!canManage} /> giây rồi chuyển slide</label>}
       <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={16} /> Làm mới hồ sơ</button>
       <button className={button} disabled={!ready} onClick={download}><Download size={16} /> Tải PNG</button>
-      <button ref={launchButton} className={button} disabled={navigationBusy || !!error || !selected} onClick={() => { if (selected) beginPresentation(selected); }}><Play size={16} /> Bắt đầu thuyết trình</button>
+      <button
+        ref={launchButton}
+        className={button}
+        disabled={navigationBusy || !!error || !selected}
+        onClick={() => {
+          const target = (checkedSpeakerIds.length > 0 ? deck.slides.find(s => s.id === checkedSpeakerIds[checkedSpeakerIds.length - 1] || checkedSpeakerIds.includes(s.id)) : null) || selected;
+          if (target) beginPresentation(target);
+        }}
+      >
+        <Play size={16} /> Bắt đầu thuyết trình
+      </button>
     </div>
     <p className="text-xs text-slate-500">Toàn màn hình: dùng phím ← → để chuyển lượt ở chế độ thủ công; Esc để trở về Điều hành.</p>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error} <button className="underline" onClick={() => setRevision(v => v + 1)}>Tải lại dữ liệu</button></p>}
@@ -338,9 +348,12 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
             </button>
             <button
               type="button"
-              className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
+              className="text-xs text-slate-500 hover:text-cyan-700 transition-colors cursor-pointer"
               disabled={navigationBusy}
-              onClick={() => setCheckedSpeakerIds([])}
+              onClick={() => {
+                setCheckedSpeakerIds([]);
+                setSelectedId("");
+              }}
             >
               Bỏ chọn
             </button>
@@ -348,7 +361,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         )}
         <div className="flex-1 min-h-[360px] max-h-[540px] lg:max-h-none space-y-1 overflow-y-auto pr-1 mt-2">
           {deck.slides.map(s => {
-            const isSelected = selected?.id === s.id;
+            const isSelected = selected?.id === s.id || checkedSpeakerIds.includes(s.id);
             return (
               <div
                 key={s.id}
@@ -364,7 +377,20 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
                     aria-label={`Chọn ${s.name}`}
                     checked={checkedSpeakerIds.includes(s.id)}
                     disabled={navigationBusy || (meeting.status !== "scheduled" && meeting.speakers.findIndex(person => person.id === s.id) < meeting.currentIndex)}
-                    onChange={e => setCheckedSpeakerIds(ids => e.target.checked ? [...ids, s.id] : ids.filter(id => id !== s.id))}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setCheckedSpeakerIds(ids => [...ids, s.id]);
+                        setSelectedId(s.id);
+                      } else {
+                        setCheckedSpeakerIds(ids => {
+                          const next = ids.filter(id => id !== s.id);
+                          if (selectedId === s.id) {
+                            setSelectedId(next[next.length - 1] || "");
+                          }
+                          return next;
+                        });
+                      }
+                    }}
                   />
                 )}
                 {!followsSpeaker && !(canManage && onDeferSpeaker) && meeting.status === "scheduled" && (
