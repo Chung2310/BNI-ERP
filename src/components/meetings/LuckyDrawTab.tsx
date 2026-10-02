@@ -27,6 +27,7 @@ import {
   Dices,
   Play,
   Disc,
+  X,
 } from "lucide-react";
 import {
   Meeting,
@@ -1047,19 +1048,26 @@ export function LuckyDrawTab({
       {isPrizeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
-            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Trophy className="h-5 w-5 text-amber-400" />
-                <h3 className="font-bold text-sm">
-                  {editingPrize ? "Sửa giải thưởng" : "Thêm giải thưởng mới"}
-                </h3>
+            <div className="bg-white border-b border-slate-100 p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-50 text-amber-500 rounded-xl border border-amber-100/80 shadow-xs">
+                  <Trophy className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">
+                    {editingPrize ? "Sửa giải thưởng" : "Thêm giải thưởng mới"}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {editingPrize ? "Cập nhật thông tin chi tiết giải thưởng" : "Thiết lập giải thưởng mới cho vòng quay"}
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsPrizeModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg"
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -1072,7 +1080,7 @@ export function LuckyDrawTab({
                   placeholder="Ví dụ: Giải Nhất, Giải Đặc Biệt..."
                   value={prizeName}
                   onChange={(e) => setPrizeName(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#0088A9]"
                 />
               </div>
 
@@ -1083,7 +1091,7 @@ export function LuckyDrawTab({
                   placeholder="Ví dụ: Xe máy Honda Wave, 5.000.000đ tiền mặt..."
                   value={prizeReward}
                   onChange={(e) => setPrizeReward(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#0088A9]"
                 />
               </div>
 
@@ -1095,7 +1103,7 @@ export function LuckyDrawTab({
                     min="1"
                     value={prizeQuantity}
                     onChange={(e) => setPrizeQuantity(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#0088A9]"
                   />
                 </div>
 
@@ -1106,7 +1114,7 @@ export function LuckyDrawTab({
                     min="1"
                     value={prizeOrder}
                     onChange={(e) => setPrizeOrder(Number(e.target.value))}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#0088A9]"
                   />
                 </div>
               </div>
@@ -1135,7 +1143,7 @@ export function LuckyDrawTab({
                 <button
                   type="submit"
                   disabled={savingPrize}
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-[#0088A9] hover:bg-[#007490] text-white text-xs font-bold shadow-md shadow-cyan-900/10 cursor-pointer disabled:opacity-50"
                 >
                   {savingPrize ? "Đang lưu..." : "Lưu giải thưởng"}
                 </button>

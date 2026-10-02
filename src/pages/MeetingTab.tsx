@@ -165,7 +165,7 @@ export default function MeetingTab() {
   const presentationClosed = useCallback(() => {
     setStartPresentation(false);
     presentationFullscreen.current = null;
-    setActiveSubTab("speakers");
+    setActiveSubTab("slides");
   }, []);
   const [prioritySpeakerId, setPrioritySpeakerId] = useState("");
   const [priorityPosition, setPriorityPosition] = useState(1);
