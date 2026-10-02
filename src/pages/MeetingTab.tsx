@@ -677,12 +677,12 @@ export default function MeetingTab() {
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-black/20" />
                     </>
                   ) : (
-                    <div className="relative h-full w-full bg-gradient-to-br from-slate-50 via-white to-rose-50/60 p-3 flex items-center justify-end overflow-hidden border-b border-slate-100">
-                      {/* Subtle BNI corporate accents */}
-                      <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-gradient-to-br from-red-600/10 via-rose-500/5 to-transparent blur-md pointer-events-none" />
+                    <div className="relative h-full w-full bg-gradient-to-br from-slate-50 via-slate-100/70 to-slate-200/50 p-3 flex items-center justify-end overflow-hidden border-b border-slate-200/60">
+                      {/* Subtle elegant neutral accents */}
+                      <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-slate-200/60 blur-md pointer-events-none" />
                       <div className="absolute -left-6 -bottom-6 h-20 w-28 rounded-full bg-slate-200/40 blur-sm pointer-events-none" />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-25 pointer-events-none">
-                        <CalendarDays className="h-16 w-16 text-rose-600 rotate-12 transition-transform duration-300 group-hover:scale-110" />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-30 pointer-events-none">
+                        <CalendarDays className="h-16 w-16 text-slate-400 rotate-12 transition-transform duration-300 group-hover:scale-110" />
                       </div>
                     </div>
                   )}
@@ -690,14 +690,7 @@ export default function MeetingTab() {
                   {/* Status Badge */}
                   <div className="absolute top-2 left-2">
                     {m.status === "live" ? (
-                      <span
-                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border backdrop-blur-md shadow-md"
-                        style={{
-                          backgroundColor: "rgba(5, 20, 10, 0.9)",
-                          borderColor: "#22c55e",
-                          color: "#22c55e",
-                        }}
-                      >
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-green-300 bg-green-50/95 text-green-700 shadow-xs backdrop-blur-xs">
                         <span className="relative flex h-2 w-2 shrink-0">
                           <span
                             className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-80"
@@ -705,16 +698,16 @@ export default function MeetingTab() {
                           />
                           <span
                             className="relative inline-flex rounded-full h-2 w-2"
-                            style={{ backgroundColor: "#22c55e" }}
+                            style={{ backgroundColor: "#16a34a" }}
                           />
                         </span>
-                        <span className="animate-pulse tracking-tight font-extrabold" style={{ color: "#22c55e" }}>
+                        <span className="animate-pulse tracking-tight font-extrabold text-green-700">
                           Đang diễn ra {getLiveElapsedMinutes(m.startsAt)} phút
                         </span>
                       </span>
                     ) : m.status === "paused" ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-sky-400/80 bg-slate-950/85 text-sky-400 shadow-md shadow-sky-500/25 backdrop-blur-md">
-                        <span className="h-2 w-2 rounded-full bg-sky-400" />
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-sky-300 bg-sky-50 text-sky-700 shadow-xs backdrop-blur-xs">
+                        <span className="h-2 w-2 rounded-full bg-sky-500" />
                         <span>Tạm dừng • {getLiveElapsedMinutes(m.startsAt)} phút</span>
                       </span>
                     ) : (
@@ -760,8 +753,8 @@ export default function MeetingTab() {
                         <span className="truncate">{dateText(m.startsAt)}</span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1.5 text-slate-700 font-semibold drop-shadow-xs">
-                        <Clock3 className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                      <div className="flex items-center gap-1.5 text-slate-600 font-semibold drop-shadow-xs">
+                        <Clock3 className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                         <span className="truncate">{dateText(m.startsAt)}</span>
                       </div>
                     )}
