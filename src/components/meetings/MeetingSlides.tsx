@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Download, ChevronLeft, ChevronRight, Play, RefreshCw, Pencil, ArrowDownToLine } from "lucide-react";
+import { Download, ChevronLeft, ChevronRight, Play, Pause, RefreshCw, Pencil, ArrowDownToLine } from "lucide-react";
 import { renderProfileSlide, loadSlideImage, SLIDE_WIDTH, SLIDE_HEIGHT } from "./profileSlideRenderer";
 import { drawSlideTimer, getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
 import { SlideTransitionDelayInput } from "./SlideTransitionDelayInput";
@@ -24,11 +24,12 @@ type Props = {
   onPresentationStarted?: () => void;
   onPresentationClosed?: () => void;
   api: (path: string, method?: string, body?: unknown) => Promise<SlideDeck>;
+  onTogglePause?: () => void | Promise<void>;
 };
 const button = "inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition disabled:opacity-40 cursor-pointer";
 const fieldClass = "w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none transition";
 
-export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker }: Props) {
+export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker, onTogglePause }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -218,6 +219,11 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       if (e.key === "Tab") {
         e.preventDefault(); presentationDialog.current?.focus(); return;
       }
+      if (e.key === "p" || e.key === "P") {
+        e.preventDefault();
+        onTogglePause?.();
+        return;
+      }
       if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
         if (mode !== "manual") return;
@@ -344,8 +350,32 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       >
         <Play size={14} /> Bắt đầu thuyết trình
       </button>
+
+      {canManage && ["live", "paused"].includes(meeting.status) && (
+        <button
+          type="button"
+          disabled={controlBusy}
+          onClick={() => onTogglePause?.()}
+          className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-medium transition disabled:opacity-40 cursor-pointer ${
+            meeting.status === "paused"
+              ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+              : "border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800"
+          }`}
+          title={meeting.status === "paused" ? "Tiếp tục đếm ngược thời gian phát biểu" : "Tạm dừng đếm ngược thời gian phát biểu"}
+        >
+          {meeting.status === "paused" ? (
+            <>
+              <Play size={14} className="fill-current" /> Tiếp tục phát biểu
+            </>
+          ) : (
+            <>
+              <Pause size={14} className="fill-current" /> Tạm dừng
+            </>
+          )}
+        </button>
+      )}
     </div>
-    <p className="text-[11px] text-slate-400">Toàn màn hình: phím ← → chuyển lượt (thủ công) · Esc thoát</p>
+    <p className="text-[11px] text-slate-400">Toàn màn hình: phím ← → chuyển lượt (thủ công) · phím P tạm dừng · Esc thoát</p>
     {error && <p role="alert" className="rounded-xl bg-red-50 border border-red-200/80 p-3 text-xs text-red-700">{error} <button className="underline hover:text-red-900 transition cursor-pointer" onClick={() => setRevision(v => v + 1)}>Tải lại dữ liệu</button></p>}
     <div className="grid gap-4 lg:grid-cols-[280px_1fr] items-stretch">
       <aside className="flex flex-col h-full rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
