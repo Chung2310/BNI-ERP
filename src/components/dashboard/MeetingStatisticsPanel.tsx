@@ -17,16 +17,21 @@ import {
   Trophy,
   Award,
   Ticket,
+  Crown,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { authService } from "../../services/authService";
 import { meetingService, Meeting, Speaker } from "../../services/meetingService";
+import { socketService } from "../../services/socketService";
 import { UserProfile } from "../../types/common";
 
 type QuickTimeFilter = "all" | "month" | "quarter" | "year";
 type StatusFilter = "all" | "ended" | "live" | "scheduled";
 
+export const drawSourceLabels = { wheel: "Vòng quay may mắn", bingo: "Lồng cầu bingo", draw: "Bốc thăm" };
+
 export interface LuckyDrawWinnerRecord {
+  source: keyof typeof drawSourceLabels;
   id: string;
   name: string;
   email?: string;
@@ -58,12 +63,13 @@ const getLiveElapsedMinutes = (startsAt: string | Date): number => {
   return Math.floor(diffMs / 60000);
 };
 
-const extractLuckyWinners = (meeting: Meeting): LuckyDrawWinnerRecord[] => {
+export const extractLuckyWinners = (meeting: Meeting): LuckyDrawWinnerRecord[] => {
   const result: LuckyDrawWinnerRecord[] = [];
   const prizes = meeting.luckyDraw?.prizes || [];
   prizes.forEach((p) => {
     (p.winners || []).forEach((w) => {
       result.push({
+        source: w.source || "draw",
         id: w.id || `${p.id}-${w.name}-${w.wonAt || Math.random()}`,
         name: w.name,
         email: w.email,
@@ -82,6 +88,10 @@ const extractLuckyWinners = (meeting: Meeting): LuckyDrawWinnerRecord[] => {
       });
     });
   });
+  for (const w of meeting.gameWinners || []) {
+    result.push({ ...w, source: w.source || "draw", meetingId: meeting._id,
+      meetingTitle: meeting.title, meetingDate: meeting.startsAt ? new Date(meeting.startsAt).toISOString() : "" });
+  }
   return result;
 };
 
@@ -111,6 +121,7 @@ function LuckyWinnersTable({
             <th className="py-2.5 px-3 w-10">STT</th>
             <th className="py-2.5 px-3">Người trúng thưởng</th>
             {showMeetingInfo && <th className="py-2.5 px-3">Cuộc họp</th>}
+            <th className="py-2.5 px-3">Loại hình</th>
             <th className="py-2.5 px-3">Giải thưởng</th>
             <th className="py-2.5 px-3">Phần quà / Giá trị</th>
             <th className="py-2.5 px-3 text-center">Số vé</th>
@@ -121,7 +132,7 @@ function LuckyWinnersTable({
           {winners.map((w, idx) => {
             const initial = (w.name || "?").trim().charAt(0).toUpperCase();
             return (
-              <tr key={w.id || idx} className="hover:bg-slate-50/70 transition-colors">
+              <tr key={`${w.meetingId}-${w.source}-${w.id || idx}`} className="hover:bg-slate-50/70 transition-colors">
                 <td className="py-2.5 px-3 text-slate-400">{idx + 1}</td>
                 <td className="py-2.5 px-3">
                   <div className="flex items-center gap-2.5">
@@ -171,6 +182,7 @@ function LuckyWinnersTable({
                     )}
                   </td>
                 )}
+                <td className="py-2.5 px-3 whitespace-nowrap">{drawSourceLabels[w.source]}</td>
                 <td className="py-2.5 px-3 whitespace-nowrap">
                   <span
                     className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold border shadow-2xs"
@@ -304,6 +316,10 @@ export function MeetingStatisticsPanel() {
 
   useEffect(() => {
     fetchData();
+    const refreshWinners = () => { void meetingService.listMeetings().then(setMeetings).catch(console.error); };
+    const off = socketService.on("lucky_draw_spun", refreshWinners);
+    window.addEventListener("focus", refreshWinners);
+    return () => { off(); window.removeEventListener("focus", refreshWinners); };
   }, [userProfile?.companyCode]);
 
   // Distinct member ids across system
@@ -390,9 +406,7 @@ export function MeetingStatisticsPanel() {
     // Lucky draw winners across filtered meetings
     let totalLuckyWinners = 0;
     filteredMeetings.forEach((m) => {
-      (m.luckyDraw?.prizes || []).forEach((p) => {
-        totalLuckyWinners += (p.winners || []).length;
-      });
+      totalLuckyWinners += extractLuckyWinners(m).length;
     });
 
     const completedCount = filteredMeetings.filter((m) => m.status === "ended").length;
@@ -951,7 +965,7 @@ export function MeetingStatisticsPanel() {
           </div>
           <div className="mt-2 text-[11px] text-amber-700/80 font-medium truncate flex items-center gap-1">
             <Trophy className="h-3 w-3 text-amber-500 shrink-0" />
-            <span>{metrics.totalWinners > 0 ? "Vòng quay may mắn" : "Chưa có lượt quay"}</span>
+            <span>{metrics.totalWinners > 0 ? "Vòng quay, bingo và bốc thăm" : "Chưa có lượt quay"}</span>
           </div>
         </div>
       </div>
@@ -1257,9 +1271,9 @@ export function MeetingStatisticsPanel() {
         </div>
       </div>
 
-      {/* 4. BẢNG XẾP HẠNG THÀNH VIÊN TÍCH CỰC (Top 5 cột cao thấp, Top 6-10 danh sách) */}
+      {/* 4. BẢNG XẾP HẠNG THÀNH VIÊN TÍCH CỰC (Top 5 bục podium cao thấp, Top 1 ở giữa, Top 6-10 danh sách) */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
           <div>
             <div className="flex items-center gap-2">
               <Trophy className="h-4 w-4 text-amber-500" />
@@ -1274,18 +1288,26 @@ export function MeetingStatisticsPanel() {
               Xếp hạng theo số buổi điểm danh tham gia và thói quen đến sớm chuẩn giờ
             </p>
           </div>
-          <div className="flex items-center gap-3 text-xs text-slate-400">
-            <span className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-medium">
+            <span className="flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60 font-semibold">
               <span className="h-2 w-2 rounded-full bg-amber-400" />
-              Top 1
+              #1 Vàng kim (Quán quân)
             </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-slate-300" />
-              Top 2
+            <span className="flex items-center gap-1 text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200/60 font-semibold">
+              <span className="h-2 w-2 rounded-full bg-sky-500" />
+              #2 Xanh dương
             </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-amber-700" />
-              Top 3
+            <span className="flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60 font-semibold">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              #3 Xanh lục
+            </span>
+            <span className="flex items-center gap-1 text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200/60 font-semibold">
+              <span className="h-2 w-2 rounded-full bg-purple-500" />
+              #4 Tím
+            </span>
+            <span className="flex items-center gap-1 text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200/60 font-semibold">
+              <span className="h-2 w-2 rounded-full bg-rose-500" />
+              #5 Hồng
             </span>
           </div>
         </div>
@@ -1297,153 +1319,202 @@ export function MeetingStatisticsPanel() {
           </div>
         ) : (
           <div className="pt-6">
-            {/* Top 5 - 5 Cột cao thấp */}
-            <div className="grid grid-cols-5 gap-2 sm:gap-4 items-end min-h-[300px] sm:min-h-[340px] px-1 sm:px-4 pb-2 border-b border-slate-100">
-              {topFiveMembers.map((m, idx) => {
-                const rankStyles = [
-                  {
-                    heightClass: "h-48 sm:h-56",
-                    bgGradient:
-                      "bg-gradient-to-t from-amber-500 via-amber-400 to-amber-300 text-amber-950 border-amber-300/80 shadow-md shadow-amber-200/50",
-                    badgeColor: "bg-amber-500 text-white ring-2 ring-white shadow-xs font-black",
-                    ringColor: "ring-2 ring-amber-400",
-                    rankLabel: "1",
-                  },
-                  {
-                    heightClass: "h-40 sm:h-48",
-                    bgGradient:
-                      "bg-gradient-to-t from-slate-400 via-slate-300 to-slate-200 text-slate-900 border-slate-300 shadow-xs",
-                    badgeColor: "bg-slate-400 text-white ring-2 ring-white shadow-xs font-bold",
-                    ringColor: "ring-2 ring-slate-300",
-                    rankLabel: "2",
-                  },
-                  {
-                    heightClass: "h-32 sm:h-40",
-                    bgGradient:
-                      "bg-gradient-to-t from-amber-700/85 via-amber-600/75 to-amber-500/75 text-white border-amber-600/70 shadow-xs",
-                    badgeColor: "bg-amber-700 text-white ring-2 ring-white shadow-xs font-bold",
-                    ringColor: "ring-2 ring-amber-600/70",
-                    rankLabel: "3",
-                  },
-                  {
-                    heightClass: "h-26 sm:h-32",
-                    bgGradient:
-                      "bg-gradient-to-t from-cyan-600/70 via-cyan-500/60 to-cyan-400/50 text-cyan-950 border-cyan-300/60 shadow-xs",
-                    badgeColor: "bg-cyan-600 text-white ring-2 ring-white shadow-xs font-bold",
-                    ringColor: "ring-1 ring-cyan-400/50",
-                    rankLabel: "4",
-                  },
-                  {
-                    heightClass: "h-20 sm:h-26",
-                    bgGradient:
-                      "bg-gradient-to-t from-slate-300/70 via-slate-200/60 to-slate-100/60 text-slate-800 border-slate-200/80",
-                    badgeColor: "bg-slate-500 text-white ring-2 ring-white shadow-xs font-bold",
-                    ringColor: "ring-1 ring-slate-300",
-                    rankLabel: "5",
-                  },
-                ];
+            {/* Top 5 - Bục Podium 5 cột cao thấp, Top 1 ở chính giữa (#4 - #2 - #1 - #3 - #5) */}
+            {(() => {
+              const PODIUM_SLOTS = [
+                {
+                  rankIndex: 3, // #4 (ngoài cùng bên trái)
+                  rankNum: 4,
+                  heightClass: "h-28 sm:h-36",
+                  bgGradient:
+                    "bg-gradient-to-t from-purple-600 via-indigo-500 to-purple-400 text-white border-purple-300/80 shadow-md shadow-purple-200/50",
+                  badgeColor: "bg-purple-600 text-white font-bold ring-2 ring-white shadow-xs",
+                  ringColor: "ring-2 ring-purple-400 shadow-sm",
+                  nameColor: "text-slate-800",
+                },
+                {
+                  rankIndex: 1, // #2 (trái giữa)
+                  rankNum: 2,
+                  heightClass: "h-44 sm:h-52",
+                  bgGradient:
+                    "bg-gradient-to-t from-blue-600 via-sky-500 to-cyan-400 text-white border-sky-300/80 shadow-lg shadow-sky-200/50",
+                  badgeColor: "bg-sky-500 text-white font-bold ring-2 ring-white shadow-xs",
+                  ringColor: "ring-3 ring-sky-400 shadow-md shadow-sky-200",
+                  nameColor: "text-slate-800",
+                },
+                {
+                  rankIndex: 0, // #1 (CHÍNH GIỮA - TOP 1 QUÁN QUÂN)
+                  rankNum: 1,
+                  heightClass: "h-56 sm:h-64",
+                  bgGradient:
+                    "bg-gradient-to-t from-amber-500 via-amber-400 to-yellow-300 text-amber-950 border-2 border-amber-300 shadow-xl shadow-amber-300/40 ring-4 ring-amber-200/60",
+                  badgeColor: "bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-black ring-2 ring-white shadow-md",
+                  ringColor: "ring-4 ring-amber-400 shadow-lg shadow-amber-300/50",
+                  nameColor: "text-amber-950 font-black",
+                  isTop1: true,
+                },
+                {
+                  rankIndex: 2, // #3 (phải giữa)
+                  rankNum: 3,
+                  heightClass: "h-36 sm:h-44",
+                  bgGradient:
+                    "bg-gradient-to-t from-emerald-600 via-teal-500 to-emerald-400 text-white border-emerald-300/80 shadow-lg shadow-emerald-200/50",
+                  badgeColor: "bg-emerald-600 text-white font-bold ring-2 ring-white shadow-xs",
+                  ringColor: "ring-3 ring-emerald-400 shadow-md shadow-emerald-200",
+                  nameColor: "text-slate-800",
+                },
+                {
+                  rankIndex: 4, // #5 (ngoài cùng bên phải)
+                  rankNum: 5,
+                  heightClass: "h-22 sm:h-28",
+                  bgGradient:
+                    "bg-gradient-to-t from-rose-600 via-rose-500 to-pink-400 text-white border-rose-300/80 shadow-md shadow-rose-200/50",
+                  badgeColor: "bg-rose-500 text-white font-bold ring-2 ring-white shadow-xs",
+                  ringColor: "ring-2 ring-rose-400 shadow-sm",
+                  nameColor: "text-slate-800",
+                },
+              ];
 
-                const currentRankStyle = rankStyles[idx] || rankStyles[4];
+              return (
+                <div className="grid grid-cols-5 gap-2 sm:gap-4 items-end min-h-[300px] sm:min-h-[340px] px-1 sm:px-4 pb-2 border-b border-slate-100">
+                  {PODIUM_SLOTS.map((slot) => {
+                    const m = topFiveMembers[slot.rankIndex];
 
-                return (
-                  <div key={m.id} className="flex flex-col items-center justify-end h-full group">
-                    {/* Header info above column: Avatar & Name */}
-                    <div className="flex flex-col items-center mb-2.5 w-full">
-                      <div className="relative mb-1.5">
-                        {m.photoURL ? (
-                          <img
-                            src={m.photoURL}
-                            alt={m.name}
-                            className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover shadow-xs ${currentRankStyle.ringColor}`}
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                            }}
-                          />
-                        ) : (
-                          <div
-                            className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-700 text-xs sm:text-sm shadow-xs ${currentRankStyle.ringColor}`}
-                          >
-                            {(m.name || "?").trim().charAt(0).toUpperCase()}
+                    if (!m) {
+                      return (
+                        <div key={`empty-${slot.rankNum}`} className="flex flex-col items-center justify-end h-full opacity-50">
+                          <div className="flex flex-col items-center mb-2.5 w-full">
+                            <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 border-dashed border-slate-200 text-slate-400 text-xs font-bold mb-1.5 bg-slate-50">
+                              #{slot.rankNum}
+                            </div>
+                            <p className="text-[11px] sm:text-xs text-slate-400 text-center font-medium">Chờ thành viên</p>
+                            <p className="text-[9px] sm:text-[10px] text-slate-300 text-center">-</p>
                           </div>
-                        )}
-                        <span
-                          className={`absolute -bottom-1 -right-1 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full text-[10px] sm:text-xs ${currentRankStyle.badgeColor}`}
+                          <div
+                            className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 flex flex-col items-center justify-center py-2 px-1 text-slate-400 ${slot.heightClass}`}
+                          >
+                            <span className="text-xs font-semibold text-slate-300">#{slot.rankNum}</span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={m.id || `rank-${slot.rankNum}`} className="flex flex-col items-center justify-end h-full group">
+                        {/* Header info above column: Avatar & Name */}
+                        <div className="flex flex-col items-center mb-2.5 w-full">
+                          {slot.isTop1 && (
+                            <Crown className="h-5 w-5 text-amber-500 fill-amber-400 drop-shadow-sm -mb-1 animate-bounce" />
+                          )}
+                          <div className="relative mb-1.5">
+                            {m.photoURL ? (
+                              <img
+                                src={m.photoURL}
+                                alt={m.name}
+                                className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover shadow-xs ${slot.ringColor}`}
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = "none";
+                                }}
+                              />
+                            ) : (
+                              <div
+                                className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-700 text-xs sm:text-sm shadow-xs ${slot.ringColor}`}
+                              >
+                                {(m.name || "?").trim().charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <span
+                              className={`absolute -bottom-1 -right-1 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full text-[10px] sm:text-xs ${slot.badgeColor}`}
+                            >
+                              #{slot.rankNum}
+                            </span>
+                          </div>
+
+                          <p
+                            className={`text-[11px] sm:text-xs text-center truncate max-w-[70px] sm:max-w-[120px] ${
+                              slot.isTop1 ? "font-black text-amber-900" : "font-bold text-slate-800"
+                            }`}
+                            title={m.name}
+                          >
+                            {m.name}
+                          </p>
+                          {m.companyName && (
+                            <p
+                              className="text-[9px] sm:text-[10px] text-slate-400 text-center truncate max-w-[70px] sm:max-w-[120px]"
+                              title={m.companyName}
+                            >
+                              {m.companyName}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* The Pillar / Column bar */}
+                        <div
+                          className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border flex flex-col items-center justify-between py-2 sm:py-3 px-1 transition-all duration-500 ease-out group-hover:scale-[1.03] ${slot.heightClass} ${slot.bgGradient}`}
                         >
-                          #{currentRankStyle.rankLabel}
-                        </span>
-                      </div>
+                          <div className="text-center">
+                            <span className="block font-black text-xs sm:text-sm tracking-tight">
+                              {m.attendedCount} buổi
+                            </span>
+                            <span
+                              className={`inline-block text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.2 rounded-full mt-0.5 ${
+                                slot.isTop1 ? "bg-amber-900/10 text-amber-950" : "bg-white/20 text-white"
+                              }`}
+                            >
+                              {m.attendanceRate}%
+                            </span>
+                          </div>
 
-                      <p
-                        className="font-bold text-[11px] sm:text-xs text-slate-800 text-center truncate max-w-[70px] sm:max-w-[120px]"
-                        title={m.name}
-                      >
-                        {m.name}
-                      </p>
-                      {m.companyName && (
-                        <p
-                          className="text-[9px] sm:text-[10px] text-slate-400 text-center truncate max-w-[70px] sm:max-w-[120px]"
-                          title={m.companyName}
-                        >
-                          {m.companyName}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* The Pillar / Column bar */}
-                    <div
-                      className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border flex flex-col items-center justify-between py-2 sm:py-3 px-1 transition-all duration-500 ease-out group-hover:scale-[1.03] ${currentRankStyle.heightClass} ${currentRankStyle.bgGradient}`}
-                    >
-                      <div className="text-center">
-                        <span className="block font-black text-xs sm:text-sm tracking-tight">
-                          {m.attendedCount} buổi
-                        </span>
-                        <span className="block text-[9px] sm:text-[10px] font-medium opacity-85">
-                          {m.attendanceRate}%
-                        </span>
+                          <div className="text-center border-t border-black/10 pt-1 w-full">
+                            <span className="block text-[9px] sm:text-[10px] font-semibold opacity-95 truncate">
+                              {m.avgEarlyMinutes > 0
+                                ? `Sớm +${m.avgEarlyMinutes}p`
+                                : m.attendedCount > 0
+                                ? "Đúng giờ"
+                                : "Chưa họp"}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-
-                      <div className="text-center border-t border-black/10 pt-1 w-full">
-                        <span className="block text-[9px] sm:text-[10px] font-semibold opacity-90 truncate">
-                          {m.avgEarlyMinutes > 0
-                            ? `Sớm +${m.avgEarlyMinutes}p`
-                            : m.attendedCount > 0
-                            ? "Đúng giờ"
-                            : "Chưa họp"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* Top 6 to 10 - Danh sách dạng bảng gọn gàng */}
             {nextFiveMembers.length > 0 && (
-              <div className="mt-4 pt-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">
-                  Thành viên tiếp theo (Hạng 6 - 10)
-                </p>
-                <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/50">
+              <div className="mt-5 pt-3">
+                <div className="flex items-center justify-between mb-2.5">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 text-slate-400" />
+                    Thành viên tiếp theo (Hạng 6 - 10)
+                  </p>
+                  <span className="text-[11px] text-slate-400">
+                    Hiển thị {nextFiveMembers.length} thành viên
+                  </span>
+                </div>
+                <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xs">
                   {nextFiveMembers.map((m, idx) => (
                     <div
                       key={m.id}
-                      className="flex items-center justify-between p-2.5 sm:px-4 hover:bg-white transition-colors text-xs"
+                      className="flex items-center justify-between p-2.5 sm:px-4 hover:bg-slate-50/80 transition-colors text-xs"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-6 text-center font-mono font-bold text-slate-400 text-xs">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 font-mono font-bold text-slate-600 text-xs">
                           #{idx + 6}
                         </span>
                         {m.photoURL ? (
                           <img
                             src={m.photoURL}
                             alt={m.name}
-                            className="h-7 w-7 rounded-full object-cover border border-slate-200 shrink-0"
+                            className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = "none";
                             }}
                           />
                         ) : (
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 font-bold text-slate-600 text-[11px] shrink-0">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-600 text-xs shrink-0">
                             {(m.name || "?").trim().charAt(0).toUpperCase()}
                           </div>
                         )}
@@ -1464,7 +1535,9 @@ export function MeetingStatisticsPanel() {
                           className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
                             m.avgEarlyMinutes > 0
                               ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : "bg-slate-100 text-slate-600"
+                              : m.attendedCount > 0
+                              ? "bg-sky-50 text-sky-700 border border-sky-200"
+                              : "bg-slate-100 text-slate-500"
                           }`}
                         >
                           {m.avgEarlyMinutes > 0
@@ -1736,10 +1809,7 @@ export function MeetingStatisticsPanel() {
                     const guestCount = speakers.length - memberCount;
                     const absentCount = Math.max(0, totalChapterMembersCount - memberCount);
                     const guestRatio = speakers.length > 0 ? Math.round((guestCount / speakers.length) * 100) : 0;
-                    const luckyCount = (m.luckyDraw?.prizes || []).reduce(
-                      (acc, p) => acc + (p.winners?.length || 0),
-                      0
-                    );
+                    const luckyCount = extractLuckyWinners(m).length;
 
                     return (
                       <tr
