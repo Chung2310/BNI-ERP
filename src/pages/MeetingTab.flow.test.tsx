@@ -344,6 +344,25 @@ it("settings place priority last and list all checked-in people including locked
   expect(section.previousElementSibling?.textContent).toContain("Cấu hình theo toàn bộ thứ tự check-in");
 });
 
+it.each(["live", "paused"])("shows the check-in list and explains unavailable priority changes at the last %s turn", async status => {
+  const item = { ...meeting, status, currentIndex: 1, elapsedSeconds: 12,
+    speakers: [{ id: "a", name: "An", seconds: 30 }, { id: "b", name: "Bình", seconds: 30 }] };
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [item] }) });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MeetingTab />);
+  fireEvent.click((await screen.findAllByTitle("Sửa cuộc họp"))[0]);
+  const select = screen.getByLabelText("Chọn người để sắp xếp") as HTMLSelectElement;
+  expect(select.disabled).toBe(false);
+  expect(select.selectedOptions[0].textContent).toBe("Không còn người đang chờ phát biểu");
+  expect(Array.from(select.options).map(option => option.value)).toEqual(["", "a", "b"]);
+  expect(select.options[1].textContent).toBe("An — Đã phát biểu");
+  expect(select.options[2].textContent).toBe("Bình — Đang phát biểu");
+  expect(screen.getByText(/Danh sách check-in đã được tải/)).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Áp dụng thứ tự" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Áp dụng thứ tự" }));
+  expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/order"))).toBe(false);
+});
+
 
 it.each([0, 3, 150])("slide delay %s waits until speaking time ends before changing the speaker", async delay => {
   const origin = Date.now();
