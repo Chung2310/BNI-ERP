@@ -1413,26 +1413,29 @@ export default function MeetingTab() {
                                 <Megaphone className="h-3 w-3 animate-bounce" /> Đang nói
                               </span>
                             )}
-                            {p.deferred && (
+                            {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (activeMeeting.status === "scheduled" || i >= activeMeeting.currentIndex) ? (
+                              <button
+                                type="button"
+                                title={i === activeMeeting.speakers.length - 1 ? (p.deferred ? "Đã chuyển cuối lượt" : "Người cuối danh sách") : "Chuyển xuống cuối lượt"}
+                                aria-label={`Để cuối lượt: ${p.name}`}
+                                disabled={saving || i === activeMeeting.speakers.length - 1}
+                                onClick={() => void deferSpeaker(p.id).catch(error => toast.error(error.message || "Không hoãn được lượt."))}
+                                className={`shrink-0 p-1.5 rounded-lg border transition cursor-pointer ${
+                                  p.deferred
+                                    ? "border-amber-300 bg-amber-100/90 text-amber-800"
+                                    : "border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100"
+                                } disabled:opacity-40 disabled:cursor-not-allowed`}
+                              >
+                                <ArrowDownToLine className="h-3.5 w-3.5" />
+                              </button>
+                            ) : p.deferred ? (
                               <span
-                                title="Đã để cuối lượt"
+                                title="Đã chuyển cuối lượt"
                                 className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-amber-50 text-amber-700 border border-amber-200/80 shrink-0"
                               >
                                 <ArrowDownToLine className="h-3.5 w-3.5" />
                               </span>
-                            )}
-                            {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (activeMeeting.status === "scheduled" || i >= activeMeeting.currentIndex) && (
-                              <button
-                                type="button"
-                                title="Để cuối lượt"
-                                aria-label={`Để cuối lượt: ${p.name}`}
-                                disabled={saving || i === activeMeeting.speakers.length - 1}
-                                onClick={() => void deferSpeaker(p.id).catch(error => toast.error(error.message || "Không hoãn được lượt."))}
-                                className="shrink-0 p-1.5 rounded-lg border border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100 disabled:opacity-40 transition cursor-pointer"
-                              >
-                                <ArrowDownToLine className="h-3.5 w-3.5" />
-                              </button>
-                            )}
+                            ) : null}
                           </div>
                         );
                       })}
