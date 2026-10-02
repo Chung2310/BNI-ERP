@@ -204,7 +204,7 @@ export default function MemberFeesTab() {
         " khoản" +
         (failed
           ? "; " + failed + " khoản lỗi: " + failure
-          : ". Thông báo đã gửi hôm nay sẽ không bị gửi trùng."),
+          : ". Đã gửi thông báo và email. Khoản đã gửi hôm nay sẽ không bị gửi trùng."),
     );
   };
   const create = async (event: React.FormEvent) => {
@@ -457,7 +457,7 @@ export default function MemberFeesTab() {
                   Đang gửi...
                 </span>
               ) : (
-                "Gửi thông báo & QR cho danh sách đang lọc"
+                "Gửi thông báo & email QR cho danh sách đang lọc"
               )}{" "}
             </button>{" "}
             {sendProgress && (

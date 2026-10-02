@@ -26,6 +26,10 @@ const memberFee = new Schema({
   paymentCode: String,
   bankAccount: { bank: String, accountNumber: String, accountName: String },
   notifiedAt: Date,
+  emailNotifiedAt: Date,
+  emailNotifiedDay: String,
+  emailClaimToken: { type: String, select: false },
+  emailClaimUntil: { type: Date, select: false },
   payments: { type: [payment], default: [] },
 }, { timestamps: true, optimisticConcurrency: true });
 memberFee.index({ companyCode: 1, year: 1, memberId: 1, titleKey: 1 }, { unique: true });

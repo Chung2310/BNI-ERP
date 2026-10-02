@@ -32,6 +32,7 @@ export const companyEmailService = {
     if (!smtp?.passwordEncrypted) throw new Error("SMTP chua duoc cau hinh");
     const transporter = nodemailer.createTransport({ host: smtp.host, port: smtp.port, secure: smtp.secure, auth: { user: smtp.user, pass: decryptSecret(smtp.passwordEncrypted) } });
     const info = await transporter.sendMail({ from: `"${smtp.fromName}" <${smtp.fromEmail}>`, ...message });
+    if (!info.accepted?.length || info.rejected?.length) throw new Error("SMTP khong chap nhan dia chi nhan");
     return { messageId: info.messageId };
   },
   async verify(companyCode: string) {

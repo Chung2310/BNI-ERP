@@ -27,13 +27,14 @@ export default function FeePaymentPanel({ id, canManage, onUpdate }: { id: strin
       await memberFeeService.notify(id);
       const result = await memberFeeService.get(id);
       setFee(result); update.current(result);
-      setMessage("Đã gửi thông báo kèm liên kết mã QR. Mỗi khoản chỉ gửi một thông báo mỗi ngày.");
+      setMessage("Đã gửi thông báo trong ứng dụng và email kèm mã QR. Khoản đã gửi email hôm nay sẽ không gửi lại.");
     } catch (e: any) { setError(e.message); } finally { setSending(false); }
   };
   return (
     <section className="mb-4 rounded-xl border border-cyan-200 bg-cyan-50/50 p-4 text-sm">
       <h4 className="font-semibold text-slate-800">Thanh toán chuyển khoản</h4>
       {error && <p role="alert" className="my-2 text-rose-700">{error}</p>}
+      {canManage && fee?.emailNotifiedAt && <p className="mt-2 text-slate-600">Email gần nhất: {new Date(fee.emailNotifiedAt).toLocaleString("vi-VN")}</p>}
       {message && <p role="status" className="my-2 text-emerald-700">{message}</p>}
       {!fee && !error && <p className="mt-2 text-slate-500">Đang tải thông tin thanh toán...</p>}
       {fee && fee.remaining <= 0 && <p className="mt-2 font-semibold text-emerald-700">Đã đóng đủ khoản phí.</p>}
@@ -55,7 +56,7 @@ export default function FeePaymentPanel({ id, canManage, onUpdate }: { id: strin
       ))}
       {canManage && fee && fee.remaining > 0 && (
         <button type="button" onClick={() => void send()} disabled={sending} className="mt-3 rounded-lg bg-cyan-700 hover:bg-cyan-800 px-3 py-2 font-semibold text-white disabled:opacity-50 transition cursor-pointer">
-          {sending ? "Đang gửi..." : "Gửi thông báo & QR"}
+          {sending ? "Đang gửi..." : "Gửi thông báo & email QR"}
         </button>
       )}
       {fee?.notifiedAt && <p className="mt-3 text-xs text-slate-500">Đã gửi: {new Date(fee.notifiedAt).toLocaleString("vi-VN")}</p>}

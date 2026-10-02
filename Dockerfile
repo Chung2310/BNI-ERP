@@ -9,16 +9,10 @@ COPY package.json yarn.lock ./
 # Install ALL dependencies (including devDependencies needed for build)
 # NODE_ENV must NOT be "production" here so devDeps are installed
 ENV NODE_ENV=development
-RUN --mount=type=cache,target=/root/.cache/yarn yarn install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.cache/yarn yarn install --cache-folder /root/.cache/yarn --frozen-lockfile --prefer-offline --non-interactive --no-progress
 
 # Copy the entire workspace (excluding files in .dockerignore)
 COPY . .
-
-# Remove package-lock.json if it exists (avoid conflicts with yarn.lock)
-RUN rm -f package-lock.json
-
-# Show Node.js and Yarn versions for debugging
-RUN node --version && yarn --version
 
 # Build the Vite frontend SPA and bundle the Express server using esbuild
 # Increase Node.js heap size to avoid OOM errors on large bundles
@@ -34,13 +28,12 @@ RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
 
 # Copy package files first to leverage Docker build cache for node_modules
 COPY --from=builder /app/package.json /app/yarn.lock ./
 
 # Install only production dependencies
-RUN --mount=type=cache,target=/root/.cache/yarn yarn install --production --frozen-lockfile
+RUN --mount=type=cache,target=/root/.cache/yarn yarn install --cache-folder /root/.cache/yarn --production --frozen-lockfile --prefer-offline --non-interactive --no-progress
 
 # Copy only the compiled output directories from builder.
 # dist/ = static frontend assets (publicly served via express.static)
@@ -50,8 +43,8 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/dist-server ./dist-server
 COPY --from=builder /app/server/assets/fonts ./server/assets/fonts
 
-# Expose Express server port
-EXPOSE 3000
+# Default port; runtime PORT is loaded from the environment or /app/.env.
+EXPOSE 3012
 
 # Run the bundled production server
 CMD ["node", "dist-server/server.cjs"]

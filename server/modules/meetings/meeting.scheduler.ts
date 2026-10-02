@@ -18,7 +18,7 @@ export async function runMeetingDeliveryScan(now = new Date(), batchSize = 100) 
   let sent = 0;
   for (let i = 0; i < batchSize; i++) {
     const claimToken = randomUUID();
-    const row: any = await MeetingDeliveryModel.findOneAndUpdate({ $or: [{ status: 'pending', nextAttemptAt: { $lte: now } }, { status: 'sending', leaseUntil: { $lte: now } }] }, { $set: { status: 'sending', leaseUntil: new Date(now.getTime() + 60_000), claimToken }, $inc: { attempts: 1 } }, { new: true, sort: { nextAttemptAt: 1, _id: 1 } }).lean();
+    const row: any = await MeetingDeliveryModel.findOneAndUpdate({ $or: [{ status: 'pending', nextAttemptAt: { $lte: now } }, { status: 'sending', leaseUntil: { $lte: now } }] }, { $set: { status: 'sending', leaseUntil: new Date(now.getTime() + 60_000), claimToken }, $inc: { attempts: 1 } }, { returnDocument: 'after', sort: { nextAttemptAt: 1, _id: 1 } }).lean();
     if (!row) break;
     try {
       const meeting: any = await MeetingModel.findOne({ _id: row.meetingId, companyCode: row.companyCode, revision: row.revision, status: 'scheduled' }).lean();
