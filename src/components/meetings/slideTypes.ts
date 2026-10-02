@@ -6,6 +6,7 @@ export interface ProfileSlide {
   photoURL: string;
   coverImage: string;
   phone: string;
+  email?: string;
   industry: string;
   bio: string;
 }

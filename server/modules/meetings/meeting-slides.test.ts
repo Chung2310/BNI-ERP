@@ -7,6 +7,19 @@ import { slideProfileInput } from "./meeting.validation";
 import { MeetingModel } from "./meeting.model";
 import { UserModel } from "../../model/user.model";
 
+test("slides include guest contact details and use current member profile fields", () => {
+  const guest = buildProfileSlide({ id: "g", name: "Guest", email: "guest@example.com", phone: "0901234567", industry: "Design", bio: "Guest bio" });
+  assert.equal(guest.email, "guest@example.com");
+  assert.equal(guest.phone, "0901234567");
+  assert.equal(guest.bio, "Guest bio");
+  const member = buildProfileSlide({ id: "m", userId: "u", email: "old@example.com", phone: "old", bio: "old" },
+    { displayName: "Current", email: "member@example.com", phone: "", bio: "Current bio", industry: "" });
+  assert.equal(member.email, "member@example.com");
+  assert.equal(member.phone, "");
+  assert.equal(member.industry, "");
+  assert.equal(member.bio, "Current bio");
+});
+
 test("member slide uses latest profile and explicit blank overrides; guest keeps check-in company", () => {
   const member = buildProfileSlide({ id: "s", userId: "u", name: "Old", slideProfile: { company: "", bio: "Giới thiệu" } },
     { displayName: "Nguyễn An", companyName: "ACME", phone: "0901234567", industry: "Thiết kế" });
@@ -18,7 +31,7 @@ test("member slide uses latest profile and explicit blank overrides; guest keeps
   const guest = buildProfileSlide({ id: "g", name: "Guest", company: "Guest Co", phone: "0901234567", slideProfile: { industry: "Legacy industry" } });
   assert.equal(guest.kind, "guest");
   assert.equal(guest.company, "Guest Co");
-  assert.equal(guest.phone, "");
+  assert.equal(guest.phone, "0901234567");
   assert.equal(guest.industry, "Legacy industry");
 });
 
