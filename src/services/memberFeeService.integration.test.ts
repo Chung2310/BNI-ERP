@@ -435,3 +435,18 @@ it("returns only newly persisted fee IDs for automatic notifications", async () 
   const repeated = await createMemberFees("A", "admin", assignment(), true);
   expect(repeated).toMatchObject({ created: 0, skipped: 1, createdIds: [] });
 });
+
+it.each(["Z12345", "1E4B52E48889010E07CE", "Z".repeat(30)])("accepts an exact BNI payment code with suffix %s", async suffix => {
+  const { id } = await checkoutSetup();
+  const paymentCode = "BNI" + suffix;
+  await MemberFeeModel.updateOne({ _id: id }, { $set: { paymentCode } });
+  const payload = { ...bankTransfer(paymentCode), code: null, content: paymentCode.toLowerCase() + " FT26275299030116 k28HMTIZ/419863" };
+  expect(await processSePay("A", payload)).toMatchObject({ status: "applied" });
+  expect(serializeFee(await getFee("A", id)).paid).toBe(40);
+});
+it.each(["BNI12345", "BNI" + "A".repeat(31), "XBNI123456", "BNI123456_ABC"])("does not partially match an invalid payment code %s", async content => {
+  const { id } = await checkoutSetup();
+  await MemberFeeModel.updateOne({ _id: id }, { $set: { paymentCode: "BNI123456" } });
+  expect(await processSePay("A", { ...bankTransfer("BNI123456"), content })).toMatchObject({ status: "review" });
+  expect(serializeFee(await getFee("A", id)).paid).toBe(0);
+});

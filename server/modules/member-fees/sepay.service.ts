@@ -1,3 +1,4 @@
+import { resolveSePayEnvironment } from "./sepay-environment";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import Joi from "joi";
 import { SePayTransactionModel } from "./sepay.model";
@@ -13,19 +14,13 @@ const bankKey = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "")
 // Resolve on the server at call time so environment loading does not depend on import order.
 // A global receiving account is explicitly bound to one organization.
 function readSePayEnvironment(companyCode: string) {
-  if (!companyCode || (process.env.SEPAY_COMPANY_CODE || "").trim().toUpperCase() !== companyCode.toUpperCase()) return null;
-  const bank = (process.env.SEPAY_BANK || "").trim();
-  const accountNumber = (process.env.SEPAY_ACCOUNT_NUMBER || "").trim();
-  const accountName = (process.env.SEPAY_ACCOUNT_NAME || "").trim();
-  const apiKey = process.env.SEPAY_API_KEY || "";
-  const ready = /^[A-Za-z0-9]{2,50}$/.test(bank) && /^[A-Za-z0-9]{3,40}$/.test(accountNumber) &&
-    accountName.length >= 2 && accountName.length <= 150 && /^[A-Za-z0-9_-]{32,200}$/.test(apiKey);
-  return { bank, accountNumber, accountName, apiKey, enabled: process.env.SEPAY_ENABLED === "true" && ready };
+  return resolveSePayEnvironment(companyCode).config;
 }
 export async function getSePayConfig(companyCode: string) {
   const config = readSePayEnvironment(companyCode);
   return { enabled: config?.enabled || false, bank: config?.bank || "", accountNumber: config?.accountNumber || "",
     accountName: config?.accountName || "", hasApiKey: !!config?.apiKey,
+    issues: resolveSePayEnvironment(companyCode).issues,
     webhookPath: "/api/v1/webhook/sepay/" + encodeURIComponent(companyCode) };
 }
 export async function authenticateSePay(companyCode: string, authorization: string) {
@@ -49,7 +44,7 @@ export async function notifyFee(companyCode: string, id: string) {
   let fee = await getFee(companyCode, id);
   if (serializeFee(fee).remaining <= 0) throw new MemberFeeError(400, "Khoản phí đã đóng đủ.");
   const config = readSePayEnvironment(companyCode);
-  if (!config?.enabled) throw new MemberFeeError(400, "SePay chưa sẵn sàng. Cần cấu hình đầy đủ trong .env của server.");
+  if (!config?.enabled) throw new MemberFeeError(400, "SePay chưa sẵn sàng: " + resolveSePayEnvironment(companyCode).issues.join(" "));
   // Freeze the receiving account for this invoice, including after settings change.
   if (!fee.paymentCode) {
     await MemberFeeModel.updateOne({ _id: fee._id, companyCode, paymentCode: { $exists: false } },
@@ -110,7 +105,7 @@ export async function processSePay(companyCode: string, raw: unknown) {
     return { success: true, status };
   };
   if (transferType !== "in") return finish("ignored", "Giao dịch tiền ra");
-  const codes = [...new Set((content.toUpperCase().match(/\bBNI[A-F0-9]{20}\b/g) || []) as string[])];
+  const codes = [...new Set((content.toUpperCase().match(/\bBNI[A-Z0-9]{6,30}\b/g) || []) as string[])];
   if (codes.length !== 1) return finish("review", "Nội dung không chứa đúng một mã khoản phí");
   const fee = await MemberFeeModel.findOne({ companyCode, paymentCode: codes[0] });
   if (!fee) return finish("review", "Không tìm thấy khoản phí trong đơn vị");
