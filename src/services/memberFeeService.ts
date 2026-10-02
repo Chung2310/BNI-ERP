@@ -23,7 +23,7 @@ export const memberFeeService = {
   list: (year: number, signal?: AbortSignal) => request<MemberFee[]>("/?year=" + year, "GET", undefined, signal),
   get: (id: string) => request<MemberFee>("/" + id),
   members: (signal?: AbortSignal) => request<FeeMember[]>("/members", "GET", undefined, signal),
-  create: (body: CreateMemberFee) => request<{ created: number; skipped: number }>("/", "POST", body),
+  create: (body: CreateMemberFee) => request<{ created: number; skipped: number; notified?: number; notificationFailures?: { feeId: string; message: string }[] }>("/", "POST", body),
   pay: (id: string, body: ReceiveMemberFee) => request<MemberFee>("/" + id + "/payments", "POST", body),
   receive: (id: string, body: ReceiveMemberFee) => request<MemberFee>("/" + id + "/payments", "POST", body),
   voidPayment: (feeId: string, paymentId: string, reason: string) => request<MemberFee>("/" + feeId + "/payments/" + paymentId + "/void", "POST", { reason }),

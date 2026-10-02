@@ -11,7 +11,7 @@ export function serializeFee(item: any) {
   const payments = data.payments || [];
   return { ...data, payments, ...feeBalance({ ...data, payments }) };
 }
-export async function createMemberFees(companyCode: string, actorId: string, input: any) {
+export async function createMemberFees(companyCode: string, actorId: string, input: any, includeCreatedIds = false) {
   const members = await UserModel.find({ _id: { $in: input.memberIds }, companyCode, isActive: { $ne: false } })
     .select("_id displayName email").lean();
   if (members.length !== input.memberIds.length) throw new MemberFeeError(400, "Danh sách có thành viên không thuộc đơn vị hoặc đã ngừng hoạt động.");
@@ -39,12 +39,15 @@ export async function createMemberFees(companyCode: string, actorId: string, inp
   }));
   // The unique key also protects against two managers assigning the same annual fee at once.
   let created = 0;
-  try { created = (await MemberFeeModel.bulkWrite(operations, { ordered: false })).upsertedCount; }
+  let bulkResult: any;
+  try { bulkResult = await MemberFeeModel.bulkWrite(operations, { ordered: false }); created = bulkResult.upsertedCount; }
   catch (error: any) {
     if (!error.writeErrors?.length || error.writeErrors.some((entry: any) => entry.code !== 11000)) throw error;
-    created = error.result?.upsertedCount || 0;
+    bulkResult = error.result;
+    created = bulkResult?.upsertedCount || 0;
   }
-  return { created, skipped: members.length - created };
+  const createdIds = Object.values(bulkResult?.upsertedIds || {}).map(String);
+  return { created, skipped: members.length - created, ...(includeCreatedIds ? { createdIds } : {}) };
 }
 export async function getFee(companyCode: string, id: string) {
   if (!mongoose.isValidObjectId(id)) throw new MemberFeeError(400, "Mã khoản phí không hợp lệ.");
