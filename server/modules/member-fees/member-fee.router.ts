@@ -4,7 +4,7 @@ import { requireModule } from "../../middleware/require-module";
 import { UserModel } from "../../model/user.model";
 import { MemberFeeModel } from "./member-fee.model";
 import { createFeeInput, feePaymentInput, voidFeePaymentInput } from "./member-fee.validation";
-import { createMemberFees, getFee, MemberFeeError, receiveFee, serializeFee, voidFeePayment } from "./member-fee.service";
+import { deleteMemberFee, createMemberFees, getFee, MemberFeeError, receiveFee, serializeFee, voidFeePayment } from "./member-fee.service";
 
 import { getSePayConfig, notifyFee, feeCheckout } from "./sepay.service";
 import { SePayTransactionModel } from "./sepay.model";
@@ -49,6 +49,9 @@ memberFeeRouter.get("/sepay/transactions", requireRole(["admin"]) as any, read, 
 });
 memberFeeRouter.post("/:id/notify", requireRole(["admin"]) as any, manage, async (req: any, res) => {
   try { res.json({ data: await notifyFee(company(req), req.params.id) }); } catch (e) { fail(res, e); }
+});
+memberFeeRouter.delete("/:id", requireRole(["admin"]) as any, manage, async (req: any, res) => {
+  try { res.json({ data: await deleteMemberFee(company(req), req.params.id) }); } catch (e) { fail(res, e); }
 });
 memberFeeRouter.get("/:id", read, async (req: any, res) => {
   try {
