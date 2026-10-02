@@ -16,7 +16,7 @@ export default function DashboardTab() {
           <div className="h-7 w-1.5 bg-red-600 rounded-full shrink-0" />
           <div>
             <h1 className="font-extrabold text-xl md:text-2xl tracking-tight text-slate-900">
-              Tổng quan Cuộc họp BNI
+              Tổng quan
             </h1>
             <p className="text-xs text-slate-500 font-medium">Hôm nay, {todayLabel}</p>
           </div>
