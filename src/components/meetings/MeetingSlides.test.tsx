@@ -17,6 +17,22 @@ const meeting = { _id: "m", __v: 1, currentIndex: 1, status: "live", speakers: s
 beforeEach(() => vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn() } as any));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
+it("checks multiple attendees and submits one batch while preserving the selection on failure", async () => {
+  const defer = vi.fn().mockRejectedValueOnce(new Error("Thử lại" )).mockResolvedValue(undefined);
+  const deck = [...slides, { ...slides[1], id: "c", name: "Người thứ ba" }];
+  render(<MeetingSlides meeting={{ ...meeting, currentIndex: 0, speakers: deck }} canManage api={vi.fn().mockResolvedValue({ slides: deck, version: 1 })} onDeferSpeaker={defer} />);
+  await screen.findByText("Nguyễn An");
+  fireEvent.click(screen.getByLabelText("Chọn Nguyễn An"));
+  fireEvent.click(screen.getByLabelText("Chọn Trần Bình"));
+  fireEvent.click(screen.getByRole("button", { name: "Để cuối lượt (2)" }));
+  await screen.findByRole("alert");
+  expect(defer).toHaveBeenCalledExactlyOnceWith(["a", "b"]);
+  expect((screen.getByLabelText("Chọn Nguyễn An") as HTMLInputElement).checked).toBe(true);
+  await waitFor(() => expect((screen.getByRole("button", { name: "Để cuối lượt (2)" }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: "Để cuối lượt (2)" }));
+  await waitFor(() => expect((screen.getByLabelText("Chọn Nguyễn An") as HTMLInputElement).checked).toBe(false));
+});
+
 it.each([0, 1])("previews selected attendee %s without changing the live turn until starting", async target => {
   const api = vi.fn().mockResolvedValue({ slides, version: 1 });
   const start = vi.fn().mockResolvedValue(undefined);

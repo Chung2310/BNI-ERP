@@ -152,6 +152,7 @@ export default function MeetingTab() {
   const [dismissedCompletion, setDismissedCompletion] = useState("");
   const [startPresentation, setStartPresentation] = useState(false);
   const [presentationSpeakerId, setPresentationSpeakerId] = useState("");
+  const [checkedSpeakerIds, setCheckedSpeakerIds] = useState<string[]>([]);
   const presentationFullscreen = useRef<Promise<boolean> | null>(null);
   const presentationStarted = useCallback(() => setStartPresentation(false), []);
   const presentationClosed = useCallback(() => {
@@ -248,7 +249,7 @@ export default function MeetingTab() {
   }, [refresh]);
 
   const activeMeeting = items.find((m) => m._id === detailMeetingId) || null;
-  useEffect(() => { setPresentationSpeakerId(""); }, [activeMeeting?._id, activeMeeting?.speakers[activeMeeting.currentIndex]?.id]);
+  useEffect(() => { setPresentationSpeakerId(""); setCheckedSpeakerIds([]); }, [activeMeeting?._id, activeMeeting?.speakers[activeMeeting.currentIndex]?.id]);
 
   const completionKey = activeMeeting?.speechesCompletedAt && ["live", "paused"].includes(activeMeeting.status)
     ? activeMeeting._id + ":" + activeMeeting.speechesCompletedAt : "";
@@ -420,14 +421,15 @@ export default function MeetingTab() {
     }
   };
 
-  const deferSpeaker = async (speakerId: string): Promise<void> => {
+  const deferSpeaker = async (speakerId: string | string[]): Promise<void> => {
     if (!activeMeeting || !canManage || meetingControlPending.current) return;
     meetingControlPending.current = true;
     setSaving(true);
     try {
-      const updated: Meeting = await api(`/${activeMeeting._id}/defer`, "POST", { speakerId, version: activeMeeting.__v });
+      const updated: Meeting = await api(`/${activeMeeting._id}/defer`, "POST", { ...(Array.isArray(speakerId) ? { speakerIds: speakerId } : { speakerId }), version: activeMeeting.__v });
       setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
       setPresentationSpeakerId("");
+      setCheckedSpeakerIds([]);
     } finally {
       meetingControlPending.current = false;
       setSaving(false);
@@ -1347,6 +1349,33 @@ export default function MeetingTab() {
                       {activeSubTab === "checkin" ? "Người đã check-in · thứ tự phát biểu" : "Danh sách thuyết trình"} ({activeMeeting.speakers.length})
                     </h3>
 
+                    {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
+                      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+                        {checkedSpeakerIds.length > 0 && <span className="font-medium text-slate-600">Đã chọn {checkedSpeakerIds.length}</span>}
+                        <button
+                          type="button"
+                          title="Chuyển xuống cuối lượt"
+                          aria-label="Chuyển xuống cuối lượt"
+                          disabled={saving || !checkedSpeakerIds.length}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-40 transition cursor-pointer shadow-2xs"
+                          onClick={() => void deferSpeaker(checkedSpeakerIds).catch(error => toast.error(error.message || "Không hoãn được lượt."))}
+                        >
+                          <ArrowDownToLine className="h-3.5 w-3.5" />
+                          {checkedSpeakerIds.length > 0 && <span className="font-bold">({checkedSpeakerIds.length})</span>}
+                        </button>
+                        {checkedSpeakerIds.length > 0 && (
+                          <button
+                            type="button"
+                            className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                            disabled={saving}
+                            onClick={() => setCheckedSpeakerIds([])}
+                          >
+                            Bỏ chọn
+                          </button>
+                        )}
+                        <span className="text-slate-400 text-[11px]">Chọn ô để hoãn lượt; bấm tên để chọn người bắt đầu.</span>
+                      </div>
+                    )}
                     <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
                       {activeMeeting.speakers.map((p, i) => {
                         const isSpeaking = i === activeMeeting.currentIndex && ["live", "paused"].includes(activeMeeting.status);
@@ -1361,7 +1390,7 @@ export default function MeetingTab() {
                             <span className="w-6 text-center font-mono text-xs font-bold text-slate-400">
                               {i + 1}
                             </span>
-                            {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && <input type="radio" name="presentation-speaker" aria-label={`Bắt đầu từ ${p.name}`} checked={presentationSpeakerId === p.id} disabled={saving} onChange={() => setPresentationSpeakerId(p.id)} />}
+                            {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && <input type="checkbox" aria-label={`Chọn ${p.name}`} checked={checkedSpeakerIds.includes(p.id)} disabled={saving || (activeMeeting.status !== "scheduled" && i < activeMeeting.currentIndex)} onChange={e => setCheckedSpeakerIds(ids => e.target.checked ? [...ids, p.id] : ids.filter(id => id !== p.id))} />}
 
                             {p.coverImage || p.photoURL ? (
                               <img
@@ -1376,7 +1405,7 @@ export default function MeetingTab() {
                             )}
 
                             <div className="min-w-0 flex-1">
-                              <span className="block truncate text-xs font-bold text-slate-800">{p.name}</span>
+                              <button type="button" aria-label={`Bắt đầu từ ${p.name}`} aria-pressed={presentationSpeakerId === p.id} disabled={saving || !canManage || !["scheduled", "live", "paused"].includes(activeMeeting.status)} onClick={() => setPresentationSpeakerId(p.id)} className="block max-w-full truncate text-left text-xs font-bold text-slate-800 aria-pressed:text-cyan-700 aria-pressed:underline">{p.name}</button>
                               <span className="text-[11px] text-slate-500">
                                 {p.email || "Khách mời"} • {p.seconds} giây
                               </span>

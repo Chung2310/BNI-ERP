@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { setRateLimitRedisClientForTesting } from "../../infrastructure/rate-limit-redis";
 setRateLimitRedisClientForTesting({ eval: async () => [1, 1000], decr: async () => 0, del: async () => 0 });
-const { reorderMeetingSpeakers, controlMeeting, checkIn, startMeetingPresentation, deferMeetingSpeaker } = await import("./meeting.service");
+const { reorderMeetingSpeakers, controlMeeting, checkIn, startMeetingPresentation, deferMeetingSpeaker, deferMeetingSpeakers } = await import("./meeting.service");
 import { allocateSpeakers } from "./meeting.rules";
 import { MeetingModel } from "./meeting.model";
 
@@ -17,6 +17,30 @@ function meeting(): any {
       { id: "chair", name: "Chair", seconds: 20, checkedInAt: new Date("2026-10-01T07:30:00Z") },
     ] };
 }
+
+test("bulk deferral keeps list order rather than selection order and saves once", async t => {
+  const item = meeting();
+  const save = t.mock.method(item, "save", async () => {});
+  await deferMeetingSpeakers(item, ["chair", "early"], now);
+  assert.deepEqual(item.speakers.map((s: any) => s.id), ["second", "early", "chair"]);
+  assert.deepEqual(item.speakers.map((s: any) => s.seconds), [20, 60, 20]);
+  assert.equal(item.speakers[1].deferred, true);
+  assert.equal(item.speakers[2].deferred, true);
+  assert.equal(item.currentIndex, 0);
+  assert.equal(item.speakerStartedAt, now);
+  assert.equal(save.mock.callCount(), 1);
+});
+
+test("invalid batches do not partially mutate or save the queue", async t => {
+  const item = meeting(); item.currentIndex = 1;
+  const original = JSON.stringify(item);
+  const save = t.mock.method(item, "save", async () => {});
+  for (const ids of [[], ["second", "second"], ["second", "missing"], ["second", "early"], ["second", "chair"], "second"]) {
+    await assert.rejects(deferMeetingSpeakers(item, ids, now));
+    assert.equal(JSON.stringify(item), original);
+  }
+  assert.equal(save.mock.callCount(), 0);
+});
 
 test("previous speaker resets the target timer and preserves live or paused state", async () => {
   for (const status of ["live", "paused"]) {

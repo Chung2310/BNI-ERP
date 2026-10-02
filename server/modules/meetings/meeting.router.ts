@@ -10,6 +10,7 @@ import {
   startMeetingPresentation,
   reorderMeetingSpeakers,
   deferMeetingSpeaker,
+  deferMeetingSpeakers,
   createMeeting,
   updateMeeting,
   deleteMeeting,
@@ -150,11 +151,11 @@ meetingRouter.post('/:id/control', manage, async (req: any, res) => {
 });
 
 meetingRouter.post('/:id/defer', manage, async (req: any, res) => {
-  if (typeof req.body?.speakerId !== 'string' || !req.body.speakerId) return res.status(400).json({ message: 'Chọn người cần để cuối lượt.' });
+  if (req.body?.speakerIds === undefined && (typeof req.body?.speakerId !== 'string' || !req.body.speakerId)) return res.status(400).json({ message: 'Chọn người cần để cuối lượt.' });
   try {
     const item = await getMeeting(company(req), req.params.id);
     assertVersion(item, req.body.version);
-    res.json({ data: await deferMeetingSpeaker(item, req.body.speakerId) });
+    res.json({ data: req.body.speakerIds !== undefined ? await deferMeetingSpeakers(item, req.body.speakerIds) : await deferMeetingSpeaker(item, req.body.speakerId) });
   } catch (e) { sendError(res, e); }
 });
 

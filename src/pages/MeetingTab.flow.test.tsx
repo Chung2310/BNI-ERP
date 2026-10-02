@@ -19,6 +19,30 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+it("checks multiple people in operations and submits their IDs in one request", async () => {
+  const people = [{ id: "a", name: "An", seconds: 30 }, { id: "b", name: "Bình", seconds: 30 }, { id: "c", name: "Chi", seconds: 30 }];
+  let item = { ...meeting, status: "live", currentIndex: 0, speakers: people };
+  const fetchMock = vi.fn(async (url, options) => {
+    if (String(url).endsWith("/defer")) {
+      expect(JSON.parse(options.body)).toEqual({ speakerIds: ["a", "b"], version: 0 });
+      item = { ...item, __v: 1, speakers: [people[2], people[0], people[1]] };
+      return { ok: true, json: async () => ({ data: item }) };
+    }
+    return { ok: true, json: async () => ({ data: [item] }) };
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MeetingTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  fireEvent.click(screen.getByLabelText("Chọn An"));
+  fireEvent.click(screen.getByLabelText("Chọn Bình"));
+  expect((screen.getByLabelText("Chọn An") as HTMLInputElement).checked).toBe(true);
+  expect((screen.getByLabelText("Chọn Bình") as HTMLInputElement).checked).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Để cuối lượt (2)" }));
+  await waitFor(() => expect(screen.getByText("Đã chọn 0 người")).toBeTruthy());
+  expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/defer"))).toHaveLength(1);
+  expect(item.speakers.map(person => person.id)).toEqual(["c", "a", "b"]);
+});
+
 it("defers from the operation list and starts fullscreen from the selected attendee", async () => {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
   const people = [

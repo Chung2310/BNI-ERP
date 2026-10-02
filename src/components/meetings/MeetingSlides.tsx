@@ -12,7 +12,7 @@ type Props = {
   canManage: boolean;
   startFromFirst?: boolean;
   initialSpeakerId?: string;
-  onDeferSpeaker?: (speakerId: string) => Promise<void>;
+  onDeferSpeaker?: (speakerId: string | string[]) => Promise<void>;
   autoAdvance?: boolean;
   onMoveSpeaker?: (direction: number) => Promise<void>;
   controlBusy?: boolean;
@@ -41,6 +41,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   const [selectedId, setSelectedId] = useState("");
+  const [checkedSpeakerIds, setCheckedSpeakerIds] = useState<string[]>([]);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const mode = autoAdvance ? "auto" : "manual";
   const changeMode = useCallback((next: "manual" | "auto") => {
@@ -97,7 +98,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   const selected = chosen || (followsSpeaker
     ? deck.slides.find(s => s.id === currentSpeakerId)
     : queue[0]);
-  useEffect(() => { setSelectedId(""); }, [currentSpeakerId]);
+  useEffect(() => { setSelectedId(""); setCheckedSpeakerIds([]); }, [currentSpeakerId]);
   const active = draft || selected;
   const speechesComplete = !!meeting.speechesCompletedAt && ["live", "paused"].includes(meeting.status);
   const timer = useMemo(() => getSlideTimer(meeting, active?.id, now), [meeting, active?.id, now]);
@@ -123,11 +124,11 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     }).finally(() => { speechRequest.current = false; if (mounted.current) setStartingSpeech(false); });
   }, [queue, index, followsSpeaker, canManage, onMoveSpeaker, autoAdvance, currentSpeakerId, meeting.currentIndex, controlBusy, draft, loading]);
 
-  const deferSpeaker = async (speakerId: string) => {
+  const deferSpeaker = async (speakerId: string | string[]) => {
     if (!canManage || !onDeferSpeaker || speechRequest.current || navigationBusy) return;
     speechRequest.current = true;
     setStartingSpeech(true); setError("");
-    try { await onDeferSpeaker(speakerId); setSelectedId(""); }
+    try { await onDeferSpeaker(speakerId); setSelectedId(""); setCheckedSpeakerIds([]); }
     catch (error) { setError(error instanceof Error ? error.message : "Không hoãn được lượt."); }
     finally { speechRequest.current = false; if (mounted.current) setStartingSpeech(false); }
   };
@@ -314,10 +315,36 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       <aside className="space-y-2 rounded-xl border bg-white p-3">
         <p className="text-sm font-bold">Danh sách chiếu ({queue.length}/{deck.slides.length})</p>
         <p className="text-xs text-slate-500">Chọn tên rồi bấm Bắt đầu thuyết trình để bắt đầu từ người đó. Người đang bận có thể để cuối lượt.</p>
-        {!followsSpeaker && <button className="text-xs text-red-700 underline" disabled={!!draft} onClick={() => setExcluded(new Set())}>Chọn tất cả</button>}
+        {canManage && onDeferSpeaker && ["scheduled", "live", "paused"].includes(meeting.status) && (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <button
+              type="button"
+              title="Chuyển xuống cuối lượt"
+              aria-label="Chuyển xuống cuối lượt"
+              disabled={navigationBusy || !checkedSpeakerIds.length}
+              className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-40 transition cursor-pointer shadow-2xs"
+              onClick={() => void deferSpeaker(checkedSpeakerIds)}
+            >
+              <ArrowDownToLine className="h-3.5 w-3.5" />
+              {checkedSpeakerIds.length > 0 && <span className="font-bold">({checkedSpeakerIds.length})</span>}
+            </button>
+            {checkedSpeakerIds.length > 0 && (
+              <button
+                type="button"
+                className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                disabled={navigationBusy}
+                onClick={() => setCheckedSpeakerIds([])}
+              >
+                Bỏ chọn
+              </button>
+            )}
+          </div>
+        )}
+        {!followsSpeaker && !(canManage && onDeferSpeaker) && <button className="text-xs text-red-700 underline" disabled={!!draft} onClick={() => setExcluded(new Set())}>Chọn tất cả</button>}
         <div className="max-h-80 space-y-1 overflow-auto">
           {deck.slides.map(s => <div key={s.id} className={`flex flex-wrap items-center gap-2 rounded-lg p-2 ${selected?.id === s.id ? "bg-red-50" : ""}`}>
-            {!followsSpeaker && <input type="checkbox" aria-label={`Chiếu ${s.name}`} checked={!excluded.has(s.id)} disabled={!!draft} onChange={e => setExcluded(old => { const next = new Set(old); if (e.target.checked) next.delete(s.id); else next.add(s.id); return next; })} />}
+            {canManage && onDeferSpeaker && ["scheduled", "live", "paused"].includes(meeting.status) && <input type="checkbox" aria-label={`Chọn ${s.name}`} checked={checkedSpeakerIds.includes(s.id)} disabled={navigationBusy || (meeting.status !== "scheduled" && meeting.speakers.findIndex(person => person.id === s.id) < meeting.currentIndex)} onChange={e => setCheckedSpeakerIds(ids => e.target.checked ? [...ids, s.id] : ids.filter(id => id !== s.id))} />}
+            {!followsSpeaker && !(canManage && onDeferSpeaker) && <input type="checkbox" aria-label={`Chiếu ${s.name}`} checked={!excluded.has(s.id)} disabled={!!draft} onChange={e => setExcluded(old => { const next = new Set(old); if (e.target.checked) next.delete(s.id); else next.add(s.id); return next; })} />}
             <button className="min-w-0 flex-1 text-left text-sm disabled:opacity-50" aria-pressed={selected?.id === s.id} disabled={navigationBusy || (followsSpeaker && !canManage) || excluded.has(s.id) || ["ended", "cancelled"].includes(meeting.status)} onClick={() => setSelectedId(s.id)}>
               <span className="block truncate font-semibold">{s.name}</span><span className="text-xs text-slate-500">{s.kind === "member" ? "Thành viên" : "Khách mời"}</span>
               {meeting.speakers.find(person => person.id === s.id)?.deferred && (
