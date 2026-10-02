@@ -1,7 +1,7 @@
 import { UserModel } from '../../model/user.model';
 import { assertVersion, getMeeting, MeetingError, saveMeeting } from './meeting.service';
 
-const fields = ['name', 'company', 'photoURL', 'coverImage', 'phone', 'industry', 'bio'] as const;
+const fields = ['name', 'company', 'photoURL', 'coverImage', 'phone', 'email', 'industry', 'bio'] as const;
 
 export function buildProfileSlide(speaker: any, profile?: any) {
   const result: Record<string, string> = {
@@ -12,13 +12,13 @@ export function buildProfileSlide(speaker: any, profile?: any) {
     photoURL: profile?.photoURL ?? speaker.photoURL ?? '',
     coverImage: profile?.coverImage ?? speaker.coverImage ?? '',
     phone: profile?.phone ?? speaker.phone ?? '',
+    email: profile?.email ?? speaker.email ?? '',
     industry: profile?.industry ?? speaker.industry ?? '',
     bio: profile?.bio ?? speaker.bio ?? '',
   };
   for (const field of fields) {
     if (typeof speaker.slideProfile?.[field] === 'string') result[field] = speaker.slideProfile[field];
   }
-  if (!speaker.userId) { result.phone = ''; }
   return result;
 }
 
@@ -27,7 +27,7 @@ export async function getMeetingSlides(companyCode: string, meetingId: string) {
   const userIds = meeting.speakers.map(s => s.userId).filter(Boolean);
   const profiles = userIds.length ? await UserModel.find({
     _id: { $in: userIds }, companyCode, isActive: { $ne: false },
-  }).select('displayName companyName photoURL coverImage phone industry bio').lean() : [];
+  }).select('displayName companyName photoURL coverImage phone email industry bio').lean() : [];
   const byId = new Map(profiles.map(p => [String(p._id), p]));
   return {
     version: meeting.__v,

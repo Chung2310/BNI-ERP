@@ -13,6 +13,11 @@ import {
   UserX,
   UserPlus,
   Phone,
+  Gift,
+  Trophy,
+  Award,
+  Ticket,
+  CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { authService } from "../../services/authService";
@@ -21,6 +26,24 @@ import { UserProfile } from "../../types/common";
 
 type QuickTimeFilter = "all" | "month" | "quarter" | "year";
 type StatusFilter = "all" | "ended" | "live" | "scheduled";
+
+export interface LuckyDrawWinnerRecord {
+  id: string;
+  name: string;
+  email?: string;
+  photoURL?: string;
+  ticketNumber?: number;
+  verificationHash?: string;
+  wonAt?: string;
+  drawnBy?: string;
+  prizeId: string;
+  prizeName: string;
+  reward?: string;
+  color?: string;
+  meetingId: string;
+  meetingTitle: string;
+  meetingDate: string;
+}
 
 interface ExtendedSpeaker extends Speaker {
   company?: string;
@@ -35,6 +58,194 @@ const getLiveElapsedMinutes = (startsAt: string | Date): number => {
   if (diffMs <= 0) return 1;
   return Math.floor(diffMs / 60000);
 };
+
+const extractLuckyWinners = (meeting: Meeting): LuckyDrawWinnerRecord[] => {
+  const result: LuckyDrawWinnerRecord[] = [];
+  const prizes = meeting.luckyDraw?.prizes || [];
+  prizes.forEach((p) => {
+    (p.winners || []).forEach((w) => {
+      result.push({
+        id: w.id || `${p.id}-${w.name}-${w.wonAt || Math.random()}`,
+        name: w.name,
+        email: w.email,
+        photoURL: w.photoURL,
+        ticketNumber: w.ticketNumber,
+        verificationHash: w.verificationHash,
+        wonAt: w.wonAt,
+        drawnBy: w.drawnBy,
+        prizeId: p.id,
+        prizeName: p.name,
+        reward: p.reward,
+        color: p.color,
+        meetingId: meeting._id,
+        meetingTitle: meeting.title,
+        meetingDate: meeting.startsAt ? new Date(meeting.startsAt).toISOString() : "",
+      });
+    });
+  });
+  return result;
+};
+
+function LuckyWinnersTable({
+  winners,
+  showMeetingInfo = false,
+  onSelectMeeting,
+}: {
+  winners: LuckyDrawWinnerRecord[];
+  showMeetingInfo?: boolean;
+  onSelectMeeting?: (meetingId: string) => void;
+}) {
+  if (winners.length === 0) {
+    return (
+      <div className="p-8 text-center text-xs text-slate-400">
+        <Gift className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+        Chưa có người trúng giải nào trong danh sách này.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-xs">
+        <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+          <tr>
+            <th className="py-2.5 px-3 w-10">STT</th>
+            <th className="py-2.5 px-3">Người trúng thưởng</th>
+            {showMeetingInfo && <th className="py-2.5 px-3">Cuộc họp</th>}
+            <th className="py-2.5 px-3">Giải thưởng</th>
+            <th className="py-2.5 px-3">Phần quà / Giá trị</th>
+            <th className="py-2.5 px-3 text-center">Số vé</th>
+            <th className="py-2.5 px-3">Thời gian</th>
+            <th className="py-2.5 px-3">Mã xác thực</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {winners.map((w, idx) => {
+            const initial = (w.name || "?").trim().charAt(0).toUpperCase();
+            return (
+              <tr key={w.id || idx} className="hover:bg-slate-50/70 transition-colors">
+                <td className="py-2.5 px-3 text-slate-400">{idx + 1}</td>
+                <td className="py-2.5 px-3">
+                  <div className="flex items-center gap-2.5">
+                    {w.photoURL ? (
+                      <img
+                        src={w.photoURL}
+                        alt={w.name}
+                        className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 font-semibold text-amber-700 text-xs">
+                        {initial}
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-semibold text-slate-800 block">{w.name}</span>
+                      {w.email && <span className="text-[11px] text-slate-400 block">{w.email}</span>}
+                    </div>
+                  </div>
+                </td>
+                {showMeetingInfo && (
+                  <td className="py-2.5 px-3">
+                    {onSelectMeeting ? (
+                      <button
+                        onClick={() => onSelectMeeting(w.meetingId)}
+                        className="text-left font-medium text-rose-600 hover:underline max-w-[200px] truncate block cursor-pointer"
+                        title={w.meetingTitle}
+                      >
+                        {w.meetingTitle}
+                      </button>
+                    ) : (
+                      <span className="font-medium text-slate-700 max-w-[200px] truncate block" title={w.meetingTitle}>
+                        {w.meetingTitle}
+                      </span>
+                    )}
+                    {w.meetingDate && (
+                      <span className="text-[11px] text-slate-400">
+                        {new Date(w.meetingDate).toLocaleDateString("vi-VN", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}
+                      </span>
+                    )}
+                  </td>
+                )}
+                <td className="py-2.5 px-3 whitespace-nowrap">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold border shadow-2xs"
+                    style={{
+                      backgroundColor: w.color ? `${w.color}15` : "#fef3c7",
+                      borderColor: w.color ? `${w.color}40` : "#fde68a",
+                      color: w.color || "#b45309",
+                    }}
+                  >
+                    <Award className="h-3 w-3" />
+                    {w.prizeName}
+                  </span>
+                </td>
+                <td className="py-2.5 px-3 font-medium text-slate-700">
+                  {w.reward ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Gift className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                      <span>{w.reward}</span>
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 italic">Theo quy định BTC</span>
+                  )}
+                </td>
+                <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                  {w.ticketNumber !== undefined ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-700">
+                      <Ticket className="h-3 w-3 text-slate-400" />#{w.ticketNumber}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">-</span>
+                  )}
+                </td>
+                <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
+                  {w.wonAt ? (
+                    <div>
+                      <span className="block font-medium text-slate-700">
+                        {new Date(w.wonAt).toLocaleTimeString("vi-VN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(w.wonAt).toLocaleDateString("vi-VN", {
+                          day: "2-digit",
+                          month: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-slate-400">-</span>
+                  )}
+                </td>
+                <td className="py-2.5 px-3 whitespace-nowrap">
+                  {w.verificationHash ? (
+                    <span
+                      title={w.verificationHash}
+                      className="inline-flex items-center gap-1 font-mono text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 rounded-md"
+                    >
+                      <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                      {w.verificationHash.slice(0, 8)}...
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 text-[11px]">-</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export function MeetingStatisticsPanel() {
   const { userProfile } = useAuth();
@@ -57,8 +268,12 @@ export function MeetingStatisticsPanel() {
   const [quickFilter, setQuickFilter] = useState<QuickTimeFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
+  // Tab switch in "all meetings" mode: "meetings" list or "winners" list
+  const [allMeetingsTab, setAllMeetingsTab] = useState<"meetings" | "winners">("meetings");
+  const [winnerSearch, setWinnerSearch] = useState("");
+
   // Sub-filter for single meeting attendee list
-  const [attendeeRoleFilter, setAttendeeRoleFilter] = useState<"all" | "present" | "absent" | "guest">("all");
+  const [attendeeRoleFilter, setAttendeeRoleFilter] = useState<"all" | "present" | "absent" | "guest" | "lucky">("all");
   const [attendeeSearch, setAttendeeSearch] = useState("");
 
   const fetchData = async () => {
@@ -176,6 +391,14 @@ export function MeetingStatisticsPanel() {
       totalMembersAbsent += meetingAbsent;
     });
 
+    // Lucky draw winners across filtered meetings
+    let totalLuckyWinners = 0;
+    filteredMeetings.forEach((m) => {
+      (m.luckyDraw?.prizes || []).forEach((p) => {
+        totalLuckyWinners += (p.winners || []).length;
+      });
+    });
+
     const completedCount = filteredMeetings.filter((m) => m.status === "ended").length;
     const liveCount = filteredMeetings.filter((m) => ["live", "paused"].includes(m.status)).length;
     const scheduledCount = filteredMeetings.filter((m) => m.status === "scheduled").length;
@@ -197,6 +420,7 @@ export function MeetingStatisticsPanel() {
       totalMembersPresent,
       totalMembersAbsent,
       totalGuests,
+      totalWinners: totalLuckyWinners,
       memberPresentRate,
       guestRate,
       absentRate,
@@ -204,12 +428,40 @@ export function MeetingStatisticsPanel() {
     };
   }, [filteredMeetings, totalChapterMembersCount]);
 
+  // Aggregate lucky draw winners for all filtered meetings
+  const allFilteredLuckyWinners = useMemo(() => {
+    const list: LuckyDrawWinnerRecord[] = [];
+    filteredMeetings.forEach((m) => {
+      list.push(...extractLuckyWinners(m));
+    });
+    return list.sort((a, b) => {
+      const timeA = a.wonAt ? new Date(a.wonAt).getTime() : new Date(a.meetingDate).getTime();
+      const timeB = b.wonAt ? new Date(b.wonAt).getTime() : new Date(b.meetingDate).getTime();
+      return timeB - timeA;
+    });
+  }, [filteredMeetings]);
+
+  // Lucky winners list with search filter
+  const displayedFilteredLuckyWinners = useMemo(() => {
+    if (!winnerSearch.trim()) return allFilteredLuckyWinners;
+    const q = winnerSearch.toLowerCase().trim();
+    return allFilteredLuckyWinners.filter((w) => {
+      const matchName = w.name?.toLowerCase().includes(q);
+      const matchPrize = w.prizeName?.toLowerCase().includes(q);
+      const matchReward = w.reward?.toLowerCase().includes(q);
+      const matchMeeting = w.meetingTitle?.toLowerCase().includes(q);
+      return matchName || matchPrize || matchReward || matchMeeting;
+    });
+  }, [allFilteredLuckyWinners, winnerSearch]);
+
   const resetFilters = () => {
     setSelectedMeetingId("all");
     setSearchQuery("");
     setSelectedDate("");
     setQuickFilter("all");
     setStatusFilter("all");
+    setAllMeetingsTab("meetings");
+    setWinnerSearch("");
     setAttendeeRoleFilter("all");
     setAttendeeSearch("");
   };
@@ -228,6 +480,27 @@ export function MeetingStatisticsPanel() {
     }
     return null;
   }, [selectedMeetingId, meetings]);
+
+  // Lucky winners for single meeting
+  const singleMeetingWinners = useMemo(() => {
+    if (!activeSingleMeeting) return [];
+    return extractLuckyWinners(activeSingleMeeting).sort((a, b) => {
+      const timeA = a.wonAt ? new Date(a.wonAt).getTime() : 0;
+      const timeB = b.wonAt ? new Date(b.wonAt).getTime() : 0;
+      return timeB - timeA;
+    });
+  }, [activeSingleMeeting]);
+
+  const displayedSingleMeetingWinners = useMemo(() => {
+    if (!attendeeSearch.trim()) return singleMeetingWinners;
+    const q = attendeeSearch.toLowerCase().trim();
+    return singleMeetingWinners.filter((w) => {
+      const matchName = w.name?.toLowerCase().includes(q);
+      const matchPrize = w.prizeName?.toLowerCase().includes(q);
+      const matchReward = w.reward?.toLowerCase().includes(q);
+      return matchName || matchPrize || matchReward;
+    });
+  }, [singleMeetingWinners, attendeeSearch]);
 
   // Absent members list for active single meeting
   const singleMeetingAbsentMembers = useMemo(() => {
@@ -470,8 +743,8 @@ export function MeetingStatisticsPanel() {
         </div>
       )}
 
-      {/* 2. CHỈ SỐ TỔNG QUAN GỌN GÀNG (5 Compact Metrics Cards với màu tươi sáng tương phản rõ) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      {/* 2. CHỈ SỐ TỔNG QUAN GỌN GÀNG (6 Compact Metrics Cards với màu tươi sáng tương phản rõ) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* Tổng số cuộc họp */}
         <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 text-xs">
@@ -498,7 +771,7 @@ export function MeetingStatisticsPanel() {
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
             <span className="text-2xl font-semibold tracking-tight text-slate-800">{metrics.totalAttendees}</span>
-            <span className="text-xs text-slate-400">lượt check-in</span>
+            <span className="text-xs text-slate-400">lượt</span>
           </div>
           <div className="mt-1.5 text-[11px] text-slate-500">
             <span>TB: {metrics.avgPerMeeting} người/buổi</span>
@@ -529,7 +802,7 @@ export function MeetingStatisticsPanel() {
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
             <span className="text-2xl font-semibold tracking-tight text-orange-600">{metrics.totalMembersAbsent}</span>
-            <span className="text-xs text-orange-400">lượt vắng</span>
+            <span className="text-xs text-orange-400">lượt</span>
             <span className="ml-auto text-xs font-medium text-orange-600">{metrics.absentRate}%</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-orange-100 overflow-hidden">
@@ -538,7 +811,7 @@ export function MeetingStatisticsPanel() {
         </div>
 
         {/* Khách mời (Màu Xanh da trời tươi sáng #0ea5e9 tương phản hoàn hảo) */}
-        <div className="rounded-2xl border border-sky-100 bg-sky-50/25 p-3.5 shadow-2xs col-span-2 md:col-span-1">
+        <div className="rounded-2xl border border-sky-100 bg-sky-50/25 p-3.5 shadow-2xs">
           <div className="flex items-center justify-between text-sky-700 text-xs">
             <span>Khách mời</span>
             <span className="h-2 w-2 rounded-full bg-sky-500" />
@@ -550,6 +823,22 @@ export function MeetingStatisticsPanel() {
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-sky-100 overflow-hidden">
             <div className="h-full rounded-full bg-sky-500 transition-all duration-300" style={{ width: `${metrics.guestRate}%` }} />
+          </div>
+        </div>
+
+        {/* Người trúng giải quay thưởng (Màu Vàng Amber sang trọng #f59e0b) */}
+        <div className="rounded-2xl border border-amber-200/80 bg-amber-50/30 p-3.5 shadow-2xs">
+          <div className="flex items-center justify-between text-amber-700 text-xs">
+            <span>Trúng giải quay</span>
+            <Gift className="h-4 w-4 text-amber-500" />
+          </div>
+          <div className="mt-1 flex items-baseline gap-1.5">
+            <span className="text-2xl font-semibold tracking-tight text-amber-600">{metrics.totalWinners}</span>
+            <span className="text-xs text-amber-500/80">lượt</span>
+          </div>
+          <div className="mt-2 text-[11px] text-amber-700/80 font-medium truncate flex items-center gap-1">
+            <Trophy className="h-3 w-3 text-amber-500 shrink-0" />
+            <span>{metrics.totalWinners > 0 ? "Vòng quay may mắn" : "Chưa có lượt quay"}</span>
           </div>
         </div>
       </div>
@@ -785,7 +1074,7 @@ export function MeetingStatisticsPanel() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {/* Lọc vai trò người tham dự + vắng mặt */}
+              {/* Lọc vai trò người tham dự + vắng mặt + trúng giải */}
               <div className="flex bg-slate-100 p-0.5 rounded-lg text-xs">
                 <button
                   onClick={() => setAttendeeRoleFilter("all")}
@@ -819,6 +1108,15 @@ export function MeetingStatisticsPanel() {
                 >
                   Vắng mặt ({singleMeetingAbsentMembers.length})
                 </button>
+                <button
+                  onClick={() => setAttendeeRoleFilter("lucky")}
+                  className={`px-2.5 py-1 rounded-md transition-colors flex items-center gap-1 ${
+                    attendeeRoleFilter === "lucky" ? "bg-white text-amber-700 font-medium shadow-2xs" : "text-slate-500"
+                  }`}
+                >
+                  <Gift className="h-3 w-3 text-amber-500" />
+                  Trúng giải ({singleMeetingWinners.length})
+                </button>
               </div>
 
               {/* Tìm người */}
@@ -826,13 +1124,15 @@ export function MeetingStatisticsPanel() {
                 type="text"
                 value={attendeeSearch}
                 onChange={(e) => setAttendeeSearch(e.target.value)}
-                placeholder="Tìm tên, công ty..."
-                className="w-36 sm:w-44 rounded-lg border border-slate-200 bg-slate-50/50 py-1 px-2.5 text-xs text-slate-700 focus:bg-white focus:outline-hidden"
+                placeholder={attendeeRoleFilter === "lucky" ? "Tìm tên, giải, quà..." : "Tìm tên, công ty..."}
+                className="w-36 sm:w-48 rounded-lg border border-slate-200 bg-slate-50/50 py-1 px-2.5 text-xs text-slate-700 focus:bg-white focus:outline-hidden"
               />
             </div>
           </div>
 
-          {singleMeetingAttendees.length === 0 ? (
+          {attendeeRoleFilter === "lucky" ? (
+            <LuckyWinnersTable winners={displayedSingleMeetingWinners} />
+          ) : singleMeetingAttendees.length === 0 ? (
             <div className="p-6 text-center text-xs text-slate-400">
               Không có người nào phù hợp với bộ lọc này.
             </div>
@@ -909,14 +1209,57 @@ export function MeetingStatisticsPanel() {
         </div>
       ) : (
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-            <span className="text-xs font-semibold text-slate-800">
-              Danh sách cuộc họp ({filteredMeetings.length})
-            </span>
-            <span className="text-[11px] text-slate-400">Bấm vào hàng để xem danh sách có mặt & vắng mặt</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="flex bg-slate-100 p-0.5 rounded-lg text-xs">
+                <button
+                  onClick={() => setAllMeetingsTab("meetings")}
+                  className={`px-3 py-1 rounded-md transition-colors font-medium cursor-pointer ${
+                    allMeetingsTab === "meetings"
+                      ? "bg-white text-slate-800 shadow-2xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Danh sách cuộc họp ({filteredMeetings.length})
+                </button>
+                <button
+                  onClick={() => setAllMeetingsTab("winners")}
+                  className={`px-3 py-1 rounded-md transition-colors font-medium flex items-center gap-1.5 cursor-pointer ${
+                    allMeetingsTab === "winners"
+                      ? "bg-white text-amber-700 shadow-2xs"
+                      : "text-slate-500 hover:text-amber-700"
+                  }`}
+                >
+                  <Gift className="h-3.5 w-3.5 text-amber-500" />
+                  Người trúng giải ({allFilteredLuckyWinners.length})
+                </button>
+              </div>
+            </div>
+
+            {allMeetingsTab === "meetings" ? (
+              <span className="text-[11px] text-slate-400">
+                Bấm vào hàng để xem danh sách có mặt, vắng mặt & trúng giải
+              </span>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={winnerSearch}
+                  onChange={(e) => setWinnerSearch(e.target.value)}
+                  placeholder="Tìm người trúng, quà, cuộc họp..."
+                  className="w-48 sm:w-60 rounded-lg border border-slate-200 bg-slate-50/50 py-1 px-2.5 text-xs text-slate-700 focus:bg-white focus:outline-hidden"
+                />
+              </div>
+            )}
           </div>
 
-          {filteredMeetings.length === 0 ? (
+          {allMeetingsTab === "winners" ? (
+            <LuckyWinnersTable
+              winners={displayedFilteredLuckyWinners}
+              showMeetingInfo={true}
+              onSelectMeeting={(meetingId) => setSelectedMeetingId(meetingId)}
+            />
+          ) : filteredMeetings.length === 0 ? (
             <div className="p-6 text-center text-xs text-slate-400">
               Không tìm thấy cuộc họp nào.
             </div>
@@ -931,6 +1274,7 @@ export function MeetingStatisticsPanel() {
                     <th className="py-2.5 px-3 text-center">Thành viên có mặt</th>
                     <th className="py-2.5 px-3 text-center">Thành viên vắng</th>
                     <th className="py-2.5 px-3 text-center">Khách mời</th>
+                    <th className="py-2.5 px-3 text-center">Trúng giải</th>
                     <th className="py-2.5 px-3 text-center">Tổng tham dự</th>
                     <th className="py-2.5 px-3 text-center">Tỷ lệ khách</th>
                     <th className="py-2.5 px-3 text-right">Chi tiết</th>
@@ -943,6 +1287,10 @@ export function MeetingStatisticsPanel() {
                     const guestCount = speakers.length - memberCount;
                     const absentCount = Math.max(0, totalChapterMembersCount - memberCount);
                     const guestRatio = speakers.length > 0 ? Math.round((guestCount / speakers.length) * 100) : 0;
+                    const luckyCount = (m.luckyDraw?.prizes || []).reduce(
+                      (acc, p) => acc + (p.winners?.length || 0),
+                      0
+                    );
 
                     return (
                       <tr
@@ -992,6 +1340,16 @@ export function MeetingStatisticsPanel() {
                           )}
                         </td>
                         <td className="py-2.5 px-3 text-center text-sky-600 font-medium">{guestCount}</td>
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          {luckyCount > 0 ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                              <Gift className="h-3 w-3 text-amber-500" />
+                              {luckyCount} giải
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </td>
                         <td className="py-2.5 px-3 text-center font-semibold text-slate-800">{speakers.length}</td>
                         <td className="py-2.5 px-3 text-center text-slate-600">{guestRatio}%</td>
                         <td className="py-2.5 px-3 text-right">

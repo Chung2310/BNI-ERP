@@ -217,6 +217,39 @@ export async function reorderMeetingSpeakers(item: any, speakerIds: unknown) {
   return item;
 }
 
+export async function deferMeetingSpeaker(item: any, speakerId: string, now = new Date()) {
+  if (item.speakers.at(-1)?.id === speakerId) throw new MeetingError(409, 'Người này đã ở cuối danh sách.');
+  return deferMeetingSpeakers(item, [speakerId], now);
+}
+
+export async function deferMeetingSpeakers(item: any, speakerIds: unknown, now = new Date()) {
+  if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp không còn nhận điều hành phát biểu.');
+  if (!Array.isArray(speakerIds) || !speakerIds.length || speakerIds.length > 1000 || speakerIds.some(id => typeof id !== 'string' || !id) || new Set(speakerIds).size !== speakerIds.length) throw new MeetingError(400, 'Chọn danh sách người cần để cuối lượt hợp lệ.');
+  const ids = new Set(speakerIds);
+  const first = item.status === 'scheduled' ? 0 : Math.max(0, item.currentIndex);
+  for (const id of ids) {
+    const index = item.speakers.findIndex((speaker: any) => speaker.id === id);
+    if (index < 0) throw new MeetingError(404, 'Không tìm thấy người phát biểu.');
+    if (index < first) throw new MeetingError(409, 'Không thể hoãn lượt đã hoàn tất.');
+  }
+  const waiting = item.speakers.slice(first);
+  const remaining = waiting.filter((person: any) => !ids.has(person.id));
+  if (!remaining.length) throw new MeetingError(409, 'Cần giữ ít nhất một người để tiếp tục phát biểu.');
+  const isCurrent = item.status !== 'scheduled' && ids.has(item.speakers[item.currentIndex]?.id);
+  const deferred = waiting.filter((person: any) => ids.has(person.id));
+  for (const person of deferred) person.deferred = true;
+  // Keep the original relative order in both groups and save the batch atomically.
+  item.speakers = [...item.speakers.slice(0, first), ...remaining, ...deferred];
+  if (isCurrent) {
+    item.elapsedSeconds = 0;
+    item.speakerStartedAt = item.status === 'live' ? now : undefined;
+    item.speakers[item.currentIndex].deferred = false;
+  }
+  await saveMeeting(item);
+  await notifyNextSpeaker(item);
+  return item;
+}
+
 export async function startMeetingPresentation(item: any, speakerId: string, now = new Date()) {
   if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp hiện không thể bắt đầu thuyết trình.');
   const index = item.speakers.findIndex((speaker: any) => speaker.id === speakerId);
@@ -235,6 +268,7 @@ export async function startMeetingPresentation(item: any, speakerId: string, now
     item.speakerStartedAt = now;
   }
   item.status = 'live';
+  item.speakers[index].deferred = false;
   item.speechesCompletedAt = undefined;
   await saveMeeting(item);
   await notifyNextSpeaker(item);
@@ -264,6 +298,7 @@ export async function controlMeeting(item: any, action: string, now = new Date()
     item.status = 'live';
     item.speechesCompletedAt = undefined;
   } else if (action === 'start_speaker' && ['live', 'paused'].includes(status)) {
+    item.speakers[item.currentIndex].deferred = false;
     item.speakerStartedAt = now;
     item.elapsedSeconds = 0;
     item.status = 'live';
@@ -290,6 +325,7 @@ export async function controlMeeting(item: any, action: string, now = new Date()
     if (item.currentIndex <= 0) throw new MeetingError(409, 'Đang ở người phát biểu đầu tiên.');
     item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
     item.currentIndex--;
+    item.speakers[item.currentIndex].deferred = false;
     item.elapsedSeconds = 0;
     item.speakers[item.currentIndex].spokenSeconds = undefined;
     item.speakerStartedAt = status === 'live' ? now : undefined;
@@ -304,6 +340,7 @@ export async function controlMeeting(item: any, action: string, now = new Date()
       item.speakerStartedAt = undefined;
     } else {
       item.currentIndex++;
+      item.speakers[item.currentIndex].deferred = false;
       item.elapsedSeconds = 0;
       item.speakerStartedAt = status === 'live' ? now : undefined;
     }

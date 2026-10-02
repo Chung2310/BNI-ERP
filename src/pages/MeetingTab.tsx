@@ -28,6 +28,7 @@ import {
   Trophy,
   Filter,
   RotateCcw,
+  ArrowDownToLine,
 } from "lucide-react";
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
@@ -44,6 +45,7 @@ type Speaker = {
   coverImage?: string;
   seconds: number;
   spokenSeconds?: number;
+  deferred?: boolean;
   checkedInAt?: string;
 };
 
@@ -149,6 +151,8 @@ export default function MeetingTab() {
   const [finishRequested, setFinishRequested] = useState(false);
   const [dismissedCompletion, setDismissedCompletion] = useState("");
   const [startPresentation, setStartPresentation] = useState(false);
+  const [presentationSpeakerId, setPresentationSpeakerId] = useState("");
+  const [checkedSpeakerIds, setCheckedSpeakerIds] = useState<string[]>([]);
   const presentationFullscreen = useRef<Promise<boolean> | null>(null);
   const presentationStarted = useCallback(() => setStartPresentation(false), []);
   const presentationClosed = useCallback(() => {
@@ -245,6 +249,7 @@ export default function MeetingTab() {
   }, [refresh]);
 
   const activeMeeting = items.find((m) => m._id === detailMeetingId) || null;
+  useEffect(() => { setPresentationSpeakerId(""); setCheckedSpeakerIds([]); }, [activeMeeting?._id, activeMeeting?.speakers[activeMeeting.currentIndex]?.id]);
 
   const completionKey = activeMeeting?.speechesCompletedAt && ["live", "paused"].includes(activeMeeting.status)
     ? activeMeeting._id + ":" + activeMeeting.speechesCompletedAt : "";
@@ -410,6 +415,21 @@ export default function MeetingTab() {
     try {
       const updated: Meeting = await api(`/${activeMeeting._id}/control`, "POST", { action, version: activeMeeting.__v });
       setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
+    } finally {
+      meetingControlPending.current = false;
+      setSaving(false);
+    }
+  };
+
+  const deferSpeaker = async (speakerId: string | string[]): Promise<void> => {
+    if (!activeMeeting || !canManage || meetingControlPending.current) return;
+    meetingControlPending.current = true;
+    setSaving(true);
+    try {
+      const updated: Meeting = await api(`/${activeMeeting._id}/defer`, "POST", { ...(Array.isArray(speakerId) ? { speakerIds: speakerId } : { speakerId }), version: activeMeeting.__v });
+      setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
+      setPresentationSpeakerId("");
+      setCheckedSpeakerIds([]);
     } finally {
       meetingControlPending.current = false;
       setSaving(false);
@@ -668,30 +688,29 @@ export default function MeetingTab() {
                 {/* Top Cover / Header Image */}
                 <div className="relative h-24 w-full overflow-hidden bg-slate-100">
                   {m.coverImage ? (
-                    <img
-                      src={m.coverImage}
-                      alt={m.title}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
+                    <>
+                      <img
+                        src={m.coverImage}
+                        alt={m.title}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-black/20" />
+                    </>
                   ) : (
-                    <div className="h-full w-full bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-950 p-3 flex items-center justify-end text-white">
-                      <CalendarDays className="h-16 w-16 rotate-12 text-cyan-400/15" />
+                    <div className="relative h-full w-full bg-gradient-to-br from-slate-50 via-slate-100/70 to-slate-200/50 p-3 flex items-center justify-end overflow-hidden border-b border-slate-200/60">
+                      {/* Subtle elegant neutral accents */}
+                      <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-slate-200/60 blur-md pointer-events-none" />
+                      <div className="absolute -left-6 -bottom-6 h-20 w-28 rounded-full bg-slate-200/40 blur-sm pointer-events-none" />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-30 pointer-events-none">
+                        <CalendarDays className="h-16 w-16 text-slate-400 rotate-12 transition-transform duration-300 group-hover:scale-110" />
+                      </div>
                     </div>
                   )}
-
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-black/20" />
 
                   {/* Status Badge */}
                   <div className="absolute top-2 left-2">
                     {m.status === "live" ? (
-                      <span
-                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border backdrop-blur-md shadow-md"
-                        style={{
-                          backgroundColor: "rgba(5, 20, 10, 0.9)",
-                          borderColor: "#22c55e",
-                          color: "#22c55e",
-                        }}
-                      >
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-green-300 bg-green-50/95 text-green-700 shadow-xs backdrop-blur-xs">
                         <span className="relative flex h-2 w-2 shrink-0">
                           <span
                             className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-80"
@@ -699,16 +718,16 @@ export default function MeetingTab() {
                           />
                           <span
                             className="relative inline-flex rounded-full h-2 w-2"
-                            style={{ backgroundColor: "#22c55e" }}
+                            style={{ backgroundColor: "#16a34a" }}
                           />
                         </span>
-                        <span className="animate-pulse tracking-tight font-extrabold" style={{ color: "#22c55e" }}>
+                        <span className="animate-pulse tracking-tight font-extrabold text-green-700">
                           Đang diễn ra {getLiveElapsedMinutes(m.startsAt)} phút
                         </span>
                       </span>
                     ) : m.status === "paused" ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-sky-400/80 bg-slate-950/85 text-sky-400 shadow-md shadow-sky-500/25 backdrop-blur-md">
-                        <span className="h-2 w-2 rounded-full bg-sky-400" />
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-sky-300 bg-sky-50 text-sky-700 shadow-xs backdrop-blur-xs">
+                        <span className="h-2 w-2 rounded-full bg-sky-500" />
                         <span>Tạm dừng • {getLiveElapsedMinutes(m.startsAt)} phút</span>
                       </span>
                     ) : (
@@ -728,7 +747,7 @@ export default function MeetingTab() {
                         type="button"
                         title="Sửa cuộc họp"
                         onClick={(e) => openEditModal(m, e)}
-                        className="rounded-lg bg-white/80 backdrop-blur-md p-1.5 text-slate-700 hover:bg-white hover:text-cyan-700 shadow-sm transition cursor-pointer"
+                        className="rounded-lg bg-white/90 backdrop-blur-md p-1.5 text-slate-700 hover:bg-white hover:text-cyan-700 shadow-sm border border-slate-200/60 transition cursor-pointer"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -739,7 +758,7 @@ export default function MeetingTab() {
                           e.stopPropagation();
                           setDeletingMeeting(m);
                         }}
-                        className="rounded-lg bg-white/80 backdrop-blur-md p-1.5 text-slate-700 hover:bg-rose-50 hover:text-rose-600 shadow-sm transition cursor-pointer"
+                        className="rounded-lg bg-white/90 backdrop-blur-md p-1.5 text-slate-700 hover:bg-rose-50 hover:text-rose-600 shadow-sm border border-slate-200/60 transition cursor-pointer"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -747,9 +766,18 @@ export default function MeetingTab() {
                   )}
 
                   {/* Time preview on image bottom */}
-                  <div className="absolute bottom-2.5 left-3 right-3 flex items-center gap-1.5 text-xs text-white/95 font-medium drop-shadow-sm">
-                    <Clock3 className="h-3.5 w-3.5 text-cyan-300 shrink-0" />
-                    <span className="truncate">{dateText(m.startsAt)}</span>
+                  <div className="absolute bottom-2.5 left-3 right-3 flex items-center gap-1.5 text-xs">
+                    {m.coverImage ? (
+                      <div className="flex items-center gap-1.5 text-white/95 font-medium drop-shadow-sm">
+                        <Clock3 className="h-3.5 w-3.5 text-cyan-300 shrink-0" />
+                        <span className="truncate">{dateText(m.startsAt)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-slate-600 font-semibold drop-shadow-xs">
+                        <Clock3 className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                        <span className="truncate">{dateText(m.startsAt)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -957,7 +985,7 @@ export default function MeetingTab() {
 
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} onPresentationClosed={presentationClosed} onStartPresentation={canManage ? startPresentationTimer : undefined} onMoveSpeaker={direction => requestMeetingControl(direction > 0 ? "next" : "previous")} controlBusy={saving} autoAdvance={autoAdvance} autoAdvanceDelay={autoAdvanceDelay} onAutoAdvanceChange={updateAutoAdvance} onAutoAdvanceDelayChange={updateAutoAdvanceDelay} fullscreenRequest={presentationFullscreen.current} />}
+              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} initialSpeakerId={presentationSpeakerId} onDeferSpeaker={deferSpeaker} onPresentationStarted={presentationStarted} onPresentationClosed={presentationClosed} onStartPresentation={canManage ? startPresentationTimer : undefined} onMoveSpeaker={direction => requestMeetingControl(direction > 0 ? "next" : "previous")} controlBusy={saving} autoAdvance={autoAdvance} autoAdvanceDelay={autoAdvanceDelay} onAutoAdvanceChange={updateAutoAdvance} onAutoAdvanceDelayChange={updateAutoAdvanceDelay} fullscreenRequest={presentationFullscreen.current} />}
               {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
               {(activeSubTab === "speakers" || activeSubTab === "checkin") && (
                 <div className="space-y-4">
@@ -1020,7 +1048,7 @@ export default function MeetingTab() {
 
                       {/* Operation Control Buttons */}
                       <div className="flex flex-wrap items-center gap-2">
-                        <button type="button" disabled={!activeMeeting.speakers.length}
+                        <button type="button" disabled={saving || !activeMeeting.speakers.length}
                           onClick={() => {
                             presentationFullscreen.current = document.documentElement.requestFullscreen && !document.fullscreenElement
                               ? document.documentElement.requestFullscreen().then(() => true).catch(() => false)
@@ -1128,9 +1156,9 @@ export default function MeetingTab() {
 
                       {current ? (
                         <div className="my-4 flex items-center gap-4">
-                          {current.coverImage || current.photoURL ? (
+                          {current.photoURL ? (
                             <img
-                              src={current.coverImage || current.photoURL}
+                              src={current.photoURL}
                               alt={current.name}
                               className="h-16 w-16 rounded-2xl object-cover ring-2 ring-cyan-500/30"
                             />
@@ -1222,7 +1250,7 @@ export default function MeetingTab() {
                                 <span className="text-slate-600 font-semibold">giây</span>
                               </div>
                             )}
-                            <p className="w-full text-xs text-slate-500">{autoAdvance ? <>Khi hết thời gian phát biểu, chờ {autoAdvanceDelay} giây rồi chuyển người và slide. Đây là thời gian chờ chuyển lượt, không phải thời lượng phát biểu.</> : "Bấm chuyển người ở tab Điều hành hoặc trên slide. Người phát biểu, đồng hồ và slide luôn đồng bộ."}</p>
+                            {autoAdvance && <p className="w-full text-xs text-slate-500">Khi hết thời gian phát biểu, chờ {autoAdvanceDelay} giây rồi chuyển người và slide. Đây là thời gian chờ chuyển lượt, không phải thời lượng phát biểu.</p>}
                           </div>
                         )}
                       </div>
@@ -1244,9 +1272,9 @@ export default function MeetingTab() {
 
                       {upcoming ? (
                         <div className="my-4 flex items-center gap-4">
-                          {upcoming.coverImage || upcoming.photoURL ? (
+                          {upcoming.photoURL ? (
                             <img
-                              src={upcoming.coverImage || upcoming.photoURL}
+                              src={upcoming.photoURL}
                               alt={upcoming.name}
                               className="h-16 w-16 rounded-2xl object-cover ring-1 ring-slate-200"
                             />
@@ -1320,6 +1348,30 @@ export default function MeetingTab() {
                       {activeSubTab === "checkin" ? "Người đã check-in · thứ tự phát biểu" : "Danh sách thuyết trình"} ({activeMeeting.speakers.length})
                     </h3>
 
+                    {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && checkedSpeakerIds.length > 0 && (
+                      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs py-1">
+                        <span className="font-medium text-slate-600">Đã chọn {checkedSpeakerIds.length}</span>
+                        <button
+                          type="button"
+                          title="Chuyển xuống cuối lượt"
+                          aria-label="Chuyển xuống cuối lượt"
+                          disabled={saving}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-40 transition cursor-pointer shadow-2xs"
+                          onClick={() => void deferSpeaker(checkedSpeakerIds).catch(error => toast.error(error.message || "Không hoãn được lượt."))}
+                        >
+                          <ArrowDownToLine className="h-3.5 w-3.5" />
+                          <span className="font-bold">({checkedSpeakerIds.length})</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                          disabled={saving}
+                          onClick={() => setCheckedSpeakerIds([])}
+                        >
+                          Bỏ chọn
+                        </button>
+                      </div>
+                    )}
                     <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
                       {activeMeeting.speakers.map((p, i) => {
                         const isSpeaking = i === activeMeeting.currentIndex && ["live", "paused"].includes(activeMeeting.status);
@@ -1334,10 +1386,11 @@ export default function MeetingTab() {
                             <span className="w-6 text-center font-mono text-xs font-bold text-slate-400">
                               {i + 1}
                             </span>
+                            {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && <input type="checkbox" aria-label={`Chọn ${p.name}`} checked={checkedSpeakerIds.includes(p.id)} disabled={saving || (activeMeeting.status !== "scheduled" && i < activeMeeting.currentIndex)} onChange={e => setCheckedSpeakerIds(ids => e.target.checked ? [...ids, p.id] : ids.filter(id => id !== p.id))} />}
 
-                            {p.coverImage || p.photoURL ? (
+                            {p.photoURL ? (
                               <img
-                                src={p.coverImage || p.photoURL}
+                                src={p.photoURL}
                                 alt={p.name}
                                 className="h-9 w-9 rounded-full object-cover ring-1 ring-slate-200"
                               />
@@ -1348,7 +1401,7 @@ export default function MeetingTab() {
                             )}
 
                             <div className="min-w-0 flex-1">
-                              <span className="block truncate text-xs font-bold text-slate-800">{p.name}</span>
+                              <button type="button" aria-label={`Bắt đầu từ ${p.name}`} aria-pressed={presentationSpeakerId === p.id} disabled={saving || !canManage || !["scheduled", "live", "paused"].includes(activeMeeting.status)} onClick={() => setPresentationSpeakerId(p.id)} className="block max-w-full truncate text-left text-xs font-bold text-slate-800 aria-pressed:text-cyan-700 aria-pressed:underline">{p.name}</button>
                               <span className="text-[11px] text-slate-500">
                                 {p.email || "Khách mời"} • {p.seconds} giây
                               </span>
@@ -1359,8 +1412,29 @@ export default function MeetingTab() {
                                 <Megaphone className="h-3 w-3 animate-bounce" /> Đang nói
                               </span>
                             )}
-
-
+                            {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (activeMeeting.status === "scheduled" || i >= activeMeeting.currentIndex) ? (
+                              <button
+                                type="button"
+                                title={i === activeMeeting.speakers.length - 1 ? (p.deferred ? "Đã chuyển cuối lượt" : "Người cuối danh sách") : "Chuyển xuống cuối lượt"}
+                                aria-label={`Để cuối lượt: ${p.name}`}
+                                disabled={saving || i === activeMeeting.speakers.length - 1}
+                                onClick={() => void deferSpeaker(p.id).catch(error => toast.error(error.message || "Không hoãn được lượt."))}
+                                className={`shrink-0 p-1.5 rounded-lg border transition cursor-pointer ${
+                                  p.deferred
+                                    ? "border-amber-300 bg-amber-100/90 text-amber-800"
+                                    : "border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100"
+                                } disabled:opacity-40 disabled:cursor-not-allowed`}
+                              >
+                                <ArrowDownToLine className="h-3.5 w-3.5" />
+                              </button>
+                            ) : p.deferred ? (
+                              <span
+                                title="Đã chuyển cuối lượt"
+                                className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-amber-50 text-amber-700 border border-amber-200/80 shrink-0"
+                              >
+                                <ArrowDownToLine className="h-3.5 w-3.5" />
+                              </span>
+                            ) : null}
                           </div>
                         );
                       })}
@@ -1698,9 +1772,10 @@ export default function MeetingTab() {
                 <h4 className="font-bold text-slate-800">Sắp xếp thứ tự thuyết trình</h4>
                 <div className="flex flex-wrap items-end gap-3">
                   <label className="min-w-48 flex-1 text-xs font-semibold">Chọn người phát biểu
-                    <select aria-label="Chọn người để sắp xếp" disabled={saving || pendingStart >= orderingMeeting.speakers.length} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm"
+                    <select aria-label="Chọn người để sắp xếp" disabled={saving} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm"
                       value={orderingMeeting.speakers.slice(pendingStart).some(person => person.id === prioritySpeakerId) ? prioritySpeakerId : orderingMeeting.speakers[pendingStart]?.id || ""}
                       onChange={event => setPrioritySpeakerId(event.target.value)}>
+                      {pendingStart >= orderingMeeting.speakers.length && <option value="">Không còn người đang chờ phát biểu</option>}
                       {orderingMeeting.speakers.map((person, index) => <option key={person.id} value={person.id} disabled={index < pendingStart}>{person.name}{index < pendingStart ? index === orderingMeeting.currentIndex ? " — Đang phát biểu" : " — Đã phát biểu" : ""}</option>)}
                     </select>
                   </label>
@@ -1717,6 +1792,7 @@ export default function MeetingTab() {
                       if (target !== index) reorder(index, target - index);
                     }}>Áp dụng thứ tự</button>
                 </div>
+                {pendingStart >= orderingMeeting.speakers.length && <p role="status" className="text-xs text-slate-600">Danh sách check-in đã được tải. Các lượt đã hoàn tất hoặc đang phát biểu nên không thể đổi ưu tiên. Để thuyết trình lại, chọn người trong tab Thuyết trình rồi bấm Bắt đầu thuyết trình.</p>}
                 <ol className="list-inside list-decimal space-y-1 text-xs text-slate-600">
                   {orderingMeeting.speakers.map(person => <li key={person.id}>{person.name}</li>)}
                 </ol>
