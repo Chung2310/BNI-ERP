@@ -19,7 +19,7 @@ test("member slide uses latest profile and explicit blank overrides; guest keeps
   assert.equal(guest.kind, "guest");
   assert.equal(guest.company, "Guest Co");
   assert.equal(guest.phone, "");
-  assert.equal(guest.industry, "");
+  assert.equal(guest.industry, "Legacy industry");
 });
 
 test("slide input rejects oversized phone numbers, script URLs, oversized bio and unknown fields", () => {

@@ -12,13 +12,13 @@ export function buildProfileSlide(speaker: any, profile?: any) {
     photoURL: profile?.photoURL ?? speaker.photoURL ?? '',
     coverImage: profile?.coverImage ?? speaker.coverImage ?? '',
     phone: profile?.phone ?? speaker.phone ?? '',
-    industry: profile?.industry ?? '',
-    bio: profile?.bio ?? '',
+    industry: profile?.industry ?? speaker.industry ?? '',
+    bio: profile?.bio ?? speaker.bio ?? '',
   };
   for (const field of fields) {
     if (typeof speaker.slideProfile?.[field] === 'string') result[field] = speaker.slideProfile[field];
   }
-  if (!speaker.userId) { result.phone = ''; result.industry = ''; }
+  if (!speaker.userId) { result.phone = ''; }
   return result;
 }
 

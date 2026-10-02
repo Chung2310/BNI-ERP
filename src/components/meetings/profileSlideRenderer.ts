@@ -132,15 +132,13 @@ export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas:
     textBox(ctx, value, x + 30, cardsY + 65, 610, 1, 37, 23, "#252525", 700);
   }
   let cardCount = 0;
-  if (member) {
-    for (const [label, value] of [["SỐ ĐIỆN THOẠI", slide.phone], ["LOẠI HÌNH DỊCH VỤ", slide.industry]]) {
-      if (!value?.trim()) continue;
-      card(480 + cardCount * 710, label, value.trim());
-      cardCount++;
-    }
+  for (const [label, value] of [["SỐ ĐIỆN THOẠI", member ? slide.phone : ""], [member ? "LOẠI HÌNH DỊCH VỤ" : "LĨNH VỰC", slide.industry]]) {
+    if (!value?.trim()) continue;
+    card(480 + cardCount * 710, label, value.trim());
+    cardCount++;
   }
   if (slide.bio?.trim()) {
-    const bioY = member ? (cardCount ? 843 : 700) : 635;
+    const bioY = member ? (cardCount ? 843 : 700) : (cardCount ? 773 : 635);
     textBox(ctx, "BIO / GIỚI THIỆU NGẮN", 480, bioY, 1380, 1, 30, 30, RED, 700);
     textBox(ctx, slide.bio.trim(), 480, bioY + 50, 1380, member && cardCount ? 3 : 4, 30, 25, "#646464");
   }

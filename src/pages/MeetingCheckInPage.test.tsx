@@ -107,3 +107,27 @@ it("rejects oversized avatar and lets the guest remove a selected image", async 
   fireEvent.click(screen.getByText("Bỏ ảnh"));
   expect(screen.queryByAltText("Xem trước ảnh đại diện")).toBeNull();
 });
+
+it("submits industry, bio and a cover without an avatar", async () => {
+  vi.stubGlobal("URL", class extends URL {
+    static createObjectURL = vi.fn(() => "blob:guest-cover");
+    static revokeObjectURL = vi.fn();
+  });
+  fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: { name: "Khách An" } }) });
+  render(<MeetingCheckInPage />);
+  await screen.findByLabelText("Email tài khoản");
+  fireEvent.click(screen.getByRole("button", { name: "Khách mời" }));
+  fireEvent.change(screen.getByLabelText("Họ và tên *"), { target: { value: "Khách An" } });
+  fireEvent.change(screen.getByLabelText("Lĩnh vực (không bắt buộc)"), { target: { value: " Thiết kế " } });
+  fireEvent.change(screen.getByLabelText("Bio ngắn (không bắt buộc)"), { target: { value: " Giới thiệu ngắn " } });
+  const file = new File(["image"], "cover.png", { type: "image/png" });
+  fireEvent.change(screen.getByLabelText("Ảnh bìa (không bắt buộc)"), { target: { files: [file] } });
+  expect(await screen.findByAltText("Xem trước ảnh bìa")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+  await screen.findByText("Check-in thành công");
+  const payload = fetchMock.mock.calls[1][1].body;
+  expect(payload.get("coverImage")).toBe(file);
+  expect(payload.has("avatar")).toBe(false);
+  expect(payload.get("industry")).toBe("Thiết kế");
+  expect(payload.get("bio")).toBe("Giới thiệu ngắn");
+});

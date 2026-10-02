@@ -8,6 +8,8 @@ const speaker = new Schema(
     email: String,
     phone: String,
     company: String,
+    industry: String,
+    bio: String,
     photoURL: String,
     coverImage: String,
     slideProfile: {

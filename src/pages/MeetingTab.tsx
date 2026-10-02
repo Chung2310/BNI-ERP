@@ -151,6 +151,11 @@ export default function MeetingTab() {
   const [startPresentation, setStartPresentation] = useState(false);
   const presentationFullscreen = useRef<Promise<boolean> | null>(null);
   const presentationStarted = useCallback(() => setStartPresentation(false), []);
+  const presentationClosed = useCallback(() => {
+    setStartPresentation(false);
+    presentationFullscreen.current = null;
+    setActiveSubTab("speakers");
+  }, []);
   const [prioritySpeakerId, setPrioritySpeakerId] = useState("");
   const [priorityPosition, setPriorityPosition] = useState(1);
 
@@ -216,6 +221,7 @@ export default function MeetingTab() {
     localStorage.setItem("bni_auto_advance_delay", String(seconds));
   }, []);
   const autoAdvancedSpeakerRef = useRef<string | null>(null);
+  const meetingControlPending = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -397,6 +403,19 @@ export default function MeetingTab() {
     });
   };
 
+  const requestMeetingControl = async (action: string): Promise<void> => {
+    if (!activeMeeting || !canManage || meetingControlPending.current) return;
+    meetingControlPending.current = true;
+    setSaving(true);
+    try {
+      const updated: Meeting = await api(`/${activeMeeting._id}/control`, "POST", { action, version: activeMeeting.__v });
+      setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
+    } finally {
+      meetingControlPending.current = false;
+      setSaving(false);
+    }
+  };
+
   const control = async (action: string): Promise<void> => {
     if (!activeMeeting) return;
     const actionLabels: Record<string, string> = {
@@ -409,7 +428,7 @@ export default function MeetingTab() {
       finish: "Kết thúc cuộc họp",
     };
     await run(async () => {
-      await api(`/${activeMeeting._id}/control`, "POST", { action, version: activeMeeting.__v });
+      await requestMeetingControl(action);
       toast.success(actionLabels[action] || "Cập nhật trạng thái thành công");
     });
   };
@@ -431,9 +450,16 @@ export default function MeetingTab() {
   };
 
   const startPresentationTimer = useCallback(async (speakerId: string) => {
-    if (!activeMeeting || !canManage) return;
-    const updated: Meeting = await api('/' + activeMeeting._id + '/presentation', 'POST', { speakerId, version: activeMeeting.__v });
-    setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
+    if (!activeMeeting || !canManage || meetingControlPending.current) return;
+    meetingControlPending.current = true;
+    setSaving(true);
+    try {
+      const updated: Meeting = await api('/' + activeMeeting._id + '/presentation', 'POST', { speakerId, version: activeMeeting.__v });
+      setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
+    } finally {
+      meetingControlPending.current = false;
+      setSaving(false);
+    }
   }, [activeMeeting, canManage]);
 
   const current = activeMeeting && ["live", "paused"].includes(activeMeeting.status) ? activeMeeting.speakers[activeMeeting.currentIndex] : undefined;
@@ -459,7 +485,7 @@ export default function MeetingTab() {
         if (autoAdvancedSpeakerRef.current !== speakerKey) {
           autoAdvancedSpeakerRef.current = speakerKey;
           void run(async () => {
-            await api(`/${activeMeeting._id}/control`, "POST", { action: "next", version: activeMeeting.__v });
+            await requestMeetingControl("next");
             toast.success(upcoming ? `Hết giờ! Đã tự động chuyển sang: ${upcoming.name}` : "Đã hoàn tất phần phát biểu.");
           });
         }
@@ -476,9 +502,9 @@ export default function MeetingTab() {
     },
     live: {
       label: "Đang diễn ra",
-      badge: "bg-emerald-50 text-emerald-700 border-emerald-200/70",
-      dot: "bg-emerald-500 animate-pulse",
-      border: "border-emerald-300 hover:border-emerald-400 shadow-emerald-500/10",
+      badge: "bg-green-50 text-green-700 border-green-300",
+      dot: "bg-green-500 animate-pulse",
+      border: "border-green-400 hover:border-green-500 shadow-green-500/15",
     },
     paused: {
       label: "Đang tạm dừng",
@@ -498,6 +524,13 @@ export default function MeetingTab() {
       dot: "bg-rose-500",
       border: "border-rose-200 hover:border-rose-300",
     },
+  };
+
+  const getLiveElapsedMinutes = (startsAt: string | Date): number => {
+    const startTime = new Date(startsAt).getTime();
+    const diffMs = Date.now() - startTime;
+    if (diffMs <= 0) return 1;
+    return Math.floor(diffMs / 60000);
   };
 
   const filteredItems = items.filter((m) => {
@@ -566,11 +599,11 @@ export default function MeetingTab() {
               type="button"
               onClick={() => setStatusFilter("live")}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer ${statusFilter === "live"
-                ? "bg-emerald-600 text-white shadow-xs"
+                ? "bg-green-600 text-white shadow-xs"
                 : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
             >
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
               Đang diễn ra ({items.filter((m) => m.status === "live" || m.status === "paused").length})
             </button>
             <button
@@ -650,12 +683,42 @@ export default function MeetingTab() {
 
                   {/* Status Badge */}
                   <div className="absolute top-2 left-2">
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold border backdrop-blur-md ${s.badge}`}
-                    >
-                      <span className={`h-2 w-2 rounded-full ${s.dot}`} />
-                      {s.label}
-                    </span>
+                    {m.status === "live" ? (
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border backdrop-blur-md shadow-md"
+                        style={{
+                          backgroundColor: "rgba(5, 20, 10, 0.9)",
+                          borderColor: "#22c55e",
+                          color: "#22c55e",
+                        }}
+                      >
+                        <span className="relative flex h-2 w-2 shrink-0">
+                          <span
+                            className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-80"
+                            style={{ backgroundColor: "#4ade80" }}
+                          />
+                          <span
+                            className="relative inline-flex rounded-full h-2 w-2"
+                            style={{ backgroundColor: "#22c55e" }}
+                          />
+                        </span>
+                        <span className="animate-pulse tracking-tight font-extrabold" style={{ color: "#22c55e" }}>
+                          Đang diễn ra {getLiveElapsedMinutes(m.startsAt)} phút
+                        </span>
+                      </span>
+                    ) : m.status === "paused" ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-sky-400/80 bg-slate-950/85 text-sky-400 shadow-md shadow-sky-500/25 backdrop-blur-md">
+                        <span className="h-2 w-2 rounded-full bg-sky-400" />
+                        <span>Tạm dừng • {getLiveElapsedMinutes(m.startsAt)} phút</span>
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold border backdrop-blur-md ${s.badge}`}
+                      >
+                        <span className={`h-2 w-2 rounded-full ${s.dot}`} />
+                        {s.label}
+                      </span>
+                    )}
                   </div>
 
                   {/* Top Action Icons (Sửa, Xóa) */}
@@ -802,13 +865,25 @@ export default function MeetingTab() {
                     <h2 className="font-extrabold text-slate-900 text-base sm:text-lg truncate">
                       {activeMeeting.title}
                     </h2>
-                    <span
-                      className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold border shrink-0 ${statusMap[activeMeeting.status]?.badge || "bg-slate-100 text-slate-600"
-                        }`}
-                    >
-                      <span className={`h-1.5 w-1.5 rounded-full ${statusMap[activeMeeting.status]?.dot}`} />
-                      {statusMap[activeMeeting.status]?.label || activeMeeting.status}
-                    </span>
+                    {activeMeeting.status === "live" ? (
+                      <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-green-400 bg-green-50 text-green-700 shadow-xs shrink-0">
+                        <span className="relative flex h-2 w-2 shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-80" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                        </span>
+                        <span className="animate-pulse text-green-600 font-bold">
+                          Đang diễn ra {getLiveElapsedMinutes(activeMeeting.startsAt)} phút
+                        </span>
+                      </span>
+                    ) : (
+                      <span
+                        className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold border shrink-0 ${statusMap[activeMeeting.status]?.badge || "bg-slate-100 text-slate-600"
+                          }`}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${statusMap[activeMeeting.status]?.dot}`} />
+                        {statusMap[activeMeeting.status]?.label || activeMeeting.status}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                     <span className="flex items-center gap-1">
@@ -882,7 +957,7 @@ export default function MeetingTab() {
 
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} onStartPresentation={canManage ? startPresentationTimer : undefined} autoAdvance={autoAdvance} autoAdvanceDelay={autoAdvanceDelay} onAutoAdvanceChange={updateAutoAdvance} onAutoAdvanceDelayChange={updateAutoAdvanceDelay} fullscreenRequest={presentationFullscreen.current} />}
+              {activeSubTab === "slides" && <MeetingSlides key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} startFromFirst={startPresentation} onPresentationStarted={presentationStarted} onPresentationClosed={presentationClosed} onStartPresentation={canManage ? startPresentationTimer : undefined} onMoveSpeaker={direction => requestMeetingControl(direction > 0 ? "next" : "previous")} controlBusy={saving} autoAdvance={autoAdvance} autoAdvanceDelay={autoAdvanceDelay} onAutoAdvanceChange={updateAutoAdvance} onAutoAdvanceDelayChange={updateAutoAdvanceDelay} fullscreenRequest={presentationFullscreen.current} />}
               {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
               {(activeSubTab === "speakers" || activeSubTab === "checkin") && (
                 <div className="space-y-4">
@@ -1132,19 +1207,12 @@ export default function MeetingTab() {
                         )}
 
                         {/* Auto-Advance Setting Box */}
-                        {canManage && activeMeeting.status === "live" && (
+                        {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
                           <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50/90 border border-slate-200/80 text-xs">
-                            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 select-none">
-                              <input
-                                type="checkbox"
-                                checked={autoAdvance}
-                                onChange={e => updateAutoAdvance(e.target.checked)}
-                                className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 cursor-pointer"
-                              />
-                              <span className="flex items-center gap-1.5">
-                                <Sparkles className="h-3.5 w-3.5 text-cyan-600" />
-                                Tự động chuyển slide và người phát biểu tiếp theo
-                              </span>
+                            <label className="flex items-center gap-2 font-bold text-slate-700">Chế độ
+                              <select aria-label="Chế độ điều hành" value={autoAdvance ? "auto" : "manual"} disabled={saving} onChange={e => updateAutoAdvance(e.target.value === "auto")} className="rounded-lg border border-slate-300 bg-white p-2">
+                                <option value="manual">Thủ công</option><option value="auto">Tự động</option>
+                              </select>
                             </label>
 
                             {autoAdvance && (
@@ -1154,7 +1222,7 @@ export default function MeetingTab() {
                                 <span className="text-slate-600 font-semibold">giây</span>
                               </div>
                             )}
-                            <p className="w-full text-xs text-slate-500">Khi hết thời gian phát biểu, chờ {autoAdvanceDelay} giây rồi chuyển sang slide của thành viên hoặc khách mời tiếp theo. Đây là thời gian chờ chuyển lượt, không phải thời lượng phát biểu.</p>
+                            <p className="w-full text-xs text-slate-500">{autoAdvance ? <>Khi hết thời gian phát biểu, chờ {autoAdvanceDelay} giây rồi chuyển người và slide. Đây là thời gian chờ chuyển lượt, không phải thời lượng phát biểu.</> : "Bấm chuyển người ở tab Điều hành hoặc trên slide. Người phát biểu, đồng hồ và slide luôn đồng bộ."}</p>
                           </div>
                         )}
                       </div>
