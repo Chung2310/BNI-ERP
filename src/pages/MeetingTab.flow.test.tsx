@@ -19,6 +19,23 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+it("uses avatars instead of covers for current, upcoming and listed attendees", async () => {
+  const people = [
+    { id: "a", name: "An", seconds: 30, photoURL: "https://example.com/avatar-a.png", coverImage: "https://example.com/cover-a.png" },
+    { id: "b", name: "Bình", seconds: 30, photoURL: "https://example.com/avatar-b.png", coverImage: "https://example.com/cover-b.png" },
+    { id: "c", name: "Chi", seconds: 30, photoURL: "", coverImage: "https://example.com/cover-c.png" },
+  ];
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, status: "live", currentIndex: 0, speakers: people }] }) }));
+  render(<MeetingTab />);
+  fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  expect(screen.getAllByAltText("An")).toHaveLength(2);
+  expect(screen.getAllByAltText("Bình")).toHaveLength(2);
+  for (const img of screen.getAllByAltText("An")) expect(img.getAttribute("src")).toBe(people[0].photoURL);
+  for (const img of screen.getAllByAltText("Bình")) expect(img.getAttribute("src")).toBe(people[1].photoURL);
+  expect(screen.queryByAltText("Chi")).toBeNull();
+  expect(screen.getByText("C")).toBeTruthy();
+});
+
 it("checks multiple people in operations and submits their IDs in one request", async () => {
   const people = [{ id: "a", name: "An", seconds: 30 }, { id: "b", name: "Bình", seconds: 30 }, { id: "c", name: "Chi", seconds: 30 }];
   let item = { ...meeting, status: "live", currentIndex: 0, speakers: people };

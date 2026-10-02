@@ -1157,9 +1157,9 @@ export default function MeetingTab() {
 
                       {current ? (
                         <div className="my-4 flex items-center gap-4">
-                          {current.coverImage || current.photoURL ? (
+                          {current.photoURL ? (
                             <img
-                              src={current.coverImage || current.photoURL}
+                              src={current.photoURL}
                               alt={current.name}
                               className="h-16 w-16 rounded-2xl object-cover ring-2 ring-cyan-500/30"
                             />
@@ -1273,9 +1273,9 @@ export default function MeetingTab() {
 
                       {upcoming ? (
                         <div className="my-4 flex items-center gap-4">
-                          {upcoming.coverImage || upcoming.photoURL ? (
+                          {upcoming.photoURL ? (
                             <img
-                              src={upcoming.coverImage || upcoming.photoURL}
+                              src={upcoming.photoURL}
                               alt={upcoming.name}
                               className="h-16 w-16 rounded-2xl object-cover ring-1 ring-slate-200"
                             />
@@ -1389,9 +1389,9 @@ export default function MeetingTab() {
                             </span>
                             {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && <input type="checkbox" aria-label={`Chọn ${p.name}`} checked={checkedSpeakerIds.includes(p.id)} disabled={saving || (activeMeeting.status !== "scheduled" && i < activeMeeting.currentIndex)} onChange={e => setCheckedSpeakerIds(ids => e.target.checked ? [...ids, p.id] : ids.filter(id => id !== p.id))} />}
 
-                            {p.coverImage || p.photoURL ? (
+                            {p.photoURL ? (
                               <img
-                                src={p.coverImage || p.photoURL}
+                                src={p.photoURL}
                                 alt={p.name}
                                 className="h-9 w-9 rounded-full object-cover ring-1 ring-slate-200"
                               />
