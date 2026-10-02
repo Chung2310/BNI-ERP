@@ -29,6 +29,8 @@ export default function FeeSePaySettings({ onClose }: { onClose: () => void }) {
         {config && (
           <div className="mt-4 space-y-2 rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
             <p className="font-semibold">{config.enabled ? "SePay đang bật" : "SePay chưa sẵn sàng"}</p>
+            {!!config.issues?.length && <ul role="alert" className="list-disc space-y-1 rounded-lg bg-amber-50 p-3 pl-7 text-amber-800">{config.issues.map(issue => <li key={issue}>{issue}</li>)}</ul>}
+            {!config.enabled && <p className="text-xs text-slate-500">Sau khi sửa .env, cần khởi động lại máy chủ; nếu dùng Docker Compose, hãy tạo lại container để nạp biến môi trường mới.</p>}
             <p>Cấu hình được quản lý trong .env của server. Liên hệ quản trị hệ thống khi cần thay đổi.</p>
             <p>Ngân hàng: <b>{config.bank || "Chưa cấu hình"}</b></p>
             <p>Tài khoản: <b>{config.accountNumber || "Chưa cấu hình"}</b> · {config.accountName}</p>

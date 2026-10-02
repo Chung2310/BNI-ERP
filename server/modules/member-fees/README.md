@@ -34,3 +34,5 @@ Khi đưa lên môi trường thật, cần khởi tạo unique indexes của Me
 Tài liệu giao thức: https://developer.sepay.vn/vi/sepay-webhooks/tich-hop-webhook
 Xác thực: https://developer.sepay.vn/vi/sepay-webhooks/xac-thuc
 QR: https://developer.sepay.vn/vi/sepay-webhooks/tao-qr-va-form-thanh-toan
+
+Webhook nhận mã BNI + hậu tố 6–30 ký tự chữ hoặc số (không phân biệt hoa/thường), và chỉ ghi nhận khi khớp chính xác mã khoản phí đã lưu. Mã mới do ERP tạo vẫn có hậu tố 20 ký tự hex. Trong SePay, bật nhận diện mã thanh toán, đặt tiền tố BNI, hậu tố tối thiểu 6, tối đa 30, loại Số và chữ. ERP đọc mã từ content kể cả khi code là null.

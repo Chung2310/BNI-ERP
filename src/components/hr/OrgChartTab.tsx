@@ -2128,21 +2128,7 @@ export default function OrgChartTab({
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-gray-500 mb-1">Người kết nối / Phụ trách</label>
-                <select
-                  value={addParentId}
-                  onChange={(e) => setAddParentId(e.target.value)}
-                  className="w-full p-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer text-slate-800"
-                >
-                  <option value="">Không phân công</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.name} ({emp.role}{emp.companyName ? ` · ${emp.companyName}` : ""})
-                    </option>
-                  ))}
-                </select>
-              </div>
+
             </div>
 
             <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 text-xs font-bold">
