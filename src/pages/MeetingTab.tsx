@@ -482,7 +482,7 @@ export default function MeetingTab() {
       start: "Bắt đầu cuộc họp",
       start_speaker: "Bắt đầu tính giờ phát biểu",
       reset_speaker: "Đã đặt lại thời gian phát biểu",
-      pause: "Tạm dừng cuộc họp",
+      pause: "Tạm dừng phát biểu",
       resume: "Tiếp tục cuộc họp",
       next: "Chuyển người tiếp theo",
       finish: "Kết thúc cuộc họp",
@@ -567,10 +567,10 @@ export default function MeetingTab() {
       border: "border-green-400 hover:border-green-500 shadow-green-500/15",
     },
     paused: {
-      label: "Đang tạm dừng",
-      badge: "bg-sky-50 text-sky-700 border-sky-200/70",
-      dot: "bg-sky-500",
-      border: "border-sky-200 hover:border-sky-300",
+      label: "Đang diễn ra",
+      badge: "bg-green-50 text-green-700 border-green-300",
+      dot: "bg-green-500 animate-pulse",
+      border: "border-green-400 hover:border-green-500 shadow-green-500/15",
     },
     ended: {
       label: "Đã kết thúc",
@@ -588,7 +588,7 @@ export default function MeetingTab() {
 
   const getLiveElapsedMinutes = (startsAt: string | Date): number => {
     const startTime = new Date(startsAt).getTime();
-    const diffMs = Date.now() - startTime;
+    const diffMs = tick - startTime;
     if (diffMs <= 0) return 1;
     return Math.floor(diffMs / 60000);
   };
@@ -749,7 +749,7 @@ export default function MeetingTab() {
 
                   {/* Status Badge */}
                   <div className="absolute top-2 left-2">
-                    {m.status === "live" ? (
+                    {m.status === "live" || m.status === "paused" ? (
                       <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-green-300 bg-green-50/95 text-green-700 shadow-xs backdrop-blur-xs">
                         <span className="relative flex h-2 w-2 shrink-0">
                           <span
@@ -764,11 +764,6 @@ export default function MeetingTab() {
                         <span className="animate-pulse tracking-tight font-extrabold text-green-700">
                           Đang diễn ra {getLiveElapsedMinutes(m.startsAt)} phút
                         </span>
-                      </span>
-                    ) : m.status === "paused" ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-sky-300 bg-sky-50 text-sky-700 shadow-xs backdrop-blur-xs">
-                        <span className="h-2 w-2 rounded-full bg-sky-500" />
-                        <span>Tạm dừng • {getLiveElapsedMinutes(m.startsAt)} phút</span>
                       </span>
                     ) : (
                       <span
@@ -933,7 +928,7 @@ export default function MeetingTab() {
                     <h2 className="font-extrabold text-slate-900 text-base sm:text-lg truncate">
                       {activeMeeting.title}
                     </h2>
-                    {activeMeeting.status === "live" ? (
+                    {activeMeeting.status === "live" || activeMeeting.status === "paused" ? (
                       <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-green-400 bg-green-50 text-green-700 shadow-xs shrink-0">
                         <span className="relative flex h-2 w-2 shrink-0">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-80" />

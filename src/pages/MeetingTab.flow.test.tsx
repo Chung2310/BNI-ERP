@@ -19,6 +19,28 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+it("keeps paused meetings ongoing and advances meeting duration while the speaker timer stays paused", async () => {
+  vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+  const origin = Date.now();
+  vi.setSystemTime(origin);
+  const item = { ...meeting, status: "paused", startsAt: new Date(origin - 96 * 60000).toISOString(),
+    currentIndex: 0, elapsedSeconds: 11,
+    speakers: [{ id: "guest", kind: "guest", name: "Khách đang nói", seconds: 30 }] };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [item] }) }));
+  try {
+    render(<MeetingTab />);
+    await screen.findByText("Đang diễn ra 96 phút");
+    expect(screen.queryByText(/Tạm dừng •/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Tiếp tục điều hành" }));
+    expect(screen.getAllByText("Đang diễn ra 96 phút")).toHaveLength(2);
+    expect(screen.queryByText("Đang tạm dừng")).toBeNull();
+    expect(screen.getByText("00:19")).toBeTruthy();
+    await act(async () => { vi.advanceTimersByTime(60000); });
+    expect(screen.getAllByText("Đang diễn ra 97 phút")).toHaveLength(2);
+    expect(screen.getByText("00:19")).toBeTruthy();
+  } finally { vi.useRealTimers(); }
+});
+
 it("uses avatars instead of covers for current, upcoming and listed attendees", async () => {
   const people = [
     { id: "a", name: "An", seconds: 30, photoURL: "https://example.com/avatar-a.png", coverImage: "https://example.com/cover-a.png" },
