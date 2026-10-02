@@ -15,11 +15,22 @@ export async function createMemberFees(companyCode: string, actorId: string, inp
   const members = await UserModel.find({ _id: { $in: input.memberIds }, companyCode, isActive: { $ne: false } })
     .select("_id displayName email").lean();
   if (members.length !== input.memberIds.length) throw new MemberFeeError(400, "Danh sách có thành viên không thuộc đơn vị hoặc đã ngừng hoạt động.");
-  const titleKey = feeTitleKey(input.title);
+  const normalizedTitle = feeTitleKey(input.title);
+  // Keep the legacy unique index valid without a destructive index migration.
+  // The UUID distinguishes new collection rounds, even with identical names.
+  const titleKey = input.campaignId ? normalizedTitle + ":" + input.campaignId : normalizedTitle;
+  if (input.campaignId) {
+    const existing = await MemberFeeModel.findOne({ companyCode, campaignId: input.campaignId }).lean();
+    if (existing && (existing.year !== input.year || feeTitleKey(existing.title) !== normalizedTitle ||
+        existing.amount !== input.amount || existing.dueDate !== input.dueDate || existing.note !== input.note)) {
+      throw new MemberFeeError(409, "Thông tin đợt thu không khớp. Vui lòng tải lại trước khi thêm thành viên.");
+    }
+  }
   const operations = members.map(member => ({
     updateOne: {
       filter: { companyCode, year: input.year, memberId: String(member._id), titleKey },
       update: { $setOnInsert: { companyCode, year: input.year, memberId: String(member._id), titleKey,
+        ...(input.campaignId ? { campaignId: input.campaignId } : {}),
         memberName: member.displayName, memberEmail: member.email, title: input.title.trim(), amount: input.amount,
         dueDate: input.dueDate, note: input.note, createdBy: actorId, __v: 0, createdAt: new Date(), updatedAt: new Date() } },
       upsert: true,
@@ -44,7 +55,7 @@ export async function getFee(companyCode: string, id: string) {
 async function saveFee(item: any) {
   try { await item.save(); }
   catch (error: any) {
-    if (error.name === "VersionError") throw new MemberFeeError(409, "Khoản phí vừa được cập nhật. Hãy tải lại trước khi ghi nhận.");
+    if (error.name === "VersionError" || error.name === "DocumentNotFoundError") throw new MemberFeeError(409, "Khoản phí vừa được cập nhật. Hãy tải lại trước khi ghi nhận.");
     throw error;
   }
   return serializeFee(item);
@@ -74,4 +85,15 @@ export async function voidFeePayment(companyCode: string, id: string, paymentId:
   if (payment.voidedAt) return serializeFee(item);
   payment.voidedAt = new Date(); payment.voidedBy = actorId; payment.voidReason = reason;
   return saveFee(item);
+}
+
+
+export async function deleteMemberFee(companyCode: string, id: string) {
+  const fee = await getFee(companyCode, id);
+  // Atomic predicate protects against a simultaneous receipt/webhook or email send.
+  const result = await MemberFeeModel.deleteOne({ _id: fee._id, companyCode, payments: { $size: 0 },
+    $or: [{ emailClaimUntil: { $exists: false } }, { emailClaimUntil: { $lte: new Date() } }] });
+  if (!result.deletedCount) throw new MemberFeeError(409,
+    "Không thể xóa khoản phí đã có lịch sử thu tiền hoặc đang gửi email. Vui lòng tải lại để kiểm tra.");
+  return { message: "Đã xóa khoản phí." };
 }

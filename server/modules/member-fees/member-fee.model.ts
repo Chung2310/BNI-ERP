@@ -18,6 +18,7 @@ const memberFee = new Schema({
   memberEmail: { type: String, default: "" },
   year: { type: Number, required: true },
   title: { type: String, required: true },
+  campaignId: String,
   titleKey: { type: String, required: true },
   amount: { type: Number, required: true, min: 1 },
   dueDate: { type: String, required: true },
@@ -32,6 +33,7 @@ const memberFee = new Schema({
   emailClaimUntil: { type: Date, select: false },
   payments: { type: [payment], default: [] },
 }, { timestamps: true, optimisticConcurrency: true });
+memberFee.index({ companyCode: 1, campaignId: 1, memberId: 1 }, { unique: true, partialFilterExpression: { campaignId: { $type: "string" } } });
 memberFee.index({ companyCode: 1, year: 1, memberId: 1, titleKey: 1 }, { unique: true });
 memberFee.index({ companyCode: 1, paymentCode: 1 }, { unique: true, partialFilterExpression: { paymentCode: { $type: "string" } } });
 export const MemberFeeModel = model("MemberFee", memberFee);
