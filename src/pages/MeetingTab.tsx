@@ -668,18 +668,24 @@ export default function MeetingTab() {
                 {/* Top Cover / Header Image */}
                 <div className="relative h-24 w-full overflow-hidden bg-slate-100">
                   {m.coverImage ? (
-                    <img
-                      src={m.coverImage}
-                      alt={m.title}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
+                    <>
+                      <img
+                        src={m.coverImage}
+                        alt={m.title}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-black/20" />
+                    </>
                   ) : (
-                    <div className="h-full w-full bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-950 p-3 flex items-center justify-end text-white">
-                      <CalendarDays className="h-16 w-16 rotate-12 text-cyan-400/15" />
+                    <div className="relative h-full w-full bg-gradient-to-br from-slate-50 via-white to-rose-50/60 p-3 flex items-center justify-end overflow-hidden border-b border-slate-100">
+                      {/* Subtle BNI corporate accents */}
+                      <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-gradient-to-br from-red-600/10 via-rose-500/5 to-transparent blur-md pointer-events-none" />
+                      <div className="absolute -left-6 -bottom-6 h-20 w-28 rounded-full bg-slate-200/40 blur-sm pointer-events-none" />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-25 pointer-events-none">
+                        <CalendarDays className="h-16 w-16 text-rose-600 rotate-12 transition-transform duration-300 group-hover:scale-110" />
+                      </div>
                     </div>
                   )}
-
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-black/20" />
 
                   {/* Status Badge */}
                   <div className="absolute top-2 left-2">
@@ -728,7 +734,7 @@ export default function MeetingTab() {
                         type="button"
                         title="Sửa cuộc họp"
                         onClick={(e) => openEditModal(m, e)}
-                        className="rounded-lg bg-white/80 backdrop-blur-md p-1.5 text-slate-700 hover:bg-white hover:text-cyan-700 shadow-sm transition cursor-pointer"
+                        className="rounded-lg bg-white/90 backdrop-blur-md p-1.5 text-slate-700 hover:bg-white hover:text-cyan-700 shadow-sm border border-slate-200/60 transition cursor-pointer"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -739,7 +745,7 @@ export default function MeetingTab() {
                           e.stopPropagation();
                           setDeletingMeeting(m);
                         }}
-                        className="rounded-lg bg-white/80 backdrop-blur-md p-1.5 text-slate-700 hover:bg-rose-50 hover:text-rose-600 shadow-sm transition cursor-pointer"
+                        className="rounded-lg bg-white/90 backdrop-blur-md p-1.5 text-slate-700 hover:bg-rose-50 hover:text-rose-600 shadow-sm border border-slate-200/60 transition cursor-pointer"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -747,9 +753,18 @@ export default function MeetingTab() {
                   )}
 
                   {/* Time preview on image bottom */}
-                  <div className="absolute bottom-2.5 left-3 right-3 flex items-center gap-1.5 text-xs text-white/95 font-medium drop-shadow-sm">
-                    <Clock3 className="h-3.5 w-3.5 text-cyan-300 shrink-0" />
-                    <span className="truncate">{dateText(m.startsAt)}</span>
+                  <div className="absolute bottom-2.5 left-3 right-3 flex items-center gap-1.5 text-xs">
+                    {m.coverImage ? (
+                      <div className="flex items-center gap-1.5 text-white/95 font-medium drop-shadow-sm">
+                        <Clock3 className="h-3.5 w-3.5 text-cyan-300 shrink-0" />
+                        <span className="truncate">{dateText(m.startsAt)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-slate-700 font-semibold drop-shadow-xs">
+                        <Clock3 className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                        <span className="truncate">{dateText(m.startsAt)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
