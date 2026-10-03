@@ -3,6 +3,7 @@ import { chatController } from "../controller/chat.controller";
 import { requireAuth, requirePermission } from "../middleware/auth";
 import { validateRequest } from "../middleware/validation";
 import {
+  setRoomBlockedSchema,
   createRoomSchema,
   updateRoomSchema,
   roomIdParamsSchema,
@@ -191,3 +192,5 @@ chatRouter.delete(
 );
 
 
+
+chatRouter.patch("/rooms/:roomId/block", validateRequest(setRoomBlockedSchema), chatController.setRoomBlocked as any);

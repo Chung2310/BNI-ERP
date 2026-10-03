@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { permissionForMediaUpload } from "./media-upload-permission";
 
 describe("permissionForMediaUpload", () => {
+  it("allows conversation attachments with chat access without resource management", () => {
+    expect(permissionForMediaUpload("chat.attachment")).toBe("chat:read");
+    expect(permissionForMediaUpload(" CHAT.ATTACHMENT ")).toBe("chat:read");
+    expect(permissionForMediaUpload("resource.direct")).toBe("resource:manage");
+    expect(permissionForMediaUpload("chat.unknown")).toBe("resource:manage");
+  });
+
   it("allows Kanban task and project audio/video uploads through the work permission", () => {
     expect(permissionForMediaUpload("hr.kanban")).toBe("work:manage");
   });

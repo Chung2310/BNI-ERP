@@ -16,6 +16,17 @@ export function getAccessToken(): string | null {
 }
 
 export const authService = {
+  async deleteOwnAccount(password: string, confirmation: string): Promise<void> {
+    const response = await fetch("/api/v1/auth/me", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAccessToken()}` },
+      body: JSON.stringify({ password, confirmation }),
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.message || "Không thể xóa tài khoản.");
+    }
+  },
   async getUserActivity(userId: string, filters: Record<string, string | number | undefined> = {}): Promise<any> {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== "") query.set(key, String(value));

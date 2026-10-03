@@ -22,6 +22,7 @@ interface AuthContextType {
   registerWithEmail: (email: string, password: string, displayName: string, rememberMe?: boolean) => Promise<void>;
   loginWithGoogle: (rememberMe?: boolean) => Promise<void>;
   logout: () => Promise<void>;
+  deleteOwnAccount: (password: string, confirmation: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateProfileInfo: (displayName: string, photoURL: string, details?: PersonalProfileDetails) => Promise<void>;
   uploadAvatar: (file: File) => Promise<string>;
@@ -193,6 +194,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const deleteOwnAccount = async (password: string, confirmation: string) => {
+    await authService.deleteOwnAccount(password, confirmation);
+    localStorage.removeItem("accessToken");
+    socketService.disconnect();
+    setUser(null);
+    setUserProfile(null);
+    toast.success("Đã xóa tài khoản của bạn.");
+  };
   const logout = async () => {
     setLoading(true);
     try {
@@ -287,6 +296,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         registerWithEmail,
         loginWithGoogle,
         logout,
+        deleteOwnAccount,
         refreshProfile,
         updateProfileInfo,
         uploadAvatar,

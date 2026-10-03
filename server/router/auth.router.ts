@@ -178,6 +178,13 @@ authRouter.post("/logout", requireAuth as any, authController.logout as any);
 
 // Lấy thông tin tài khoản hiện tại (yêu cầu Access Token)
 authRouter.get("/me", requireAuth as any, authController.getMe as any);
+const deleteOwnAccountSchema = {
+  body: Joi.object({
+    password: Joi.string().max(1024).required(),
+    confirmation: Joi.string().valid("XÓA TÀI KHOẢN").required(),
+  }),
+};
+authRouter.delete("/me", requireAuth as any, authRateLimiter, validateRequest(deleteOwnAccountSchema), authController.deleteOwnAccount as any);
 
 authRouter.get("/telegram-link", requireAuth as any, authController.getTelegramLinkStatus as any);
 authRouter.post("/telegram-link", requireAuth as any, authController.createTelegramLinkCode as any);

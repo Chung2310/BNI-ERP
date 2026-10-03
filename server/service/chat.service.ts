@@ -1,3 +1,4 @@
+import { assertChatNotBlocked } from "./chat-blocking";
 import { ChatRoomModel } from "../model/chat-room.model";
 import { ChatMessageModel } from "../model/chat-message.model";
 import { chatResourceIndexingService } from "./chat-resource-indexing.service";
@@ -7,6 +8,18 @@ import { IChatMessage, IChatAttachment } from "../interface/chat-message.interfa
 import mongoose from "mongoose";
 
 export const chatService = {
+  async setRoomBlocked(roomId: string, userId: string, companyCode: string, blocked: boolean): Promise<IChatRoom> {
+    const room = await ChatRoomModel.findOneAndUpdate({
+      _id: roomId,
+      companyCode,
+      isGroup: false,
+      isChatbot: { $ne: true },
+      members: { $size: 2 },
+      "members.userId": userId,
+    }, blocked ? { $addToSet: { blockedBy: userId } } : { $pull: { blockedBy: userId } }, { returnDocument: "after" });
+    if (!room) throw new Error("Chỉ thành viên của cuộc trò chuyện riêng 1–1 mới có thể chặn hoặc bỏ chặn.");
+    return chatService.getFullRoom(roomId);
+  },
   /**
    * Helper lấy phòng chat được populate đầy đủ thông tin
    */
@@ -513,6 +526,8 @@ Bạn cần tôi hỗ trợ thông tin gì hôm nay?`,
       throw new Error("Phòng chat không tồn tại hoặc bạn không phải là thành viên.");
     }
 
+    assertChatNotBlocked(room);
+
     const sender = await UserModel.findById(senderId).lean();
     if (!sender) {
       throw new Error("Không tìm thấy thông tin tài khoản người gửi.");
@@ -845,6 +860,8 @@ Bạn cần tôi hỗ trợ thông tin gì hôm nay?`,
       throw new Error("Không tìm thấy phòng chat.");
     }
 
+    assertChatNotBlocked(room);
+
     const message = await ChatMessageModel.findOne({ _id: messageId, roomId });
     if (!message) {
       throw new Error("Tin nhắn không tồn tại.");
@@ -889,6 +906,8 @@ Bạn cần tôi hỗ trợ thông tin gì hôm nay?`,
     if (!room) {
       throw new Error("Phòng chat không tồn tại hoặc bạn không phải là thành viên.");
     }
+
+    assertChatNotBlocked(room);
 
     const message = await ChatMessageModel.findOne({ _id: messageId, roomId });
     if (!message) {

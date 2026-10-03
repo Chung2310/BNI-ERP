@@ -1,3 +1,5 @@
+import { verifySelfAccountDeletion } from "./self-account-deletion";
+import { PushSubscriptionModel } from "../model/push-subscription.model";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
@@ -51,6 +53,22 @@ async function assertAccountUsable(user: IUser): Promise<void> {
 }
 
 export const authService = {
+  async deleteOwnAccount(userId: string, password: string, confirmation: string): Promise<void> {
+    const user = await UserModel.findById(userId);
+    await verifySelfAccountDeletion(user, password, confirmation);
+    const { disconnectUserSockets } = await import("../socket");
+    await authService.deleteUser(userId, user!.companyCode!, user!.role);
+    // The user record no longer exists, so existing access/refresh tokens cannot authenticate.
+    try { disconnectUserSockets(userId); } catch (error) { console.error("[deleteOwnAccount] Socket cleanup failed", error); }
+    const cleanup = await Promise.allSettled([
+      TelegramSessionModel.deleteMany({ userId }),
+      TelegramLinkTokenModel.deleteMany({ userId }),
+      PushSubscriptionModel.deleteMany({ uid: userId }),
+    ]);
+    if (cleanup.some((result) => result.status === "rejected")) {
+      console.error("[deleteOwnAccount] Some account notification records could not be removed", userId);
+    }
+  },
   /**
    * Tạo bộ đôi Access Token và Refresh Token
    */

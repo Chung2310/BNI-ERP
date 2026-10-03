@@ -51,6 +51,7 @@ export interface ChatRoom {
   _id: string;
   name?: string;
   isGroup: boolean;
+  blockedBy?: string[];
   companyCode: string;
   creatorId: string;
   members: ChatRoomMember[];
@@ -65,6 +66,16 @@ export interface ChatRoom {
 }
 
 export const internalChatService = {
+  async setRoomBlocked(roomId: string, blocked: boolean): Promise<ChatRoom> {
+    const res = await fetch(`/api/v1/chat/rooms/${roomId}/block`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAccessToken()}` },
+      body: JSON.stringify({ blocked }),
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(result.message || "Không thể cập nhật trạng thái chặn.");
+    return result.data;
+  },
   /**
    * Lấy danh sách các phòng chat
    */
