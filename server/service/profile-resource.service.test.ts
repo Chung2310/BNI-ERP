@@ -24,3 +24,10 @@ describe("ProfileResourceService", () => {
     );
   });
 });
+
+it("indexes a cover under the member profile with the correct upload source", async () => {
+  const finalize = vi.fn(async () => []);
+  const service = createProfileResourceService({ finalize });
+  await service.finalizeCover({ companyCode: "BNI", actorId: "member-1" }, { _id: "member-1", displayName: "Member" }, "cover-token");
+  expect(finalize).toHaveBeenCalledWith(expect.objectContaining({ actorId: "member-1" }), expect.objectContaining({ entityType: "user", entityId: "member-1", expectedSourceType: "profile.cover", uploads: [{ uploadToken: "cover-token", sourceField: "coverImage" }] }));
+});

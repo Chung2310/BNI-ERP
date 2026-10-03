@@ -155,7 +155,9 @@ export default function SettingsTab() {
         <div className={`relative flex flex-col items-center gap-4 overflow-hidden rounded-2xl border border-gray-200/80 bg-white/80 p-4 text-center shadow-xs backdrop-blur-md sm:p-6 ${
           visibleSubTab !== "profile" ? "hidden lg:flex" : "flex"
         }`}>
-          <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-r from-blue-500 to-indigo-600 opacity-80" />
+          <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-r from-blue-500 to-indigo-600">
+            {userProfile?.coverImage && <img src={userProfile.coverImage} alt="Ảnh bìa cá nhân" className="h-full w-full object-cover" />}
+          </div>
 
           <div className="relative mt-10 cursor-pointer group" onClick={handleAvatarClick}>
             <input

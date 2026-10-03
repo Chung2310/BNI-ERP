@@ -52,7 +52,7 @@ describe("AuthContext company module sync", () => {
     render(<AuthProvider><ProfileProbe /></AuthProvider>);
     await waitFor(() => expect(screen.getByLabelText("modules").textContent).toBe("hr,chat"));
 
-    expect(socketService.on).toHaveBeenCalledWith("company_modules_updated", expect.any(Function));
+    await waitFor(() => expect(socketService.on).toHaveBeenCalledWith("company_modules_updated", expect.any(Function)));
     const listener = vi.mocked(socketService.on).mock.calls.find(([event]) => event === "company_modules_updated")?.[1];
     await act(async () => listener?.({ companyCode: "ACME", enabledModules: ["resource"] }));
 

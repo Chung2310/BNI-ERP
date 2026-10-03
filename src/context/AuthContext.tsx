@@ -11,6 +11,8 @@ import { normalizeCompanyModulesEvent, normalizeCompanyStatusEvent } from "./com
 
 export type ErpLoginOutcome = { status: "authenticated"; role?: string };
 
+type PersonalProfileDetails = Pick<UserProfile, "phone" | "birthDate" | "companyName" | "industry" | "coverImage"> & { coverUploadToken?: string };
+
 interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
@@ -21,7 +23,7 @@ interface AuthContextType {
   loginWithGoogle: (rememberMe?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  updateProfileInfo: (displayName: string, photoURL: string) => Promise<void>;
+  updateProfileInfo: (displayName: string, photoURL: string, details?: PersonalProfileDetails) => Promise<void>;
   uploadAvatar: (file: File) => Promise<string>;
   isModuleEnabled: (key: ModuleKey) => boolean;
   hasPermission: (code: string) => boolean;
@@ -206,10 +208,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateProfileInfo = async (displayName: string, photoURL: string) => {
+  const updateProfileInfo = async (displayName: string, photoURL: string, details?: PersonalProfileDetails) => {
     if (!userProfile) return;
     try {
-      const updatedProfile = await authService.updateProfile({ displayName, photoURL });
+      const result = await authService.updateProfile({ ...details, displayName, photoURL });
+      const updatedProfile = { ...userProfile, ...result };
       setUser(updatedProfile as any);
       setUserProfile(updatedProfile);
       toast.success("Cập nhật thông tin tài khoản thành công!");
