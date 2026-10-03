@@ -10,13 +10,15 @@ export type TabType =
   | "QUẢN TRỊ USER"
   | "CÀI ĐẶT";
 
-export interface GoogleDriveIntegration {
+export interface CompanyDriveStatus {
   isConnected: boolean;
   driveEmail: string;
+  rootFolderId?: string;
   connectedAt?: any | null;
 }
 
 export interface UserProfile {
+  companyDrive?: CompanyDriveStatus;
   uid: string;
   email: string;
   displayName: string;
@@ -28,15 +30,10 @@ export interface UserProfile {
   createdAt: any;
   updatedAt?: any;
   birthDate?: string;
-  jobTitle?: string;
-  qualification?: string;
-  department?: string;
   jobDescriptionLink?: string;
   phone?: string;
-  level?: number;
   parentId?: string;
   status?: "online" | "offline";
-  division?: string;
   companyCode?: string;
   companyName?: string;
   branchId?: string;
@@ -45,7 +42,6 @@ export interface UserProfile {
   enabledModules?: string[];
   businessType?: "education" | "labor" | "service" | "recruitment" | "general";
   monthlySalary?: number;
-  isLeader?: boolean;
   isActive?: boolean;
 }
 
@@ -58,14 +54,4 @@ export interface CompanyProfile {
   enabledModules?: string[];
   businessType?: "education" | "labor" | "service" | "recruitment" | "general";
   monthlySalary?: number;
-}
-
-export interface TelegramLinkStatus {
-  linked: boolean;
-  telegramChatId: number | null;
-  telegramUserId: number | null;
-  linkedAt: any | null;
-  pendingCode: string | null;
-  pendingCodeExpiresAt: any | null;
-  botUsername: string;
 }

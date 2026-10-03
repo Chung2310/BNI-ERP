@@ -20,13 +20,13 @@ describe("role permission persistence", () => {
     const result = await rolePermissionService.saveRolePermission({
       companyCode: " acme ",
       role: "manager",
-      permissions: ["hr:read", "hr:manage", "payroll-payment:read"],
+      permissions: ["hr:read", "hr:manage", "resource:read"],
       level: 3,
       displayName: "Quản lý",
     });
 
-    expect(result.stored).toEqual(["hr:manage", "payroll-payment:read"]);
-    expect(result.effective).toEqual(["hr:manage", "hr:read", "payroll-payment:read"]);
+    expect(result.stored).toEqual(["hr:manage", "resource:read"]);
+    expect(result.effective).toEqual(["hr:manage", "hr:read", "resource:read"]);
     expect(result.rolePermission).toMatchObject({ companyCode: "ACME", role: "manager" });
   });
 

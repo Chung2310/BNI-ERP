@@ -92,6 +92,7 @@ const meeting = new Schema(
 
     coverImage: String,
     startsAt: { type: Date, required: true },
+    startedAt: Date,
     createdBy: String,
     reminderDays: { type: Number, default: 1 },
     reminderMinutes: { type: Number, default: 60 },

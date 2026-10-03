@@ -63,7 +63,6 @@ async function seedAdminUser() {
       {
         $set: {
           displayName: "Quản trị viên",
-          level: 1,
           permissions: PERMISSION_CODES,
           updatedAt: new Date(),
         },
@@ -85,10 +84,6 @@ async function seedAdminUser() {
         role: "admin",
         companyCode: seedCompanyCode,
         companyName: seedCompanyName,
-        jobTitle: "CEO",
-        department: "Ban Giám Đốc",
-        division: "Ban Giám Đốc",
-        level: 1,
         phone: seedPhone,
         status: "offline",
         isActive: true,

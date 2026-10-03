@@ -31,7 +31,6 @@ export const PERMISSION_FEATURES: PermissionFeatureDefinition[] = [
   feature("people", "Con người", "Con người"),
   feature("relationship", "Quan hệ", "Quan hệ"),
   feature("hr", "Thành viên", "Thành viên"),
-  feature("timekeeping", "Chấm công", "Thành viên"),
   feature("meetings", "Cuộc họp", "Vận hành"),
   feature("resource", "Tài nguyên", "Tài nguyên"),
   feature("chat", "Trò chuyện", "Trò chuyện"),
@@ -51,6 +50,10 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = PERMISSION_FEATURES.
 ));
 
 export type PermissionCode = `${string}:${PermissionAction}`;
+
+// Ignore only these retired codes when old clients resubmit stored permissions.
+export const RETIRED_PERMISSION_CODES = ["timekeeping:read", "timekeeping:manage"] as const;
+const retiredPermissionCodes = new Set<string>(RETIRED_PERMISSION_CODES);
 
 const permissionCodeSet = new Set(PERMISSION_CATALOG.map((entry) => entry.code));
 export const PERMISSION_CODES = PERMISSION_CATALOG.map((entry) => entry.code);
@@ -72,8 +75,9 @@ export function isPermissionCode(code: string): code is PermissionCode {
 export const isCanonicalPermission = isPermissionCode;
 
 export function expandEffectivePermissions(codes: readonly string[]): Set<string> {
-  const expanded = new Set<string>(codes);
-  for (const code of codes) {
+  const activeCodes = codes.filter((code) => !retiredPermissionCodes.has(code));
+  const expanded = new Set<string>(activeCodes);
+  for (const code of activeCodes) {
     if (code.endsWith(":manage")) expanded.add(`${code.slice(0, -":manage".length)}:read`);
   }
   return expanded;
@@ -83,7 +87,7 @@ export function compactStoredPermissions(codes: readonly string[] = []): {
   stored: string[];
   effective: string[];
 } {
-  const unique = [...new Set(codes)];
+  const unique = [...new Set(codes)].filter((code) => !retiredPermissionCodes.has(code));
   const invalidCodes = unique.filter((code) => !isPermissionCode(code)).sort();
   if (invalidCodes.length) throw new PermissionValidationError(invalidCodes);
 

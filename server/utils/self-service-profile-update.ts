@@ -6,10 +6,6 @@ const SELF_SERVICE_PROFILE_FIELDS = [
   "phone",
   "birthDate",
   "companyName",
-  "facebookIntegration",
-  "tiktokIntegration",
-  "zaloIntegration",
-  "aiAutoReplyConfig",
 ] as const;
 
 export function pickSelfServiceProfileUpdate(

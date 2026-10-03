@@ -33,7 +33,6 @@ function shouldSkipRoutineAuthLog(method: string, url: string) {
   }
 
   const noisyPrefixes = [
-    "/api/v1/auth/telegram-link",
     "/api/v1/crud/marketing-contents",
     "/api/v1/crud/crm-tickets",
     "/api/v1/crud/products",
@@ -48,13 +47,13 @@ function shouldSkipRoutineAuthLog(method: string, url: string) {
  * Danh sách mã quyền mặc định của hệ thống cho từng vai trò
  */
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
-  admin: ["dashboard:manage", "people:manage", "relationship:manage", "hr:manage", "timekeeping:manage", "meetings:manage", "resource:manage", "chat:manage", "settings:manage", "access:manage"],
+  admin: ["dashboard:manage", "people:manage", "relationship:manage", "hr:manage", "meetings:manage", "resource:manage", "chat:manage", "settings:manage", "access:manage"],
   manager: [
     "dashboard:read", "access:read",
-    "hr:read", "people:read", "timekeeping:read", "meetings:read", "chat:read", "resource:read", "settings:manage"
+    "hr:read", "people:read", "meetings:read", "chat:read", "resource:read", "settings:manage"
   ],
   user: [
-    "access:read", "hr:read", "people:read", "timekeeping:read", "meetings:read", "chat:read", "resource:read"
+    "access:read", "hr:read", "people:read", "meetings:read", "chat:read", "resource:read"
   ],
   teacher: ["people:manage"]
 };

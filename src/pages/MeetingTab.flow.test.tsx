@@ -594,3 +594,13 @@ it.each(["live", "paused"])("enables member attendance once the meeting is %s wi
   fireEvent.click(screen.getByRole("button", { name: "Điểm danh" }));
   expect(await screen.findByRole("button", { name: "Đã điểm danh" })).toBeTruthy();
 });
+
+it("does not show one minute elapsed before a future meeting without an actual start", async () => {
+  const item = { ...meeting, status: "live", startsAt: new Date(Date.now() + 3600000).toISOString() };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [item] }) }));
+  render(<MeetingTab />);
+  await screen.findByText("Chưa đến giờ họp");
+  expect(screen.queryByText("Đang diễn ra 1 phút")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Tiếp tục điều hành" }));
+  expect(screen.getAllByText("Chưa đến giờ họp")).toHaveLength(2);
+});

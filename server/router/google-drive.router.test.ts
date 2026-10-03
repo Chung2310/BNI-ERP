@@ -35,8 +35,6 @@ describe("Google Drive route permissions", () => {
   });
 
   it.each([
-    ["GET", "/auth-url"],
-    ["POST", "/disconnect"],
     ["POST", "/upload"],
     ["POST", "/upload/group/:roomId"],
     ["POST", "/create-file"],
@@ -50,10 +48,16 @@ describe("Google Drive route permissions", () => {
 
   it("does not expose a protected Drive route without a permission guard", () => {
     const unguarded = (googleDriveRouter as any).stack
-      .filter((item: any) => item.route?.path !== "/callback")
       .filter((item: any) => !item.route.stack.some((handler: any) => guards.has(handler.handle)))
       .map((item: any) => item.route.path);
 
     expect(unguarded).toEqual([]);
   });
+});
+
+it("removes personal Drive OAuth endpoints", () => {
+  const paths = (googleDriveRouter as any).stack.map((item: any) => item.route?.path);
+  expect(paths).not.toContain("/auth-url");
+  expect(paths).not.toContain("/callback");
+  expect(paths).not.toContain("/disconnect");
 });

@@ -20,7 +20,6 @@ import { UserDeleteModal } from "../components/user-admin/UserDeleteModal";
 import { RoleModal } from "../components/user-admin/RoleModal";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { getPermissionLabel, getRoleDisplayName } from "../utils/permissionUtils";
-import { branchService, BranchRecord } from "../services/branchService";
 import { resolveUserAdminBranchId } from "../components/user-admin/userBranchScope";
 
 const UserImportModal = React.lazy(() => import("../components/user-admin/UserImportModal"));
@@ -60,7 +59,6 @@ export default function UserAdminTab() {
     });
   };
   
-  const [branches, setBranches] = useState<BranchRecord[]>([]);
 
   // Advanced Filter States
   const [searchQuery, setSearchQuery] = useState("");
@@ -85,8 +83,6 @@ export default function UserAdminTab() {
   const [userCompanyCode, setUserCompanyCode] = useState<string>("");
   const [userBranchId, setUserBranchId] = useState<string>("");
   const [userParentId, setUserParentId] = useState<string>("");
-  const [userDepartment, setUserDepartment] = useState("");
-  const [userQualification, setUserQualification] = useState("");
   const [userJobDescriptionLink, setUserJobDescriptionLink] = useState("");
   const [userJobDescriptionUploadToken, setUserJobDescriptionUploadToken] = useState("");
   const [userMonthlySalary, setUserMonthlySalary] = useState("");
@@ -111,8 +107,6 @@ export default function UserAdminTab() {
     setUserRole("user");
     setUserBranchId("");
     setUserParentId("");
-    setUserDepartment("");
-    setUserQualification("");
     setUserJobDescriptionLink("");
     setUserJobDescriptionUploadToken("");
     setUserMonthlySalary("");
@@ -148,11 +142,6 @@ export default function UserAdminTab() {
     }
   }, [editingUser, isUserModalOpen, userProfile]);
 
-  useEffect(() => {
-    if (!isUserModalOpen || !userCompanyCode || userCompanyCode === "SYSTEM") { setBranches([]); return; }
-    branchService.list().then(setBranches).catch(() => setBranches([]));
-  }, [isUserModalOpen, userCompanyCode]);
-
   // Handle parentId based on userRole and userCompanyCode automatically
   useEffect(() => {
     if (isUserModalOpen) {
@@ -170,30 +159,6 @@ export default function UserAdminTab() {
       }
     }
   }, [userRole, userCompanyCode, usersList, isUserModalOpen]);
-
-  // Auto fill department based on manager (parentId) for user role
-  useEffect(() => {
-    if (isUserModalOpen && userRole === "user" && userParentId) {
-      const selectedManager = usersList.find(u => u.uid === userParentId);
-      if (selectedManager && selectedManager.department) {
-        setUserDepartment(selectedManager.department);
-      }
-    } else if (isUserModalOpen && userRole === "user" && !userParentId) {
-      setUserDepartment("");
-    setUserQualification("");
-    }
-  }, [userRole, userParentId, usersList, isUserModalOpen]);
-
-  // Reset userDepartment when modal is closed
-  useEffect(() => {
-    if (!isUserModalOpen) {
-      setUserDepartment("");
-    setUserQualification("");
-      setUserJobDescriptionLink("");
-    setUserMonthlySalary("");
-      setEditingUser(null);
-    }
-  }, [isUserModalOpen]);
 
   // Fetch users list from API
   const fetchUsers = async () => {
@@ -331,8 +296,6 @@ export default function UserAdminTab() {
     try {
       const compName = userCompanyName.trim() || userProfile?.companyName || userCompanyCode;
 
-      // Tìm level của người quản lý để tính level nhân viên mới
-      const managerProfile = userParentId ? usersList.find(u => u.uid === userParentId) : null;
 
       if (editingUser) {
         await authService.updateUser(editingUser.uid, {
@@ -351,31 +314,26 @@ export default function UserAdminTab() {
 
         toast.success(`Đã cập nhật tài khoản "${userDisplayName}".`);
       } else {
-        await authService.registerUserForCompany(
-          userDisplayName.trim(),
-          userEmail.trim(),
-          userPassword,
-          userRole as any,
-          userCompanyCode,
-          compName,
-          userParentId || undefined,
-          managerProfile?.level,
-          userDepartment.trim() || undefined,
-          userDepartment.trim() || undefined,
-          userPhone.trim() || undefined,
-          undefined,
-          userJobDescriptionLink.trim() || undefined,
-          userBranchId || undefined,
-          userBirthDate || undefined,
-          userQualification.trim() || undefined,
-          userMonthlySalary === "" ? undefined : Number(userMonthlySalary),
-          userJobDescriptionUploadToken || undefined,
-          {
+        await authService.registerUserForCompany({
+          displayName: userDisplayName.trim(),
+          email: userEmail.trim(),
+          password: userPassword,
+          role: userRole as any,
+          companyCode: userCompanyCode,
+          companyName: compName,
+          parentId: userParentId || undefined,
+          phone: userPhone.trim() || undefined,
+          jobDescriptionLink: userJobDescriptionLink.trim() || undefined,
+          branchId: userBranchId || undefined,
+          birthDate: userBirthDate || undefined,
+          monthlySalary: userMonthlySalary === "" ? undefined : Number(userMonthlySalary),
+          jobDescriptionUploadToken: userJobDescriptionUploadToken || undefined,
+          ...{
             industry: userIndustry.trim() || undefined,
             photoURL: userPhotoURL.trim() || undefined,
             coverImage: userCoverImage.trim() || undefined,
           }
-        );
+        });
 
         toast.success(`Đăng ký tài khoản cho "${userDisplayName}" thành công!`);
       }
@@ -419,8 +377,6 @@ export default function UserAdminTab() {
     setUserCompanyCode(user.companyCode || "");
     setUserBranchId(user.branchId || "");
     setUserParentId(user.parentId || "");
-    setUserDepartment(user.department || "");
-    setUserQualification(user.qualification || "");
     setUserJobDescriptionLink(user.jobDescriptionLink || "");
     setUserMonthlySalary(user.monthlySalary == null ? "" : String(user.monthlySalary));
     setIsUserModalOpen(true);
@@ -551,8 +507,8 @@ export default function UserAdminTab() {
               {/* Supported roles: Admin and Member (stored as user). */}
               {(() => {
                 const defaultRolesList = [
-                  { role: "admin", displayName: "Admin", level: 1, isDefault: true, permissions: ["dashboard:manage", "people:manage", "relationship:manage", "hr:manage", "timekeeping:manage", "meetings:manage", "resource:manage", "chat:manage", "settings:manage", "access:manage"] },
-                  { role: "user", displayName: "Member", level: 3, isDefault: true, permissions: ["access:read", "hr:read", "people:read", "timekeeping:read", "meetings:read", "chat:read", "resource:read"] },
+                  { role: "admin", displayName: "Admin", level: 1, isDefault: true, permissions: ["dashboard:manage", "people:manage", "relationship:manage", "hr:manage", "meetings:manage", "resource:manage", "chat:manage", "settings:manage", "access:manage"] },
+                  { role: "user", displayName: "Member", level: 3, isDefault: true, permissions: ["access:read", "hr:read", "people:read", "meetings:read", "chat:read", "resource:read"] },
                 ];
                 const rolesToDisplay = defaultRolesList.map(role => {
                   const saved = rolePermissionsList.find(item => item.role === role.role);
@@ -678,10 +634,6 @@ export default function UserAdminTab() {
         setUserBranchId={setUserBranchId}
         userParentId={userParentId}
         setUserParentId={setUserParentId}
-        userDepartment={userDepartment}
-        setUserDepartment={setUserDepartment}
-        userQualification={userQualification}
-        setUserQualification={setUserQualification}
         userJobDescriptionLink={userJobDescriptionLink}
         userMonthlySalary={userMonthlySalary}
         setUserMonthlySalary={setUserMonthlySalary}
@@ -689,7 +641,6 @@ export default function UserAdminTab() {
         setUserJobDescriptionUploadToken={setUserJobDescriptionUploadToken}
         getAvailableRoles={getAvailableRoles}
         userProfile={userProfile}
-        branches={branches}
         usersList={usersList}
         onSubmit={handleRegisterUser}
         submittingUser={submittingUser}

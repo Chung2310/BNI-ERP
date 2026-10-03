@@ -200,6 +200,7 @@ export async function autoStartDueMeetings(now = new Date()) {
       item.speakerStartedAt = undefined;
       item.elapsedSeconds = 0;
     }
+    item.startedAt = now;
     item.status = 'live';
     await saveMeeting(item);
   }
@@ -281,6 +282,7 @@ export async function startMeetingPresentation(item: any, speakerId: string, now
   if (index < 0) throw new MeetingError(400, 'Không tìm thấy người thuyết trình.');
   const sameSpeaker = item.status !== 'scheduled' && item.currentIndex === index;
   if (item.status === 'scheduled') {
+    item.startedAt = now;
     item.speakers = allocateSpeakers(item.speakers.map((person: any) => person.toObject ? person.toObject() : person), item.tiers, item.fallbackSeconds);
   }
   if (!sameSpeaker) {
@@ -306,6 +308,7 @@ export async function controlMeeting(item: any, action: string, now = new Date()
     throw new MeetingError(409, 'Không có người đang chờ phát biểu.');
   }
   if (action === 'start' && status === 'scheduled') {
+    item.startedAt = now;
     if (item.speakers && item.speakers.length > 0) {
       item.speakers = allocateSpeakers(
         item.speakers.map((p: any) => (p.toObject ? p.toObject() : p)),

@@ -1,3 +1,4 @@
+import { meetingElapsedLabel } from "../meetings/meetingElapsedLabel";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   CalendarDays,
@@ -56,13 +57,6 @@ interface ExtendedSpeaker extends Speaker {
   phone?: string;
   isMember: boolean;
 }
-
-const getLiveElapsedMinutes = (startsAt: string | Date): number => {
-  const startTime = new Date(startsAt).getTime();
-  const diffMs = Date.now() - startTime;
-  if (diffMs <= 0) return 1;
-  return Math.floor(diffMs / 60000);
-};
 
 export const extractLuckyWinners = (meeting: Meeting): LuckyDrawWinnerRecord[] => {
   const result: LuckyDrawWinnerRecord[] = [];
@@ -1556,7 +1550,7 @@ export function MeetingStatisticsPanel() {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-80" />
                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
                     </span>
-                    <span className="animate-pulse">Đang diễn ra {getLiveElapsedMinutes(activeSingleMeeting.startsAt)} phút</span>
+                    <span className="animate-pulse">{meetingElapsedLabel(activeSingleMeeting)}</span>
                   </span>
                 ) : (
                   <span className="text-xs text-slate-500">
@@ -1805,7 +1799,7 @@ export function MeetingStatisticsPanel() {
                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
                               </span>
                               <span className="animate-pulse">
-                                Đang diễn ra {getLiveElapsedMinutes(m.startsAt)} phút
+                                {meetingElapsedLabel(m)}
                               </span>
                             </span>
                           ) : (

@@ -50,7 +50,6 @@ export const createBranchOwnerSchema = { body: Joi.object({
   password: Joi.string().min(6).required(),
   phone: Joi.string().trim().max(32).allow("").optional(),
   birthDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow(""),
-  qualification: Joi.string().trim().max(200).allow("").optional(),
 }).unknown(false) };
 
 const registerSchema = {
@@ -72,15 +71,11 @@ const registerSchema = {
     photoURL: Joi.string().uri().optional().allow("").messages({
       "string.uri": "photoURL phải là một đường dẫn URL hợp lệ.",
     }),
-    // Lưu ý bảo mật: KHÔNG cho phép client tự đặt role/companyCode/level/parentId qua
+    // Lưu ý bảo mật: KHÔNG cho phép client tự đặt role/companyCode/parentId qua
     // endpoint đăng ký công khai này — các trường đó chỉ được gán qua
     // register-company/register-user (đã kiểm tra xác thực + phân quyền).
     companyName: Joi.string().optional().allow(""),
     branchId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow(""),
-    jobTitle: Joi.string().optional().allow(""),
-    qualification: Joi.string().max(200).optional().allow(""),
-    department: Joi.string().optional().allow(""),
-    division: Joi.string().optional().allow(""),
     monthlySalary: Joi.number().min(0).optional(),
     phone: Joi.string().pattern(vnPhoneRegex).optional().allow("").messages({
       "string.pattern.base": "Số điện thoại Việt Nam không đúng định dạng (ví dụ: 0987654321).",
@@ -117,50 +112,6 @@ const updateProfileSchema = {
     companyName: Joi.string().optional().allow(""),
     photoUploadToken: Joi.string().trim().optional(),
     coverUploadToken: Joi.string().trim().optional(),
-    facebookIntegration: Joi.object({
-      isConnected: Joi.boolean().required(),
-      pageId: Joi.string().allow(""),
-      pageName: Joi.string().allow(""),
-      pageAccessToken: Joi.string().allow(""),
-      connectedAt: Joi.date().optional(),
-      isMock: Joi.boolean().optional(),
-    }).optional().allow(null),
-    tiktokIntegration: Joi.object({
-      isConnected: Joi.boolean().required(),
-      username: Joi.string().allow(""),
-      displayName: Joi.string().allow(""),
-      avatarUrl: Joi.string().uri().optional().allow(""),
-      accessToken: Joi.string().allow(""),
-      refreshToken: Joi.string().optional().allow(""),
-      tokenExpiredAt: Joi.date().optional().allow(null),
-      clientKey: Joi.string().optional().allow(""),
-      clientSecret: Joi.string().optional().allow(""),
-      scopes: Joi.array().items(Joi.string()).optional(),
-      connectedAt: Joi.date().optional(),
-      privacyLevel: Joi.string().optional(),
-      isMock: Joi.boolean().optional(),
-    }).optional().allow(null),
-    zaloIntegration: Joi.object({
-      isConnected: Joi.boolean().required(),
-      oaId: Joi.string().allow(""),
-      oaName: Joi.string().allow(""),
-      accessToken: Joi.string().allow(""),
-      refreshToken: Joi.string().allow(""),
-      tokenExpiredAt: Joi.date().optional(),
-      connectedAt: Joi.date().optional(),
-      isMock: Joi.boolean().optional(),
-    }).optional().allow(null),
-    aiAutoReplyConfig: Joi.object({
-      enabled: Joi.boolean().required(),
-      autoClassify: Joi.boolean().required(),
-      autoCloseDeal: Joi.boolean().required(),
-      autoFeedback: Joi.boolean().required(),
-      replyDelay: Joi.number().required(),
-      advancedInstructions: Joi.string().allow(""),
-      trainingKnowledge: Joi.string().allow(""),
-      model: Joi.string().allow("").optional(),
-      disabledAt: Joi.string().isoDate().allow(null).optional(),
-    }).optional().allow(null),
   }),
 };
 
@@ -186,9 +137,6 @@ const deleteOwnAccountSchema = {
 };
 authRouter.delete("/me", requireAuth as any, authRateLimiter, validateRequest(deleteOwnAccountSchema), authController.deleteOwnAccount as any);
 
-authRouter.get("/telegram-link", requireAuth as any, authController.getTelegramLinkStatus as any);
-authRouter.post("/telegram-link", requireAuth as any, authController.createTelegramLinkCode as any);
-authRouter.delete("/telegram-link", requireAuth as any, authController.unlinkTelegram as any);
 
 // Cập nhật thông tin tài khoản hiện tại (yêu cầu Access Token)
 authRouter.patch("/profile", requireAuth as any, validateRequest(updateProfileSchema), authController.updateProfile as any);
@@ -264,16 +212,6 @@ const registerUserSchema = {
     photoURL: Joi.string().optional().allow(""),
     coverImage: Joi.string().optional().allow(""),
     parentId: Joi.string().optional().allow(""),
-    level: Joi.number().integer().optional(),
-    department: Joi.string().optional().allow(""),
-    division: Joi.string().optional().allow(""),
-    isLeader: Joi.boolean().optional(),
-    heygenAccess: Joi.object({
-      avatarIds: Joi.array().items(Joi.string().allow("")).optional(),
-      avatarId: Joi.string().optional().allow(""),
-      voiceId: Joi.string().optional().allow(""),
-      apiKey: Joi.string().optional().allow(""),
-    }).optional(),
     monthlySalary: Joi.number().min(0).optional(),
     birthDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow("", null),
     phone: Joi.string().pattern(vnPhoneRegex).optional().allow("").messages({
@@ -282,7 +220,6 @@ const registerUserSchema = {
     branchId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow("", null),
     jobDescriptionLink: Joi.string().uri().optional().allow(""),
     jobDescriptionUploadToken: Joi.string().trim().optional(),
-    qualification: Joi.string().max(200).optional().allow(""),
   }),
 };
 
@@ -363,12 +300,7 @@ const bulkUpdateUsersSchema = {
           "string.pattern.base": "ID người dùng không đúng định dạng.",
         }),
         parentId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow(null, ""),
-        level: Joi.number().integer().optional(),
         role: Joi.string().optional(),
-        department: Joi.string().optional().allow(""),
-        division: Joi.string().optional().allow(""),
-        jobTitle: Joi.string().optional().allow(""),
-    qualification: Joi.string().max(200).optional().allow(""),
       })
     ).required().messages({
       "any.required": "Danh sách 'updates' là bắt buộc.",
@@ -386,12 +318,6 @@ const updateUserSchema = {
   body: Joi.object({
     role: Joi.string().optional(),
     parentId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow(null, ""),
-    level: Joi.number().integer().optional(),
-    department: Joi.string().optional().allow(""),
-    division: Joi.string().optional().allow(""),
-    jobTitle: Joi.string().optional().allow(""),
-    qualification: Joi.string().max(200).optional().allow(""),
-    isLeader: Joi.boolean().optional(),
     displayName: Joi.string().optional().allow(""),
     email: Joi.string().pattern(emailRegex).optional(),
     password: Joi.string().min(6).optional().allow(""),
@@ -401,12 +327,6 @@ const updateUserSchema = {
     photoURL: Joi.string().optional().allow(""),
     coverImage: Joi.string().optional().allow(""),
     branchId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow("", null),
-    heygenAccess: Joi.object({
-      avatarIds: Joi.array().items(Joi.string().allow("")).optional(),
-      avatarId: Joi.string().optional().allow(""),
-      voiceId: Joi.string().optional().allow(""),
-      apiKey: Joi.string().optional().allow(""),
-    }).optional(),
     monthlySalary: Joi.number().min(0).optional(),
     birthDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow("", null),
     phone: Joi.string().pattern(vnPhoneRegex).optional().allow("").messages({

@@ -1,3 +1,4 @@
+import { meetingElapsedLabel } from "../components/meetings/meetingElapsedLabel";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MemberMeetingDetail, { memberAttendance, memberAttendanceLabel } from "../components/meetings/MemberMeetingDetail";
 import { SpeechesCompleteDialog } from "../components/meetings/SpeechesCompleteDialog";
@@ -87,6 +88,7 @@ type Meeting = {
   allowDirectCheckIn?: boolean;
   coverImage?: string;
   startsAt: string;
+  startedAt?: string;
   reminderDays: number;
   status: "scheduled" | "live" | "paused" | "ended" | "cancelled";
   speakers: Speaker[];
@@ -651,13 +653,6 @@ export default function MeetingTab() {
     },
   };
 
-  const getLiveElapsedMinutes = (startsAt: string | Date): number => {
-    const startTime = new Date(startsAt).getTime();
-    const diffMs = tick - startTime;
-    if (diffMs <= 0) return 1;
-    return Math.floor(diffMs / 60000);
-  };
-
   const filteredItems = items.filter((m) => {
     const matchesSearch =
       m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -829,7 +824,7 @@ export default function MeetingTab() {
                           />
                         </span>
                         <span className="animate-pulse tracking-tight font-extrabold text-green-700">
-                          Đang diễn ra {getLiveElapsedMinutes(m.startsAt)} phút
+                          {meetingElapsedLabel(m, tick)}
                         </span>
                       </span>
                     ) : (
@@ -1004,7 +999,7 @@ export default function MeetingTab() {
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
                         </span>
                         <span className="animate-pulse text-green-600 font-bold">
-                          Đang diễn ra {getLiveElapsedMinutes(activeMeeting.startsAt)} phút
+                          {meetingElapsedLabel(activeMeeting, tick)}
                         </span>
                       </span>
                     ) : (

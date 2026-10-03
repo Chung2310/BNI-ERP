@@ -69,6 +69,7 @@ export interface Meeting {
   location?: string;
   coverImage?: string;
   startsAt: string;
+  startedAt?: string;
   createdBy?: string;
   reminderMinutes?: number;
   revision: number;

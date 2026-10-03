@@ -61,24 +61,15 @@ export default function HRTab() {
     .map((usr) => ({
       id: usr.uid,
       name: usr.displayName,
-      role: (usr.jobTitle && usr.jobTitle.trim().toLowerCase() !== "nhân viên")
-        ? usr.jobTitle
-        : (usr.role === "manager" ? "Quản lý" : "Thành viên"),
-    department: usr.department || "",
+      role: usr.role === "manager" ? "Quản lý" : "Thành viên",
     email: usr.email,
     phone: usr.phone || "Chưa cập nhật",
     avatar:
       usr.photoURL && (usr.photoURL.startsWith("http") || usr.photoURL.startsWith("/"))
         ? usr.photoURL
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(usr.displayName)}&background=random&color=fff`,
-    level: usr.level || (
-      usr.role === "admin" ? 1 :
-      usr.role === "manager" ? 2 : 3
-    ),
     parentId: usr.parentId,
     status: usr.status || "offline",
-    division: usr.division || "Khối Vận Hành",
-    isLeader: usr.isLeader,
     jobDescriptionLink: usr.jobDescriptionLink || "",
     monthlySalary: usr.monthlySalary,
     companyName: usr.companyName,

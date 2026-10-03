@@ -166,8 +166,8 @@ export default function ResourceTab() {
     setLocalItemsCount({ count, total });
   }, []);
 
-  const isConnected = userProfileAny?.googleDriveIntegration?.isConnected;
-  const driveEmail = userProfileAny?.googleDriveIntegration?.driveEmail;
+  const isConnected = userProfileAny?.companyDrive?.isConnected;
+  const driveEmail = userProfileAny?.companyDrive?.driveEmail;
 
   // Space management
   const [selectedSpace, setSelectedSpace] = useState<string>("personal");
@@ -370,81 +370,6 @@ export default function ResourceTab() {
   const [driveRenameValue, setDriveRenameValue] = useState("");
   const [driveRenaming, setDriveRenaming] = useState(false);
 
-  const [connectingGoogleDrive, setConnectingGoogleDrive] = useState(false);
-
-  useEffect(() => {
-    const handleGoogleDriveMessage = async (event: MessageEvent) => {
-      const isAllowedOrigin =
-        event.origin === window.location.origin ||
-        event.origin.includes("localhost:") ||
-        event.origin.includes("127.0.0.1:");
-      if (!isAllowedOrigin) return;
-
-      if (event.data?.type === "GOOGLE_DRIVE_CONNECTED") {
-        toast.success(`Đã kết nối Google Drive cá nhân thành công!`);
-        void refreshProfile();
-        window.location.reload();
-      } else if (event.data?.type === "GOOGLE_DRIVE_FAILED") {
-        toast.error(event.data.error || "Kết nối Google Drive cá nhân thất bại.");
-      }
-    };
-    window.addEventListener("message", handleGoogleDriveMessage);
-    return () => window.removeEventListener("message", handleGoogleDriveMessage);
-  }, [refreshProfile]);
-
-  const handleGoogleDriveOAuth = async () => {
-    setConnectingGoogleDrive(true);
-    try {
-      localStorage.removeItem("google_drive_oauth_result");
-      const res = await fetch("/api/v1/integrations/google-drive/auth-url", {
-        headers: { Authorization: `Bearer ${getAccessToken()}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Không thể lấy link xác thực Google.");
-
-      const authUrl = data.authUrl;
-      const width = 600;
-      const height = 650;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
-      const oauthWindow = window.open(
-        authUrl,
-        "GoogleDriveOAuthPopup",
-        `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
-      );
-
-      if (!oauthWindow) {
-        throw new Error("Trình duyệt đang chặn cửa sổ popup. Vui lòng cho phép popup để kết nối.");
-      }
-
-      const checkInterval = setInterval(() => {
-        if (oauthWindow.closed) {
-          clearInterval(checkInterval);
-          setConnectingGoogleDrive(false);
-          // Polling check to automatically reload if connection succeeded
-          setTimeout(async () => {
-            try {
-              const res = await fetch("/api/v1/auth/me", {
-                headers: { Authorization: `Bearer ${getAccessToken()}` },
-              });
-              const data = await res.json();
-              if (res.ok && data.user?.googleDriveIntegration?.isConnected) {
-                toast.success(`Đã kết nối Google Drive cá nhân thành công!`);
-                window.location.reload();
-              }
-            } catch (err) {
-              console.error("Lỗi khi kiểm tra kết nối Google Drive:", err);
-            }
-          }, 600);
-        }
-      }, 800);
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Không thể kết nối Google Drive.");
-      setConnectingGoogleDrive(false);
-    }
-  };
-
   const fetchMoveFolders = async (space: string, folderId: string) => {
     setLoadingMoveFolders(true);
     try {
@@ -572,7 +497,7 @@ export default function ResourceTab() {
     if (moveTarget) {
       // Khi mở modal, browse từ thư mục gốc của space đích
       const rootId = moveSpace === "personal"
-        ? (userProfileAny?.googleDriveIntegration?.rootFolderId || "root")
+        ? (userProfileAny?.companyDrive?.rootFolderId || "root")
         : (rooms.find(r => r._id === moveSpace)?.driveFolderId || "root");
       void fetchMoveFolders(moveSpace, rootId);
     }
@@ -696,10 +621,7 @@ export default function ResourceTab() {
   };
 
   const fetchResources = async () => {
-    const targetUser = allStaff.find(u => (u.uid || u.id) === selectedOwnerId);
-    const targetIsConnected = selectedOwnerId === userProfileId
-      ? isConnected
-      : targetUser?.googleDriveIntegration?.isConnected;
+    const targetIsConnected = isConnected;
 
     if (selectedSpace === "personal" && !targetIsConnected) {
       setResources([]);
@@ -1746,7 +1668,7 @@ export default function ResourceTab() {
                     setActiveMenuId(null);
                     // Mở modal, browse từ thư mục gốc của space hiện tại
                     const rootId = selectedSpace === "personal"
-                      ? (userProfileAny?.googleDriveIntegration?.rootFolderId || "root")
+                      ? (userProfileAny?.companyDrive?.rootFolderId || "root")
                       : (rooms.find(r => r._id === selectedSpace)?.driveFolderId || "root");
                     setMoveTarget(resource);
                     setMoveSpace(selectedSpace);
@@ -2617,25 +2539,9 @@ export default function ResourceTab() {
                             </div>
                             <h3 className="text-base font-bold text-gray-800">Chưa kết nối Google Drive</h3>
                             <p className="text-xs text-gray-500 max-w-sm text-center mt-2 leading-relaxed">
-                              Nhân viên cần liên kết với tài khoản Google cá nhân của mình để kích hoạt không gian lưu trữ tài nguyên riêng biệt.
+                              Quản trị viên cần kết nối Google Drive trong Cài đặt doanh nghiệp để sử dụng tài nguyên Drive.
                             </p>
-                            <button
-                              onClick={handleGoogleDriveOAuth}
-                              disabled={connectingGoogleDrive}
-                              className="mt-6 flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-lg transition-all duration-150 cursor-pointer disabled:opacity-60"
-                            >
-                              {connectingGoogleDrive ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 animate-spin text-white" />
-                                  <span>Đang kết nối...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span>Kết nối Google Drive cá nhân ngay</span>
-                                  <ArrowUpRight className="h-4 w-4" />
-                                </>
-                              )}
-                            </button>
+
                           </div>
                         ) : (
                           <div className="h-full flex flex-col">
@@ -3636,7 +3542,7 @@ export default function ResourceTab() {
                           <button
                             onClick={() => {
                               setMoveSpace("personal");
-                              setMoveFolderId(userProfileAny?.googleDriveIntegration?.rootFolderId || "root");
+                              setMoveFolderId(userProfileAny?.companyDrive?.rootFolderId || "root");
                               setMoveBreadcrumbs([]);
                               setShowMoveSpaceDropdown(false);
                             }}
@@ -3729,7 +3635,7 @@ export default function ResourceTab() {
                 <button
                   onClick={() => {
                     const rootId = moveSpace === "personal"
-                      ? (userProfileAny?.googleDriveIntegration?.rootFolderId || "root")
+                      ? (userProfileAny?.companyDrive?.rootFolderId || "root")
                       : (rooms.find(r => r._id === moveSpace)?.driveFolderId || "root");
                     setMoveFolderId(rootId);
                     setMoveBreadcrumbs([]);
@@ -3911,7 +3817,7 @@ export default function ResourceTab() {
         const canDelete = canEdit;
         if (!canEdit) return null;
         const rootId = selectedSpace === "personal"
-          ? (userProfileAny?.googleDriveIntegration?.rootFolderId || "root")
+          ? (userProfileAny?.companyDrive?.rootFolderId || "root")
           : (rooms.find(r => r._id === selectedSpace)?.driveFolderId || "root");
         return ReactDOM.createPortal(
           <div

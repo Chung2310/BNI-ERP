@@ -77,19 +77,18 @@ export const resourceService = {
     }
 
     if (isFetchingGoogleDrive && userId) {
-      const { UserModel } = await import("../model/user.model");
-      const { GoogleDriveService } = await import("./personal-google-drive.service");
+      const { getCompanyDriveContext } = await import("./company-drive-context.service");
       const { google } = await import("googleapis");
 
-      const user = await UserModel.findById(userId);
-      if (user && user.googleDriveIntegration?.isConnected) {
+      const driveContext = await getCompanyDriveContext(companyCode);
+      if (driveContext.isConnected) {
         try {
-          const authClient = await GoogleDriveService.getClientForUser(userId);
+          const authClient = driveContext.authClient;
           const drive = google.drive({ version: "v3", auth: authClient });
 
           let targetFolderId = driveFolderId;
           if (targetFolderId === "root") {
-            targetFolderId = user.googleDriveIntegration.rootFolderId;
+            targetFolderId = driveContext.rootFolderId;
           }
 
           const response = await drive.files.list({
@@ -231,17 +230,16 @@ export const resourceService = {
     const guard = new Set<string>();
 
     if (currentId && !isValidObjectId(currentId) && userId) {
-      const { UserModel } = await import("../model/user.model");
-      const { GoogleDriveService } = await import("./personal-google-drive.service");
+      const { getCompanyDriveContext } = await import("./company-drive-context.service");
       const { google } = await import("googleapis");
 
-      const user = await UserModel.findById(userId);
-      if (user && user.googleDriveIntegration?.isConnected) {
+      const driveContext = await getCompanyDriveContext(companyCode);
+      if (driveContext.isConnected) {
         try {
-          const authClient = await GoogleDriveService.getClientForUser(userId);
+          const authClient = driveContext.authClient;
           const drive = google.drive({ version: "v3", auth: authClient });
 
-          while (currentId && currentId !== user.googleDriveIntegration.rootFolderId) {
+          while (currentId && currentId !== driveContext.rootFolderId) {
             if (guard.has(currentId)) break;
             guard.add(currentId);
 

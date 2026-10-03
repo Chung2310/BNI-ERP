@@ -200,3 +200,18 @@ test("scheduled presentation starts selected person and rejects invalid or ended
   item.status = "ended";
   await assert.rejects(startMeetingPresentation(item, "chair", now), { status: 409 });
 });
+
+test("records the actual meeting start and does not reset it when resuming", async () => {
+  const item = meeting(); item.status = "scheduled"; item.startsAt = new Date(now.getTime() + 3600000);
+  await controlMeeting(item, "start", now);
+  assert.equal(item.startedAt, now);
+  assert.equal(item.startsAt.getTime(), now.getTime() + 3600000);
+  await controlMeeting(item, "pause", new Date(now.getTime() + 60000));
+  await controlMeeting(item, "resume", new Date(now.getTime() + 120000));
+  assert.equal(item.startedAt, now);
+});
+test("records the actual start when starting a presentation directly", async () => {
+  const item = meeting(); item.status = "scheduled";
+  await startMeetingPresentation(item, "early", now);
+  assert.equal(item.startedAt, now);
+});

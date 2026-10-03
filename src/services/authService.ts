@@ -1,4 +1,4 @@
-import { UserProfile, CompanyProfile, TelegramLinkStatus } from "../types";
+import { UserProfile, CompanyProfile } from "../types";
 
 function getDeviceId(): string {
   const key = "igen_device_id";
@@ -375,65 +375,19 @@ export const authService = {
   },
 
   // Đăng ký người dùng mới cho doanh nghiệp qua REST API
-  async registerUserForCompany(
-    displayName: string,
-    email: string,
-    password: string,
-    role: "user" | "teacher" | "manager" | "branch_owner" | "admin",
-    companyCode: string,
-    companyName: string,
-    parentId?: string,
-    managerLevel?: number,
-    department?: string,
-    division?: string,
-    phone?: string,
-    heygenAccess?: {
-      avatarIds?: string[];
-      avatarId?: string;
-      voiceId?: string;
-      apiKey?: string;
-    },
-    jobDescriptionLink?: string,
-    branchId?: string,
-    birthDate?: string,
-    qualification?: string,
-    monthlySalary?: number,
-    jobDescriptionUploadToken?: string,
-    extraFields?: {
-      industry?: string;
-      photoURL?: string;
-      coverImage?: string;
-    }
-  ): Promise<string> {
+  async registerUserForCompany(input: {
+    displayName: string; email: string; password: string; role: UserProfile["role"];
+    companyCode: string; companyName: string; parentId?: string; phone?: string;
+    jobDescriptionLink?: string; branchId?: string; birthDate?: string; monthlySalary?: number;
+    jobDescriptionUploadToken?: string; industry?: string; photoURL?: string; coverImage?: string;
+  }): Promise<string> {
     const res = await fetch("/api/v1/auth/register-user", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${getAccessToken()}`,
       },
-      body: JSON.stringify({
-        displayName,
-        email,
-        password,
-        role,
-        companyCode,
-        companyName,
-        industry: extraFields?.industry,
-        photoURL: extraFields?.photoURL,
-        coverImage: extraFields?.coverImage,
-        parentId,
-        level: parentId && managerLevel ? managerLevel + 1 : undefined,
-        department,
-        division,
-        phone,
-        heygenAccess,
-        jobDescriptionLink,
-        branchId,
-        birthDate,
-        qualification,
-        monthlySalary,
-        jobDescriptionUploadToken,
-      }),
+      body: JSON.stringify(input),
     });
 
     if (!res.ok) {
@@ -525,56 +479,6 @@ export const authService = {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.message || "Không thể ngắt kết nối Google Drive");
     }
-  },
-
-  async getTelegramLinkStatus(): Promise<TelegramLinkStatus> {
-    const res = await fetch("/api/v1/auth/telegram-link", {
-      headers: {
-        "Authorization": `Bearer ${getAccessToken()}`,
-      },
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.message || "Không thể lấy trạng thái liên kết Telegram");
-    }
-
-    const result = await res.json();
-    return result.data;
-  },
-
-  async createTelegramLinkCode(): Promise<TelegramLinkStatus> {
-    const res = await fetch("/api/v1/auth/telegram-link", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${getAccessToken()}`,
-      },
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.message || "Không thể tạo mã liên kết Telegram");
-    }
-
-    const result = await res.json();
-    return result.data;
-  },
-
-  async unlinkTelegram(): Promise<TelegramLinkStatus> {
-    const res = await fetch("/api/v1/auth/telegram-link", {
-      method: "DELETE",
-      headers: {
-        "Authorization": `Bearer ${getAccessToken()}`,
-      },
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.message || "Không thể gỡ liên kết Telegram");
-    }
-
-    const result = await res.json();
-    return result.data;
   },
 
   // Thay đổi mật khẩu người dùng qua REST API

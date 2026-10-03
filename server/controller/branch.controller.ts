@@ -45,9 +45,9 @@ export const branchController = {
     if (!branch) return res.status(404).json({ status: "error", message: "Không tìm thấy chi nhánh chưa có Chủ chi nhánh." });
     let owner: any;
     try {
-      const { displayName, email, password, phone, birthDate, qualification } = req.body;
+      const { displayName, email, password, phone, birthDate } = req.body;
       owner = await authService.registerUserForCompany({
-        displayName, email, password, phone, birthDate, qualification,
+        displayName, email, password, phone, birthDate,
         role: "branch_owner", companyCode, branchId: String(branch._id), parentId: req.user.id,
       }, companyCode, req.user.role);
       const linkedBranch = await BranchModel.findOneAndUpdate(
