@@ -116,6 +116,7 @@ const updateProfileSchema = {
     birthDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow("", null),
     companyName: Joi.string().optional().allow(""),
     photoUploadToken: Joi.string().trim().optional(),
+    coverUploadToken: Joi.string().trim().optional(),
     facebookIntegration: Joi.object({
       isConnected: Joi.boolean().required(),
       pageId: Joi.string().allow(""),

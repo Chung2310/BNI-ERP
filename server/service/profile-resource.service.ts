@@ -10,6 +10,17 @@ interface SourceFinalizer {
 
 export function createProfileResourceService(finalizer: SourceFinalizer) {
   return {
+    async finalizeCover(actor: ManagedUploadActor, user: any, uploadToken: string) {
+      const userId = String(user._id || user.id || user.uid);
+      return finalizer.finalize(actor, {
+        entityType: "user",
+        entityId: userId,
+        entityLabel: user.displayName || user.email || userId,
+        sourceRecordId: userId,
+        expectedSourceType: "profile.cover",
+        uploads: [{ uploadToken, sourceField: "coverImage" }],
+      });
+    },
     async finalizeAvatar(actor: ManagedUploadActor, user: any, uploadToken?: string) {
       const userId = String(user._id || user.id || user.uid);
       return finalizer.finalize(actor, {

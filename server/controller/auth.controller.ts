@@ -355,9 +355,22 @@ export const authController = {
           actorName: userObj.displayName || userObj.email,
         }, userObj, req.body.photoUploadToken);
       }
+      if (req.body.coverUploadToken) {
+        await profileResourceService.finalizeCover({
+          companyCode: userObj.companyCode,
+          branchId: userObj.branchId,
+          actorId: userId,
+          actorName: userObj.displayName || userObj.email,
+        }, userObj, req.body.coverUploadToken);
+      }
       const company = userObj.companyCode && userObj.companyCode !== "SYSTEM"
-        ? await CompanyModel.findOne({ code: userObj.companyCode }).select("driveOAuth driveFolderId").lean()
+        ? await CompanyModel.findOne({ code: userObj.companyCode }).select("enabledModules businessType driveOAuth driveFolderId").lean()
         : null;
+      // Return the same effective access configuration as GET /me, not raw user permissions.
+      userObj.businessType = company?.businessType ?? "general";
+      userObj.enabledModules = resolveProfileEnabledModules(company?.enabledModules, company?.businessType);
+      userObj.permissions = await resolveProfilePermissions(userId, userObj.role, userObj.companyCode);
+
       if (company && company.driveOAuth?.refreshToken) {
         userObj.googleDriveIntegration = {
           isConnected: true,
