@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  igen-erp:
+  igen-bni:
     image: ghcr.io/chung2310/bni-erp:${IMAGE_TAG:-latest}
-    container_name: ${CONTAINER_NAME:-igen-erp}
+    container_name: ${CONTAINER_NAME:-igen-bni}
     restart: always
     ports:
       - "${PORT:-3012}:${PORT:-3012}"
