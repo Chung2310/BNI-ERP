@@ -410,8 +410,12 @@ export default function Header({ currentTab, onSearchSelect, onMenuClick }: Head
                       }}
                       className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-700 transition-colors hover:bg-blue-50/80"
                     >
-                      <Settings className="h-4 w-4 text-gray-500" />
-                      <span>Cài đặt cá nhân</span>
+                      {userProfile?.role === "admin" ? (
+                        <Settings className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <User className="h-4 w-4 text-gray-500" />
+                      )}
+                      <span>{userProfile?.role === "admin" ? "Cài đặt hệ thống" : "Hồ sơ cá nhân"}</span>
                     </button>
                     <button
                       onClick={async () => {

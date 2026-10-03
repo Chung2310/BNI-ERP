@@ -109,11 +109,11 @@ export default function SettingsTab() {
       <div className="mb-4 flex flex-col justify-between gap-3 rounded-2xl border border-gray-200/80 bg-white/80 p-3 shadow-xs backdrop-blur-md sm:gap-4 sm:p-5 md:flex-row md:items-center">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-cyan-600 rounded-2xl shadow-sm text-white">
-            <Sliders className="h-5 w-5 text-white" />
+            {isAdmin ? <Sliders className="h-5 w-5 text-white" /> : <User className="h-5 w-5 text-white" />}
           </div>
           <div>
             <h1 className="text-xl md:text-2xl font-black text-cyan-700 dark:text-cyan-400 tracking-tight">
-              Cài đặt Hệ thống & Cá nhân
+              {isAdmin ? "Cài đặt Hệ thống & Cá nhân" : "Hồ sơ cá nhân"}
             </h1>
             <p className="text-xs text-slate-500 font-medium">{isAdmin ? "Tùy chỉnh thông tin tài khoản, bảo mật và kết nối ERP" : "Tùy chỉnh thông tin tài khoản và bảo mật"}</p>
           </div>
@@ -149,11 +149,11 @@ export default function SettingsTab() {
       </div>
 
       {/* Main Settings Body Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className={visibleSubTab === "profile" ? "w-full" : "grid grid-cols-1 lg:grid-cols-3 gap-6 items-start"}>
 
         {/* Left Column: Quick Profile Card */}
         <div className={`relative flex flex-col items-center gap-4 overflow-hidden rounded-2xl border border-gray-200/80 bg-white/80 p-4 text-center shadow-xs backdrop-blur-md sm:p-6 ${
-          visibleSubTab !== "profile" ? "hidden lg:flex" : "flex"
+          visibleSubTab === "profile" ? "hidden" : "flex"
         }`}>
           <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-r from-blue-500 to-indigo-600">
             {userProfile?.coverImage && <img src={userProfile.coverImage} alt="Ảnh bìa cá nhân" className="h-full w-full object-cover" />}
@@ -213,7 +213,7 @@ export default function SettingsTab() {
         </div>
 
         {/* Right Columns: Settings Forms */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className={visibleSubTab === "profile" ? "w-full space-y-6" : "lg:col-span-2 space-y-6"}>
           <Suspense fallback={<TabLoader label="Đang tải cấu hình..." />}>
             {visibleSubTab === "profile" && <ProfileTab />}
             {visibleSubTab === "security" && <SecurityTab />}

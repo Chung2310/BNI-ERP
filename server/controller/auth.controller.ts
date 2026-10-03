@@ -69,6 +69,16 @@ export function buildUserRosterFilter(companyCode?: string): Record<string, unkn
   };
 }
 export const authController = {
+  async deleteOwnAccount(req: AuthenticatedRequest, res: Response) {
+    if (!req.user?.id) return res.status(401).json({ status: "error", message: "Vui lòng đăng nhập." });
+    try {
+      await authService.deleteOwnAccount(req.user.id, req.body.password, req.body.confirmation);
+      res.clearCookie("refreshToken", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict" });
+      return res.status(200).json({ status: "success", message: "Đã xóa tài khoản của bạn." });
+    } catch (error: any) {
+      return res.status(400).json({ status: "error", message: error.message || "Không thể xóa tài khoản." });
+    }
+  },
   /**
    * POST /api/v1/auth/register
    */

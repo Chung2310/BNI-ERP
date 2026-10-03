@@ -272,3 +272,8 @@ export const searchMessagesSchema = {
 
 
 
+
+export const setRoomBlockedSchema = {
+  ...roomIdParamsSchema,
+  body: Joi.object({ blocked: Joi.boolean().strict().required() }),
+};

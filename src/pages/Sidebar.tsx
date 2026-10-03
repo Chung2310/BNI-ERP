@@ -10,6 +10,7 @@ import {
   Shield,
   Users,
   Lock,
+  User,
 } from "lucide-react";
 import {
   BRAND_LOGO_PATH,
@@ -118,8 +119,8 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, onMobileC
 
   menuItems.push({
     label: "CÀI ĐẶT",
-    title: "Cài đặt hệ thống",
-    icon: Settings,
+    title: userProfile?.role === "admin" ? "Cài đặt hệ thống" : "Hồ sơ cá nhân",
+    icon: userProfile?.role === "admin" ? Settings : User,
     group: "system",
   });
 

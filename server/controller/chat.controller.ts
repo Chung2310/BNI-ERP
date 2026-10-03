@@ -9,6 +9,18 @@ import { ChatMessageModel } from "../model/chat-message.model";
 import mongoose from "mongoose";
 
 export const chatController = {
+  async setRoomBlocked(req: AuthenticatedRequest, res: Response) {
+    try {
+      const room = await chatService.setRoomBlocked(req.params.roomId, req.user!.id, req.user!.companyCode || "SYSTEM", req.body.blocked);
+      for (const member of room.members) {
+        const user = member.userId as any;
+        emitToUser(String(user._id || user), "internal_room_updated", room);
+      }
+      return res.status(200).json({ status: "success", data: room });
+    } catch (error: any) {
+      return res.status(400).json({ status: "error", message: error.message || "Không thể cập nhật trạng thái chặn." });
+    }
+  },
   /**
    * GET /api/v1/chat/link-preview?url=...
    * Lấy thông tin xem trước (OG metadata) của một liên kết.
@@ -425,7 +437,7 @@ export const chatController = {
       });
     } catch (error: any) {
       console.error("[chatController.sendMessage] Error:", error);
-      return res.status(500).json({
+      return res.status(error.statusCode === 403 ? 403 : 500).json({
         status: "error",
         message: error.message || "Lỗi khi gửi tin nhắn.",
       });
@@ -682,7 +694,7 @@ export const chatController = {
       return res.status(200).json({ status: "success", data: message });
     } catch (error: any) {
       console.error("[chatController.reactToMessage] Error:", error);
-      return res.status(400).json({
+      return res.status(error.statusCode === 403 ? 403 : 400).json({
         status: "error",
         message: error.message || "Lỗi khi thả cảm xúc.",
       });
@@ -712,7 +724,7 @@ export const chatController = {
       return res.status(200).json({ status: "success", data: message });
     } catch (error: any) {
       console.error("[chatController.editMessage] Error:", error);
-      return res.status(400).json({
+      return res.status(error.statusCode === 403 ? 403 : 400).json({
         status: "error",
         message: error.message || "Lỗi khi sửa tin nhắn.",
       });

@@ -1,3 +1,4 @@
+import DeleteAccountCard from "./DeleteAccountCard";
 import React, { useState } from "react";
 import { Lock, Key, Eye, EyeOff } from "lucide-react";
 import { authService } from "../../services/authService";
@@ -39,6 +40,7 @@ export default function SecurityTab() {
   };
 
   return (
+    <div className="space-y-6">
     <div className="bg-white/80 backdrop-blur-md border border-gray-200/80 rounded-2xl p-6 shadow-xs">
       <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
         <Lock className="h-5 w-5 text-amber-500" />
@@ -96,6 +98,8 @@ export default function SecurityTab() {
           </button>
         </div>
       </form>
+    </div>
+    <DeleteAccountCard />
     </div>
   );
 }

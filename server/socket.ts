@@ -1,3 +1,4 @@
+import { assertChatNotBlocked } from "./service/chat-blocking";
 import { Server as SocketIOServer, Socket } from "socket.io";
 import { Server as HTTPServer } from "http";
 import jwt from "jsonwebtoken";
@@ -303,17 +304,19 @@ export async function initSocketServer(httpServer: HTTPServer) {
     });
 
     // Lắng nghe sự kiện đang nhập tin nhắn
-    socket.on("typing_status", (data: { roomId: string; isTyping: boolean }) => {
+    socket.on("typing_status", async (data: { roomId: string; isTyping: boolean }) => {
       if (!data?.roomId || !user?._id) return;
-      const chatRoomName = `chat_room:${data.roomId}`;
-      socket.to(chatRoomName).emit("internal_typing_status", {
-        roomId: data.roomId,
-        userId: user._id.toString(),
-        displayName: user.displayName,
-        isTyping: data.isTyping,
-      });
+      try {
+        const room = await ChatRoomModel.findOne({ _id: data.roomId, companyCode: user.companyCode || "SYSTEM", "members.userId": user._id });
+        if (!room) return;
+        assertChatNotBlocked(room);
+        socket.to(`chat_room:${data.roomId}`).emit("internal_typing_status", {
+          roomId: data.roomId, userId: user._id.toString(), displayName: user.displayName, isTyping: data.isTyping,
+        });
+      } catch {
+        // Invalid, inaccessible, or blocked conversations must not emit typing events.
+      }
     });
-
     socket.on("disconnect", () => {
       socketProtection.clearSocket(socket.id);
       releaseSocketProtectionConnection(socket);
@@ -443,3 +446,7 @@ export function isSocketIoHealthy(): boolean {
 }
 
 
+
+export function disconnectUserSockets(userId: string): void {
+  io?.in(`user:${userId}`).disconnectSockets(true);
+}

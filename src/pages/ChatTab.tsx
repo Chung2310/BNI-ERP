@@ -1,3 +1,4 @@
+import { chatBlockState } from "../components/chat/chatBlocking";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Search,
@@ -12,6 +13,7 @@ import {
   Users,
   Settings,
   MoreVertical,
+  Ban,
   LogOut,
   Trash2,
   Paperclip,
@@ -65,6 +67,7 @@ export default function ChatTab() {
   // State
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
+  const [updatingBlock, setUpdatingBlock] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [companyUsers, setCompanyUsers] = useState<UserProfile[]>([]);
   const [loadingRooms, setLoadingRooms] = useState(true);
@@ -461,6 +464,9 @@ export default function ChatTab() {
 
     // Listen for room updates (e.g. group name, avatar, member changes)
     const unsubscribeRoomUpdate = socketService.on("internal_room_updated", (updatedRoom: ChatRoom) => {
+      if (chatBlockState(updatedRoom, currentUserId).isBlocked) {
+        setTypingUsers((previous) => ({ ...previous, [updatedRoom._id]: [] }));
+      }
       setRooms((prevRooms) => {
         const index = prevRooms.findIndex((r) => r._id === updatedRoom._id);
         if (index === -1) {
@@ -1010,6 +1016,32 @@ export default function ChatTab() {
     });
   };
 
+  const handleToggleBlock = () => {
+    if (!activeRoom || updatingBlock) return;
+    const room = activeRoom;
+    const state = chatBlockState(room, currentUserId);
+    if (!state.canBlock) return;
+    const blocked = !state.blockedByMe;
+    showConfirm({
+      title: blocked ? "Chặn cuộc trò chuyện" : "Bỏ chặn cuộc trò chuyện",
+      message: blocked ? "Hai người sẽ không thể gửi hoặc tương tác tin nhắn trong cuộc trò chuyện này. Lịch sử vẫn được giữ lại." : "Bạn muốn bỏ chặn cuộc trò chuyện này? Nếu người kia cũng chặn, họ cần bỏ chặn để tiếp tục nhắn tin.",
+      isDanger: blocked,
+      confirmText: blocked ? "Chặn" : "Bỏ chặn",
+      onConfirm: async () => {
+        setUpdatingBlock(true);
+        try {
+          const updated = await internalChatService.setRoomBlocked(room._id, blocked);
+          setRooms((previous) => previous.map((item) => item._id === updated._id ? { ...item, ...updated } : item));
+          setActiveRoom((current) => current?._id === updated._id ? updated : current);
+          toast.success(blocked ? "Đã chặn cuộc trò chuyện." : "Đã bỏ chặn cuộc trò chuyện.");
+        } catch (error: any) {
+          toast.error(error.message || "Không thể cập nhật trạng thái chặn.");
+        } finally {
+          setUpdatingBlock(false);
+        }
+      },
+    });
+  };
   // Ghim/Bỏ ghim phòng chat
   const handleTogglePinRoom = async (roomId: string) => {
     try {
@@ -1153,6 +1185,7 @@ export default function ChatTab() {
 
   // Thả / gỡ cảm xúc (reaction) trên tin nhắn — cập nhật lạc quan trước, socket đồng bộ sau
   const handleReact = async (messageId: string, emoji: string) => {
+    if (chatBlockState(activeRoom, currentUserId).isBlocked) return;
     if (!activeRoom) return;
     setReactionPickerFor(null);
     // Optimistic toggle
@@ -1562,7 +1595,7 @@ export default function ChatTab() {
   // Send Message
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeRoom) return;
+    if (!activeRoom || chatBlockState(activeRoom, currentUserId).isBlocked) return;
 
     // Chế độ sửa tin nhắn
     if (editingMessage) {
@@ -1728,7 +1761,8 @@ export default function ChatTab() {
     return member?.role === "admin" || member?.role === "deputy";
   };
 
-  const canUserMessage = !activeRoom || !activeRoom.isGroup || !activeRoom.onlyAdminsCanMessage || isGroupAdminOrDeputy();
+  const blockState = chatBlockState(activeRoom, currentUserId);
+  const canUserMessage = !blockState.isBlocked && (!activeRoom || !activeRoom.isGroup || !activeRoom.onlyAdminsCanMessage || isGroupAdminOrDeputy());
 
   const getMsgSenderRole = (msg: any) => {
     if (!activeRoom || !activeRoom.isGroup) return "member";
@@ -2110,6 +2144,14 @@ export default function ChatTab() {
               </div>
 
               <div className="flex shrink-0 items-center gap-1.5">
+                {blockState.canBlock && (
+                  <button type="button" onClick={handleToggleBlock} disabled={updatingBlock}
+                    title={blockState.blockedByMe ? "Bỏ chặn cuộc trò chuyện" : "Chặn cuộc trò chuyện"}
+                    aria-label={blockState.blockedByMe ? "Bỏ chặn cuộc trò chuyện" : "Chặn cuộc trò chuyện"}
+                    className={`flex h-9 w-9 items-center justify-center rounded-xl border disabled:opacity-50 ${blockState.blockedByMe ? "border-red-300 bg-red-50 text-red-600" : "border-slate-300 text-slate-600 hover:bg-red-50"}`}>
+                    <Ban className="h-4.5 w-4.5" />
+                  </button>
+                )}
                 {/* Pin Room Button */}
                 <button
                   onClick={() => handleTogglePinRoom(activeRoom._id)}
@@ -3403,7 +3445,7 @@ export default function ChatTab() {
                 <div className="flex items-center justify-center gap-2 rounded-2xl bg-slate-100/80 px-4 py-3 text-center border border-slate-200/50">
                   <VolumeX className="h-4.5 w-4.5 text-slate-400 shrink-0" />
                   <span className="text-xs font-semibold text-slate-500">
-                    Chỉ Trưởng phòng hoặc Phó phòng mới được phép gửi tin nhắn trong nhóm này.
+                    {blockState.isBlocked ? (blockState.blockedByMe ? "Bạn đã chặn cuộc trò chuyện. Bấm Bỏ chặn ở thanh công cụ để tiếp tục." : "Cuộc trò chuyện đang bị chặn. Bạn không thể gửi tin nhắn.") : "Chỉ Trưởng phòng hoặc Phó phòng mới được phép gửi tin nhắn trong nhóm này."}
                   </span>
                 </div>
               )}
