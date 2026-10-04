@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Crown, Trophy, Users } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
 import { authService } from "../../services/authService";
 import { UserProfile } from "../../types/common";
 
@@ -40,20 +41,40 @@ export interface MemberRankingEntry {
 }
 
 export function ActiveMembersPanel({ meeting, meetings }: Props) {
+  const { userProfile } = useAuth();
   const [chapterMembers, setChapterMembers] = useState<UserProfile[]>([]);
 
   useEffect(() => {
     let isMounted = true;
-    authService
-      .getColleagues()
-      .then((members) => {
-        if (isMounted && members) setChapterMembers(members);
-      })
-      .catch(() => {});
+    const fetchMembers = async () => {
+      let members: UserProfile[] = [];
+      if (userProfile?.companyCode) {
+        try {
+          members = await authService.getUsersByCompany(userProfile.companyCode);
+        } catch {
+          try {
+            members = await authService.getColleagues();
+          } catch {
+            members = [];
+          }
+        }
+      } else {
+        try {
+          members = await authService.getColleagues();
+        } catch {
+          members = [];
+        }
+      }
+      if (isMounted && members && members.length > 0) {
+        setChapterMembers(members);
+      }
+    };
+
+    void fetchMembers();
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [userProfile?.companyCode]);
 
   const { memberRankings, totalEligibleMeetings } = useMemo(() => {
     const memberMap = new Map<string, {
@@ -68,7 +89,7 @@ export function ActiveMembersPanel({ meeting, meetings }: Props) {
       totalEarlyMinutes: number;
     }>();
 
-    // 1. Seed members from chapter directory
+    // 1. Khởi tạo danh sách thành viên trong Chapter
     chapterMembers.forEach((u) => {
       const uid = String(u.uid || (u as any)._id || (u as any).id);
       memberMap.set(uid, {
@@ -84,7 +105,7 @@ export function ActiveMembersPanel({ meeting, meetings }: Props) {
       });
     });
 
-    // 2. Filter meetings that have occurred up to this meeting
+    // 2. Lấy các buổi họp đã/đang diễn ra tính tới buổi họp này
     const until = new Date(meeting.startsAt).getTime();
     const eligibleMeetings = meetings.filter(
       (m) =>
@@ -93,12 +114,12 @@ export function ActiveMembersPanel({ meeting, meetings }: Props) {
           new Date(m.startsAt).getTime() <= until)
     );
 
-    // 3. Aggregate check-ins and punctuality
+    // 3. Tổng hợp lượt check-in và đi sớm
     eligibleMeetings.forEach((m) => {
       const startsAtTime = new Date(m.startsAt).getTime();
       const speakers = m.speakers || [];
       speakers.forEach((s) => {
-        if (!s.userId) return; // Skip guests
+        if (!s.userId) return; // Bỏ qua khách mời
         const uid = String(s.userId);
         let entry = memberMap.get(uid);
         if (!entry) {
@@ -152,7 +173,7 @@ export function ActiveMembersPanel({ meeting, meetings }: Props) {
       };
     });
 
-    // Sort descending: attendedCount -> avgEarlyMinutes -> score
+    // Sắp xếp: Số buổi tham gia -> Đi sớm trung bình -> Điểm số tổng
     list.sort((a, b) => {
       if (b.attendedCount !== a.attendedCount) return b.attendedCount - a.attendedCount;
       if (b.avgEarlyMinutes !== a.avgEarlyMinutes) return b.avgEarlyMinutes - a.avgEarlyMinutes;
@@ -227,7 +248,7 @@ export function ActiveMembersPanel({ meeting, meetings }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* 1. Header Card giống Dashboard */}
+      {/* 1. Header Card chuẩn Dashboard */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
           <div>
@@ -236,8 +257,8 @@ export function ActiveMembersPanel({ meeting, meetings }: Props) {
               <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">
                 Bảng xếp hạng thành viên tích cực
               </h3>
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                Top {Math.min(10, memberRankings.filter(m => m.attendedCount > 0).length || 5)} người chăm nhất
+              <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                Top 10 người chăm nhất
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -358,78 +379,112 @@ export function ActiveMembersPanel({ meeting, meetings }: Props) {
               })}
             </div>
 
-            {/* Top 6 to 10 - Danh sách 5-10 người chăm nhất */}
-            {nextFiveMembers.filter((m) => m.attendedCount > 0).length > 0 && (
-              <div className="mt-5 pt-3">
-                <div className="flex items-center justify-between mb-2.5">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 text-slate-400" />
-                    Thành viên tiếp theo (Hạng 6 - 10)
-                  </p>
-                  <span className="text-[11px] text-slate-400">
-                    Hiển thị {nextFiveMembers.filter((m) => m.attendedCount > 0).length} thành viên
-                  </span>
-                </div>
-                <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xs">
-                  {nextFiveMembers
-                    .filter((m) => m.attendedCount > 0)
-                    .map((m, idx) => (
+            {/* Top 6 to 10 - Danh sách 5-10 người chăm nhất (Luôn hiển thị) */}
+            <div className="mt-6 pt-3">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-cyan-600" />
+                  Thành viên tiếp theo (Hạng 6 - 10)
+                </p>
+                <span className="text-[11px] text-slate-400">
+                  {nextFiveMembers.filter((m) => m.attendedCount > 0).length > 0
+                    ? `Hiển thị ${nextFiveMembers.filter((m) => m.attendedCount > 0).length} thành viên`
+                    : "Chờ thêm thành viên tham gia"}
+                </span>
+              </div>
+              <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xs">
+                {[0, 1, 2, 3, 4].map((offset) => {
+                  const rankNum = offset + 6;
+                  const m = nextFiveMembers[offset];
+
+                  // Nếu chưa có thành viên hoặc chưa có buổi họp nào: Hiển thị dòng chờ giống bục podium
+                  if (!m || m.attendedCount === 0) {
+                    return (
                       <div
-                        key={m.id}
-                        className="flex items-center justify-between p-2.5 sm:px-4 hover:bg-slate-50/80 transition-colors text-xs"
+                        key={`empty-rank-${rankNum}`}
+                        className="flex items-center justify-between p-2.5 sm:px-4 text-xs opacity-50 bg-slate-50/40"
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 font-mono font-medium text-slate-500 text-xs">
-                            #{idx + 6}
+                          <span className="flex h-6 w-6 items-center justify-center rounded-lg border border-dashed border-slate-300 font-mono font-medium text-slate-400 text-xs">
+                            #{rankNum}
                           </span>
-                          {m.photoURL ? (
-                            <img
-                              src={m.photoURL}
-                              alt={m.name}
-                              className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
-                              onError={(e) => {
-                                (e.target as HTMLElement).style.display = "none";
-                              }}
-                            />
-                          ) : (
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 font-medium text-slate-600 text-xs shrink-0">
-                              {(m.name || "?").trim().charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-300 text-xs shrink-0">
+                            ?
+                          </div>
                           <div className="min-w-0">
-                            <p className="font-medium text-slate-800 truncate">{m.name}</p>
-                            {m.companyName && (
-                              <p className="text-[10px] text-slate-400 truncate">{m.companyName}</p>
-                            )}
+                            <p className="font-normal text-slate-400">Chờ thành viên</p>
+                            <p className="text-[10px] text-slate-300">-</p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-3 sm:gap-6 text-right shrink-0">
-                          <div>
-                            <span className="font-semibold text-slate-700">{m.attendedCount}</span>
-                            <span className="text-slate-400 ml-1">buổi ({m.attendanceRate}%)</span>
-                          </div>
-                          <span
-                            className={`text-[11px] font-normal px-2 py-0.5 rounded-full ${
-                              m.avgEarlyMinutes > 0
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : m.attendedCount > 0
-                                ? "bg-sky-50 text-sky-700 border border-sky-200"
-                                : "bg-slate-100 text-slate-500"
-                            }`}
-                          >
-                            {m.avgEarlyMinutes > 0
-                              ? `Sớm +${m.avgEarlyMinutes}p`
-                              : m.attendedCount > 0
-                              ? "Đúng giờ"
-                              : "Chưa họp"}
+                          <span className="text-slate-300 font-mono text-[11px]">-</span>
+                          <span className="text-[11px] font-normal px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200/80">
+                            Chờ điểm danh
                           </span>
                         </div>
                       </div>
-                    ))}
-                </div>
+                    );
+                  }
+
+                  // Thành viên có lượt tham gia
+                  return (
+                    <div
+                      key={m.id || `rank-${rankNum}`}
+                      className="flex items-center justify-between p-2.5 sm:px-4 hover:bg-slate-50/80 transition-colors text-xs"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 font-mono font-medium text-slate-600 text-xs">
+                          #{rankNum}
+                        </span>
+                        {m.photoURL ? (
+                          <img
+                            src={m.photoURL}
+                            alt={m.name}
+                            className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 font-medium text-slate-600 text-xs shrink-0">
+                            {(m.name || "?").trim().charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-800 truncate">{m.name}</p>
+                          {m.companyName && (
+                            <p className="text-[10px] text-slate-400 truncate">{m.companyName}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 sm:gap-6 text-right shrink-0">
+                        <div>
+                          <span className="font-semibold text-slate-700">{m.attendedCount}</span>
+                          <span className="text-slate-400 ml-1">buổi ({m.attendanceRate}%)</span>
+                        </div>
+                        <span
+                          className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                            m.avgEarlyMinutes > 0
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : m.attendedCount > 0
+                              ? "bg-sky-50 text-sky-700 border border-sky-200"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {m.avgEarlyMinutes > 0
+                            ? `Sớm +${m.avgEarlyMinutes}p`
+                            : m.attendedCount > 0
+                            ? "Đúng giờ"
+                            : "Chưa họp"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>
