@@ -201,7 +201,7 @@ it("opens check-in for a scheduled meeting and keeps QR separate from MC control
   expect(screen.getByText("Đón tiếp & check-in")).toBeTruthy();
   expect(screen.queryByText("Diễn giả hiện tại")).toBeNull();
   expect(screen.queryByText("Quay thưởng đang mở")).toBeNull();
-  fireEvent.click(screen.getByRole("button", {name:"Sang điều hành →"}));
+  fireEvent.click(screen.getByRole("button", {name:/^Tiếp tục: Thuyết trình/}));
   expect(screen.getByText("Diễn giả hiện tại")).toBeTruthy();
   expect(screen.queryByText("Mở QR khi bắt đầu đón khách")).toBeNull();
   fireEvent.click(screen.getByRole("button", {name:/^Bước \d+: Quay số may mắn$/}));
