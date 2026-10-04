@@ -66,7 +66,6 @@ export function LuckyDrawTab({
 
   const [selectedPrizeId, setSelectedPrizeId] = useState<string>("");
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinningDisplay, setSpinningDisplay] = useState<string>("READY");
   const [activeWinnerModal, setActiveWinnerModal] = useState<{
@@ -117,23 +116,7 @@ export function LuckyDrawTab({
 
   const selectedPrize = luckyConfig.prizes?.find((p) => p.id === selectedPrizeId);
 
-  // Toggle Fullscreen
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
-    } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
-    }
-  };
 
-  useEffect(() => {
-    const handleFsChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener("fullscreenchange", handleFsChange);
-    return () => document.removeEventListener("fullscreenchange", handleFsChange);
-  }, []);
 
   // Quick Preset Prizes
   const handleApplyPresets = async () => {
@@ -433,7 +416,7 @@ export function LuckyDrawTab({
   return (
     <div
       ref={containerRef}
-      className={`space-y-6 ${isFullscreen ? "fixed inset-0 z-50 bg-slate-950 p-6 overflow-y-auto text-white" : ""}`}
+      className="space-y-6"
     >
       {/* Top Banner Alert: CHỈ QUAY KHI CUỘC HỌP ĐÃ BẮT ĐẦU */}
       {!isMeetingStarted && (
