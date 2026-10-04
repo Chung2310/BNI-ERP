@@ -103,8 +103,6 @@ export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas:
     const logoWidth = 200;
     ctx.drawImage(template, 70, 45, logoWidth, logoWidth * template.naturalHeight / template.naturalWidth);
   } else textBox(ctx, "BNI", 70, 40, 240, 1, 95, 95, RED, 800);
-  ctx.textAlign = "right"; font(ctx, 30, 800); ctx.fillStyle = "#555";
-  ctx.fillText(member ? "BNI MEMBER PROFILE" : "BNI GUEST PROFILE", 1850, 65);
   ctx.textAlign = "left"; ctx.fillStyle = "#e2e2e2"; ctx.fillRect(60, 150, 1800, 7);
 
   const bannerY = 180, bannerH = member ? 310 : 185;
