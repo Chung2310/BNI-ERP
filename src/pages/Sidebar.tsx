@@ -13,9 +13,7 @@ import {
   User,
 } from "lucide-react";
 import {
-  BRAND_LOGO_PATH,
   BRAND_NAME,
-  BRAND_TAGLINE,
   PRIVACY_POLICY_URL,
   TERMS_OF_SERVICE_URL,
   USER_DATA_DELETION_URL,
@@ -144,22 +142,18 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, onMobileC
         id="sidebar_container"
       >
         {/* Brand Header */}
-        <div className={`flex items-center border-b border-slate-100 ${isCollapsed ? "justify-center px-3 py-4" : "px-5 py-4.5"}`} id="sidebar_brand_header">
-          <div className={`flex min-w-0 items-center ${isCollapsed ? "justify-center" : "gap-3"}`}>
-            <img
-              src={BRAND_LOGO_PATH}
-              alt={BRAND_NAME}
-              onClick={() => setActiveTab("TỔNG QUAN")}
-              title="Về trang Tổng quan"
-              className="h-10 w-10 shrink-0 rounded-xl border border-sky-100 object-cover shadow-sm cursor-pointer transition-transform hover:scale-105 active:scale-95"
-            />
-            {!isCollapsed ? (
-              <div className="min-w-0">
-                <h2 className="truncate font-sans text-base font-bold tracking-tight text-sky-700">{BRAND_NAME}</h2>
-                <p className="truncate font-mono text-[10px] uppercase tracking-widest text-slate-400">{BRAND_TAGLINE}</p>
-              </div>
-            ) : null}
-          </div>
+        <div className={`flex items-center border-b border-slate-100 ${isCollapsed ? "justify-center px-2 py-3" : "px-4 py-3"}`} id="sidebar_brand_header">
+          <img
+            src="/igen-connect-transparent.png"
+            alt={BRAND_NAME}
+            onClick={() => setActiveTab("TỔNG QUAN")}
+            title="Về trang Tổng quan"
+            className={`cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98] ${
+              isCollapsed
+                ? "h-9 w-auto max-w-full object-contain"
+                : "h-12 w-full object-contain object-left"
+            }`}
+          />
         </div>
 
         {/* Navigation Menu */}
