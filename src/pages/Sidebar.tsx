@@ -15,7 +15,6 @@ import {
 import {
   BRAND_LOGO_PATH,
   BRAND_NAME,
-  BRAND_TAGLINE,
   PRIVACY_POLICY_URL,
   TERMS_OF_SERVICE_URL,
   USER_DATA_DELETION_URL,
@@ -156,7 +155,6 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, onMobileC
             {!isCollapsed ? (
               <div className="min-w-0">
                 <h2 className="truncate font-sans text-base font-bold tracking-tight text-sky-700">{BRAND_NAME}</h2>
-                <p className="truncate font-mono text-[10px] uppercase tracking-widest text-slate-400">{BRAND_TAGLINE}</p>
               </div>
             ) : null}
           </div>
