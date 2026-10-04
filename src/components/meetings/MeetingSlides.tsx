@@ -75,17 +75,7 @@ function NextSpeakersOverlay({ speakers, large = false }: { speakers: ProfileSli
                     : "h-5 w-5 sm:h-6 sm:w-6"
                 }`}
               />
-            ) : (
-              <span
-                className={`grid shrink-0 place-items-center rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200 ${
-                  large
-                    ? "h-[clamp(24px,2.2vw,38px)] w-[clamp(24px,2.2vw,38px)] text-[clamp(10px,0.9vw,15px)]"
-                    : "h-5 w-5 sm:h-6 sm:w-6 text-[9px] sm:text-[10px]"
-                }`}
-              >
-                {s.name.slice(0, 1).toUpperCase()}
-              </span>
-            )}
+            ) : null}
             <span
               className={`truncate font-bold text-slate-800 tracking-tight ${
                 large
@@ -179,15 +169,11 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   const timer = useMemo(() => getSlideTimer(meeting, active?.id, now), [meeting, active?.id, now]);
   const index = queue.findIndex(s => s.id === selected?.id);
   const nextSpeakers = useMemo(() => {
-    if (speechesComplete) return [];
-    const ids = followsSpeaker
-      ? meeting.speakers.slice(meeting.currentIndex + 1).map(s => s.id)
-      : queue.slice(Math.max(0, index) + 1).map(s => s.id);
-    return ids
-      .map(id => deck.slides.find(s => s.id === id))
-      .filter((s): s is ProfileSlide => !!s && !excluded.has(s.id))
-      .slice(0, 3);
-  }, [speechesComplete, followsSpeaker, meeting.speakers, meeting.currentIndex, queue, index, deck.slides, excluded]);
+    if (speechesComplete || !active) return [];
+    const currentIdx = queue.findIndex(s => s.id === active.id);
+    if (currentIdx < 0) return [];
+    return queue.slice(currentIdx + 1, currentIdx + 4);
+  }, [speechesComplete, active, queue]);
   const isSpeakingLive = (meeting.status === "live" && Boolean(meeting.speakerStartedAt)) || (presenting && meeting.status !== "paused");
 
   const navigationBusy = startingSpeech || controlBusy || !!draft || loading;
