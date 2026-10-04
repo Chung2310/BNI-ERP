@@ -1000,7 +1000,7 @@ export default function MeetingTab() {
       {!canManage && activeMeeting && <MemberMeetingDetail key={activeMeeting._id} onCheckIn={async (location) => { const updated = await api("/" + activeMeeting._id + "/checkin", "POST", location); setItems(previous => previous.map(item => item._id === updated._id ? updated : item)); }} meeting={activeMeeting} userId={userProfile?.uid} onClose={() => setDetailMeetingId(null)} />}
       {canManage && activeMeeting && (
         <div className={`fixed inset-0 z-50 ${isModalFullscreen ? "bg-slate-900 overflow-hidden" : "flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto"}`}>
-          <div className={`${isModalFullscreen ? "w-full h-full max-w-none max-h-none rounded-none border-0" : "w-full max-w-6xl max-h-[94vh] rounded-3xl border border-slate-200 shadow-2xl"} flex flex-col bg-slate-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150`}>
+          <div className={`${isModalFullscreen ? "w-full h-full max-w-none max-h-none rounded-none border-0" : "w-full max-w-6xl h-[92vh] min-h-[620px] rounded-3xl border border-slate-200 shadow-2xl"} flex flex-col bg-slate-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150`}>
             {/* Modal Top Header Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 bg-white px-5 py-3.5 shrink-0">
               <div className="flex items-center gap-3 min-w-0">
