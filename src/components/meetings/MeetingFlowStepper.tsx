@@ -10,7 +10,7 @@ const FLOW_STORAGE_KEY = "bni_meeting_flow_order";
 export const MEETING_FLOW_META: Record<MeetingFlowStep, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
   checkin: { label: "Check-in", icon: Users },
   presentation: { label: "Thuyết trình", icon: Megaphone },
-  luckyDraw: { label: "Quay số may mắn", icon: Gift },
+  luckyDraw: { label: "Quay thưởng", icon: Gift },
   activeMembers: { label: "Thành viên tích cực", icon: Star },
 };
 

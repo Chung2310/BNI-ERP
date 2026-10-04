@@ -204,7 +204,7 @@ it("opens check-in for a scheduled meeting and keeps QR separate from MC control
   fireEvent.click(screen.getByRole("button", {name:/^Tiếp tục: Thuyết trình/}));
   expect(screen.getByText("Diễn giả hiện tại")).toBeTruthy();
   expect(screen.queryByText("Mở QR khi bắt đầu đón khách")).toBeNull();
-  fireEvent.click(screen.getByRole("button", {name:/^Bước \d+: Quay số may mắn$/}));
+  fireEvent.click(screen.getByRole("button", {name:/^Bước \d+: Quay thưởng$/}));
   expect(screen.getByText("Quay thưởng đang mở")).toBeTruthy();
 });
 it("preserves zero-day reminders when editing a meeting", async () => {
