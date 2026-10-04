@@ -24,10 +24,7 @@ import { authService } from "../../services/authService";
 import { meetingService, Meeting, Speaker } from "../../services/meetingService";
 import { socketService } from "../../services/socketService";
 import { UserProfile } from "../../types/common";
-import { VietnameseDatePicker } from "../common/VietnameseDatePicker";
-
 type QuickTimeFilter = "all" | "month" | "quarter" | "year";
-type StatusFilter = "all" | "ended" | "live" | "scheduled";
 
 export const drawSourceLabels = { wheel: "Vòng quay may mắn", bingo: "Lồng cầu bingo", draw: "Bốc thăm" };
 
@@ -262,9 +259,7 @@ export function MeetingStatisticsPanel() {
   // Filters
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickTimeFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   // Tab switch in "all meetings" mode: "meetings" list or "winners" list
   const [allMeetingsTab, setAllMeetingsTab] = useState<"meetings" | "winners">("meetings");
@@ -348,10 +343,6 @@ export function MeetingStatisticsPanel() {
         const matchLocation = m.location?.toLowerCase().includes(q);
         if (!matchTitle && !matchLocation) return false;
       }
-      if (selectedDate) {
-        const mDate = new Date(m.startsAt).toISOString().slice(0, 10);
-        if (mDate !== selectedDate) return false;
-      }
       if (quickFilter !== "all") {
         const now = new Date();
         const mDate = new Date(m.startsAt);
@@ -365,14 +356,9 @@ export function MeetingStatisticsPanel() {
           if (mDate.getFullYear() !== now.getFullYear()) return false;
         }
       }
-      if (statusFilter !== "all") {
-        if (statusFilter === "ended" && m.status !== "ended") return false;
-        if (statusFilter === "live" && !["live", "paused"].includes(m.status)) return false;
-        if (statusFilter === "scheduled" && m.status !== "scheduled") return false;
-      }
       return true;
     });
-  }, [meetings, selectedMeetingId, searchQuery, selectedDate, quickFilter, statusFilter]);
+  }, [meetings, selectedMeetingId, searchQuery, quickFilter]);
 
   useEffect(() => {
     setIsAnimated(false);
@@ -468,9 +454,7 @@ export function MeetingStatisticsPanel() {
   const resetFilters = () => {
     setSelectedMeetingId("all");
     setSearchQuery("");
-    setSelectedDate("");
     setQuickFilter("all");
-    setStatusFilter("all");
     setAllMeetingsTab("meetings");
     setWinnerSearch("");
     setAttendeeRoleFilter("all");
@@ -480,9 +464,7 @@ export function MeetingStatisticsPanel() {
   const hasActiveFilters =
     selectedMeetingId !== "all" ||
     searchQuery.trim() !== "" ||
-    selectedDate !== "" ||
-    quickFilter !== "all" ||
-    statusFilter !== "all";
+    quickFilter !== "all";
 
   // Selected single meeting object
   const activeSingleMeeting = useMemo(() => {
@@ -772,18 +754,6 @@ export function MeetingStatisticsPanel() {
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           </div>
 
-          {/* Lọc ngày (Việt hóa) */}
-          <VietnameseDatePicker
-            ariaLabel="Lọc theo ngày"
-            value={selectedDate}
-            onChange={(val) => {
-              setSelectedDate(val);
-              if (val) setQuickFilter("all");
-            }}
-            placeholder="Lọc theo ngày..."
-            className="w-36 sm:w-40"
-          />
-
           {/* Nhóm nút thời gian */}
           <div className="flex rounded-xl bg-slate-100 p-0.5 text-xs">
             {(
@@ -798,10 +768,9 @@ export function MeetingStatisticsPanel() {
                 key={item.key}
                 onClick={() => {
                   setQuickFilter(item.key);
-                  setSelectedDate("");
                 }}
                 className={`rounded-lg px-2.5 py-1 text-xs transition-colors cursor-pointer ${
-                  quickFilter === item.key && !selectedDate
+                  quickFilter === item.key
                     ? "bg-white font-medium text-slate-800 shadow-2xs"
                     : "font-normal text-slate-500 hover:text-slate-800"
                 }`}
@@ -809,22 +778,6 @@ export function MeetingStatisticsPanel() {
                 {item.label}
               </button>
             ))}
-          </div>
-
-          {/* Trạng thái */}
-          <div className="relative">
-            <select
-              aria-label="Trạng thái"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="appearance-none rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 pl-3 pr-7 text-xs font-normal text-slate-700 focus:border-red-500 focus:bg-white focus:outline-hidden"
-            >
-              <option value="all">Mọi trạng thái</option>
-              <option value="ended">Đã kết thúc</option>
-              <option value="live">Đang diễn ra</option>
-              <option value="scheduled">Sắp tới</option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           </div>
 
           {/* Reset & Refresh */}

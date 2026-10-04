@@ -10,16 +10,8 @@ export default function MeetingCheckInPage() {
   const [meeting, setMeeting] = useState<MeetingInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<Mode>("member");
-  const [form, setForm] = useState({ email: "", password: "", name: "", phone: "", company: "", industry: "", bio: "" });
+  const [form, setForm] = useState({ email: "", password: "", name: "", phone: "", company: "", industry: "" });
   const [avatar, setAvatar] = useState<File | null>(null);
-  const [coverImage, setCoverImage] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState("");
-  useEffect(() => {
-    if (!coverImage) { setCoverPreview(""); return; }
-    const url = URL.createObjectURL(coverImage);
-    setCoverPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [coverImage]);
   const [avatarPreview, setAvatarPreview] = useState("");
   useEffect(() => {
     if (!avatar) { setAvatarPreview(""); return; }
@@ -53,14 +45,13 @@ export default function MeetingCheckInPage() {
       setPhase("submitting");
       const identity = mode === "member"
         ? { email: form.email.trim(), password: form.password }
-        : { name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim(), company: form.company.trim(), industry: form.industry.trim(), bio: form.bio.trim() };
+        : { name: form.name.trim(), phone: form.phone.trim(), company: form.company.trim(), industry: form.industry.trim() };
       let body: string | FormData = JSON.stringify({ ...identity, ...position });
       const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (mode === "guest" && (avatar || coverImage)) {
+      if (mode === "guest" && avatar) {
         const multipart = new FormData();
         for (const [key, value] of Object.entries({ ...identity, ...position })) multipart.append(key, String(value));
-        if (avatar) multipart.append("avatar", avatar);
-        if (coverImage) multipart.append("coverImage", coverImage);
+        multipart.append("avatar", avatar);
         body = multipart;
         delete headers["Content-Type"];
       }
@@ -70,7 +61,6 @@ export default function MeetingCheckInPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Không thể check-in. Vui lòng thử lại.");
       setAvatar(null);
-      setCoverImage(null);
       setSuccess(data.data?.name || (mode === "guest" ? form.name : "Bạn"));
       setForm(old => ({ ...old, password: "" }));
     } catch (e: any) { setError(e.message); } finally { setPhase("idle"); }
@@ -113,13 +103,11 @@ export default function MeetingCheckInPage() {
                 <label className="block text-sm font-medium text-slate-700">Mật khẩu<input required type="password" autoComplete="current-password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className={fieldClass} /></label>
               </> : <>
                 <label className="block text-sm font-medium text-slate-700">Họ và tên *<input required minLength={2} maxLength={150} autoComplete="name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={fieldClass} /></label>
-                <label className="block text-sm font-medium text-slate-700">Email<input type="email" autoComplete="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={fieldClass} /></label>
                 <label className="block text-sm font-medium text-slate-700">Số điện thoại<input type="tel" maxLength={40} autoComplete="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className={fieldClass} /></label>
                 <label className="block text-sm font-medium text-slate-700">Công ty<input maxLength={150} autoComplete="organization" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} className={fieldClass} /></label>
-                <label className="block text-sm font-medium text-slate-700">Lĩnh vực (không bắt buộc)<input maxLength={150} value={form.industry} onChange={e => setForm({ ...form, industry: e.target.value })} className={fieldClass} /></label>
-                <label className="block text-sm font-medium text-slate-700">Bio ngắn (không bắt buộc)<textarea rows={3} maxLength={1000} value={form.bio} onChange={e => setForm({ ...form, bio: e.target.value })} className={fieldClass} /></label>
+                <label className="block text-sm font-medium text-slate-700">Lĩnh vực<input maxLength={150} value={form.industry} onChange={e => setForm({ ...form, industry: e.target.value })} className={fieldClass} /></label>
                 <div className="space-y-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4">
-                  <label className="block text-sm font-medium text-slate-700">Ảnh đại diện (không bắt buộc)
+                  <label className="block text-sm font-medium text-slate-700">Ảnh đại diện
                     <input type="file" accept="image/jpeg,image/png,image/webp" className={fieldClass}
                       onChange={event => {
                         const file = event.target.files?.[0];
@@ -139,29 +127,6 @@ export default function MeetingCheckInPage() {
                     <img src={avatarPreview} alt="Xem trước ảnh đại diện" className="h-20 w-20 rounded-full border object-cover" />
                     <span className="min-w-0 flex-1 truncate text-sm">{avatar?.name}</span>
                     <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => setAvatar(null)}>Bỏ ảnh</button>
-                  </div>}
-                </div>
-                <div className="space-y-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4">
-                  <label className="block text-sm font-medium text-slate-700">Ảnh bìa (không bắt buộc)
-                    <input type="file" accept="image/jpeg,image/png,image/webp" className={fieldClass}
-                      onChange={event => {
-                        const file = event.target.files?.[0];
-                        event.target.value = "";
-                        if (!file) return;
-                        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-                          setError("Vui lòng chọn ảnh JPG, PNG hoặc WebP."); return;
-                        }
-                        if (!file.size || file.size > 5 * 1024 * 1024) {
-                          setError("Ảnh bìa phải có dung lượng từ 1 byte đến 5 MB."); return;
-                        }
-                        setCoverImage(file); setError("");
-                      }} />
-                  </label>
-                  <p className="text-xs text-slate-500">JPG, PNG hoặc WebP, tối đa 5 MB. Ảnh sẽ hiển thị trên slide giới thiệu của bạn.</p>
-                  {coverPreview && <div className="flex items-center gap-3">
-                    <img src={coverPreview} alt="Xem trước ảnh bìa" className="h-20 w-36 rounded-lg border object-cover" />
-                    <span className="min-w-0 flex-1 truncate text-sm">{coverImage?.name}</span>
-                    <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => setCoverImage(null)}>Bỏ ảnh bìa</button>
                   </div>}
                 </div>
               </>}
