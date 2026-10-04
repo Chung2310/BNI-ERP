@@ -176,17 +176,17 @@ it("shares manual navigation and operating mode between slides and MC controls",
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
-  fireEvent.click(screen.getByRole("button", { name: "Thuyết trình" }));
+  fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
   await screen.findByText("Người đầu");
   await waitFor(() => expect((screen.getByRole("button", { name: "Slide tiếp" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Slide tiếp" }));
   await waitFor(() => expect(screen.getByRole("img").getAttribute("aria-label")).toContain("Người tiếp"));
   expect(item.currentIndex).toBe(1);
   fireEvent.change(screen.getByLabelText("Chế độ trình chiếu"), { target: { value: "auto" } });
-  fireEvent.click(screen.getByRole("button", { name: "Điều hành" }));
+  fireEvent.click(screen.getByRole("button", { name: "Bảng điều hành" }));
   expect((screen.getByLabelText("Chế độ điều hành") as HTMLSelectElement).value).toBe("auto");
   fireEvent.change(screen.getByLabelText("Chế độ điều hành"), { target: { value: "manual" } });
-  fireEvent.click(screen.getByRole("button", { name: "Thuyết trình" }));
+  fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
   await waitFor(() => expect((screen.getByRole("button", { name: "Slide trước" }) as HTMLButtonElement).disabled).toBe(false));
   expect((screen.getByLabelText("Chế độ trình chiếu") as HTMLSelectElement).value).toBe("manual");
   fireEvent.click(screen.getByRole("button", { name: "Slide trước" }));
@@ -204,7 +204,7 @@ it("opens check-in for a scheduled meeting and keeps QR separate from MC control
   fireEvent.click(screen.getByRole("button", {name:"Sang điều hành →"}));
   expect(screen.getByText("Diễn giả hiện tại")).toBeTruthy();
   expect(screen.queryByText("Mở QR khi bắt đầu đón khách")).toBeNull();
-  fireEvent.click(screen.getByRole("button", {name:"Quay thưởng"}));
+  fireEvent.click(screen.getByRole("button", {name:/^Bước \d+: Quay số may mắn$/}));
   expect(screen.getByText("Quay thưởng đang mở")).toBeTruthy();
 });
 it("preserves zero-day reminders when editing a meeting", async () => {
@@ -403,7 +403,7 @@ it.each([0, 3, 150])("slide delay %s waits until speaking time ends before chang
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
   render(<MeetingTab />);
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
-  fireEvent.click(screen.getByRole("button", { name: "Thuyết trình" }));
+  fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
   await screen.findByText("Đầu tiên");
 
   try {
@@ -443,7 +443,7 @@ it("opening a paused presentation resumes the countdown from its remaining time"
   try {
     render(<MeetingTab />);
     fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
-    fireEvent.click(screen.getByRole("button", { name: "Thuyết trình" }));
+    fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
     await screen.findByText("Khách đang nói");
     fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
     await waitFor(() => expect(item.status).toBe("live"));
