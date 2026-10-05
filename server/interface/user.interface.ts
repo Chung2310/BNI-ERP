@@ -27,6 +27,9 @@ export interface IUser extends Document {
   createdAt: Date;
   updatedAt?: Date;
   birthDate?: Date;
+  gender?: "male" | "female" | "other";
+  address?: string;
+  targetMarket?: string;
   jobDescriptionLink?: string;
   phone?: string;
   parentId?: string;

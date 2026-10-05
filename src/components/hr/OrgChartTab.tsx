@@ -25,7 +25,9 @@ import {
   LayoutGrid,
   Network,
   Camera,
-  Image as ImageIcon
+  Image as ImageIcon,
+  UserRound,
+  Target
 } from "lucide-react";
 import { EmployeeNode, UserProfile, TrainingCourse } from "../../types";
 import { authService, getAccessToken } from "../../services/authService";
@@ -163,6 +165,9 @@ export default function OrgChartTab({
   const [addCompanyName, setAddCompanyName] = useState("");
   const [addIndustry, setAddIndustry] = useState("");
   const [addBirthDate, setAddBirthDate] = useState("");
+  const [addGender, setAddGender] = useState<"" | "male" | "female" | "other">("");
+  const [addAddress, setAddAddress] = useState("");
+  const [addTargetMarket, setAddTargetMarket] = useState("");
   const [addParentId, setAddParentId] = useState("");
   const [addRole, setAddRole] = useState<"user" | "manager" | "branch_owner" | "admin">("user");
   const [addPhotoURL, setAddPhotoURL] = useState("");
@@ -180,6 +185,9 @@ export default function OrgChartTab({
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editBirthDate, setEditBirthDate] = useState("");
+  const [editGender, setEditGender] = useState<"" | "male" | "female" | "other">("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editTargetMarket, setEditTargetMarket] = useState("");
   const [editPhotoURL, setEditPhotoURL] = useState("");
   const [editCoverImage, setEditCoverImage] = useState("");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -199,6 +207,9 @@ export default function OrgChartTab({
     setEditName(raw?.displayName || selectedEmp.name || "");
     setEditCompanyName(raw?.companyName || selectedEmp.companyName || "");
     setEditIndustry(raw?.industry || selectedEmp.industry || "");
+    setEditGender(raw?.gender || selectedEmp.gender || "");
+    setEditAddress(raw?.address || selectedEmp.address || "");
+    setEditTargetMarket(raw?.targetMarket || selectedEmp.targetMarket || "");
     setEditEmail(raw?.email || selectedEmp.email || "");
     setEditPhone(raw?.phone && raw.phone !== "Chưa cập nhật" ? raw.phone : (selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : ""));
     setEditPhotoURL(raw?.photoURL || selectedEmp.avatar || "");
@@ -326,6 +337,9 @@ export default function OrgChartTab({
         photoURL: editPhotoURL.trim() || "",
         coverImage: editCoverImage.trim() || "",
         birthDate: editBirthDate || undefined,
+        gender: editGender || undefined,
+        address: editAddress.trim(),
+        targetMarket: editTargetMarket.trim(),
       };
 
       await authService.updateUser(selectedEmp.id, updateData);
@@ -344,6 +358,9 @@ export default function OrgChartTab({
         avatar: updateData.photoURL || prev.avatar,
         coverImage: updateData.coverImage ?? prev.coverImage,
         birthDate: updateData.birthDate,
+        gender: updateData.gender,
+        address: updateData.address,
+        targetMarket: updateData.targetMarket,
       } : null);
     } catch (err) {
       console.error(err);
@@ -583,6 +600,9 @@ export default function OrgChartTab({
           phone: addPhone.trim(),
           branchId: activeBranchId || undefined,
           birthDate: addBirthDate ? addBirthDate : undefined,
+          gender: addGender || undefined,
+          address: addAddress.trim(),
+          targetMarket: addTargetMarket.trim(),
           ...{
           industry: addIndustry.trim() || undefined,
           photoURL: addPhotoURL.trim() || undefined,
@@ -605,6 +625,9 @@ export default function OrgChartTab({
       setAddCompanyName("");
       setAddIndustry("");
       setAddBirthDate("");
+      setAddGender("");
+      setAddAddress("");
+      setAddTargetMarket("");
       setAddPhotoURL("");
       setAddCoverImage("");
       setAddParentId("");
@@ -847,6 +870,9 @@ export default function OrgChartTab({
         const memberRole = selectedEmp.role || "Thành viên";
         const memberCompany = rawUser?.companyName || selectedEmp.companyName || "Chưa cập nhật";
         const memberIndustry = rawUser?.industry || selectedEmp.industry || "Chưa cập nhật";
+        const memberGender = rawUser?.gender || selectedEmp.gender;
+        const memberAddress = rawUser?.address || selectedEmp.address || "Chưa cập nhật";
+        const memberTargetMarket = rawUser?.targetMarket || selectedEmp.targetMarket || "Chưa cập nhật";
         const memberPhone = (rawUser?.phone && rawUser.phone !== "Chưa cập nhật") ? rawUser.phone : (selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : "Chưa cập nhật");
         const memberEmail = rawUser?.email || selectedEmp.email || "Chưa cập nhật";
         const memberBirthDate = rawUser?.birthDate || selectedEmp.birthDate;
@@ -956,7 +982,7 @@ export default function OrgChartTab({
                           className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 font-bold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50 text-[11px]"
                         >
                           {uploadingAvatar ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                          <span>{uploadingAvatar ? "Đang tải..." : (editPhotoURL ? "Đổi avatar" : "Tải avatar")}</span>
+                          <span>{uploadingAvatar ? "Đang tải..." : (editPhotoURL ? "Đổi ảnh đại diện" : "Tải ảnh đại diện")}</span>
                         </button>
                         {editPhotoURL && (
                           <button
@@ -1006,6 +1032,46 @@ export default function OrgChartTab({
                         className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
                       />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-gray-500 mb-1">Giới tính</label>
+                      <select
+                        aria-label="Giới tính"
+                        value={editGender}
+                        onChange={(e) => setEditGender(e.target.value as typeof editGender)}
+                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                      >
+                        <option value="">Chưa cập nhật</option>
+                        <option value="male">Nam</option>
+                        <option value="female">Nữ</option>
+                        <option value="other">Khác</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-bold text-gray-500 mb-1">Thị trường mục tiêu</label>
+                      <input
+                        type="text"
+                        maxLength={500}
+                        value={editTargetMarket}
+                        onChange={(e) => setEditTargetMarket(e.target.value)}
+                        placeholder="Ví dụ: Doanh nghiệp vừa và nhỏ"
+                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-gray-500 mb-1">Địa chỉ</label>
+                    <textarea
+                      rows={2}
+                      maxLength={300}
+                      value={editAddress}
+                      onChange={(e) => setEditAddress(e.target.value)}
+                      placeholder="Nhập địa chỉ"
+                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white resize-y"
+                    />
                   </div>
 
                   {/* Role in Chapter */}
@@ -1131,6 +1197,32 @@ export default function OrgChartTab({
                         <div className="min-w-0">
                           <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lĩnh vực hoạt động</span>
                           <strong className="text-slate-800 text-xs font-bold block truncate">{memberIndustry}</strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2.5">
+                        <UserRound className="w-4 h-4 text-violet-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Giới tính</span>
+                          <strong className="text-slate-800 text-xs font-bold block">
+                            {memberGender === "male" ? "Nam" : memberGender === "female" ? "Nữ" : memberGender === "other" ? "Khác" : "Chưa cập nhật"}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2.5">
+                        <Target className="w-4 h-4 text-cyan-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thị trường mục tiêu</span>
+                          <strong className="text-slate-800 text-xs font-bold block break-words">{memberTargetMarket}</strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2.5 sm:col-span-2">
+                        <MapPin className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Địa chỉ</span>
+                          <strong className="text-slate-800 text-xs font-bold block break-words">{memberAddress}</strong>
                         </div>
                       </div>
 
@@ -1335,7 +1427,7 @@ export default function OrgChartTab({
                       className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 font-bold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50 text-[11px]"
                     >
                       {uploadingAddAvatar ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                      <span>{uploadingAddAvatar ? "Đang tải..." : (addPhotoURL ? "Đổi avatar" : "Tải avatar")}</span>
+                      <span>{uploadingAddAvatar ? "Đang tải..." : (addPhotoURL ? "Đổi ảnh đại diện" : "Tải ảnh đại diện")}</span>
                     </button>
                     {addPhotoURL && (
                       <button
@@ -1386,6 +1478,46 @@ export default function OrgChartTab({
                     className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-500 mb-1">Giới tính</label>
+                  <select
+                    aria-label="Giới tính"
+                    value={addGender}
+                    onChange={(e) => setAddGender(e.target.value as typeof addGender)}
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-white"
+                  >
+                    <option value="">Chưa cập nhật</option>
+                    <option value="male">Nam</option>
+                    <option value="female">Nữ</option>
+                    <option value="other">Khác</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-500 mb-1">Thị trường mục tiêu</label>
+                  <input
+                    type="text"
+                    maxLength={500}
+                    value={addTargetMarket}
+                    onChange={(e) => setAddTargetMarket(e.target.value)}
+                    placeholder="Ví dụ: Doanh nghiệp vừa và nhỏ"
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-500 mb-1">Địa chỉ</label>
+                <textarea
+                  rows={2}
+                  maxLength={300}
+                  value={addAddress}
+                  onChange={(e) => setAddAddress(e.target.value)}
+                  placeholder="Nhập địa chỉ"
+                  className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 resize-y"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

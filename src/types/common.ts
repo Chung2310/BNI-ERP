@@ -31,6 +31,9 @@ export interface UserProfile {
   createdAt: any;
   updatedAt?: any;
   birthDate?: string;
+  gender?: "male" | "female" | "other";
+  address?: string;
+  targetMarket?: string;
   jobDescriptionLink?: string;
   phone?: string;
   parentId?: string;

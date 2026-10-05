@@ -5,6 +5,9 @@ const SELF_SERVICE_PROFILE_FIELDS = [
   "industry",
   "phone",
   "birthDate",
+  "gender",
+  "address",
+  "targetMarket",
   "companyName",
 ] as const;
 
