@@ -115,17 +115,29 @@ export function MeetingStage({ snapshot, now }: { snapshot: MeetingLiveSnapshot;
     }
   }, [meeting.currentIndex, meeting.speakers, slides]);
   if (meeting.status === "ended" || meeting.status === "cancelled") return <StageMessage title={meeting.title} text={meeting.status === "ended" ? "Cuộc họp đã kết thúc" : "Cuộc họp đã hủy"} />;
+
   const view = presentationState(meeting.presentation).view;
-  if (view === "checkin") return <CheckInStage meeting={meeting} />;
-  if (view === "activeMembers") return <RankingStage meeting={meeting} />;
-  if (view === "luckyDraw") return <DrawStage meeting={meeting} />;
-  if (view === "waiting") return <StageMessage title={meeting.title} text="Vui lòng chờ" />;
   const speaker = meeting.speakers[meeting.currentIndex];
   const upcoming = meeting.speakers.slice(meeting.currentIndex + 1, meeting.currentIndex + 4);
-  return <div className="relative">
+  let activeStage: React.ReactNode;
+
+  if (view === "checkin") activeStage = <CheckInStage meeting={meeting} />;
+  else if (view === "activeMembers") activeStage = <RankingStage meeting={meeting} />;
+  else if (view === "waiting") activeStage = <StageMessage title={meeting.title} text="Vui lòng chờ" />;
+  else activeStage = <div className="relative">
     <SpeakerStage meeting={meeting} slide={slides.find(item => item.id === speaker?.id)} now={now} />
     {!!speaker && upcoming.length > 0 && <div className="absolute right-4 top-4 max-w-[65%] rounded-lg bg-white/95 px-3 py-2 text-xs font-medium text-slate-700 md:text-lg">
       Tiếp theo: {upcoming.map(person => person.name).join(" · ")}
     </div>}
+  </div>;
+
+  return <div className="relative aspect-video w-full overflow-hidden bg-slate-950">
+    <div
+      className={`absolute inset-0 ${view === "luckyDraw" ? "visible" : "invisible pointer-events-none"}`}
+      aria-hidden={view !== "luckyDraw"}
+    >
+      <DrawStage meeting={meeting} />
+    </div>
+    {view !== "luckyDraw" && <div className="absolute inset-0">{activeStage}</div>}
   </div>;
 }

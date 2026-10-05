@@ -885,8 +885,9 @@ async function resolveQrMeeting(token: string) {
   const matches = await MeetingModel.find({ companyCode: qr!.companyCode,
     status: { $in: ['scheduled', 'live', 'paused'] }, startsAt: { $lte: checkInStartsAt },
     $or: [
-      { endsAt: { $gt: now } },
-      { endsAt: null, startsAt: { $gt: new Date(now.getTime() - DEFAULT_MEETING_DURATION_MS) } },
+      { status: { $in: ['live', 'paused'] } },
+      { status: 'scheduled', endsAt: { $gt: now } },
+      { status: 'scheduled', endsAt: null, startsAt: { $gt: new Date(now.getTime() - DEFAULT_MEETING_DURATION_MS) } },
     ],
   }).sort({ startsAt: -1 }).limit(2);
   if (!matches.length) throw new MeetingError(409, 'Hiện không có cuộc họp nào trong thời gian check-in. Vui lòng kiểm tra lịch họp.');

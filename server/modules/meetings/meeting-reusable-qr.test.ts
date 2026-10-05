@@ -90,13 +90,16 @@ test('existing shared QR becomes permanent without changing a printed token', as
 test('one reusable QR records consecutive meetings instead of its source meeting', async t => {
   const { state, source } = setup(t);
   assert.equal((await getPublicQrMeeting(token)).id, 'current');
-  const query = state.queries[0] as { companyCode: string; status: { $in: string[] }; startsAt: { $lte: Date }; $or: [{ endsAt: { $gt: Date } }, { endsAt: null; startsAt: { $gt: Date } }] };
+  const query = state.queries[0] as { companyCode: string; status: { $in: string[] }; startsAt: { $lte: Date }; $or: [{ status: { $in: string[] } }, { status: string; endsAt: { $gt: Date } }, { status: string; endsAt: null; startsAt: { $gt: Date } }] };
   assert.equal(query.companyCode, 'ACME');
   assert.deepEqual(query.status.$in, ['scheduled', 'live', 'paused']);
   assert.equal(query.startsAt.$lte.getTime(), now.getTime() + 2 * 60 * 60 * 1000);
-  assert.equal(query.$or[0].endsAt.$gt.getTime(), now.getTime());
-  assert.equal(query.$or[1].endsAt, null);
-  assert.equal(query.$or[1].startsAt.$gt.getTime(), now.getTime() - 2 * 60 * 60 * 1000);
+  assert.deepEqual(query.$or[0].status.$in, ['live', 'paused']);
+  assert.equal(query.$or[1].status, 'scheduled');
+  assert.equal(query.$or[1].endsAt.$gt.getTime(), now.getTime());
+  assert.equal(query.$or[2].status, 'scheduled');
+  assert.equal(query.$or[2].endsAt, null);
+  assert.equal(query.$or[2].startsAt.$gt.getTime(), now.getTime() - 2 * 60 * 60 * 1000);
   const first = state.matches[0];
   const result = await qrCheckInGuest(token, input);
   assert.equal(result.meetingId, 'current');
