@@ -129,8 +129,9 @@ export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas:
   textBox(ctx, slide.kind === "member" ? "THÔNG TIN THÀNH VIÊN / MEMBER PROFILE" : "THÔNG TIN KHÁCH MỜI / GUEST PROFILE", 1120, 59, 1280, 1, 44, 30, "#fff", 800);
 
   if (avatar) {
-    ctx.save(); ctx.beginPath(); ctx.arc(337, 465, 191, 0, Math.PI * 2); ctx.clip();
-    cover(ctx, avatar, 146, 274, 382, 382, true); ctx.restore();
+    // Crop the photo to the clear circular opening so it stays behind the gold rim and leaves.
+    ctx.save(); ctx.beginPath(); ctx.arc(337, 454, 170, 0, Math.PI * 2); ctx.clip();
+    cover(ctx, avatar, 167, 284, 340, 340, true); ctx.restore();
   }
   // The frame belongs to the template, even when the profile has no photo yet.
   if (frame) ctx.drawImage(frame, 100, 247, 480, 456);
