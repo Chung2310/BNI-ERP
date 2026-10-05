@@ -111,7 +111,11 @@ async function api(path: string, method = "GET", body?: unknown) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.message || "Không thể kết nối máy chủ.");
+  if (!response.ok) {
+    const error = new Error(data.message || "Không thể kết nối máy chủ.") as Error & { status: number };
+    error.status = response.status;
+    throw error;
+  }
   return data.data;
 }
 
@@ -703,18 +707,26 @@ function MeetingWorkspace() {
     );
   };
 
-  const startPresentationTimer = useCallback(async (speakerId: string) => {
+  const startPresentationTimer = useCallback(async (speakerId: string, version: number) => {
     if (!activeMeeting || !canManage || meetingControlPending.current) return;
+    const meetingId = activeMeeting._id;
     meetingControlPending.current = true;
     setSaving(true);
     try {
-      const updated: Meeting = await api('/' + activeMeeting._id + '/presentation', 'POST', { speakerId, version: activeMeeting.__v });
+      let updated: Meeting;
+      try {
+        updated = await api('/' + meetingId + '/presentation', 'POST', { speakerId, version });
+      } catch (error) {
+        if ((error as { status?: number }).status !== 409) throw error;
+        const latest: Meeting = await api('/' + meetingId);
+        updated = await api('/' + meetingId + '/presentation', 'POST', { speakerId, version: latest.__v });
+      }
       setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
     } finally {
       meetingControlPending.current = false;
       setSaving(false);
     }
-  }, [activeMeeting, canManage]);
+  }, [activeMeeting?._id, canManage]);
 
   const current = activeMeeting && ["live", "paused"].includes(activeMeeting.status) ? activeMeeting.speakers[activeMeeting.currentIndex] : undefined;
   const upcoming = activeMeeting && !["ended", "cancelled"].includes(activeMeeting.status) ? activeMeeting.speakers[activeMeeting.status === "scheduled" ? 0 : activeMeeting.currentIndex + 1] : undefined;
@@ -1385,6 +1397,7 @@ function MeetingWorkspace() {
                   onDeferSpeaker={deferSpeaker}
                   onPresentationStarted={presentationStarted}
                   onPresentationClosed={presentationClosed}
+                  onReloadData={refresh}
                   onStartPresentation={canModifyActiveMeeting ? startPresentationTimer : undefined}
                   onMoveSpeaker={direction => requestMeetingControl(direction > 0 ? "next" : "previous")}
                   onTogglePause={() => control(activeMeeting.status === "paused" ? "resume" : "pause")}

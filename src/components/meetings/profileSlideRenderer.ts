@@ -6,6 +6,7 @@ import "./profileSlideFonts.css";
 
 export const SLIDE_WIDTH = 1920;
 export const SLIDE_HEIGHT = 1080;
+export const DEFAULT_PROFILE_PHOTO = "/member-slide/default-pfp.jpg";
 const RED = "#d70b2d";
 const images = new Map<string, Promise<HTMLImageElement | null>>();
 
@@ -117,13 +118,15 @@ function pill(ctx: CanvasRenderingContext2D, label: string, x: number, y: number
 
 export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas: HTMLCanvasElement; warnings: string[] }> {
   const urls = (slide.galleryImages ?? []).filter(url => url?.trim()).slice(0, 5);
-  const [assets, avatar, photos] = await Promise.all([
+  const [assets, requestedAvatar, defaultAvatar, photos] = await Promise.all([
     Promise.all(ASSETS.map(name => loadSlideImage(`/member-slide/${name}`))),
     loadSlideImage(slide.photoURL),
+    loadSlideImage(DEFAULT_PROFILE_PHOTO),
     Promise.all(urls.map(loadSlideImage)),
     ...[400, 700, 800].map(weight => document.fonts.load(`${weight} 32px "Be Vietnam Pro"`, "Nguyễn Đặng Trần Quốc Việt")),
     document.fonts.load('700 32px "Faustina"', "Địa chỉ Thị trường mục tiêu"),
   ]);
+  const avatar = requestedAvatar || defaultAvatar;
   const [background, frame, logo, footerWhite, footerRed, swoosh] = assets;
   const canvas = document.createElement("canvas");
   canvas.width = SLIDE_WIDTH; canvas.height = SLIDE_HEIGHT;
@@ -220,7 +223,7 @@ export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas:
     textBox(ctx, slide.targetMarket.trim(), 735, 852, 1020, 5, 40, 17, "#003b67", 700, 170, "Faustina");
   }
   const warnings: string[] = [];
-  if (slide.photoURL && !avatar) warnings.push("Không tải được ảnh đại diện.");
+  if (!avatar) warnings.push("Không tải được ảnh đại diện mặc định.");
   if (photos.some(photo => !photo)) warnings.push("Một số ảnh sản phẩm/hoạt động chưa tải được.");
   if (assets.some(asset => !asset)) warnings.push("Một số chi tiết của mẫu slide chưa tải được. Vui lòng làm mới.");
   return { canvas, warnings };

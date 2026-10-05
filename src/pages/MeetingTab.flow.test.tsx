@@ -5,6 +5,7 @@ import { cleanup, render, screen, fireEvent, waitFor, act, within } from "@testi
 import MeetingTab from "./MeetingTab";
 vi.mock("../components/meetings/profileSlideRenderer", () => ({
   SLIDE_WIDTH: 1920, SLIDE_HEIGHT: 1080, loadSlideImage: vi.fn().mockResolvedValue(null),
+  DEFAULT_PROFILE_PHOTO: "/member-slide/default-pfp.jpg",
   renderProfileSlide: vi.fn(async () => ({ canvas: document.createElement("canvas"), warnings: [] })),
 }));
 const auth = vi.hoisted(() => ({ manage: true }));
@@ -131,6 +132,39 @@ it("defers from the operation list and starts fullscreen from the selected atten
     expect(item.currentIndex).toBe(1);
     expect(item.speakers[2].id).toBe("first");
   } finally { cleanup(); await act(async () => {}); vi.restoreAllMocks(); }
+});
+
+it("refreshes the meeting version and retries once when starting presentation gets 409", async () => {
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as unknown as Parameters<((value: ReturnType<typeof HTMLCanvasElement.prototype.getContext>) => void)>[0]));
+  const people = [{ id: "first", kind: "member", name: "Người trình bày", company: "", seconds: 30 }];
+  const stale = { ...meeting, status: "live", currentIndex: 0, speakers: people, __v: 1 };
+  let current = { ...stale, __v: 2 };
+  let presentationCalls = 0;
+  const fetchMock = vi.fn(async (url, options) => {
+    const path = String(url);
+    if (path.endsWith("/slides")) return { ok: true, json: async () => ({ data: { slides: people, version: 1 } }) };
+    if (path.endsWith("/presentation")) {
+      presentationCalls += 1;
+      const body = JSON.parse(options.body);
+      if (presentationCalls === 1) {
+        expect(body.version).toBe(1);
+        return { ok: false, status: 409, json: async () => ({ message: "Cuộc họp đã thay đổi. Vui lòng tải lại trước khi thao tác." }) };
+      }
+      expect(body.version).toBe(2);
+      current = { ...current, __v: 3 };
+      return { ok: true, json: async () => ({ data: current }) };
+    }
+    if (path.endsWith("/a")) return { ok: true, json: async () => ({ data: current }) };
+    return { ok: true, json: async () => ({ data: [stale] }) };
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
+  await waitFor(() => expect(presentationCalls).toBe(2));
+  expect(screen.queryByRole("alert")).toBeNull();
 });
 
 it.each(["Escape", "fullscreen"])("returns to the slides presentation tab after exiting presentation via %s", async exit => {

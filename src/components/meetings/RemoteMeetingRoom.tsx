@@ -308,9 +308,9 @@ function MeetingRoom({ meetingId, mode }: Props) {
           </div>
         </div>
       ) : readOnly ? (
-        <main className="flex min-h-[80vh] items-center justify-center bg-black" style={fullscreen ? { height: "100dvh" } : {}}>
-          <div style={{ width: "min(100%, 177.7778dvh)" }}>
-            <MeetingStage snapshot={snapshot} now={now} />
+        <main className="flex min-h-[80vh] items-center justify-center bg-slate-100" style={fullscreen ? { height: "100dvh" } : {}}>
+          <div style={fullscreen && state.view === "speaker" ? { width: "100%", height: "100%" } : { width: "min(100%, 177.7778dvh)" }}>
+            <MeetingStage snapshot={snapshot} now={now} fill={fullscreen && state.view === "speaker"} />
           </div>
         </main>
       ) : (

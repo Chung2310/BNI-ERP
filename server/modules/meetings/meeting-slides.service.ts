@@ -28,6 +28,11 @@ export function buildProfileSlide(speaker: SlideSpeaker, profile?: Partial<IUser
   if (Array.isArray(speaker.slideProfile?.galleryImages)) {
     result.galleryImages = speaker.slideProfile.galleryImages.filter((url: unknown) => typeof url === 'string' && url.trim()).slice(0, 5);
   }
+  const name = typeof result.name === 'string' ? result.name.trim() : '';
+  if (speaker.userId && name && !/^(?:mr|mrs|ms)\.\s+/i.test(name)) {
+    if (profile?.gender === 'female') result.name = `Ms. ${name}`;
+    if (profile?.gender === 'male') result.name = `Mr. ${name}`;
+  }
   return result;
 }
 
@@ -40,7 +45,7 @@ export async function buildMeetingSlides(meeting: Pick<MeetingDocument, 'company
   const userIds = meeting.speakers.map(s => s.userId).filter(Boolean);
   const profiles = userIds.length ? await UserModel.find({
     _id: { $in: userIds }, companyCode, isActive: { $ne: false },
-  }).select('displayName companyName photoURL coverImage phone email industry bio address targetMarket galleryImages').lean() : [];
+  }).select('displayName companyName photoURL coverImage phone email industry bio gender address targetMarket galleryImages').lean() : [];
   const byId = new Map(profiles.map(p => [String(p._id), p]));
   return {
     version: meeting.__v,
