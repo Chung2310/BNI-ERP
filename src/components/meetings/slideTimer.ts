@@ -4,7 +4,7 @@ export interface SlideTimerMeeting {
   speakerStartedAt?: string;
   speechesCompletedAt?: string;
   elapsedSeconds?: number;
-  speakers: { id: string; seconds?: number; spokenSeconds?: number; checkedInAt?: string; deferred?: boolean }[];
+  speakers: { id: string; name?: string; photoURL?: string; seconds?: number; spokenSeconds?: number; checkedInAt?: string; deferred?: boolean }[];
 }
 
 export function getSlideTimer(meeting: SlideTimerMeeting, speakerId: string | undefined, now: number) {

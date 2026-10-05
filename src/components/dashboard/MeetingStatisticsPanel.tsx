@@ -84,7 +84,7 @@ export const extractLuckyWinners = (meeting: Meeting): LuckyDrawWinnerRecord[] =
   return result;
 };
 
-function LuckyWinnersTable({
+export function LuckyWinnersTable({
   winners,
   showMeetingInfo = false,
   onSelectMeeting,
@@ -93,6 +93,20 @@ function LuckyWinnersTable({
   showMeetingInfo?: boolean;
   onSelectMeeting?: (meetingId: string) => void;
 }) {
+  const winnersPerPage = 10;
+  const [page, setPage] = useState(1);
+  const [previousWinners, setPreviousWinners] = useState(winners);
+
+  if (previousWinners !== winners) {
+    setPreviousWinners(winners);
+    setPage(1);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(winners.length / winnersPerPage));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * winnersPerPage;
+  const paginatedWinners = winners.slice(pageStart, pageStart + winnersPerPage);
+
   if (winners.length === 0) {
     return (
       <div className="p-8 text-center text-xs text-slate-400">
@@ -103,8 +117,9 @@ function LuckyWinnersTable({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
+    <div className="space-y-3">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs">
         <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
           <tr>
             <th className="py-2.5 px-3 w-10">STT</th>
@@ -118,11 +133,11 @@ function LuckyWinnersTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {winners.map((w, idx) => {
+          {paginatedWinners.map((w, idx) => {
             const initial = (w.name || "?").trim().charAt(0).toUpperCase();
             return (
               <tr key={`${w.meetingId}-${w.source}-${w.id || idx}`} className="hover:bg-slate-50/70 transition-colors">
-                <td className="py-2.5 px-3 text-slate-400">{idx + 1}</td>
+                <td className="py-2.5 px-3 text-slate-400">{pageStart + idx + 1}</td>
                 <td className="py-2.5 px-3">
                   <div className="flex items-center gap-2.5">
                     {w.photoURL ? (
@@ -228,7 +243,19 @@ function LuckyWinnersTable({
             );
           })}
         </tbody>
-      </table>
+        </table>
+      </div>
+      <div className="space-y-3 border-t border-slate-100 pt-3">
+        <p className="text-xs text-slate-500" aria-live="polite">
+          Hiển thị {pageStart + 1}–{Math.min(pageStart + winnersPerPage, winners.length)} / {winners.length} người trúng giải
+        </p>
+        <Pagination
+          key={currentPage}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
+      </div>
     </div>
   );
 }

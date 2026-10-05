@@ -5,6 +5,7 @@ import { renderProfileSlide, loadSlideImage, SLIDE_WIDTH, SLIDE_HEIGHT } from ".
 import { getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
 import { SlideTransitionDelayInput } from "./SlideTransitionDelayInput";
 import { SpeechesCompleteMessage } from "./SpeechesCompleteDialog";
+import { SpeakerPresentationFrame } from "./SpeakerPresentationFrame";
 import type { ProfileSlide, SlideDeck } from "./slideTypes";
 import { SpeakerAvatar } from "./SpeakerAvatar";
 
@@ -17,13 +18,14 @@ type Props = {
   autoAdvance?: boolean;
   onMoveSpeaker?: (direction: number) => Promise<void>;
   controlBusy?: boolean;
-  onStartPresentation?: (speakerId: string) => Promise<void>;
+  onStartPresentation?: (speakerId: string, version: number) => Promise<void>;
   autoAdvanceDelay?: number;
   onAutoAdvanceChange?: (enabled: boolean) => void;
   onAutoAdvanceDelayChange?: (seconds: number) => void;
   fullscreenRequest?: Promise<boolean> | null;
   onPresentationStarted?: () => void;
   onPresentationClosed?: () => void;
+  onReloadData?: () => void | Promise<void>;
   api: (path: string, method?: string, body?: unknown) => Promise<SlideDeck>;
   onTogglePause?: () => void | Promise<void>;
 };
@@ -95,7 +97,7 @@ function NextSpeakersOverlay({ speakers, large = false }: { speakers: ProfileSli
   );
 }
 
-export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker, onTogglePause }: Props) {
+export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, onReloadData, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker, onTogglePause }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -326,12 +328,24 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     if (onStartPresentation) {
       speechRequest.current = true;
       setStartingSpeech(true); setError("");
-      void onStartPresentation(slide.id).catch(error => {
+      void onStartPresentation(slide.id, deck.version).catch(error => {
         closePresentation();
         setError(error instanceof Error ? error.message : "Không bắt đầu được bộ đếm. Vui lòng thử lại.");
       }).finally(() => { speechRequest.current = false; if (mounted.current) setStartingSpeech(false); });
     }
-  }, [present, onStartPresentation, closePresentation]);
+  }, [present, onStartPresentation, closePresentation, deck.version]);
+
+  const reloadData = useCallback(async () => {
+    setError("");
+    setLoading(true);
+    try {
+      await onReloadData?.();
+      setRevision(value => value + 1);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Không tải lại được dữ liệu cuộc họp.");
+      setLoading(false);
+    }
+  }, [onReloadData]);
 
   useEffect(() => {
     if (!startFromFirst || loading || error || !deck.slides.length) return;
@@ -390,7 +404,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         title="Làm mới hồ sơ"
         aria-label="Làm mới hồ sơ"
         disabled={loading || !!draft}
-        onClick={() => setRevision(v => v + 1)}
+        onClick={() => void reloadData()}
       >
         <RotateCcw size={14} aria-hidden="true" />
       </button>
@@ -428,7 +442,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       )}
     </div>
     <p className="text-[11px] text-slate-400">Toàn màn hình: phím ← → chuyển lượt (thủ công) · phím P tạm dừng · Esc thoát</p>
-    {error && <p role="alert" className="rounded-xl bg-red-50 border border-red-200/80 p-3 text-xs text-red-700">{error} <button className="underline hover:text-red-900 transition cursor-pointer" onClick={() => setRevision(v => v + 1)}>Tải lại dữ liệu</button></p>}
+    {error && <p role="alert" className="rounded-xl bg-red-50 border border-red-200/80 p-3 text-xs text-red-700">{error} <button type="button" className="underline hover:text-red-900 transition cursor-pointer" onClick={() => void reloadData()}>Tải lại dữ liệu</button></p>}
     <div className="grid gap-4 lg:grid-cols-[280px_1fr] items-stretch">
       <aside className="flex flex-col h-full rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
         <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
@@ -552,12 +566,14 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         </div>
       </aside>
       <div className="min-w-0 space-y-3">
-        <div className="relative aspect-video overflow-hidden rounded-2xl bg-slate-900 shadow-sm">
+        <SpeakerPresentationFrame meeting={meeting} slides={deck.slides} speakerId={active?.id} now={now}>
+        <div className="relative aspect-video overflow-hidden bg-slate-900 shadow-sm">
           {canvas(preview)}
           {(drawing || !active || drawError) && <div className="absolute inset-0 grid place-items-center p-6 text-center text-xs text-white/90">
             {speechesComplete && followsSpeaker ? <div className="rounded-2xl bg-white p-8"><SpeechesCompleteMessage /></div> : drawError || (loading ? "Đang tải hồ sơ…" : active ? "Đang chuẩn bị ảnh và font…" : followsSpeaker ? "Chưa có người đang phát biểu." : deck.slides.length ? "Chọn ít nhất một người để trình chiếu." : "Chưa có người check-in. Hãy check-in thành viên hoặc khách mời trước.")}
           </div>}
         </div>
+        </SpeakerPresentationFrame>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <button aria-label="Slide trước" className={button} disabled={!canMove(-1)} onClick={() => move(-1)}><ChevronLeft size={14} /></button>
@@ -586,9 +602,11 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         </form>}
       </div>
     </div>
-    {presenting && createPortal(<div ref={presentationDialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Trình chiếu hồ sơ" className="fixed inset-0 z-[10000] flex items-center justify-center bg-black" style={{ cursor: "none", outline: "none" }}>
-      <div className="relative" style={{ width: "min(100vw, 177.7778vh)", height: "min(100vh, 56.25vw)" }}>
-        {canvas(screen)}
+    {presenting && createPortal(<div ref={presentationDialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Trình chiếu hồ sơ" className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-100" style={{ cursor: "none", outline: "none" }}>
+      <div className="relative h-full w-full">
+        <SpeakerPresentationFrame meeting={meeting} slides={deck.slides} speakerId={active?.id} now={now} fill>
+          {canvas(screen)}
+        </SpeakerPresentationFrame>
       </div>
       {(loading || error || drawing || !active || drawError) && <div role="status" className="absolute text-white">{speechesComplete && followsSpeaker ? <div className="max-w-2xl rounded-3xl bg-white p-12"><SpeechesCompleteMessage /></div> : error || drawError || (loading ? "Đang tải slide…" : active ? "Đang chuẩn bị slide…" : "Chờ người phát biểu…")}</div>}
     </div>, document.body)}

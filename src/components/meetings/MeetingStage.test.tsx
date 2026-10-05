@@ -3,7 +3,7 @@ import React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { MeetingStage } from "./MeetingStage";
-vi.mock("./profileSlideRenderer", () => ({ SLIDE_WIDTH: 1920, SLIDE_HEIGHT: 1080, renderProfileSlide: vi.fn(), loadSlideImage: vi.fn() }));
+vi.mock("./profileSlideRenderer", () => ({ SLIDE_WIDTH: 1920, SLIDE_HEIGHT: 1080, DEFAULT_PROFILE_PHOTO: "/member-slide/default-pfp.jpg", renderProfileSlide: vi.fn(), loadSlideImage: vi.fn() }));
 vi.mock("./ActiveMembersPanel", () => ({ ActiveMembersPanel: () => <div>Ranking</div> }));
 afterEach(cleanup);
 it("uses the meeting wheel screen for the lucky draw stage", () => {
