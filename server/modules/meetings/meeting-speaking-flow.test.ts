@@ -58,6 +58,13 @@ test("previous speaker resets the target timer and preserves live or paused stat
   }
 });
 
+test("next switches the shared display to speaker view", async () => {
+  const item = meeting();
+  item.set("presentation", { view: "checkin", autoAdvance: false, autoAdvanceDelay: 3 });
+  await controlMeeting((item as unknown as Parameters<typeof controlMeeting>[0]), "next", now);
+  assert.equal(item.currentIndex, 1);
+  assert.equal(item.presentation?.view, "speaker");
+});
 test("deferring the current speaker moves them to the end and starts the next allocated turn", async () => {
   const item = meeting();
   await deferMeetingSpeaker((item as unknown as Parameters<typeof deferMeetingSpeaker>[0]), "early", now);

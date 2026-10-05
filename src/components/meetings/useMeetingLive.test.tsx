@@ -30,7 +30,7 @@ beforeEach(() => {
     const body = JSON.parse(options.body);
     if (body.version !== data.meeting.__v) return { ok: false, status: 409, json: async () => ({ message: "conflict" }) };
     data.meeting.__v++;
-    if (body.action === "next") { data.meeting.currentIndex++; data.meeting.speakerStartedAt = new Date(data.serverNow).toISOString(); }
+    if (body.action === "next") { data.meeting.currentIndex++; data.meeting.speakerStartedAt = new Date(data.serverNow).toISOString(); data.meeting.presentation.view = "speaker"; }
     if (body.action === "pause") { data.meeting.status = "paused"; data.meeting.elapsedSeconds = 10; data.meeting.speakerStartedAt = undefined; }
     if (body.view) data.meeting.presentation.view = body.view;
     emit();
@@ -56,6 +56,17 @@ it("synchronizes two independent devices and uses server time despite a wrong lo
   const writes = vi.mocked(fetch).mock.calls.filter(([, options]) => options?.method !== "GET").length;
   await act(async () => { expect(await display.result.current.command("/control", { action: "next" })).toBe(false); });
   expect(vi.mocked(fetch).mock.calls.filter(([, options]) => options?.method !== "GET")).toHaveLength(writes);
+});
+it("switches the shared display to speaker view after a remote next command", async () => {
+  data.meeting.presentation.view = "checkin";
+  const display = renderHook(() => useMeetingLive("meeting", true));
+  const phone = renderHook(() => useMeetingLive("meeting", false));
+  await waitFor(() => expect(display.result.current.snapshot && phone.result.current.snapshot).toBeTruthy());
+  await act(async () => { await phone.result.current.command("/control", { action: "next" }); });
+  await waitFor(() => {
+    expect(display.result.current.snapshot?.meeting.currentIndex).toBe(1);
+    expect(display.result.current.snapshot?.meeting.presentation?.view).toBe("speaker");
+  });
 });
 it("recovers missed updates on reconnect and ignores a stale snapshot", async () => {
   const display = renderHook(() => useMeetingLive("meeting", true));
