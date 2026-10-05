@@ -223,6 +223,7 @@ export default function MeetingTab() {
     setSlidesOpen(true);
   }, []);
   const [prioritySpeakerId, setPrioritySpeakerId] = useState("");
+  const [prioritySpeakerSearch, setPrioritySpeakerSearch] = useState("");
   const [priorityPosition, setPriorityPosition] = useState(1);
 
   // Fullscreen state for Meeting Detail Modal
@@ -492,6 +493,7 @@ export default function MeetingTab() {
     if (m.status === "ended") return;
     setEditingMeeting(m);
     setPrioritySpeakerId("");
+    setPrioritySpeakerSearch("");
     setPriorityPosition(1);
     setEditTitle(m.title);
     setEditLocation(m.location || "");
@@ -2049,11 +2051,13 @@ export default function MeetingTab() {
                 <h4 className="font-bold text-slate-800">Sắp xếp thứ tự thuyết trình</h4>
                 <div className="flex flex-wrap items-end gap-3">
                   <label className="min-w-48 flex-1 text-xs font-semibold">Chọn người phát biểu
+                    <input aria-label="Tìm người phát biểu để sắp xếp" type="search" value={prioritySpeakerSearch} onChange={event => setPrioritySpeakerSearch(event.target.value)} placeholder="Tìm theo tên..." disabled={saving || pendingStart >= orderingMeeting.speakers.length} className="mt-1 mb-1 w-full rounded-lg border bg-white p-2 text-sm" />
                     <select aria-label="Chọn người để sắp xếp" disabled={saving} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm"
                       value={orderingMeeting.speakers.slice(pendingStart).some(person => person.id === prioritySpeakerId) ? prioritySpeakerId : orderingMeeting.speakers[pendingStart]?.id || ""}
                       onChange={event => setPrioritySpeakerId(event.target.value)}>
                       {pendingStart >= orderingMeeting.speakers.length && <option value="">Không còn người đang chờ phát biểu</option>}
-                      {orderingMeeting.speakers.map((person, index) => <option key={person.id} value={person.id} disabled={index < pendingStart}>{person.name}{index < pendingStart ? index === orderingMeeting.currentIndex ? " — Đang phát biểu" : " — Đã phát biểu" : ""}</option>)}
+                      {orderingMeeting.speakers.map((person, index) => ({ person, index })).filter(({ person }) => person.name.toLocaleLowerCase("vi").includes(prioritySpeakerSearch.trim().toLocaleLowerCase("vi"))).map(({ person, index }) => <option key={person.id} value={person.id} disabled={index < pendingStart}>{person.name}{index < pendingStart ? index === orderingMeeting.currentIndex ? " — Đang phát biểu" : " — Đã phát biểu" : ""}</option>)}
+                      {prioritySpeakerSearch && !orderingMeeting.speakers.some(person => person.name.toLocaleLowerCase("vi").includes(prioritySpeakerSearch.trim().toLocaleLowerCase("vi"))) && <option value="" disabled>Không tìm thấy người phát biểu</option>}
                     </select>
                   </label>
                   <label className="text-xs font-semibold">Thứ tự ưu tiên
