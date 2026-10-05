@@ -14,8 +14,8 @@ function meeting() {
     speakerStartedAt: origin, elapsedSeconds: 0, fallbackSeconds: 30, tiers: [],
     speakers: [{ id: "first", name: "An", seconds: 30 }, { id: "second", name: "Binh", seconds: 20 }],
   });
-  item.save = vi.fn(async () => item);
-  return item as any;
+  item.save = vi.fn(async () => item) as unknown as typeof item.save;
+  return item;
 }
 it.each([0, 3, 150])("advances only after the speech and %s seconds of server-managed delay", async delay => {
   const item = meeting(); item.presentation.autoAdvanceDelay = delay;
@@ -43,12 +43,13 @@ it("allows only one of two concurrent scheduler workers to advance a version", a
   let version = 0;
   vi.spyOn(MeetingModel, "find").mockImplementation((() => {
     const item = meeting();
-    item.save = async () => {
+    item.save = (async () => {
       if (item.__v !== version) throw Object.assign(new Error("race"), { name: "VersionError" });
       item.__v = ++version;
-    };
+      return item;
+    }) as unknown as typeof item.save;
     return Promise.resolve([item]);
-  }) as any);
+  }) as unknown as typeof MeetingModel.find);
   const results = await Promise.all([advanceDuePresentations(new Date(+origin + 40000)), advanceDuePresentations(new Date(+origin + 40000))]);
   expect(results.reduce((sum, value) => sum + value, 0)).toBe(1);
   expect(version).toBe(1);
@@ -56,7 +57,7 @@ it("allows only one of two concurrent scheduler workers to advance a version", a
 });
 it("persists presentation configuration while retaining draw state", async () => {
   const item = new MeetingModel({ companyCode: "BNI", title: "Demo", presentation: { drawWinnerId: "winner", view: "luckyDraw", autoAdvance: true } });
-  item.save = vi.fn(async () => item) as any;
+  item.save = vi.fn(async () => item);
   await updatePresentationState(item, { view: "checkin", autoAdvanceDelay: 15 });
   const restored = new MeetingModel(item.toObject());
   expect(restored.presentation).toMatchObject({ view: "checkin", autoAdvance: true, autoAdvanceDelay: 15, drawWinnerId: "winner" });
@@ -70,7 +71,7 @@ it("switches the shared view on speaker start without resetting a running timer"
 });
 it("saves one shared draw result and reveal timestamp in the same write", async () => {
   const item = meeting();
-  item.luckyDraw = { drawMode: "attendees", allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] };
+  item.set("luckyDraw", { drawMode: "attendees", allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
   const result = await spinLuckyDraw(item, "prize", "organizer", true);
   expect(item.save).toHaveBeenCalledTimes(1);
   expect(item.presentation.view).toBe("luckyDraw");

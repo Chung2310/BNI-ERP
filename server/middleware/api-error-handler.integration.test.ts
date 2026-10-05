@@ -42,7 +42,7 @@ test("terminal middleware returns the exact correlated error envelope", async ()
     assert.equal(conflict.headers.get("x-request-id"), "test-request-1");
 
     const internal = await fetch(`${base}/internal`);
-    const internalBody = await internal.json();
+    const internalBody = await internal.json() as { error: { code: string; message: string } };
     assert.equal(internal.status, 500);
     assert.equal(internalBody.error.code, "INTERNAL_ERROR");
     assert.equal(internalBody.error.message, "Đã xảy ra lỗi hệ thống.");
@@ -50,9 +50,10 @@ test("terminal middleware returns the exact correlated error envelope", async ()
 
     const missing = await fetch(`${base}/missing`);
     assert.equal(missing.status, 404);
-    assert.equal((await missing.json()).error.code, "API_ROUTE_NOT_FOUND");
+    const missingBody = await missing.json() as { error: { code: string } };
+    assert.equal(missingBody.error.code, "API_ROUTE_NOT_FOUND");
     assert.deepEqual(logs.map(({ level }) => level), ["warn", "error", "warn"]);
-    assert.equal((logs[1].event).error.cause.message, "db-secret");
+    assert.equal((logs[1].event as unknown as { error: { cause: { message: string } } }).error.cause.message, "db-secret");
     assert.deepEqual(redactLogData({ password: "secret", nested: { token: "jwt", safe: 1 } }), {
       password: "[REDACTED]",
       nested: { token: "[REDACTED]", safe: 1 },

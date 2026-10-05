@@ -22,7 +22,7 @@ function meeting(id = 'current') {
 function setup(t: import("node:test").TestContext) {
   t.mock.timers.enable({ apis: ['Date'], now });
   const source = { ...meeting('source'), status: 'ended' };
-  const state: { qr: any; matches: any[]; queries: any[] } = { qr: { companyCode: 'ACME', tokenHash: createHash('sha256').update(token).digest('hex'), tokenEncrypted: encryptSecret(token), expiresAt: null }, matches: [meeting()], queries: [] };
+  const state: { qr: { companyCode: string; tokenHash?: string; tokenEncrypted?: string; expiresAt?: Date | null; revokedAt?: Date }; matches: ReturnType<typeof meeting>[]; queries: Record<string, unknown>[] } = { qr: { companyCode: 'ACME', tokenHash: createHash('sha256').update(token).digest('hex'), tokenEncrypted: encryptSecret(token), expiresAt: null }, matches: [meeting()], queries: [] };
   t.mock.method(MeetingModel, 'findOne', (query) => {
     const result = query._id === 'source' && query.companyCode === 'ACME' ? source : null;
     return Object.assign(Promise.resolve(result), { select: async () => result });
@@ -90,7 +90,7 @@ test('existing shared QR becomes permanent without changing a printed token', as
 test('one reusable QR records consecutive meetings instead of its source meeting', async t => {
   const { state, source } = setup(t);
   assert.equal((await getPublicQrMeeting(token)).id, 'current');
-  const query = state.queries[0];
+  const query = state.queries[0] as { companyCode: string; status: { $in: string[] }; startsAt: { $lte: Date }; $or: [{ endsAt: { $gt: Date } }, { endsAt: null; startsAt: { $gt: Date } }] };
   assert.equal(query.companyCode, 'ACME');
   assert.deepEqual(query.status.$in, ['scheduled', 'live', 'paused']);
   assert.equal(query.startsAt.$lte.getTime(), now.getTime());

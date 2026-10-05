@@ -32,6 +32,6 @@ it.each([
   { userProfile: { uid: "manager-1", role: "manager" }, lockRole: true },
   { lockRole: true },
 ])("locks role editing when authorization or an explicit lock requires it: %j", override => {
-  render((((<UserFormModal {...props} {...override} /> as unknown as Parameters<typeof render>[0])) as unknown as Parameters<typeof render>[0]));
+  render(<UserFormModal {...({ ...props, ...override } as UserFormModalProps)} />);
   expect((screen.getByLabelText("Vai trò") as HTMLSelectElement).disabled).toBe(true);
 });

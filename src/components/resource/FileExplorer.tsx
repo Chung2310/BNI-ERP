@@ -1,5 +1,4 @@
-import { useNow } from "../../hooks/useNow";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ChevronRight,
   ChevronLeft,
@@ -36,6 +35,7 @@ const FilePreviewModal = React.lazy(() => import("./FilePreviewModal").then((m) 
 import { formatBytes, formatDate, getFileIcon } from "./resourceHelpers";
 import UploadProgressPanel, { type UploadQueueItem } from "./UploadProgressPanel";
 import { useAuth } from "../../context/AuthContext";
+import { useNow } from "../../hooks/useNow";
 import {
   SystemManagedResourceBadge,
   canMutateResourceItem,
@@ -125,7 +125,6 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbEntry[]>([]);
   const isInsideFixedFolder = breadcrumb.some((b) => b.isFixed);
   const [items, setItems] = useState<ResourceItem[]>([]);
-  const now = useNow();
   const [loading, setLoading] = useState(true);
   const [, setUploading] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
@@ -2386,6 +2385,7 @@ const ResourceCard: React.FC<{
   onShare,
   onSendToChat,
 }) => {
+  const now = useNow();
   const isFolder = item.type === "folder";
   const canMutate = canMutateResourceItem(item);
   const { Icon, color } = isFolder ? { Icon: Folder, color: "text-[#5bc0be]" } : getFileIcon(item.mimeType, item.name);

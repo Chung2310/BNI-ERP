@@ -156,9 +156,9 @@ it.each(["Escape", "fullscreen"])("returns to the slides presentation tab after 
   } finally {
     cleanup();
     await act(async () => {});
-    delete (document.documentElement).requestFullscreen;
-    delete (document).fullscreenElement;
-    delete (document).exitFullscreen;
+    Reflect.deleteProperty(document.documentElement, "requestFullscreen");
+    Reflect.deleteProperty(document, "fullscreenElement");
+    Reflect.deleteProperty(document, "exitFullscreen");
     vi.restoreAllMocks();
   }
 });

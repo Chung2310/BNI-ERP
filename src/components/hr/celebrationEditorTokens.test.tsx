@@ -57,7 +57,7 @@ it("drops a palette chip at the pointer rather than the previous selection", () 
   const data = transfer("employeeName");
   fireEvent.dragStart(screen.getByRole("button", { name: "Tên thành viên" }), { dataTransfer: data });
   expect(data.setData).toHaveBeenCalledWith(TEMPLATE_VARIABLE_MIME, "employeeName");
-  (document).caretPositionFromPoint = vi.fn(() => ({ offsetNode: editor.querySelector("p")!.firstChild!, offset: 6 }));
+  Object.defineProperty(document, "caretPositionFromPoint", { configurable: true, value: vi.fn((_x: number, _y: number) => ({ offsetNode: editor.querySelector("p")!.firstChild!, offset: 6 })) });
   fireEvent.drop(editor, { dataTransfer: data, clientX: 20, clientY: 30 });
   expect(changed).toHaveBeenLastCalledWith("<p>Hello {{employeeName}}world</p>");
   expect(changed.mock.lastCall?.[0]).not.toContain("data-celebration-variable");

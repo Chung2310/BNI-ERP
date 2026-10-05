@@ -58,33 +58,12 @@ type Speaker = {
   seconds: number;
   spokenSeconds?: number;
   deferred?: boolean;
-  checkedInAt?: string;
-};
-
-type LuckyDrawWinner = {
-  prizeId: string;
-  prizeName: string;
-  winnerId: string;
-  winnerName: string;
-  winnerEmail?: string;
-  winnerAvatar?: string;
-  wonAt: string;
-  verificationHash?: string;
-  redrawCount?: number;
-};
-
-type LuckyDrawPrize = {
-  id: string;
-  name: string;
-  description?: string;
-  quantity: number;
-  order: number;
-  sponsorName?: string;
-  sponsorAvatar?: string;
-  valueText?: string;
+  checkedInAt: string;
 };
 
 type Meeting = {
+  companyCode: string;
+  revision: number;
   seriesId?: string;
   originalStartsAt?: string;
   _id: string;
@@ -110,14 +89,8 @@ type Meeting = {
   speechesCompletedAt?: string;
   elapsedSeconds: number;
   __v: number;
-  luckyDraw?: {
-    enabled: boolean;
-    requireCheckIn: boolean;
-    allowMultipleWins: boolean;
-    animationDurationMs: number;
-    prizes: LuckyDrawPrize[];
-    winners: LuckyDrawWinner[];
-  };
+  luckyDraw?: import("../services/meetingService").LuckyDrawConfig;
+  gameWinners?: import("../services/meetingService").LuckyDrawWinner[];
 };
 
 const token = () => localStorage.getItem("accessToken") || "";
@@ -323,8 +296,8 @@ function MeetingWorkspace() {
       setItems(next);
       setCalendarRevision(value => value + 1);
       setLoadError("");
-    
-}).catch(e => {
+
+    }).catch(e => {
       setLoadError(e.message || "Không thể tải danh sách cuộc họp");
     }).finally(() => { setLoading(false); });
   }, []);
@@ -864,7 +837,7 @@ function MeetingWorkspace() {
               border: "border-slate-200",
             };
             const prizeCount = m.luckyDraw?.prizes?.length || 0;
-            const winnerCount = m.luckyDraw?.winners?.length || 0;
+            const winnerCount = (m.luckyDraw?.prizes.reduce((total, prize) => total + prize.winners.length, 0) || 0) + (m.gameWinners?.length || 0);
             const isLive = m.status === "live" || m.status === "paused";
 
             return (
@@ -1185,7 +1158,7 @@ function MeetingWorkspace() {
                 order={flowOrder}
                 current={flowStep}
                 canReorder={canManage}
-                badges={{ checkin: activeMeeting.speakers.length, luckyDraw: activeMeeting.luckyDraw?.winners?.length }}
+                badges={{ checkin: activeMeeting.speakers.length, luckyDraw: (activeMeeting.luckyDraw?.prizes.reduce((total, prize) => total + prize.winners.length, 0) || 0) + (activeMeeting.gameWinners?.length || 0) }}
                 onSelect={goToFlowStep}
                 onReorder={updateFlowOrder}
                 onFinish={canManage && ["live", "paused"].includes(activeMeeting.status) ? () => setFinishRequested(true) : undefined}
@@ -1542,7 +1515,7 @@ function MeetingWorkspace() {
                     </div>}
 
                   </>)}
-                  {flowStep === "checkin" && <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} companyCode={userProfile?.companyCode} onConfigure={() => openEditModal(activeMeeting)} />}
+                  {flowStep === "checkin" && <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} onConfigure={() => openEditModal(activeMeeting)} />}
                   {/* Guest Checkin Form (MC / Admin) */}
                   {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
                     <form

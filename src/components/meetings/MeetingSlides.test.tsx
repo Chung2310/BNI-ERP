@@ -233,8 +233,8 @@ it("StrictMode does not exit an incoming fullscreen request; real unmount still 
     await waitFor(() => expect(exitFullscreen).toHaveBeenCalledTimes(1));
   } finally {
     view.unmount();
-    delete (document).fullscreenElement;
-    delete (document).exitFullscreen;
+    Reflect.deleteProperty(document, "fullscreenElement");
+    Reflect.deleteProperty(document, "exitFullscreen");
   }
 });
 

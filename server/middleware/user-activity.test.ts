@@ -74,8 +74,8 @@ test("uses friendly module names for common company workflows", () => {
 });
 
 test("batches routine activity writes", async () => {
-  const batches: any[][] = [];
-  const writer = createActivityBatchWriter(async (events) => { batches.push(events); }, { maxBatchSize: 10, flushIntervalMs: 60_000 });
+  const batches: Array<Array<{ actionType: string }>> = [];
+  const writer = createActivityBatchWriter(async (events) => { batches.push(events as Array<{ actionType: string }>); }, { maxBatchSize: 10, flushIntervalMs: 60_000 });
   await writer({ actionType: "data.view" });
   await writer({ actionType: "data.search" });
   assert.equal(batches.length, 0);

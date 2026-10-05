@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../middleware/auth", (() => ({
   requireAuth: (req: import("express").Request, _res: import("express").Response, next: import("express").NextFunction) => {
-    req.user = { id: "user-1", role: "user", companyCode: "ACME" };
+    req.user = { id: "user-1", email: "user@example.com", role: "user", companyCode: "ACME" };
     next();
   },
   requirePermission: (required: string) => (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {

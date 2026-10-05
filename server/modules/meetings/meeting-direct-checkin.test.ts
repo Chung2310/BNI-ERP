@@ -8,8 +8,8 @@ const { MeetingModel } = await import("./meeting.model");
 const { meetingInput, updateMeetingInput, recurringMeetingInput } = await import("./meeting.validation");
 
 function setup(t: import("node:test").TestContext) {
-  const queries: any[] = [];
-  const item = { _id: "meeting", companyCode: "ACME", status: "scheduled", latitude: 10, longitude: 106, gpsRadiusMeters: 200,
+  const queries: Array<{ _id?: string; companyCode?: string; isActive?: { $ne?: boolean } }> = [];
+  const item = { _id: "meeting", companyCode: "ACME", status: "scheduled", latitude: 10, longitude: 106, gpsRadiusMeters: 200, allowDirectCheckIn: undefined as boolean | undefined,
     speakers: [], tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20, save: async () => {} };
   t.mock.method(UserModel, "findOne", (query) => {
     queries.push(query);

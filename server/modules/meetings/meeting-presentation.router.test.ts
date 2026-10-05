@@ -3,8 +3,8 @@ import type { Server } from "node:http";
 import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 vi.mock("../../socket", () => ({ emitToCompany: vi.fn() }));
 vi.mock("../../middleware/auth", () => ({
-  requireAuth: (req: any, _res: any, next: any) => { req.user = { id: "organizer", companyCode: req.headers["x-company"] || "BNI", role: req.headers["x-role"] || "admin" }; next(); },
-  requirePermission: () => (req: any, res: any, next: any) => req.user.role === "admin" ? next() : res.sendStatus(403),
+  requireAuth: (req: import('express').Request, _res: import('express').Response, next: import('express').NextFunction) => { req.user = { id: "organizer", email: "organizer@test.invalid", companyCode: String(req.headers["x-company"] || "BNI"), role: String(req.headers["x-role"] || "admin") }; next(); },
+  requirePermission: () => (req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => req.user.role === "admin" ? next() : res.sendStatus(403),
   getEffectivePermissions: vi.fn(), hasAnyPermission: vi.fn(),
 }));
 import { MeetingModel } from "./meeting.model";
@@ -14,14 +14,14 @@ let server: Server; let base: string;
 beforeAll(async () => {
   const app = express(); app.use(express.json()); app.use("/meetings", meetingRouter);
   server = await new Promise<Server>(resolve => { const instance = app.listen(0, "127.0.0.1", () => resolve(instance)); });
-  base = "http://127.0.0.1:" + (server.address() as any).port + "/meetings/" + id;
+  base = "http://127.0.0.1:" + (server.address() as import('node:net').AddressInfo).port + "/meetings/" + id;
 });
 afterAll(async () => { await new Promise<void>(resolve => server.close(() => resolve())); });
 afterEach(() => vi.restoreAllMocks());
 function seed() {
   const item = MeetingModel.hydrate({ _id: id, companyCode: "BNI", title: "Demo", speakers: [], __v: 2 });
-  item.save = vi.fn(async () => item);
-  const find = vi.spyOn(MeetingModel, "findOne").mockImplementation((query: any) => Promise.resolve(query.companyCode === "BNI" ? item : null) as any);
+  item.save = vi.fn(async () => item) as unknown as typeof item.save;
+  const find = vi.spyOn(MeetingModel, "findOne").mockImplementation((query) => Promise.resolve((query as unknown as { companyCode?: string }).companyCode === "BNI" ? item : null) as unknown as ReturnType<typeof MeetingModel.findOne>);
   return { item, find };
 }
 it("returns a read-only snapshot with server time and no cache", async () => {

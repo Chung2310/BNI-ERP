@@ -18,7 +18,7 @@ it.each(["0901234567", "+84 901 234 567", "0901.234.567"])("logs in by phone %s 
  const result = await authService.login(identifier, " pass123 ");
  expect(result.user).toBe(member);
  expect(result.accessToken).toBeTruthy();
- const phone = (find.mock.calls[0][0]).phone as RegExp;
+ const phone = (find.mock.calls[0][0] as unknown as { phone: RegExp }).phone;
  for (const stored of ["0901234567", "0901 234 567", "+84 (901) 234-567", "84901234567"]) expect(phone.test(stored)).toBe(true);
  expect(phone.test("10901234567")).toBe(false);
 });

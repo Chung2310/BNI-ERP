@@ -45,7 +45,7 @@ test("invalid batches do not partially mutate or save the queue", async t => {
 });
 
 test("previous speaker resets the target timer and preserves live or paused state", async () => {
-  for (const status of ["live", "paused"]) {
+  for (const status of ["live", "paused"] as const) {
     const item = meeting(); item.currentIndex = 1; item.status = status;
     if (status === "paused") { item.speakerStartedAt = undefined; item.elapsedSeconds = 12; }
     await controlMeeting((item as unknown as Parameters<typeof controlMeeting>[0]), "previous", now);

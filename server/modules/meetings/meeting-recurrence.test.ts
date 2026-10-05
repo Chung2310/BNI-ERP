@@ -25,10 +25,10 @@ it("validates common meeting details and recurrence before creating the series",
  expect(recurringMeetingInput.validate({...details,recurrence:{...rule,months:13}}).error).toBeDefined();
 });
 it("creates separate scoped meetings with one series identifier and per-date reminders", async () => {
- const insert = vi.spyOn(MeetingModel,"insertMany").mockImplementation((async (rows) => rows as unknown as Parameters<((value: typeof MeetingModel.insertMany) => void)>[0]));
+ const insert = vi.spyOn(MeetingModel,"insertMany").mockImplementation(async (rows) => rows as never);
  const rows = await createRecurringMeetings("BNI","actor",{...details,recurrence:rule});
  expect(rows).toHaveLength(26);
- const values = insert.mock.calls[0][0] as any[];
+ const values = insert.mock.calls[0][0] as Array<{ seriesId: string; companyCode: string; createdBy: string; startsAt: Date; reminderAt: Date; originalStartsAt: Date }>;
  expect(new Set(values.map(row => row.seriesId)).size).toBe(1);
  values.forEach(row => { expect(row.companyCode).toBe("BNI"); expect(row.createdBy).toBe("actor"); expect(+row.startsAt - +row.reminderAt).toBe(86400000); expect(row.originalStartsAt).toEqual(row.startsAt); });
 });

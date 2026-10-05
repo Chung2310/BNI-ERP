@@ -25,7 +25,7 @@ function makeUser(activeSessionId = "") {
 }
 
 describe("regular user concurrent device sessions", () => {
-  let user: any;
+  let user: ReturnType<typeof makeUser> & { disabledAt?: Date; isActive?: boolean };
   const originalUserFindOne = UserModel.findOne;
   const originalUserFindById = UserModel.findById;
   const originalCompanyFindOne = CompanyModel.findOne;
@@ -34,9 +34,9 @@ describe("regular user concurrent device sessions", () => {
     process.env.JWT_ACCESS_SECRET ||= "test-access-secret-at-least-32-characters";
     process.env.JWT_REFRESH_SECRET ||= "test-refresh-secret-at-least-32-characters";
     user = makeUser();
-    (UserModel).findOne = async () => user;
-    (UserModel).findById = async () => user;
-    (CompanyModel).findOne = () => ({ select: () => ({ lean: async () => ({ lifecycleStatus: "active" }) }) });
+    (UserModel).findOne = (async () => user) as unknown as typeof UserModel.findOne;
+    (UserModel).findById = (async () => user) as unknown as typeof UserModel.findById;
+    (CompanyModel).findOne = (() => ({ select: () => ({ lean: async () => ({ lifecycleStatus: "active" }) }) })) as unknown as typeof CompanyModel.findOne;
   });
 
   afterEach(() => {
@@ -51,8 +51,8 @@ describe("regular user concurrent device sessions", () => {
     user.activeSessionId = "legacy-device";
     const first = await authService.login("user@example.com", "password123");
     const second = await authService.login("user@example.com", "password123");
-    const firstRefresh = jwt.verify(first.refreshToken, getJwtRefreshSecret());
-    const secondRefresh = jwt.verify(second.refreshToken, getJwtRefreshSecret());
+    const firstRefresh = jwt.verify(first.refreshToken, getJwtRefreshSecret()) as { sid?: string };
+    const secondRefresh = jwt.verify(second.refreshToken, getJwtRefreshSecret()) as { sid?: string };
 
     assert.ok(firstRefresh.sid);
     assert.notEqual(secondRefresh.sid, firstRefresh.sid);
@@ -64,9 +64,9 @@ describe("regular user concurrent device sessions", () => {
     const first = await authService.login("user@example.com", "password123");
     const second = await authService.login("user@example.com", "password123");
     for (const device of [first, second, first]) {
-      const original = jwt.verify(device.refreshToken, getJwtRefreshSecret());
+      const original = jwt.verify(device.refreshToken, getJwtRefreshSecret()) as { sid?: string };
       const renewed = await authService.refresh(device.refreshToken);
-      const payload = jwt.verify(renewed.accessToken, getJwtAccessSecret());
+      const payload = jwt.verify(renewed.accessToken, getJwtAccessSecret()) as { sid?: string; id?: string };
       assert.equal(payload.sid, original.sid);
       assert.equal(payload.id, user._id);
     }
@@ -81,7 +81,7 @@ describe("regular user concurrent device sessions", () => {
     await assert.rejects(authService.refresh(first.refreshToken));
   });
   it("does not send a forced logout event to another device", async () => {
-    const socketCalls: Array<{ sessionId: string; eventName: string; data: any }> = [];
+    const socketCalls: Array<{ sessionId: string; eventName: string; data: unknown }> = [];
     socketModule.setEmitToUserSessionMockForTesting((sessionId, eventName, data) => {
       socketCalls.push({ sessionId, eventName, data });
     });

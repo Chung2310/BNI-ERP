@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { buildMemberAbsenceRanking } from './memberAbsenceRanking';
 const members = ['absent', 'late', 'less-late', 'on-time'].map(uid => ({ uid, displayName: uid, createdAt: '2020-01-01' }));
-const meeting = (id: string, speakers: any[] = [], status = 'ended') => ({ _id: id, startsAt: '2025-01-01T08:00:00Z', status, speakers });
+const meeting = (id: string, speakers: { userId?: string; checkedInAt?: string; name?: string; email?: string }[] = [], status = 'ended') => ({ _id: id, startsAt: '2025-01-01T08:00:00Z', status, speakers });
 const arrival = (userId: string, minutes: number) => ({ userId, checkedInAt: new Date(Date.parse('2025-01-01T08:00:00Z') + minutes * 60000).toISOString() });
 it('prioritizes absences before late attendance, then late count and total minutes', () => {
   const meetings = [meeting('1', [arrival('late', 30), arrival('less-late', 5), arrival('on-time', 0)]), meeting('2', [arrival('late', 10), arrival('less-late', 5), arrival('on-time', -5)])];
