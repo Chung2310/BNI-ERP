@@ -4,6 +4,8 @@ import { CompanyModel } from "../model/company.model";
 import { BranchModel } from "../model/branch.model";
 import { authService } from "./auth.service";
 import { normalizeBirthDate } from "./birth-date";
+import { findLoginAccount } from "../utils/login-account";
+import { normalizeLoginIdentifier } from "../../src/utils/loginIdentifier";
 
 export class UserImportError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -11,7 +13,7 @@ export class UserImportError extends Error {
 const rowSchema = Joi.object({
   rowNumber: Joi.number().integer().min(2).max(201).required(),
   displayName: Joi.string().trim().min(1).max(150).required(),
-  email: Joi.string().trim().lowercase().max(254).pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/).required(),
+  email: Joi.string().trim().lowercase().max(254).pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/).allow("").default(""),
   phone: Joi.string().trim().pattern(/^(0|\+84|84)(3|5|7|8|9)[0-9]{8}$/).allow("").default(""),
   companyName: Joi.string().trim().max(200).allow("").default(""),
   industry: Joi.string().trim().max(200).allow("").default(""),
@@ -22,6 +24,16 @@ const rowSchema = Joi.object({
   }),
 });
 export type ImportResultRow = { rowNumber: number; email: string; status: "valid" | "created" | "skipped" | "error"; message: string };
+
+function accountEmail(email: string, normalizedPhone: string) {
+  return email || `phone-${normalizedPhone.replace(/\D/g, "")}@import.invalid`;
+}
+
+async function phoneAccountExists(phone: string) {
+  try { return Boolean(await findLoginAccount(phone)); }
+  catch { return true; }
+}
+
 export async function importUsers(input: unknown, actor: { companyCode?: string; role: string; branchId?: string }) {
   if (actor.role !== "admin") throw new UserImportError(403, "Chỉ Admin được nhập tài khoản.");
   const { error, value } = Joi.object({
@@ -38,6 +50,7 @@ export async function importUsers(input: unknown, actor: { companyCode?: string;
   }
   const results: ImportResultRow[] = [];
   const seenEmails = new Set<string>();
+  const seenPhones = new Set<string>();
   const seenRows = new Set<number>();
   const fieldNames: Record<string, string> = { displayName: "Họ tên", email: "Email", phone: "Điện thoại", birthDate: "Ngày sinh",
     photoURL: "Ảnh đại diện", coverImage: "Ảnh bìa / Banner", companyName: "Doanh nghiệp", industry: "Lĩnh vực", rowNumber: "Số dòng" };
@@ -49,26 +62,34 @@ export async function importUsers(input: unknown, actor: { companyCode?: string;
       results.push(result); continue;
     }
     const row = checked.value;
+    const normalizedPhone = row.phone ? normalizeLoginIdentifier(row.phone) || "" : "";
     result.email = row.email;
+    if (!row.email && !normalizedPhone) { result.message = "Cần có ít nhất Email hoặc Điện thoại."; results.push(result); continue; }
     if (seenRows.has(row.rowNumber)) { result.message = "Số dòng bị trùng."; results.push(result); continue; }
     seenRows.add(row.rowNumber);
-    if (seenEmails.has(row.email)) { result.message = "Email trùng trong file."; results.push(result); continue; }
-    seenEmails.add(row.email);
-    if (await UserModel.exists({ email: row.email })) {
-      result.status = "skipped"; result.message = "Email đã có tài khoản."; results.push(result); continue;
+    if (row.email && seenEmails.has(row.email)) { result.message = "Email trùng trong file."; results.push(result); continue; }
+    if (normalizedPhone && seenPhones.has(normalizedPhone)) { result.message = "Điện thoại trùng trong file."; results.push(result); continue; }
+    if (row.email) seenEmails.add(row.email);
+    if (normalizedPhone) seenPhones.add(normalizedPhone);
+
+    const persistedEmail = accountEmail(row.email, normalizedPhone);
+    if (await UserModel.exists({ email: persistedEmail })) {
+      result.status = "skipped"; result.message = row.email ? "Email đã có tài khoản." : "Điện thoại đã có tài khoản."; results.push(result); continue;
+    }
+    if (normalizedPhone && await phoneAccountExists(row.phone)) {
+      result.status = "skipped"; result.message = "Điện thoại đã có tài khoản."; results.push(result); continue;
     }
     if (value.dryRun) {
-      result.status = "valid"; result.message = "Sẵn sàng tạo Member.";
+      result.status = "valid"; result.message = `Sẵn sàng tạo Member, đăng nhập bằng ${row.email ? "Email" : "Điện thoại"}.`;
     } else {
       try {
         const { rowNumber: _rowNumber, ...profile } = row;
-        await authService.registerUserForCompany({ ...profile, companyName: row.companyName || company.name,
+        await authService.registerUserForCompany({ ...profile, email: persistedEmail, companyName: row.companyName || company.name,
           role: "user", password: "123456", companyCode, branchId: actor.branchId }, companyCode, actor.role);
-        result.status = "created"; result.message = "Đã tạo tài khoản Member.";
+        result.status = "created"; result.message = `Đã tạo tài khoản Member, đăng nhập bằng ${row.email ? "Email" : "Điện thoại"}.`;
       } catch {
-        // Unique email index also prevents duplicate accounts on retry/concurrent imports.
-        if (await UserModel.exists({ email: row.email })) {
-          result.status = "skipped"; result.message = "Email đã có tài khoản.";
+        if (await UserModel.exists({ email: persistedEmail }) || (normalizedPhone && await phoneAccountExists(row.phone))) {
+          result.status = "skipped"; result.message = row.email ? "Email hoặc Điện thoại đã có tài khoản." : "Điện thoại đã có tài khoản.";
         } else { result.message = "Không thể tạo tài khoản. Kiểm tra quyền của Admin hoặc thử lại."; }
       }
     }

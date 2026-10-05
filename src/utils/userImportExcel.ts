@@ -27,7 +27,7 @@ export function parseUserImportExcel(data: ArrayBuffer): UserImportRow[] {
     if (columns.some(c => c.field === field)) throw new Error("Tên cột bị trùng: " + name);
     columns.push({ index: col, field });
   }
-  if (!columns.some(c => c.field === "displayName") || !columns.some(c => c.field === "email")) throw new Error("Thiếu cột Họ tên hoặc Email.");
+  if (!columns.some(c => c.field === "displayName") || (!columns.some(c => c.field === "email") && !columns.some(c => c.field === "phone"))) throw new Error("Thiếu cột Họ tên hoặc ít nhất một trong hai cột Email, Điện thoại.");
   const rows: UserImportRow[] = [];
   for (let r = 1; r <= range.e.r; r++) {
     const row: UserImportRow = { rowNumber: r + 1, displayName: "", email: "", phone: "", companyName: "", industry: "", birthDate: "" };
@@ -57,7 +57,8 @@ export function parseUserImportExcel(data: ArrayBuffer): UserImportRow[] {
 }
 export function downloadUserImportTemplate() {
   const sheet = XLSX.utils.aoa_to_sheet([["STT", "Họ tên", "Email", "Điện thoại", "Doanh nghiệp", "Lĩnh vực", "Ngày sinh"],
-    [1, "Nguyễn Văn An", "an@example.com", "0901234567", "Công ty ABC", "Công nghệ", "15/08/1990"]]);
+    [1, "Nguyễn Văn An", "an@example.com", "", "Công ty ABC", "Công nghệ", "15/08/1990"],
+    [2, "Trần Thị Bình", "", "0901234567", "Công ty XYZ", "Dịch vụ", "20/10/1992"]]);
   sheet["!cols"] = [8, 25, 32, 18, 30, 25, 18].map(wch => ({ wch }));
   const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, "Tai khoan");
   XLSX.writeFile(book, "mau-nhap-tai-khoan.xlsx");
