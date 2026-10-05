@@ -1,9 +1,9 @@
 import { CompanyCheckInQrPanel, type CheckInQrApi } from "./CompanyCheckInQrPanel";
 
 type Meeting = { title: string; status: string; latitude?: number; longitude?: number; gpsRadiusMeters?: number; speakers: { userId?: string }[] };
-export function MeetingCheckInPanel({ meeting, canManage, api, companyCode, onConfigure, onOperate }: {
+export function MeetingCheckInPanel({ meeting, canManage, api, companyCode, onConfigure }: {
   meeting: Meeting; canManage: boolean; api: CheckInQrApi; companyCode?: string;
-  onConfigure: () => void; onOperate: () => void;
+  onConfigure: () => void;
 }) {
   const open = ["scheduled", "live", "paused"].includes(meeting.status);
   const hasGps = typeof meeting.latitude === "number" && typeof meeting.longitude === "number";
@@ -11,7 +11,6 @@ export function MeetingCheckInPanel({ meeting, canManage, api, companyCode, onCo
   return <section className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h3 className="text-xl font-bold text-slate-900">Đón tiếp & check-in</h3><p className="mt-1 text-sm text-slate-500">{members} thành viên · {meeting.speakers.length - members} khách mời · thứ tự phát biểu theo check-in</p></div>
-      <button type="button" onClick={onOperate} className="rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white">Sang điều hành →</button>
     </div>
     {!open && <p className="rounded-xl bg-slate-100 p-4 text-sm">Buổi họp đã đóng check-in. QR cố định vẫn dùng cho những cuộc họp tiếp theo của đơn vị.</p>}
     {canManage ? <>

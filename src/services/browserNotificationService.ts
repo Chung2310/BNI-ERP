@@ -24,7 +24,7 @@ export const browserNotificationService = {
       const notification = new Notification(title, {
         body: options.body,
         tag: options.tag,
-        icon: "/brand-icon.png",
+        icon: "/igen-connect.png",
       });
       notification.onclick = () => {
         window.focus();

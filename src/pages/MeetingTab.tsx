@@ -44,6 +44,8 @@ import {
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
 import { LuckyDrawTab } from "../components/meetings/LuckyDrawTab";
+import { MeetingFlowStepper, loadMeetingFlowOrder, saveMeetingFlowOrder, type MeetingFlowStep } from "../components/meetings/MeetingFlowStepper";
+import { ActiveMembersPanel } from "../components/meetings/ActiveMembersPanel";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { toast } from "./Toast";
 
@@ -169,7 +171,19 @@ export default function MeetingTab() {
   const [detailMeetingId, setDetailMeetingId] = useState<string | null>(null);
   const detailMeetingIdRef = useRef<string | null>(null);
   detailMeetingIdRef.current = detailMeetingId;
-  const [activeSubTab, setActiveSubTab] = useState<"checkin" | "speakers" | "luckyDraw" | "slides">("checkin");
+  // Quy trình điều hành: các bước theo thứ tự do MC sắp xếp (lưu localStorage)
+  const [flowOrder, setFlowOrder] = useState<MeetingFlowStep[]>(loadMeetingFlowOrder);
+  const [flowStep, setFlowStep] = useState<MeetingFlowStep>("checkin");
+  const [slidesOpen, setSlidesOpen] = useState(false);
+  const updateFlowOrder = useCallback((order: MeetingFlowStep[]) => {
+    setFlowOrder(order);
+    saveMeetingFlowOrder(order);
+  }, []);
+  const goToFlowStep = useCallback((step: MeetingFlowStep) => {
+    setFlowStep(step);
+    setSlidesOpen(false);
+  }, []);
+  const openMeetingFlow = (status: string) => goToFlowStep(status === "scheduled" ? flowOrder[0] : "presentation");
   const [attendedOnly, setAttendedOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -187,7 +201,8 @@ export default function MeetingTab() {
   const presentationClosed = useCallback(() => {
     setStartPresentation(false);
     presentationFullscreen.current = null;
-    setActiveSubTab("slides");
+    setFlowStep("presentation");
+    setSlidesOpen(true);
   }, []);
   const [prioritySpeakerId, setPrioritySpeakerId] = useState("");
   const [priorityPosition, setPriorityPosition] = useState(1);
@@ -439,7 +454,7 @@ export default function MeetingTab() {
         setView("calendar"); setDetailMeetingId(null);
         toast.success("Đã tạo " + result.length + " buổi họp định kỳ.");
       } else { detailMeetingIdRef.current = result._id; setDetailMeetingId(result._id); }
-      setActiveSubTab("checkin");
+      openMeetingFlow("scheduled");
     });
   };
 
@@ -858,7 +873,7 @@ export default function MeetingTab() {
       {canManage && showSharedQr && <CompanyCheckInQrDialog api={api} companyCode={userProfile?.companyCode} onClose={() => setShowSharedQr(false)} />}
       {/* Grid of Meeting Cards (Dạng danh sách / Thẻ hiển thị) */}
       {view === "calendar" ? <MeetingCalendar<Meeting> month={calendarMonth} onMonthChange={setCalendarMonth} revision={calendarRevision} load={api} canManage={canManage} filter={matchesMeetingFilter}
-        onOpen={meeting => { setItems(previous => [...previous.filter(item => item._id !== meeting._id), meeting]); setDetailMeetingId(meeting._id); setActiveSubTab(meeting.status === "scheduled" ? "checkin" : "speakers"); }}
+        onOpen={meeting => { setItems(previous => [...previous.filter(item => item._id !== meeting._id), meeting]); setDetailMeetingId(meeting._id); openMeetingFlow(meeting.status); }}
         onEdit={meeting => openEditModal(meeting)}
         onCancel={async meeting => { try { await api("/" + meeting._id + "/control", "POST", { action: "cancel", version: meeting.__v }); await refresh(); toast.success("Đã hủy buổi họp."); } catch (error: any) { toast.error(error.message); throw error; } }}
       /> : loading ? <p role="status" className="p-8 text-center text-sm text-slate-500">Đang tải cuộc họp...</p> : loadError ? <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{loadError}<button type="button" onClick={() => { setLoading(true); void refresh(); }} className="ml-3 font-bold">Thử lại</button></div> : filteredItems.length > 0 ? (
@@ -879,7 +894,7 @@ export default function MeetingTab() {
                 key={m._id}
                 onClick={() => {
                   setDetailMeetingId(m._id);
-                  setActiveSubTab(m.status === "scheduled" ? "checkin" : "speakers");
+                  openMeetingFlow(m.status);
                 }}
                 className={`group relative flex flex-col justify-between overflow-hidden rounded-lg border bg-white shadow-2xs transition-all duration-200 hover:shadow-md cursor-pointer ${s.border}`}
               >
@@ -1011,7 +1026,7 @@ export default function MeetingTab() {
                   <button
                     type="button"
                     aria-label={!canManage ? "Xem chi tiết cuộc họp" : isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}
-                    onClick={(event) => { event.stopPropagation(); setDetailMeetingId(m._id); setActiveSubTab(m.status === "scheduled" ? "checkin" : "speakers"); }}
+                    onClick={(event) => { event.stopPropagation(); setDetailMeetingId(m._id); openMeetingFlow(m.status); }}
                     className="flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-lg bg-slate-50 group-hover:bg-cyan-600 text-slate-700 group-hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap"
                   >
                     <span className="truncate">{!canManage ? "Xem chi tiết" : isLive ? "Điều hành" : m.status === "scheduled" ? "Check-in" : "Xem cuộc họp"}</span>
@@ -1077,7 +1092,7 @@ export default function MeetingTab() {
       {!canManage && activeMeeting && <MemberMeetingDetail key={activeMeeting._id} onCheckIn={async (location) => { const updated = await api("/" + activeMeeting._id + "/checkin", "POST", location); setItems(previous => previous.map(item => item._id === updated._id ? updated : item)); }} meeting={activeMeeting} userId={userProfile?.uid} onClose={() => setDetailMeetingId(null)} />}
       {canManage && activeMeeting && (
         <div className={`fixed inset-0 z-50 ${isModalFullscreen ? "bg-slate-900 overflow-hidden" : "flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto"}`}>
-          <div className={`${isModalFullscreen ? "w-full h-full max-w-none max-h-none rounded-none border-0" : "w-full max-w-6xl max-h-[94vh] rounded-3xl border border-slate-200 shadow-2xl"} flex flex-col bg-slate-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150`}>
+          <div className={`${isModalFullscreen ? "w-full h-full max-w-none max-h-none rounded-none border-0" : "w-full max-w-6xl h-[92vh] min-h-[620px] rounded-3xl border border-slate-200 shadow-2xl"} flex flex-col bg-slate-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150`}>
             {/* Modal Top Header Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 bg-white px-5 py-3.5 shrink-0">
               <div className="flex items-center gap-3 min-w-0">
@@ -1124,66 +1139,8 @@ export default function MeetingTab() {
                 </div>
               </div>
 
-              {/* Sub-tab Switcher & Actions */}
+              {/* Actions */}
               <div className="flex items-center justify-between sm:justify-end gap-2">
-                <div className="flex overflow-x-auto bg-slate-100 p-1 rounded-xl gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setActiveSubTab("slides")}
-                    aria-pressed={activeSubTab === "slides"}
-                    className={`shrink-0 rounded-lg px-3 py-1.5 text-xs transition cursor-pointer ${
-                      activeSubTab === "slides"
-                        ? "bg-white text-cyan-700 shadow-xs font-bold border border-slate-200/60"
-                        : "text-slate-600 hover:text-cyan-700 font-medium"
-                    }`}
-                  >
-                    Thuyết trình
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveSubTab("checkin")}
-                    aria-pressed={activeSubTab === "checkin"}
-                    className={`shrink-0 rounded-lg px-3 py-1.5 text-xs transition cursor-pointer ${
-                      activeSubTab === "checkin"
-                        ? "bg-white text-cyan-700 shadow-xs font-bold border border-slate-200/60"
-                        : "text-slate-600 hover:text-cyan-700 font-medium"
-                    }`}
-                  >
-                    Check-in ({activeMeeting.speakers.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveSubTab("speakers")}
-                    aria-pressed={activeSubTab === "speakers"}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition cursor-pointer ${
-                      activeSubTab === "speakers"
-                        ? "bg-white text-cyan-700 shadow-xs font-bold border border-slate-200/60"
-                        : "text-slate-600 hover:text-cyan-700 font-medium"
-                    }`}
-                  >
-                    <Users className="h-3.5 w-3.5" />
-                    <span>Điều hành</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveSubTab("luckyDraw")}
-                    aria-pressed={activeSubTab === "luckyDraw"}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition cursor-pointer ${
-                      activeSubTab === "luckyDraw"
-                        ? "bg-white text-cyan-700 shadow-xs font-bold border border-slate-200/60"
-                        : "text-slate-600 hover:text-cyan-700 font-medium"
-                    }`}
-                  >
-                    <Gift className="h-3.5 w-3.5" />
-                    <span>Quay thưởng</span>
-                    {activeMeeting.luckyDraw?.winners?.length ? (
-                      <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-100 text-amber-800 font-extrabold border border-amber-300">
-                        {activeMeeting.luckyDraw.winners.length}
-                      </span>
-                    ) : null}
-                  </button>
-                </div>
 
                 {canManage && (
                   <button
@@ -1242,7 +1199,22 @@ export default function MeetingTab() {
 
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              {activeSubTab === "slides" && (
+              <MeetingFlowStepper
+                order={flowOrder}
+                current={flowStep}
+                canReorder={canManage}
+                badges={{ checkin: activeMeeting.speakers.length, luckyDraw: activeMeeting.luckyDraw?.winners?.length }}
+                onSelect={goToFlowStep}
+                onReorder={updateFlowOrder}
+                onFinish={canManage && ["live", "paused"].includes(activeMeeting.status) ? () => setFinishRequested(true) : undefined}
+              />
+              {flowStep === "presentation" && (
+                <div role="group" aria-label="Chế độ xem thuyết trình" className="inline-flex rounded-xl bg-slate-100 p-1">
+                  <button type="button" aria-pressed={!slidesOpen} onClick={() => setSlidesOpen(false)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 transition aria-pressed:bg-white aria-pressed:font-semibold aria-pressed:text-cyan-700 aria-pressed:shadow-2xs cursor-pointer"><Users className="h-3.5 w-3.5" /> Bảng điều hành</button>
+                  <button type="button" aria-pressed={slidesOpen} onClick={() => setSlidesOpen(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 transition aria-pressed:bg-white aria-pressed:font-semibold aria-pressed:text-cyan-700 aria-pressed:shadow-2xs cursor-pointer"><Megaphone className="h-3.5 w-3.5" /> Slide trình chiếu</button>
+                </div>
+              )}
+              {flowStep === "presentation" && slidesOpen && (
                 <MeetingSlides
                   key={activeMeeting._id}
                   meeting={activeMeeting}
@@ -1265,9 +1237,9 @@ export default function MeetingTab() {
                 />
               )}
               {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
-              {(activeSubTab === "speakers" || activeSubTab === "checkin") && (
+              {(flowStep === "checkin" || (flowStep === "presentation" && !slidesOpen)) && (
                 <div className="space-y-4">
-                  {activeSubTab === "speakers" && (<>
+                  {flowStep === "presentation" && (<>
                   {/* Meeting Hero Banner Card */}
                   <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
                     {activeMeeting.coverImage ? (
@@ -1333,7 +1305,7 @@ export default function MeetingTab() {
                             presentationFullscreen.current = document.documentElement.requestFullscreen && !document.fullscreenElement
                               ? document.documentElement.requestFullscreen().then(() => true).catch(() => false)
                               : null;
-                            setStartPresentation(true); setActiveSubTab("slides");
+                            setStartPresentation(true); setFlowStep("presentation"); setSlidesOpen(true);
                           }}
                           className="flex items-center gap-1.5 rounded-xl bg-cyan-600 px-4 py-2 text-xs font-bold text-white shadow-sm shadow-cyan-600/20 disabled:opacity-40 hover:bg-cyan-700 transition cursor-pointer">
                           <Play className="h-3.5 w-3.5" /> Bắt đầu thuyết trình
@@ -1588,9 +1560,9 @@ export default function MeetingTab() {
                   </div>}
 
                   </>)}
-                  {activeSubTab === "checkin" && <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} companyCode={userProfile?.companyCode} onConfigure={() => openEditModal(activeMeeting)} onOperate={() => setActiveSubTab("speakers")} />}
+                  {flowStep === "checkin" && <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} companyCode={userProfile?.companyCode} onConfigure={() => openEditModal(activeMeeting)} />}
                   {/* Guest Checkin Form (MC / Admin) */}
-                  {canManage && (activeSubTab === "checkin" || activeSubTab === "speakers") && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
+                  {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
                     <form
                       onSubmit={addGuest}
                       className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs flex flex-wrap items-center gap-3"
@@ -1627,7 +1599,7 @@ export default function MeetingTab() {
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-cyan-600" />
                         <h3 className="text-[11px] font-medium uppercase tracking-wider text-slate-600">
-                          {activeSubTab === "checkin" ? "Người đã check-in · thứ tự phát biểu" : "Danh sách thuyết trình"} ({filteredSpeakers.length}{filteredSpeakers.length !== activeMeeting.speakers.length ? `/${activeMeeting.speakers.length}` : ""})
+                          {flowStep === "checkin" ? "Người đã check-in · thứ tự phát biểu" : "Danh sách thuyết trình"} ({filteredSpeakers.length}{filteredSpeakers.length !== activeMeeting.speakers.length ? `/${activeMeeting.speakers.length}` : ""})
                         </h3>
                       </div>
 
@@ -1733,7 +1705,7 @@ export default function MeetingTab() {
                                 setSpeakerSearch("");
                                 setSpeakerTypeFilter("all");
                               }}
-                              className="mt-2 text-cyan-600 hover:text-cyan-800 font-semibold cursor-pointer underline"
+                              className="mt-2 text-cyan-600 hover:text-cyan-800 font-semibold cursor-pointer"
                             >
                               Xóa bộ lọc tìm kiếm
                             </button>
@@ -1840,7 +1812,7 @@ export default function MeetingTab() {
               )}
 
               {/* SUBTAB 2: VÒNG QUAY MAY MẮN (RANDOM.ORG) */}
-              {activeSubTab === "luckyDraw" && (
+              {flowStep === "luckyDraw" && (
                 <LuckyDrawTab
                   meeting={activeMeeting as any}
                   canManage={canManage}
@@ -1848,6 +1820,9 @@ export default function MeetingTab() {
                   onStartMeeting={() => control("start")}
                 />
               )}
+
+              {/* BƯỚC: THÀNH VIÊN TÍCH CỰC */}
+              {flowStep === "activeMembers" && <ActiveMembersPanel meeting={activeMeeting} meetings={items} />}
             </div>
           </div>
         </div>
@@ -2053,7 +2028,7 @@ export default function MeetingTab() {
                       if (target !== index) reorder(index, target - index);
                     }}>Áp dụng thứ tự</button>
                 </div>
-                {pendingStart >= orderingMeeting.speakers.length && <p role="status" className="text-xs text-slate-600">Danh sách check-in đã được tải. Các lượt đã hoàn tất hoặc đang phát biểu nên không thể đổi ưu tiên. Để thuyết trình lại, chọn người trong tab Thuyết trình rồi bấm Bắt đầu thuyết trình.</p>}
+                {pendingStart >= orderingMeeting.speakers.length && <p role="status" className="text-xs text-slate-600">Danh sách check-in đã được tải. Các lượt đã hoàn tất hoặc đang phát biểu nên không thể đổi ưu tiên. Để thuyết trình lại, chọn người trong bước Thuyết trình rồi bấm Bắt đầu thuyết trình.</p>}
                 <ol className="list-inside list-decimal space-y-1 text-xs text-slate-600">
                   {orderingMeeting.speakers.map(person => <li key={person.id}>{person.name}</li>)}
                 </ol>

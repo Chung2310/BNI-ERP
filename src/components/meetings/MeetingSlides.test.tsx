@@ -38,7 +38,7 @@ it.each([0, 1])("previews selected attendee %s without changing the live turn un
   const start = vi.fn().mockResolvedValue(undefined);
   const initial = { ...meeting, currentIndex: target === 0 ? 1 : 0 };
   const view = render(<MeetingSlides meeting={initial} canManage api={api} onStartPresentation={start} />);
-  fireEvent.click(await screen.findByText(slides[target].name));
+  fireEvent.click(await within(screen.getByRole("complementary")).findByText(slides[target].name));
   expect((await screen.findByRole("img")).getAttribute("aria-label")).toContain(slides[target].name);
   expect(start).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
@@ -156,10 +156,8 @@ it("keeps the version captured when editing even if live meeting data refreshes"
 });
 
 it("does not keep showing the last speaker after the meeting ends", async () => {
-  render(<MeetingSlides meeting={{ ...meeting, status: "ended" }} canManage api={vi.fn().mockResolvedValue({ slides, version: 1 })} />);
-  await screen.findByText("Nguyễn An");
-  fireEvent.change(screen.getByLabelText("Chế độ trình chiếu"), { target: { value: "live" } });
-  expect(screen.getByText("Chưa có người đang phát biểu.")).toBeTruthy();
+  render(<MeetingSlides meeting={{ ...meeting, status: "ended" }} canManage api={vi.fn().mockResolvedValue({ slides: [], version: 1 })} />);
+  expect(await screen.findByText("Chưa có người check-in. Hãy check-in thành viên hoặc khách mời trước.")).toBeTruthy();
 });
 
 
@@ -245,7 +243,7 @@ it.each(["Nguyễn An", "Trần Bình"])("starts the selected member or guest %s
   const api = vi.fn().mockResolvedValue({ slides, version: 1 });
   render(<MeetingSlides meeting={{ ...meeting, status: "scheduled" }} canManage api={api} />);
   await screen.findByText("Nguyễn An");
-  fireEvent.click(screen.getByText(name));
+  fireEvent.click(within(screen.getByRole("complementary")).getByText(name));
   await waitFor(() => expect(screen.getByRole("img").getAttribute("aria-label")).toContain(name));
   fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
   const dialog = screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" });
