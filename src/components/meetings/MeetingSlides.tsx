@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Play, Pause, RotateCcw, Pencil, ArrowDownToLine } from "lucide-react";
 import { renderProfileSlide, loadSlideImage, SLIDE_WIDTH, SLIDE_HEIGHT } from "./profileSlideRenderer";
-import { drawSlideTimer, getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
+import { getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
 import { SlideTransitionDelayInput } from "./SlideTransitionDelayInput";
 import { SpeechesCompleteMessage } from "./SpeechesCompleteDialog";
 import type { ProfileSlide, SlideDeck } from "./slideTypes";
@@ -28,70 +28,6 @@ type Props = {
 };
 const button = "inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition disabled:opacity-40 cursor-pointer";
 const fieldClass = "w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none transition";
-
-function NextSpeakersOverlay({ speakers, large = false }: { speakers: ProfileSlide[]; large?: boolean }) {
-  if (!speakers.length) return null;
-  return (
-    <div
-      aria-label="Người thuyết trình tiếp theo"
-      className={`pointer-events-none absolute z-10 flex items-center justify-end select-none ${
-        large
-          ? "right-[3.8%] top-[3.8%] h-[8%] max-w-[70%] gap-3.5"
-          : "right-[3.8%] top-[3.2%] h-[9%] max-w-[72%] gap-2"
-      }`}
-    >
-      <span
-        className={`font-black uppercase tracking-wider text-[#d70b2d] shrink-0 ${
-          large ? "text-[clamp(11px,1.1vw,18px)]" : "text-[9px] sm:text-[11px]"
-        }`}
-      >
-        Tiếp theo:
-      </span>
-
-      <div className={`flex items-center ${large ? "gap-3.5" : "gap-1.5 sm:gap-2.5"}`}>
-        {speakers.map((s, i) => (
-          <div key={s.id} className="flex items-center gap-1.5 min-w-0 shrink-0">
-            {i > 0 && (
-              <span className={`text-slate-300 font-light ${large ? "text-[clamp(11px,1.1vw,18px)] mx-0.5" : "text-[10px] mx-0.5"}`}>
-                •
-              </span>
-            )}
-            <span
-              className={`grid shrink-0 place-items-center rounded-full bg-[#d70b2d] text-white font-extrabold ${
-                large
-                  ? "h-[clamp(18px,1.5vw,26px)] w-[clamp(18px,1.5vw,26px)] text-[clamp(10px,0.85vw,14px)]"
-                  : "h-4 w-4 text-[9px]"
-              }`}
-            >
-              {i + 1}
-            </span>
-            {s.photoURL ? (
-              <img
-                src={s.photoURL}
-                alt=""
-                className={`shrink-0 rounded-full border border-slate-200 object-cover ${
-                  large
-                    ? "h-[clamp(24px,2.2vw,38px)] w-[clamp(24px,2.2vw,38px)]"
-                    : "h-5 w-5 sm:h-6 sm:w-6"
-                }`}
-              />
-            ) : null}
-            <span
-              className={`truncate font-bold text-slate-800 tracking-tight ${
-                large
-                  ? "text-[clamp(12px,1.15vw,20px)] max-w-[clamp(100px,13vw,240px)]"
-                  : "text-[10px] sm:text-[12px] max-w-[85px] sm:max-w-[130px]"
-              }`}
-              title={s.name}
-            >
-              {s.name}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker, onTogglePause }: Props) {
   const [now, setNow] = useState(Date.now);
@@ -168,12 +104,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   const speechesComplete = !!meeting.speechesCompletedAt && ["live", "paused"].includes(meeting.status);
   const timer = useMemo(() => getSlideTimer(meeting, active?.id, now), [meeting, active?.id, now]);
   const index = queue.findIndex(s => s.id === selected?.id);
-  const nextSpeakers = useMemo(() => {
-    if (speechesComplete || !active) return [];
-    const currentIdx = queue.findIndex(s => s.id === active.id);
-    if (currentIdx < 0) return [];
-    return queue.slice(currentIdx + 1, currentIdx + 4);
-  }, [speechesComplete, active, queue]);
+
   const isSpeakingLive = (meeting.status === "live" && Boolean(meeting.speakerStartedAt)) || (presenting && meeting.status !== "paused");
 
   const navigationBusy = startingSpeech || controlBusy || !!draft || loading;
@@ -232,7 +163,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     if (!rendered.current || drawing) return;
     for (const target of [preview.current, screen.current]) {
       const ctx = target?.getContext("2d");
-      if (ctx) { ctx.drawImage(rendered.current, 0, 0); drawSlideTimer(ctx, timer); }
+      if (ctx) { ctx.drawImage(rendered.current, 0, 0); }
     }
   }, [timer, drawing, presenting]);
 
@@ -240,7 +171,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   useEffect(() => {
     for (const offset of [1, 2]) {
       const next = queue[(Math.max(0, index) + offset) % queue.length];
-      if (next) { void loadSlideImage(next.photoURL); void loadSlideImage(next.coverImage); }
+      if (next) { void loadSlideImage(next.photoURL); next.galleryImages?.slice(0, 5).forEach(url => void loadSlideImage(url)); }
     }
   }, [queue, index]);
 
@@ -347,7 +278,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     setSaving(true); setError("");
     try {
       const id = active.id;
-      const profile = { name: active.name, company: active.company, photoURL: active.photoURL, coverImage: active.coverImage, phone: active.phone, ...(active.email !== undefined ? { email: active.email } : {}), industry: active.industry, bio: active.bio };
+      const profile = { name: active.name, company: active.company, photoURL: active.photoURL, coverImage: active.coverImage, phone: active.phone, ...(active.email !== undefined ? { email: active.email } : {}), industry: active.industry, bio: active.bio, address: active.address ?? "", targetMarket: active.targetMarket ?? "", galleryImages: active.galleryImages ?? [] };
       const data = await api(`/${meeting._id}/slides/${id}`, "PUT", { version: draft ? draftVersion.current : deck.version, profile: reset ? null : profile });
       setDeck(data); setDraft(null);
     } catch (e) { setError(e instanceof Error ? e.message : "Không lưu được slide."); }
@@ -557,7 +488,6 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
       <div className="min-w-0 space-y-3">
         <div className="relative aspect-video overflow-hidden rounded-2xl bg-slate-900 shadow-sm">
           {canvas(preview)}
-          {active && !drawing && !drawError && <NextSpeakersOverlay speakers={nextSpeakers} />}
           {(drawing || !active || drawError) && <div className="absolute inset-0 grid place-items-center p-6 text-center text-xs text-white/90">
             {speechesComplete && followsSpeaker ? <div className="rounded-2xl bg-white p-8"><SpeechesCompleteMessage /></div> : drawError || (loading ? "Đang tải hồ sơ…" : active ? "Đang chuẩn bị ảnh và font…" : followsSpeaker ? "Chưa có người đang phát biểu." : deck.slides.length ? "Chọn ít nhất một người để trình chiếu." : "Chưa có người check-in. Hãy check-in thành viên hoặc khách mời trước.")}
           </div>}
@@ -573,15 +503,15 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         {warnings.map(w => <p key={w} role="status" className="text-sm text-amber-700">{w}</p>)}
         {canManage && draft && <form className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs" onSubmit={e => { e.preventDefault(); void save(); }}>
           <p className="text-sm font-medium text-slate-800">Thông tin riêng cho slide trong cuộc họp này</p>
-          <p className="text-xs text-slate-500">Tự điền từ hồ sơ khi chưa có bản chỉnh riêng. Bio có thể nhập tại đây. Lưu sẽ giữ bản thông tin hiện tại cho slide; dùng “Dùng lại hồ sơ” để lấy thông tin hồ sơ mới nhất.</p>
+          <p className="text-xs text-slate-500">Thông tin và ảnh lấy từ hồ sơ. Bạn có thể sửa riêng cho buổi họp này hoặc chọn “Dùng lại hồ sơ”. Thông tin để trống sẽ không hiển thị.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {([
               ["name", "Họ và tên", "text", 150], ["company", "Công ty / thương hiệu", "text", 150],
-              ["phone", "Số điện thoại", "tel", 40], ["email", "Email", "email", 254], ["industry", "Lĩnh vực / dịch vụ", "text", 150],
-              ["photoURL", "URL ảnh đại diện", "url", 2000], ["coverImage", "URL ảnh bìa", "url", 2000],
+              ["phone", "Hotline / số điện thoại", "tel", 40], ["industry", "Lĩnh vực / dịch vụ", "text", 150],
+              ["photoURL", "URL ảnh đại diện", "url", 2000], ["address", "Địa chỉ", "text", 500],
             ] as const).map(([key, label, type, max]) => <label key={key} className="space-y-1 text-xs font-semibold">{label}<input className={fieldClass} type={type} maxLength={max} required={key === "name"} value={draft[key] ?? ""} disabled={saving} onChange={e => setDraft({ ...draft, [key]: e.target.value })} /></label>)}
           </div>
-          <label className="block text-xs font-semibold">Bio / giới thiệu ngắn<textarea className={fieldClass} rows={3} maxLength={1000} value={draft.bio} disabled={saving} onChange={e => setDraft({ ...draft, bio: e.target.value })} /></label>
+          <label className="block text-xs font-semibold">Thị trường mục tiêu<textarea className={fieldClass} rows={3} maxLength={1000} value={draft.targetMarket ?? ""} disabled={saving} onChange={e => setDraft({ ...draft, targetMarket: e.target.value })} /></label>
           <div className="flex flex-wrap gap-2">
             <button type="submit" className={button} disabled={saving}>{saving ? "Đang lưu…" : "Lưu thông tin slide"}</button>
             <button type="button" className={button} disabled={saving} onClick={() => { setDraft(null); setError(""); setRevision(v => v + 1); }}>Hủy</button>
@@ -593,7 +523,6 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     {presenting && createPortal(<div ref={presentationDialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Trình chiếu hồ sơ" className="fixed inset-0 z-[10000] flex items-center justify-center bg-black" style={{ cursor: "none", outline: "none" }}>
       <div className="relative" style={{ width: "min(100vw, 177.7778vh)", height: "min(100vh, 56.25vw)" }}>
         {canvas(screen)}
-        {active && !drawing && !drawError && <NextSpeakersOverlay speakers={nextSpeakers} large />}
       </div>
       {(loading || error || drawing || !active || drawError) && <div role="status" className="absolute text-white">{speechesComplete && followsSpeaker ? <div className="max-w-2xl rounded-3xl bg-white p-12"><SpeechesCompleteMessage /></div> : error || drawError || (loading ? "Đang tải slide…" : active ? "Đang chuẩn bị slide…" : "Chờ người phát biểu…")}</div>}
     </div>, document.body)}

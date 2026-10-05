@@ -1,10 +1,10 @@
 import { UserModel } from '../../model/user.model';
 import { assertMeetingEditable, assertVersion, getMeeting, MeetingError, saveMeeting } from './meeting.service';
 
-const fields = ['name', 'company', 'photoURL', 'coverImage', 'phone', 'email', 'industry', 'bio'] as const;
+const fields = ['name', 'company', 'photoURL', 'coverImage', 'phone', 'email', 'industry', 'bio', 'address', 'targetMarket'] as const;
 
 export function buildProfileSlide(speaker: any, profile?: any) {
-  const result: Record<string, string> = {
+  const result: Record<string, string | string[]> = {
     id: speaker.id,
     kind: speaker.userId ? 'member' : 'guest',
     name: profile?.displayName ?? speaker.name ?? '',
@@ -15,9 +15,15 @@ export function buildProfileSlide(speaker: any, profile?: any) {
     email: profile?.email ?? speaker.email ?? '',
     industry: profile?.industry ?? speaker.industry ?? '',
     bio: profile?.bio ?? speaker.bio ?? '',
+    address: profile?.address ?? speaker.address ?? '',
+    targetMarket: profile?.targetMarket ?? speaker.targetMarket ?? '',
+    galleryImages: (profile?.galleryImages ?? speaker.galleryImages ?? []).filter((url: unknown) => typeof url === 'string' && url.trim()).slice(0, 5),
   };
   for (const field of fields) {
     if (typeof speaker.slideProfile?.[field] === 'string') result[field] = speaker.slideProfile[field];
+  }
+  if (Array.isArray(speaker.slideProfile?.galleryImages)) {
+    result.galleryImages = speaker.slideProfile.galleryImages.filter((url: unknown) => typeof url === 'string' && url.trim()).slice(0, 5);
   }
   return result;
 }
@@ -27,7 +33,7 @@ export async function getMeetingSlides(companyCode: string, meetingId: string) {
   const userIds = meeting.speakers.map(s => s.userId).filter(Boolean);
   const profiles = userIds.length ? await UserModel.find({
     _id: { $in: userIds }, companyCode, isActive: { $ne: false },
-  }).select('displayName companyName photoURL coverImage phone email industry bio').lean() : [];
+  }).select('displayName companyName photoURL coverImage phone email industry bio address targetMarket galleryImages').lean() : [];
   const byId = new Map(profiles.map(p => [String(p._id), p]));
   return {
     version: meeting.__v,

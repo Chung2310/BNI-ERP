@@ -81,69 +81,106 @@ function cover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, 
   ctx.drawImage(img, (img.naturalWidth - sw) / 2, top ? (img.naturalHeight - sh) * 0.25 : (img.naturalHeight - sh) / 2, sw, sh, x, y, w, h);
 }
 
+// Decorative assets extracted from the supplied PowerPoint, without sample profile data.
+const ASSETS = ["background.jpeg", "portrait-frame.png", "bni.png", "footer-white.svg", "footer-red.svg", "swoosh.png"];
+
+function pill(ctx: CanvasRenderingContext2D, label: string, x: number, y: number, width: number) {
+  ctx.fillStyle = RED;
+  ctx.beginPath(); ctx.roundRect(x, y, width, 54, 20); ctx.fill();
+  ctx.textAlign = "center";
+  textBox(ctx, label, x + width / 2, y + 10, width - 24, 1, 27, 22, "#fff", 700);
+  ctx.textAlign = "left";
+}
+
 export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas: HTMLCanvasElement; warnings: string[] }> {
-  const member = slide.kind === "member";
-  const [template, avatar, banner] = await Promise.all([
-    loadSlideImage("/bni-logo.png"),
+  const urls = (slide.galleryImages ?? []).filter(url => url?.trim()).slice(0, 5);
+  const [assets, avatar, photos] = await Promise.all([
+    Promise.all(ASSETS.map(name => loadSlideImage(`/member-slide/${name}`))),
     loadSlideImage(slide.photoURL),
-    loadSlideImage(slide.coverImage),
-    document.fonts.load('400 32px "Noto Sans"', "Nguyễn Đặng Trần Quốc Việt"),
-    document.fonts.load('700 32px "Noto Sans"', "Nguyễn Đặng Trần Quốc Việt"),
-    document.fonts.load('800 32px "Noto Sans"', "Nguyễn Đặng Trần Quốc Việt"),
+    Promise.all(urls.map(loadSlideImage)),
+    ...[400, 700, 800].map(weight => document.fonts.load(`${weight} 32px "Noto Sans"`, "Nguyễn Đặng Trần Quốc Việt")),
   ]);
+  const [background, frame, logo, footerWhite, footerRed, swoosh] = assets;
   const canvas = document.createElement("canvas");
   canvas.width = SLIDE_WIDTH; canvas.height = SLIDE_HEIGHT;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Trình duyệt không hỗ trợ xuất slide.");
   ctx.textBaseline = "top";
-  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 1920, 1080);
-  ctx.fillStyle = RED; ctx.fillRect(0, 0, 1920, 17); ctx.fillRect(0, 1038, 1920, 42);
-  // Preserve the supplied BNI mark without baking the placeholder text into the slide.
-  if (template) {
-    const logoWidth = 200;
-    ctx.drawImage(template, 70, 45, logoWidth, logoWidth * template.naturalHeight / template.naturalWidth);
-  } else textBox(ctx, "BNI", 70, 40, 240, 1, 95, 95, RED, 800);
-  ctx.textAlign = "left"; ctx.fillStyle = "#e2e2e2"; ctx.fillRect(60, 150, 1800, 7);
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, SLIDE_WIDTH, SLIDE_HEIGHT);
+  if (background) {
+    ctx.save(); ctx.globalAlpha = 0.53; // Same background opacity as the PowerPoint.
+    ctx.drawImage(background, 0, 0, SLIDE_WIDTH, SLIDE_HEIGHT); ctx.restore();
+  }
+  if (footerWhite) ctx.drawImage(footerWhite, 1390, 873, 530, 207);
+  if (footerRed) ctx.drawImage(footerRed, 1560, 873, 360, 207);
 
-  const bannerY = 180, bannerH = member ? 310 : 185;
-  if (banner) cover(ctx, banner, 60, bannerY, 1800, bannerH);
+  // Chapter mark and the red title ribbon from the reference layout.
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(55, 28, 288, 191);
+  if (logo) ctx.drawImage(logo, 92, 36, 215, 105);
+  else textBox(ctx, "BNI", 100, 35, 220, 1, 90, 90, RED, 800);
+  ctx.textAlign = "center";
+  textBox(ctx, "KINH BAC", 199, 143, 280, 1, 37, 37, "#626262", 700);
+  textBox(ctx, "TITANIUMCHAPTER", 199, 189, 278, 1, 21, 21, "#626262", 700);
+  ctx.fillStyle = RED; ctx.fillRect(373, 28, 1500, 112);
+  if (swoosh) {
+    ctx.drawImage(swoosh, 373, 29, 230, 110);
+    ctx.drawImage(swoosh, 1620, 29, 250, 110);
+  }
+  textBox(ctx, slide.kind === "member" ? "THÔNG TIN THÀNH VIÊN / MEMBER PROFILE" : "THÔNG TIN KHÁCH MỜI / GUEST PROFILE", 1120, 59, 1280, 1, 44, 30, "#fff", 800);
 
   if (avatar) {
-    const cy = member ? 550 : 500;
-    ctx.save(); ctx.shadowColor = "#00000026"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 4;
-    ctx.beginPath(); ctx.arc(255, cy, 170, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill(); ctx.restore();
-    ctx.save(); ctx.beginPath(); ctx.arc(255, cy, 156, 0, Math.PI * 2); ctx.clip();
-    cover(ctx, avatar, 99, cy - 156, 312, 312, true);
-    ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.arc(337, 465, 191, 0, Math.PI * 2); ctx.clip();
+    cover(ctx, avatar, 146, 274, 382, 382, true); ctx.restore();
+    if (frame) ctx.drawImage(frame, 100, 247, 480, 456);
   }
-  const badgeY = member ? 455 : 355;
-  ctx.fillStyle = RED; ctx.beginPath(); ctx.roundRect(480, badgeY, 280, 58, 8); ctx.fill();
-  ctx.fillStyle = "#fff"; font(ctx, 25, 800); ctx.fillText(member ? "THÀNH VIÊN BNI" : "KHÁCH MỜI", 503, badgeY + 12);
-  const nameY = member ? 532 : 441;
-  textBox(ctx, slide.name.toLocaleUpperCase("vi-VN"), 480, nameY, 1380, 1, 62, 33, "#242424", 800);
-  let contentY = nameY + 79;
+  if (slide.name?.trim()) {
+    ctx.fillStyle = RED; ctx.beginPath(); ctx.roundRect(60, 702, 575, 65, 18); ctx.fill();
+    textBox(ctx, slide.name.trim().toLocaleUpperCase("vi-VN"), 347, 717, 550, 1, 34, 20, "#fff", 800);
+  }
+  let leftY = 791;
   if (slide.company?.trim()) {
-    textBox(ctx, slide.company.trim(), 480, contentY, 1380, 1, 37, 25, RED, 700);
-    contentY += 55;
+    leftY += textBox(ctx, slide.company.trim().toLocaleUpperCase("vi-VN"), 347, leftY, 620, 2, 30, 21, RED, 700) + 14;
   }
-  const contact = [slide.phone, slide.email].map(value => value?.trim()).filter(Boolean).join(" • ");
-  for (const value of [slide.industry, contact]) {
-    if (!value?.trim()) continue;
-    contentY += textBox(ctx, value.trim(), 480, contentY, 1380, 2, 30, 20, "#454545") + 14;
+  if (slide.phone?.trim()) {
+    leftY += textBox(ctx, `HOTLINE: ${slide.phone.trim()}`, 347, leftY, 600, 1, 28, 22, "#00528d", 700) + 12;
   }
-  if (slide.bio?.trim()) {
-    const availableHeight = 990 - contentY;
-    let size = 30;
-    for (; size > 16; size--) {
-      font(ctx, size);
-      if (wrapSlideText(ctx, slide.bio.trim(), 1380).length * size * 1.35 <= availableHeight) break;
-    }
-    textBox(ctx, slide.bio.trim(), 480, contentY, 1380, Math.max(1, Math.floor(availableHeight / (size * 1.35))), size, size, "#646464");
+  if (slide.address?.trim()) {
+    textBox(ctx, slide.address.trim(), 347, leftY, 610, 3, 27, 19, "#00528d", 700);
   }
-  textBox(ctx, member ? "THÀNH VIÊN BNI" : "KHÁCH MỜI BNI", 65, 993, 380, 1, 18, 18, "#888", 700);
+  ctx.textAlign = "left";
+
+  if (slide.industry?.trim()) {
+    // Gold-edged orange arrow from the reference layout.
+    ctx.fillStyle = "#f3c85e";
+    ctx.beginPath(); ctx.moveTo(705, 243); ctx.lineTo(1755, 243); ctx.lineTo(1830, 326);
+    ctx.lineTo(1755, 409); ctx.lineTo(705, 409); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#f58b08";
+    ctx.beginPath(); ctx.moveTo(714, 252); ctx.lineTo(1750, 252); ctx.lineTo(1818, 326);
+    ctx.lineTo(1750, 400); ctx.lineTo(714, 400); ctx.closePath(); ctx.fill();
+    pill(ctx, "LĨNH VỰC HOẠT ĐỘNG", 765, 212, 465);
+    ctx.textAlign = "center";
+    textBox(ctx, slide.industry.trim().toLocaleUpperCase("vi-VN"), 1238, 294, 985, 2, 42, 26, "#fff", 800);
+    ctx.textAlign = "left";
+  }
+  const loadedPhotos = photos.filter((photo): photo is HTMLImageElement => photo !== null);
+  if (loadedPhotos.length) {
+    textBox(ctx, "SẢN PHẨM TIÊU BIỂU", 710, 448, 1100, 1, 32, 32, RED, 800);
+    const gap = 18, width = (1120 - gap * (loadedPhotos.length - 1)) / loadedPhotos.length;
+    loadedPhotos.forEach((photo, index) => {
+      const x = 710 + index * (width + gap);
+      // Preserve the complete product/activity image instead of cropping its contents.
+      const scale = Math.min(width / photo.naturalWidth, 235 / photo.naturalHeight);
+      const w = photo.naturalWidth * scale, h = photo.naturalHeight * scale;
+      ctx.drawImage(photo, x + (width - w) / 2, 504 + (235 - h) / 2, w, h);
+    });
+  }
+  if (slide.targetMarket?.trim()) {
+    pill(ctx, "THỊ TRƯỜNG MỤC TIÊU", 710, 777, 470);
+    textBox(ctx, slide.targetMarket.trim(), 735, 852, 1060, 4, 36, 24, "#003b67", 700);
+  }
   const warnings: string[] = [];
-  if (slide.photoURL && !avatar) warnings.push("Không tải được ảnh đại diện (đường dẫn hoặc quyền truy cập ảnh).");
-  if (slide.coverImage && !banner) warnings.push("Không tải được ảnh bìa (đường dẫn hoặc quyền truy cập ảnh).");
-  if (!template) warnings.push("Không tải được logo từ ảnh mẫu.");
+  if (slide.photoURL && !avatar) warnings.push("Không tải được ảnh đại diện.");
+  if (photos.some(photo => !photo)) warnings.push("Một số ảnh sản phẩm/hoạt động chưa tải được.");
+  if (assets.some(asset => !asset)) warnings.push("Một số chi tiết của mẫu slide chưa tải được. Vui lòng làm mới.");
   return { canvas, warnings };
 }

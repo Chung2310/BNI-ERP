@@ -21,6 +21,9 @@ export const slideProfileInput = Joi.object({
     email: Joi.string().trim().email().max(254).allow(''),
     industry: Joi.string().trim().max(150).allow('').required(),
     bio: Joi.string().trim().max(1000).allow('').required(),
+    address: Joi.string().trim().max(500).allow(''),
+    targetMarket: Joi.string().trim().max(1000).allow(''),
+    galleryImages: Joi.array().max(5).items(Joi.string().uri({ scheme: ['http', 'https'] }).max(2000)),
   }).allow(null).required(),
 });
 const speakingTimeSlots = Joi.array().items(Joi.object({
