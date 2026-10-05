@@ -670,10 +670,11 @@ it("creates a weekly series from its own popup and returns to the calendar", asy
   expect(dialog.queryByRole("checkbox", { name: /Cho phép điểm danh trực tiếp/ })).toBeNull();
   expect(dialog.queryByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40")).toBeNull();
   fireEvent.click(dialog.getByRole("button", { name: "Ngày bắt đầu chu kỳ" }));
-  const calendar = within(dialog.getByRole("dialog", { name: "Lịch chọn ngày" }));
-  fireEvent.change(calendar.getByLabelText("Chọn năm"), { target: { value: "2030" } });
-  fireEvent.change(calendar.getByLabelText("Chọn tháng"), { target: { value: "0" } });
-  fireEvent.click(calendar.getByRole("button", { name: "1" }));
+  const calendar = within(dialog.getByRole("dialog", { name: "Chọn ngày" }));
+  fireEvent.click(within(calendar.getByRole("group", { name: "Năm" })).getByRole("button", { name: "2030" }));
+  fireEvent.click(within(calendar.getByRole("group", { name: "Tháng" })).getByRole("button", { name: "01" }));
+  fireEvent.click(within(calendar.getByRole("group", { name: "Ngày" })).getByRole("button", { name: "01" }));
+  fireEvent.click(calendar.getByRole("button", { name: "Xong" }));
   expect(dialog.getByText("01/01/2030")).toBeTruthy();
   expect(dialog.queryByText("Giờ bắt đầu (Việt Nam)")).toBeNull();
   fireEvent.click(dialog.getByRole("button", { name: "Giờ bắt đầu chu kỳ" }));

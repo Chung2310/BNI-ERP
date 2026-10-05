@@ -21,6 +21,7 @@ interface TimeInput24Props {
   variant?: "default" | "flat";
   ariaLabel?: string;
   minuteStep?: 1 | 5;
+  selectionTone?: "default" | "brandSoft";
 }
 
 export function TimeInput24({
@@ -32,6 +33,7 @@ export function TimeInput24({
   variant = "default",
   ariaLabel,
   minuteStep = 5,
+  selectionTone = "default",
 }: TimeInput24Props) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,6 +92,9 @@ export function TimeInput24({
   };
 
   const isFlat = variant === "flat";
+  const selectedOptionClass = selectionTone === "brandSoft"
+    ? "border border-cyan-200 bg-cyan-100 text-cyan-800"
+    : "bg-indigo-600 text-white shadow-xs";
 
   return (
     <div ref={containerRef} className={`relative inline-block text-xs text-slate-800 ${className}`}>
@@ -102,8 +107,8 @@ export function TimeInput24({
         onClick={() => setIsOpen(!isOpen)}
         className={
           isFlat
-            ? "w-full flex items-center justify-between text-left cursor-pointer bg-transparent border-0 outline-none focus:outline-none font-semibold font-sans py-1 px-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            : `w-full flex items-center justify-between text-left cursor-pointer bg-white border border-gray-200 hover:border-gray-300 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl font-medium font-sans px-3.5 py-2.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed`
+            ? "w-full flex items-center justify-between text-left cursor-pointer bg-transparent border-0 outline-none focus:outline-none font-normal font-sans py-1 px-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            : `w-full flex items-center justify-between text-left cursor-pointer bg-white border ${selectionTone === "brandSoft" ? "border-cyan-200 hover:border-cyan-300 focus:border-cyan-400 focus:ring-cyan-400/20" : "border-gray-200 hover:border-gray-300 focus:border-indigo-500 focus:ring-indigo-500/20"} focus:outline-none focus:ring-2 rounded-xl font-normal font-sans px-3.5 py-2.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed`
         }
       >
         <span>{current || "--:--"}</span>
@@ -112,7 +117,7 @@ export function TimeInput24({
 
       {isOpen && (
         <div role="dialog" aria-label="Chọn giờ" className="absolute right-0 mt-1.5 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl p-3.5 flex flex-col w-[170px] select-none animate-fade-in animate-scale-in">
-          <div className="grid grid-cols-2 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 font-sans">
+          <div className="grid grid-cols-2 text-center text-xs font-normal text-slate-500 mb-2 font-sans">
             <div>Giờ</div>
             <div>Phút</div>
           </div>
@@ -134,9 +139,9 @@ export function TimeInput24({
                     type="button"
                     data-active={isSelected}
                     onClick={() => handleHourSelect(h)}
-                    className={`w-full py-1.5 text-center text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    className={`w-full py-1.5 text-center text-xs font-normal tabular-nums rounded-lg transition-all cursor-pointer ${
                       isSelected
-                        ? "bg-indigo-600 text-white shadow-xs"
+                        ? selectedOptionClass
                         : "text-slate-650 hover:bg-slate-100/80 active:scale-95"
                     }`}
                   >
@@ -165,9 +170,9 @@ export function TimeInput24({
                     type="button"
                     data-active={isSelected}
                     onClick={() => handleMinuteSelect(m)}
-                    className={`w-full py-1.5 text-center text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    className={`w-full py-1.5 text-center text-xs font-normal tabular-nums rounded-lg transition-all cursor-pointer ${
                       isSelected
-                        ? "bg-indigo-600 text-white shadow-xs"
+                        ? selectedOptionClass
                         : "text-slate-650 hover:bg-slate-100/80 active:scale-95"
                     }`}
                   >
