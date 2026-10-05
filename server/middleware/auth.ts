@@ -7,9 +7,6 @@ import { RolePermissionModel } from "../model/role-permission.model";
 import { getJwtAccessSecret } from "../config/env";
 import { expandEffectivePermissions, normalizeStoredPermissions } from "../config/permission-catalog";
 
-const REGULAR_SESSION_REPLACED_CODE = "SESSION_REPLACED";
-const REGULAR_SESSION_REPLACED_MESSAGE = "Phiên đăng nhập đã được sử dụng trên thiết bị khác. Vui lòng đăng nhập lại.";
-
 export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
@@ -33,7 +30,6 @@ function shouldSkipRoutineAuthLog(method: string, url: string) {
   }
 
   const noisyPrefixes = [
-    "/api/v1/auth/telegram-link",
     "/api/v1/crud/marketing-contents",
     "/api/v1/crud/crm-tickets",
     "/api/v1/crud/products",
@@ -48,13 +44,13 @@ function shouldSkipRoutineAuthLog(method: string, url: string) {
  * Danh sách mã quyền mặc định của hệ thống cho từng vai trò
  */
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
-  admin: ["dashboard:manage", "people:manage", "relationship:manage", "hr:manage", "timekeeping:manage", "meetings:manage", "resource:manage", "chat:manage", "settings:manage", "access:manage"],
+  admin: ["dashboard:manage", "people:manage", "relationship:manage", "hr:manage", "meetings:manage", "resource:manage", "chat:manage", "settings:manage", "access:manage"],
   manager: [
     "dashboard:read", "access:read",
-    "hr:read", "people:read", "timekeeping:read", "meetings:read", "chat:read", "resource:read", "settings:manage"
+    "hr:read", "people:read", "meetings:read", "chat:read", "resource:read", "settings:manage"
   ],
   user: [
-    "access:read", "hr:read", "people:read", "timekeeping:read", "meetings:read", "chat:read", "resource:read"
+    "access:read", "hr:read", "people:read", "meetings:read", "chat:read", "resource:read"
   ],
   teacher: ["people:manage"]
 };
@@ -93,17 +89,9 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
   try {
     const decoded = jwt.verify(token, getJwtAccessSecret()) as any;
 
-    const userDoc = await UserModel.findById(decoded.id).select("branchId activeSessionId displayName").lean();
+    const userDoc = await UserModel.findById(decoded.id).select("branchId displayName").lean();
     if (!userDoc) {
       return res.status(401).json({ status: "error", message: "Mã xác thực không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại." });
-    }
-
-    if (!decoded.sid || userDoc.activeSessionId !== decoded.sid) {
-      return res.status(401).json({
-        status: "error",
-        code: REGULAR_SESSION_REPLACED_CODE,
-        message: REGULAR_SESSION_REPLACED_MESSAGE,
-      });
     }
 
     let branchId = userDoc?.branchId ? String(userDoc.branchId) : undefined;

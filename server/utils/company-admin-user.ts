@@ -25,10 +25,6 @@ export async function createCompanyAdminUser(input: CreateCompanyAdminUserInput)
     createdAt: new Date(),
     companyCode,
     companyName: companyName.trim(),
-    jobTitle: "CEO",
-    department: "Ban Giám Đốc",
-    division: "Ban Giám Đốc",
-    level: 1,
     status: "offline",
     photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(ownerName.trim())}&background=random&color=fff`,
   });

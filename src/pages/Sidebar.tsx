@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   CalendarDays,
+  Trophy,
   Settings,
   Shield,
   Users,
@@ -57,6 +58,12 @@ const baseMenuItems: MenuItem[] = [
     label: "CUỘC HỌP",
     title: "Cuộc họp",
     icon: CalendarDays,
+    group: "operations",
+  },
+  {
+    label: "BẢNG XẾP HẠNG",
+    title: "Bảng xếp hạng",
+    icon: Trophy,
     group: "operations",
   },
   {

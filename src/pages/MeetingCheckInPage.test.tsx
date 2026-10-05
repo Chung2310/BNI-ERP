@@ -131,3 +131,17 @@ it("submits industry and phone without email, bio, or cover image, and omits opt
   expect(payload).not.toHaveProperty("bio");
   expect(payload).not.toHaveProperty("coverImage");
 });
+
+
+it('accepts a permanent QR and identifies the actual recorded meeting on success', async () => {
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: { ...info, expiresAt: null } }) });
+  fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: { name: 'An', meetingTitle: 'Cuộc họp đang diễn ra' } }) });
+  render(<MeetingCheckInPage />);
+  fireEvent.change(await screen.findByLabelText('Email tài khoản'), { target: { value: 'an@example.com' } });
+  fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Check-in' }));
+  await screen.findByText('Check-in thành công');
+  expect(screen.getByText(/cho cuộc họp “Cuộc họp đang diễn ra”/)).toBeTruthy();
+  expect(screen.queryByText(/Mã QR đã hết hạn/)).toBeNull();
+});

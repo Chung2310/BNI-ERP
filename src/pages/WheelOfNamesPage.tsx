@@ -43,7 +43,7 @@ interface Participant {
   id: string;
   name: string;
   avatar?: string;
-  department?: string;
+  companyName?: string;
   role?: string;
   selected: boolean;
   isCustom?: boolean;
@@ -57,7 +57,7 @@ interface WinnerRecord {
   name: string;
   prizeName: string;
   avatar?: string;
-  department?: string;
+  companyName?: string;
   wonAt: string;
 }
 
@@ -391,7 +391,7 @@ export default function WheelOfNamesPage() {
       }
 
       // Build chapter members roster from DB users
-      const userMap = new Map<string, { id: string; name: string; avatar?: string; department?: string; role?: string }>();
+      const userMap = new Map<string, { id: string; name: string; avatar?: string; companyName?: string; role?: string }>();
 
       // Add DB users
       for (const u of users) {
@@ -401,7 +401,7 @@ export default function WheelOfNamesPage() {
           id: uid || `user-${Math.random()}`,
           name: uName,
           avatar: u.photoURL,
-          department: u.department || u.branchName || "Ban Giám Đốc",
+          companyName: u.companyName || u.branchName || "",
           role: u.role === "admin" ? "Chủ tịch / Admin" : u.role || "Thành viên",
         });
       }
@@ -435,7 +435,7 @@ export default function WheelOfNamesPage() {
           id: m.id,
           name: m.name,
           avatar: m.avatar || (matchedSpeaker ? matchedSpeaker.photoURL || matchedSpeaker.coverImage : undefined),
-          department: m.department,
+          companyName: m.companyName,
           role: m.role,
           selected: true,
           type: isPresent ? "member_present" : "member_absent",
@@ -450,7 +450,7 @@ export default function WheelOfNamesPage() {
           id: `guest-speaker-${s.id}`,
           name: s.name.trim(),
           avatar: s.photoURL || s.coverImage,
-          department: (s as any).company || (s as any).slideProfile?.company || "Khách tham dự",
+          companyName: (s as any).company || (s as any).slideProfile?.company || "Khách tham dự",
           role: "Khách mời",
           selected: true,
           type: "guest" as const,
@@ -1445,7 +1445,7 @@ export default function WheelOfNamesPage() {
           name: winner.name,
           prizeName: currentPrize,
           avatar: winner.avatar,
-          department: winner.department,
+          companyName: winner.companyName,
           wonAt: new Date().toISOString(),
         };
 
@@ -1604,7 +1604,7 @@ export default function WheelOfNamesPage() {
             name: winningParticipant.name,
             prizeName: currentPrize,
             avatar: winningParticipant.avatar,
-            department: winningParticipant.department,
+            companyName: winningParticipant.companyName,
             wonAt: new Date().toISOString(),
           };
 
@@ -1657,7 +1657,7 @@ export default function WheelOfNamesPage() {
     const newParticipant: Participant = {
       id: `guest-${Date.now()}`,
       name: trimmed,
-      department: "Khách mời",
+      companyName: "Khách mời",
       role: "Khách tham dự",
       selected: true,
       isCustom: true,
@@ -1719,11 +1719,11 @@ export default function WheelOfNamesPage() {
   // Export winners to CSV
   const handleExportWinners = () => {
     if (winners.length === 0) return;
-    const header = "STT,Tên người trúng giải,Giải thưởng,Phòng ban / Vai trò,Thời gian trúng\n";
+    const header = "STT,Tên người trúng giải,Giải thưởng,Doanh nghiệp / Vai trò,Thời gian trúng\n";
     const rows = winners
       .map(
         (w, idx) =>
-          `${idx + 1},"${w.name}","${w.prizeName}","${w.department || ""}","${w.wonAt}"`
+          `${idx + 1},"${w.name}","${w.prizeName}","${w.companyName || ""}","${w.wonAt}"`
       )
       .join("\n");
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + encodeURIComponent(header + rows);
@@ -1739,7 +1739,7 @@ export default function WheelOfNamesPage() {
   const filteredParticipants = categoryParticipants.filter(
     (p) =>
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.department && p.department.toLowerCase().includes(searchQuery.toLowerCase()))
+      (p.companyName && p.companyName.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -2268,8 +2268,8 @@ export default function WheelOfNamesPage() {
                               </span>
                             )}
                           </div>
-                          {p.department && (
-                            <div className="truncate text-[10px] text-slate-500">{p.department}</div>
+                          {p.companyName && (
+                            <div className="truncate text-[10px] text-slate-500">{p.companyName}</div>
                           )}
                         </div>
                       </label>
@@ -2410,9 +2410,9 @@ export default function WheelOfNamesPage() {
                 {winnerModal.winner.name}
               </h2>
 
-              {winnerModal.winner.department && (
+              {winnerModal.winner.companyName && (
                 <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium">
-                  {winnerModal.winner.department}
+                  {winnerModal.winner.companyName}
                 </p>
               )}
             </div>

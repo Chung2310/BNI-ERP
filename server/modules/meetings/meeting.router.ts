@@ -1,3 +1,4 @@
+import { meetingMonthRange } from "../../../src/utils/meetingRecurrence";
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import { requireAuth, requirePermission, getEffectivePermissions, hasAnyPermission } from '../../middleware/auth';
@@ -12,6 +13,7 @@ import {
   deferMeetingSpeaker,
   deferMeetingSpeakers,
   createMeeting,
+  createRecurringMeetings,
   updateMeeting,
   deleteMeeting,
   getMeeting,
@@ -23,11 +25,11 @@ import {
   recordGameWinner,
   redrawPrizeWinner,
   resetLuckyDrawWinners,
-  createCheckInQr,
-  getCheckInQr,
+  getCompanyCheckInQr,
+  getManagedCheckInQr,
   autoStartDueMeetings,
 } from './meeting.service';
-import { checkinInput, controlInput, meetingInput, updateMeetingInput, slideProfileInput, gameWinnerInput } from './meeting.validation';
+import { recurringMeetingInput, checkinInput, controlInput, meetingInput, updateMeetingInput, slideProfileInput, gameWinnerInput } from './meeting.validation';
 import { getMeetingSlides, updateMeetingSlide } from './meeting-slides.service';
 
 
@@ -45,15 +47,28 @@ const sendError = (res: any, error: any) =>
 meetingRouter.get('/', read, async (req: any, res) => {
   try {
     await autoStartDueMeetings();
-    res.json({
-      data: await MeetingModel.find({ companyCode: company(req) })
-        .sort({ startsAt: -1 })
-        .limit(100)
-        .lean(),
-    });
+    const filter: any = { companyCode: company(req) };
+    if (req.query.month !== undefined) {
+      try {
+        const range = meetingMonthRange(String(req.query.month));
+        filter.startsAt = { $gte: range.from, $lt: range.to };
+      } catch { return res.status(400).json({ message: 'Tháng không hợp lệ.' }); }
+    }
+    const query = MeetingModel.find(filter).sort({ startsAt: req.query.month ? 1 : -1 });
+    // A selected month must include every occurrence, not the old latest-100 subset.
+    if (!req.query.month && req.query.history !== "all") query.limit(100);
+    res.json({ data: await query.lean() });
   } catch (e) {
     sendError(res, e);
   }
+});
+
+// Register before /:id so the shared QR is available without selecting a meeting.
+meetingRouter.get('/checkin-qr', manage, async (req: any, res) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.json({ data: await getCompanyCheckInQr(company(req)) });
+  } catch (e) { sendError(res, e); }
 });
 
 meetingRouter.get('/:id', read, async (req: any, res) => {
@@ -81,6 +96,13 @@ meetingRouter.put('/:id/slides/:speakerId', manage, async (req: any, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
     res.json({ data: await updateMeetingSlide(company(req), req.params.id, req.params.speakerId, value) });
   } catch (e) { sendError(res, e); }
+});
+
+meetingRouter.post('/series', manage, async (req: any, res) => {
+  const { error, value } = recurringMeetingInput.validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
+  try { res.status(201).json({ data: await createRecurringMeetings(company(req), req.user.id, value) }); }
+  catch (error) { sendError(res, error); }
 });
 
 meetingRouter.post('/', manage, async (req: any, res) => {
@@ -278,24 +300,26 @@ meetingRouter.post('/:id/lucky-draw/reset', manage, async (req: any, res) => {
   }
 });
 
-meetingRouter.get('/:id/checkin-qr', manage, async (req: any, res) => {
-  try {
-    res.set('Cache-Control', 'no-store');
-    res.json({ data: await getCheckInQr(company(req), req.params.id) });
-  } catch (e) { sendError(res, e); }
-});
-
-meetingRouter.put('/:id/checkin-qr', manage, async (req: any, res) => {
-  try {
-    if (typeof req.body?.token !== 'string') throw new MeetingError(400, 'Thiếu mã QR cần khôi phục.');
-    res.set('Cache-Control', 'no-store');
-    res.json({ data: await getCheckInQr(company(req), req.params.id, req.body.token) });
-  } catch (e) { sendError(res, e); }
-});
-
-meetingRouter.post('/:id/checkin-qr', manage, async (req: any, res) => {
-  try {
-    const result = await createCheckInQr(company(req), req.params.id, Number(req.body?.hours));
-    res.json({ data: { expiresAt: result.expiresAt, checkInUrl: `/meeting-checkin/${result.token}`, token: result.token } });
-  } catch (e) { sendError(res, e); }
-});
+// Compatibility routes always return the same permanent company QR.
+meetingRouter.route('/:id/checkin-qr')
+  .get(manage, async (req: any, res) => {
+    try {
+      res.set('Cache-Control', 'no-store');
+      res.json({ data: await getManagedCheckInQr(company(req), req.params.id) });
+    } catch (e) { sendError(res, e); }
+  })
+  .post(manage, async (req: any, res) => {
+    try {
+      res.set('Cache-Control', 'no-store');
+      res.json({ data: await getManagedCheckInQr(company(req), req.params.id) });
+    } catch (e) { sendError(res, e); }
+  })
+  .put(manage, async (req: any, res) => {
+    try {
+      res.set('Cache-Control', 'no-store');
+      res.json({ data: await getManagedCheckInQr(company(req), req.params.id) });
+    } catch (e) { sendError(res, e); }
+  })
+  .delete(manage, (_req, res) => {
+    res.set('Allow', 'GET, POST, PUT').status(405).json({ message: 'QR check-in là mã cố định dùng chung vĩnh viễn, không thể hủy hoặc thay mã.' });
+  });

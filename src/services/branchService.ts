@@ -26,7 +26,7 @@ export interface BranchInput {
   isActive?: boolean;
 }
 
-export interface BranchOwnerInput { displayName: string; email: string; password: string; phone?: string; birthDate?: string; qualification?: string; }
+export interface BranchOwnerInput { displayName: string; email: string; password: string; phone?: string; birthDate?: string; }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);

@@ -15,8 +15,6 @@ export interface UserFormState {
   role: string;
   companyCode: string;
   parentId?: string;
-  department?: string;
-  qualification?: string;
 }
 
 export interface UserTableProps {

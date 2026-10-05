@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { beforeEach } from "node:test";
 import express from "express";
 import { once } from "node:events";
 import { setRateLimitRedisClientForTesting } from "../../infrastructure/rate-limit-redis";
@@ -7,9 +7,11 @@ setRateLimitRedisClientForTesting({ eval: async () => [1, 1000], decr: async () 
 const { qrCheckInGuest } = await import("./meeting.service");
 const { meetingCheckInRouter } = await import("./meeting-checkin.router");
 import { guestAvatarError, MAX_GUEST_AVATAR_BYTES } from "./meeting-guest-avatar";
-import { MeetingModel } from "./meeting.model";
+import { MeetingModel, MeetingCheckInQrModel } from "./meeting.model";
 import { cloudinaryService } from "../../service/cloudinary.service";
 const { buildProfileSlide } = await import("./meeting-slides.service");
+
+beforeEach(t => { assert.ok("mock" in t); t.mock.method(MeetingCheckInQrModel, "findOne", async () => null); });
 
 const buffer = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1kAAAAASUVORK5CYII=", "base64");
 const avatar = { buffer, size: buffer.length, mimetype: "image/png" };

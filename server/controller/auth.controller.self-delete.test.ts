@@ -35,3 +35,10 @@ it("requires authentication and keeps the session cookie when verification fails
   expect(res.status).toHaveBeenCalledWith(400);
   expect(res.clearCookie).not.toHaveBeenCalled();
 });
+it("logout clears only the current browser cookie without updating other device sessions", async () => {
+  const res: any = { status: vi.fn(), json: vi.fn(), clearCookie: vi.fn() };
+  res.status.mockReturnValue(res);
+  await authController.logout({ user: { id: "me", sessionId: "device-one" } } as any, res);
+  expect(res.clearCookie).toHaveBeenCalledWith("refreshToken", expect.objectContaining({ httpOnly: true, sameSite: "strict" }));
+  expect(res.status).toHaveBeenCalledWith(200);
+});

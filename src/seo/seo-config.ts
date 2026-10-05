@@ -98,8 +98,17 @@ export const TAB_SEO_MAP: Partial<Record<TabType, SeoMeta>> & Record<string, Seo
     changeFrequency: "daily",
   },
   "CUỘC HỌP": { title: "Cuộc họp", description: "Lịch họp và điều phối phát biểu.", keywords: "cuộc họp, check-in, điều phối", path: "/cuoc-hop", robots: "noindex, nofollow", priority: "0.2", changeFrequency: "weekly" },
+  "BẢNG XẾP HẠNG": {
+    title: "Bảng xếp hạng thành viên",
+    description: "Xếp hạng thành viên theo mức độ tham gia, vắng mặt và check-in muộn.",
+    keywords: "bảng xếp hạng, thành viên, điểm danh, vắng mặt, check-in muộn",
+    path: "/bang-xep-hang",
+    robots: "noindex, nofollow",
+    priority: "0.2",
+    changeFrequency: "daily",
+  },
   "NHÂN SỰ": {
-    title: "Quản lý thành viên - Sơ đồ tổ chức",
+    title: "Quản lý thành viên",
     description:
       "Giải pháp HRM toàn diện trên iGen Connect giúp quản lý hồ sơ nhân sự, vẽ sơ đồ tổ chức tự động, thiết lập KPI và số hóa tài liệu đào tạo nội bộ.",
     keywords:

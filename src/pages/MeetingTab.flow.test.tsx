@@ -32,6 +32,7 @@ it("keeps paused meetings ongoing and advances meeting duration while the speake
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [item] }) }));
   try {
     render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
     await screen.findByText("Đang diễn ra 96 phút");
     expect(screen.queryByText(/Tạm dừng •/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Tiếp tục điều hành" }));
@@ -52,6 +53,7 @@ it("uses avatars instead of covers for current, upcoming and listed attendees", 
   ];
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, status: "live", currentIndex: 0, speakers: people }] }) }));
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
   expect(screen.getAllByAltText("An")).toHaveLength(2);
   expect(screen.getAllByAltText("Bình")).toHaveLength(2);
@@ -74,6 +76,7 @@ it("checks multiple people in operations and submits their IDs in one request", 
   });
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
   fireEvent.click(screen.getByLabelText("Chọn An"));
   fireEvent.click(screen.getByLabelText("Chọn Bình"));
@@ -109,6 +112,7 @@ it("defers from the operation list and starts fullscreen from the selected atten
   vi.stubGlobal("fetch", fetchMock);
   try {
     render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
     fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
     fireEvent.click(screen.getByRole("button", { name: "Để cuối lượt: An đang bận" }));
     await waitFor(() => expect(item.__v).toBe(1));
@@ -137,6 +141,7 @@ it.each(["Escape", "fullscreen"])("returns to the slides presentation tab after 
   Object.defineProperty(document, "exitFullscreen", { configurable: true, value: vi.fn(async () => { fullscreen = null; }) });
   try {
     render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
     fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
     fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
     await screen.findByRole("dialog", { name: "Trình chiếu hồ sơ" });
@@ -175,6 +180,7 @@ it("shares manual navigation and operating mode between slides and MC controls",
   });
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
   fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
   await screen.findByText("Người đầu");
@@ -197,6 +203,7 @@ it("shares manual navigation and operating mode between slides and MC controls",
 });
 it("opens check-in for a scheduled meeting and keeps QR separate from MC controls", async () => {
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", {name:"Mở buổi họp & check-in"}));
   expect(screen.getByText("Đón tiếp & check-in")).toBeTruthy();
   expect(screen.queryByText("Diễn giả hiện tại")).toBeNull();
@@ -209,6 +216,7 @@ it("opens check-in for a scheduled meeting and keeps QR separate from MC control
 });
 it("preserves zero-day reminders when editing a meeting", async () => {
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click((await screen.findAllByTitle("Sửa cuộc họp"))[0]);
   const values = screen.getAllByRole("spinbutton").map(element => (element as HTMLInputElement).value);
   expect(values).toContain("0");
@@ -218,6 +226,7 @@ it("disables end meeting button when scheduled and allows ending when live with 
   const liveMeeting = { ...meeting, _id: "b", title: "Buổi họp Live", status: "live" };
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [liveMeeting] }) }));
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   const endButtons = await screen.findAllByRole("button", { name: "Kết thúc" });
   expect(endButtons.length).toBeGreaterThan(0);
   fireEvent.click(endButtons[0]);
@@ -227,6 +236,7 @@ it("disables end meeting button when scheduled and allows ending when live with 
 
 it("allows starting scheduled meeting with confirmation popup", async () => {
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   const startButtons = await screen.findAllByRole("button", { name: "Bắt đầu" });
   expect(startButtons.length).toBeGreaterThan(0);
   fireEvent.click(startButtons[0]);
@@ -246,6 +256,7 @@ it("inserting priority one shifts the existing waiting speaker down", async () =
   const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [live] }) });
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
   expect(screen.queryByLabelText("Chọn người để sắp xếp")).toBeNull();
   expect(screen.queryByLabelText("Thứ tự ưu tiên")).toBeNull();
@@ -268,6 +279,7 @@ it("manual overtime stops at zero; completing the last speaker opens BNI notice 
   });
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
   expect(screen.getByText("Hết giờ")).toBeTruthy();
   expect(screen.queryByText("00:00")).toBeNull();
@@ -293,6 +305,7 @@ it("automatic mode completes the final speaker instead of ending the meeting", a
   });
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
   await screen.findByRole("dialog", { name: "Hoàn tất phần phát biểu" });
   expect(item.status).toBe("live");
@@ -312,6 +325,7 @@ it("launches the current profile from MC controls and explains the post-speech d
   const fetchMock = vi.fn(async (url) => ({ ok: true, json: async () => ({ data: String(url).endsWith("/slides") ? { slides: people, version: 0 } : String(url).endsWith("/presentation") ? { ...live, speakerStartedAt: new Date().toISOString(), __v: 1 } : [live] }) }));
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
   expect(screen.getByText(/Đây là thời gian chờ chuyển lượt/)).toBeTruthy();
   expect((screen.getByLabelText("Số giây chờ chuyển slide sau khi hết giờ") as HTMLInputElement).value).toBe("3");
@@ -343,6 +357,7 @@ it("reorders from meeting settings without opening MC and refreshes order versio
   });
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click((await screen.findAllByTitle("Sửa cuộc họp"))[0]);
   fireEvent.change(screen.getByLabelText("Chọn người để sắp xếp"), { target: { value: "b" } });
   fireEvent.click(screen.getByText("Áp dụng thứ tự"));
@@ -358,6 +373,7 @@ it("settings place priority last and list all checked-in people including locked
     speakers: [{ id: "a", name: "An", seconds: 30 }, { id: "b", name: "Bình", seconds: 30 }, { id: "c", name: "Cường", seconds: 30 }] };
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [item] }) }));
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click((await screen.findAllByTitle("Sửa cuộc họp"))[0]);
   const select = screen.getByLabelText("Chọn người để sắp xếp") as HTMLSelectElement;
   expect(Array.from(select.options).map(option => option.value)).toEqual(["a", "b", "c"]);
@@ -366,7 +382,7 @@ it("settings place priority last and list all checked-in people including locked
   expect(select.options[1].textContent).toContain("Đang phát biểu");
   const section = screen.getByText("Sắp xếp thứ tự thuyết trình").parentElement!;
   expect(section.nextElementSibling?.textContent).toContain("Lưu thay đổi");
-  expect(section.previousElementSibling?.textContent).toContain("Cấu hình theo toàn bộ thứ tự check-in");
+  expect(section.previousElementSibling?.textContent).toContain("Thời lượng phát biểu theo giờ check-in");
 });
 
 it.each(["live", "paused"])("shows the check-in list and explains unavailable priority changes at the last %s turn", async status => {
@@ -375,6 +391,7 @@ it.each(["live", "paused"])("shows the check-in list and explains unavailable pr
   const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [item] }) });
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click((await screen.findAllByTitle("Sửa cuộc họp"))[0]);
   const select = screen.getByLabelText("Chọn người để sắp xếp") as HTMLSelectElement;
   expect(select.disabled).toBe(false);
@@ -402,6 +419,7 @@ it.each([0, 3, 150])("slide delay %s waits until speaking time ends before chang
   vi.stubGlobal("fetch", fetchMock);
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
   fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
   await screen.findByText("Đầu tiên");
@@ -442,6 +460,7 @@ it("opening a paused presentation resumes the countdown from its remaining time"
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
   try {
     render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
     fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
     fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
     await screen.findByText("Khách đang nói");
@@ -463,6 +482,7 @@ it("shows the member's own check-in and speaking information without operating c
   ];
   vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, status: "live", speakers, currentIndex: 1, location: "Hội trường A" }] }) } as Response);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
   const dialog = screen.getByRole("dialog");
   expect(within(dialog).getByText("Đã check-in")).toBeTruthy();
@@ -473,6 +493,7 @@ it("shows the member's own check-in and speaking information without operating c
   expect(screen.queryByRole("button", { name: "Tiếp tục điều hành" })).toBeNull();
   expect(screen.queryByTitle("Sửa cuộc họp")).toBeNull();
   expect(screen.queryByRole("button", { name: "Tạo cuộc họp mới" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Tạo lịch định kỳ" })).toBeNull();
   fireEvent.keyDown(dialog, { key: "Escape" });
   expect(screen.queryByRole("dialog")).toBeNull();
 });
@@ -484,11 +505,12 @@ it("keeps upcoming meetings visible and filters attendance by account ID", async
     { ...meeting, _id: "b", title: "Buổi đã tham dự", status: "ended", speakers: [{ id: "mine", userId: "member1", name: "Tôi", seconds: 20 }] },
   ] }) } as Response);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   const buttons = await screen.findAllByRole("button", { name: "Xem chi tiết cuộc họp" });
   expect(buttons).toHaveLength(2);
   fireEvent.click(buttons[0]);
   expect(within(screen.getByRole("dialog")).getByText("Chưa check-in")).toBeTruthy();
-  expect(screen.getByText(/Để check-in, hãy quét mã QR/)).toBeTruthy();
+  expect(screen.getByText(/Bấm Điểm danh và cho phép truy cập vị trí/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Đóng chi tiết cuộc họp" }));
   fireEvent.click(screen.getByRole("checkbox", { name: "Chỉ buổi đã check-in" }));
   expect(screen.queryByText("Buổi họp A")).toBeNull();
@@ -499,6 +521,7 @@ it.each(["ended", "cancelled"])("does not invite a member to check in to a %s me
   auth.manage = false;
   vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, status }] }) } as Response);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
   const dialog = screen.getByRole("dialog");
   expect(within(dialog).getByText("Buổi họp đã đóng check-in.")).toBeTruthy();
@@ -508,17 +531,19 @@ it.each(["ended", "cancelled"])("does not invite a member to check in to a %s me
 
 it("shows a retryable loading error instead of an empty meetings list", async () => {
   auth.manage = false;
-  vi.mocked(fetch).mockRejectedValueOnce(new Error("Lỗi tải cuộc họp"));
+  vi.mocked(fetch).mockRejectedValue(new Error("Lỗi tải cuộc họp"));
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   expect(await screen.findByRole("alert")).toBeTruthy();
   expect(screen.queryByText("Chưa tìm thấy cuộc họp nào")).toBeNull();
+  vi.mocked(fetch).mockResolvedValue({ ok:true, json:async () => ({data:[meeting]}) } as any);
   fireEvent.click(screen.getByRole("button", { name: "Thử lại" }));
   expect(await screen.findByText("Buổi họp A")).toBeTruthy();
 });
 
 it("allows direct member attendance and immediately updates their status", async () => {
   auth.manage = false;
-  const item = { ...meeting, allowDirectCheckIn: true };
+  const item = { ...meeting };
   const fetchMock = vi.fn(async (url, options) => {
     if (String(url).endsWith("/checkin")) {
       expect(options.method).toBe("POST");
@@ -529,6 +554,7 @@ it("allows direct member attendance and immediately updates their status", async
   });
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
   fireEvent.click(screen.getByRole("button", { name: "Điểm danh" }));
   await waitFor(() => expect(within(screen.getByRole("dialog")).getByText("Đã check-in")).toBeTruthy());
@@ -541,31 +567,36 @@ it("shows a direct check-in error and lets the member retry", async () => {
     ? { ok: false, json: async () => ({ message: "Cuộc họp đã dừng check-in." }) }
     : { ok: true, json: async () => ({ data: [{ ...meeting, allowDirectCheckIn: true }] }) }));
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
   fireEvent.click(screen.getByRole("button", { name: "Điểm danh" }));
   expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Cuộc họp đã dừng check-in.");
   expect((screen.getByRole("button", { name: "Điểm danh" }) as HTMLButtonElement).disabled).toBe(false);
 });
-it.each([["scheduled", false], ["ended", true], ["cancelled", true]])("disables direct attendance for %s with setting %s", async (status, allowDirectCheckIn) => {
+it.each(["ended", "cancelled"])("disables direct attendance for closed %s meetings", async status => {
   auth.manage = false;
-  vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, status, allowDirectCheckIn }] }) } as Response);
+  vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, status }] }) } as Response);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
   expect((screen.getByRole("button", { name: "Điểm danh" }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByRole("button", { name: "Điểm danh" }).getAttribute("aria-describedby")).toBe("member-checkin-hint");
 });
-it("loads and saves the direct attendance option in meeting settings", async () => {
+it("edits meeting settings without a direct attendance toggle", async () => {
   const fetchMock = vi.fn(async (_url, options) => ({ ok: true, json: async () => ({ data: options?.method === "PUT" ? meeting : [meeting] }) }));
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click((await screen.findAllByTitle("Sửa cuộc họp"))[0]);
-  const checkbox = screen.getByRole("checkbox", { name: /Cho phép điểm danh trực tiếp trước khi cuộc họp bắt đầu/ });
-  expect((checkbox as HTMLInputElement).checked).toBe(false);
-  fireEvent.click(checkbox);
-  fireEvent.submit(checkbox.closest("form")!);
-  await waitFor(() => expect(fetchMock.mock.calls.some(([, options]) => options?.method === "PUT" && JSON.parse(options.body).allowDirectCheckIn === true)).toBe(true));
+  expect(screen.queryByRole("checkbox", { name: /Cho phép điểm danh trực tiếp/ })).toBeNull();
+  const title = screen.getByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40");
+  fireEvent.change(title, { target: { value: "Họp đã sửa" } });
+  fireEvent.submit(title.closest("form")!);
+  await waitFor(() => expect(fetchMock.mock.calls.some(([, options]) => options?.method === "PUT")).toBe(true));
+  const request = fetchMock.mock.calls.find(([, options]) => options?.method === "PUT")!;
+  expect(JSON.parse(request[1].body)).toMatchObject({ title: "Họp đã sửa" });
+  expect(JSON.parse(request[1].body)).not.toHaveProperty("allowDirectCheckIn");
 });
-
 it("requires GPS permission before submitting member attendance from the detail popup", async () => {
   auth.manage = false;
   Object.defineProperty(navigator, "geolocation", { configurable: true, value: {
@@ -573,6 +604,7 @@ it("requires GPS permission before submitting member attendance from the detail 
   } });
   vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, allowDirectCheckIn: true }] }) } as Response);
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
   expect(screen.queryByTitle("Sửa cuộc họp")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Điểm danh" }));
@@ -580,17 +612,122 @@ it("requires GPS permission before submitting member attendance from the detail 
   expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/checkin"))).toBe(false);
 });
 
-it.each(["live", "paused"])("enables member attendance once the meeting is %s without opting in", async status => {
+it.each(["scheduled", "live", "paused"].flatMap(status => [undefined, false, true].map(allowDirectCheckIn => ({ status, allowDirectCheckIn }))))("allows member attendance for $status with old setting $allowDirectCheckIn", async ({ status, allowDirectCheckIn }) => {
   auth.manage = false;
-  const item = { ...meeting, status, allowDirectCheckIn: false };
+  const item = { ...meeting, status, allowDirectCheckIn };
   vi.stubGlobal("fetch", vi.fn(async (url) => ({
     ok: true, json: async () => ({ data: String(url).endsWith("/checkin")
       ? { ...item, speakers: [{ id: "mine", userId: "member1", name: "Tôi", seconds: 30 }] }
       : [item] })
   })));
   render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Xem chi tiết cuộc họp" }));
   expect((screen.getByRole("button", { name: "Điểm danh" }) as HTMLButtonElement).disabled).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Điểm danh" }));
   expect(await screen.findByRole("button", { name: "Đã điểm danh" })).toBeTruthy();
+});
+
+it("does not show one minute elapsed before a future meeting without an actual start", async () => {
+  const item = { ...meeting, status: "live", startsAt: new Date(Date.now() + 3600000).toISOString() };
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [item] }) }));
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+  await screen.findByText("Chưa đến giờ họp");
+  expect(screen.queryByText("Đang diễn ra 1 phút")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Tiếp tục điều hành" }));
+  expect(screen.getAllByText("Chưa đến giờ họp")).toHaveLength(2);
+});
+it("creates a weekly series from its own popup and returns to the calendar", async () => {
+  const instance = { ...meeting, startsAt: "2030-01-02T00:00:00Z", seriesId: "series" };
+  const fetchMock = vi.fn(async (_url: any, _options: any) => ({ ok: true, json: async () => ({ data: [instance] }) }));
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Tạo lịch định kỳ" }));
+  const dialog = within(screen.getByRole("dialog", { name: "Tạo lịch định kỳ hằng tuần" }));
+  expect(dialog.queryByPlaceholderText("Chọn ngày...")).toBeNull();
+  expect(dialog.queryByLabelText("Giờ kết thúc cuộc họp")).toBeNull();
+  expect(dialog.queryByRole("checkbox", { name: "Tạo lịch định kỳ hằng tuần" })).toBeNull();
+  expect(dialog.queryByRole("checkbox", { name: /Cho phép điểm danh trực tiếp/ })).toBeNull();
+  fireEvent.change(dialog.getByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40"), { target: { value: "Họp tuần" } });
+  fireEvent.change(dialog.getByLabelText("Ngày bắt đầu chu kỳ"), { target: { value: "2030-01-01" } });
+  expect(dialog.getByText(/Sẽ tạo 26 buổi/)).toBeTruthy();
+  fireEvent.click(dialog.getByRole("button", { name: "Tạo lịch định kỳ" }));
+  await waitFor(() => expect(fetchMock.mock.calls.some(([url, options]) => String(url).endsWith("/series") && options?.method === "POST")).toBe(true));
+  const request = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/series") && options?.method === "POST")!;
+  const payload = JSON.parse(request[1].body);
+  expect(payload.tiers).toEqual([{ startTime: "07:00", endTime: "08:00", seconds: 30 }, { startTime: "08:00", endTime: "09:00", seconds: 20 }]);
+  expect(payload).not.toHaveProperty("allowDirectCheckIn");
+  expect(payload).toMatchObject({ title: "Họp tuần", recurrence: { startDate: "2030-01-01", months: 6, weekday: 3, time: "07:00" } });
+  expect(payload).not.toHaveProperty("startsAt");
+  expect(payload).not.toHaveProperty("endsAt");
+  await waitFor(() => expect((screen.getByLabelText("Tháng xem lịch") as HTMLInputElement).value).toBe("2030-01"));
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("creates only one meeting after cancelling the recurring popup", async () => {
+  const fetchMock = vi.fn(async (_url: any, options: any) => ({
+    ok: true, json: async () => ({ data: options?.method === "POST" ? meeting : [meeting] }),
+  }));
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Tạo lịch định kỳ" }));
+  const recurringDialog = within(screen.getByRole("dialog", { name: "Tạo lịch định kỳ hằng tuần" }));
+  fireEvent.change(recurringDialog.getByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40"), { target: { value: "Lịch định kỳ chưa lưu" } });
+  fireEvent.change(recurringDialog.getByLabelText("Ngày bắt đầu chu kỳ"), { target: { value: "2030-01-01" } });
+  fireEvent.click(recurringDialog.getByRole("button", { name: "Hủy" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(fetchMock.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Tạo cuộc họp mới" }));
+  const dialog = within(screen.getByRole("dialog", { name: "Tạo cuộc họp BNI mới" }));
+  expect(dialog.queryByLabelText("Ngày bắt đầu chu kỳ")).toBeNull();
+  expect(dialog.queryByRole("checkbox", { name: "Tạo lịch định kỳ hằng tuần" })).toBeNull();
+  expect(dialog.queryByRole("checkbox", { name: /Cho phép điểm danh trực tiếp/ })).toBeNull();
+  const titleInput = dialog.getByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40");
+  expect((titleInput as HTMLInputElement).value).toBe("");
+  fireEvent.change(titleInput, { target: { value: "Họp một lần" } });
+  const startInput = dialog.getByPlaceholderText("Chọn ngày...");
+  fireEvent.change(startInput, { target: { value: "02/01/2030 07:00" } });
+  fireEvent.blur(startInput);
+  expect((dialog.getByLabelText("Giờ kết thúc cuộc họp") as HTMLInputElement).value).toBe("2030-01-02T09:00");
+  fireEvent.click(dialog.getByRole("button", { name: "Tạo cuộc họp" }));
+  await waitFor(() => expect(fetchMock.mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(1));
+  const request = fetchMock.mock.calls.find(([, options]) => options?.method === "POST")!;
+  expect(request[0]).toBe("/api/v1/meetings");
+  const payload = JSON.parse(request[1].body);
+  expect(payload.tiers).toEqual([{ startTime: "07:00", endTime: "08:00", seconds: 30 }, { startTime: "08:00", endTime: "09:00", seconds: 20 }]);
+  expect(payload).not.toHaveProperty("allowDirectCheckIn");
+  expect(payload).toMatchObject({ title: "Họp một lần", startsAt: "2030-01-02T00:00:00.000Z", endsAt: "2030-01-02T02:00:00.000Z" });
+  expect(payload).not.toHaveProperty("recurrence");
+});
+
+it("edits time slots, blocks overlaps and saves the configured fallback", async () => {
+  const item = { ...meeting, tiers: [{ startTime: "06:30", endTime: "07:30", seconds: 45 }, { startTime: "07:30", endTime: "08:30", seconds: 25 }], fallbackSeconds: 12 };
+  const fetchMock = vi.fn(async (_url, options) => ({ ok: true, json: async () => ({ data: options?.method === "PUT" ? item : [item] }) }));
+  vi.stubGlobal("fetch", fetchMock);
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+  fireEvent.click((await screen.findAllByTitle("Sửa cuộc họp"))[0]);
+  expect(screen.queryByText("Số lượng người:")).toBeNull();
+  const start = screen.getByLabelText("Từ giờ — khung 1") as HTMLInputElement;
+  expect(start.value).toBe("06:30");
+  expect((screen.getByLabelText("Số giây phát biểu — khung 1") as HTMLInputElement).value).toBe("45");
+  fireEvent.change(screen.getByLabelText("Đến giờ — khung 1"), { target: { value: "08:00" } });
+  fireEvent.submit(start.closest("form")!);
+  expect(screen.getByRole("alert").textContent).toContain("không được chồng nhau");
+  expect(fetchMock.mock.calls.some(([, options]) => options?.method === "PUT")).toBe(false);
+  fireEvent.change(screen.getByLabelText("Đến giờ — khung 1"), { target: { value: "07:30" } });
+  fireEvent.click(screen.getByRole("button", { name: "Thêm khung giờ" }));
+  expect((screen.getByLabelText("Từ giờ — khung 3") as HTMLInputElement).value).toBe("08:30");
+  fireEvent.change(screen.getByLabelText("Đến giờ — khung 3"), { target: { value: "09:00" } });
+  fireEvent.change(screen.getByLabelText("Số giây phát biểu — khung 3"), { target: { value: "15" } });
+  fireEvent.click(screen.getByRole("button", { name: "Xóa khung giờ 2" }));
+  fireEvent.change(screen.getByLabelText(/Ngoài khung giờ/), { target: { value: "10" } });
+  fireEvent.submit(start.closest("form")!);
+  await waitFor(() => expect(fetchMock.mock.calls.some(([, options]) => options?.method === "PUT")).toBe(true));
+  const request = fetchMock.mock.calls.find(([, options]) => options?.method === "PUT")!;
+  expect(JSON.parse(request[1].body)).toMatchObject({
+    tiers: [{ startTime: "06:30", endTime: "07:30", seconds: 45 }, { startTime: "08:30", endTime: "09:00", seconds: 15 }],
+    fallbackSeconds: 10,
+  });
 });

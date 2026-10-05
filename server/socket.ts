@@ -188,10 +188,6 @@ export async function initSocketServer(httpServer: HTTPServer) {
         return next(new Error("Authentication error: User not found"));
       }
 
-      if (!decoded.sid || user.activeSessionId !== decoded.sid) {
-        return next(new Error("Authentication error: Session replaced"));
-      }
-
       socket.data.user = user;
       socket.data.sessionId = decoded.sid;
       next();

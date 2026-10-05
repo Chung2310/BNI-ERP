@@ -8,13 +8,7 @@ import {
   isPermissionCode,
 } from "./permission-catalog";
 
-const EXPECTED_FEATURES = [
-  "access", "chat", "customer", "dashboard", "finance-receivable", "finance-wallet", "hr",
-  "inventory", "labor-partner", "labor-partner-payout", "labor-partner-policy",
-  "labor-partner-settlement", "marketing", "payroll-payment", "payroll-period", "payroll-policy",
-  "people", "recruitment", "relationship", "repair", "resource", "retail",
-  "settings", "timekeeping", "work",
-];
+const EXPECTED_FEATURES = ["access", "chat", "dashboard", "hr", "meetings", "people", "relationship", "resource", "settings"];
 
 describe("permission registry", () => {
 it("contains exactly one read/manage pair for every approved feature", () => {
@@ -29,12 +23,12 @@ it("contains exactly one read/manage pair for every approved feature", () => {
 });
 
 it("recognizes only registered read/manage codes", () => {
-  expect(isPermissionCode("customer:read")).toBe(true);
-  expect(isPermissionCode("customer:manage")).toBe(true);
-  expect(isPermissionCode("payroll-period:read")).toBe(true);
-  expect(isPermissionCode("payroll-period:manage")).toBe(true);
-  expect(isPermissionCode("payroll-payment:manage")).toBe(true);
-  expect(isPermissionCode("labor-partner-settlement:manage")).toBe(true);
+  expect(isPermissionCode("people:read")).toBe(true);
+  expect(isPermissionCode("people:manage")).toBe(true);
+  expect(isPermissionCode("meetings:read")).toBe(true);
+  expect(isPermissionCode("meetings:manage")).toBe(true);
+  expect(isPermissionCode("resource:manage")).toBe(true);
+  expect(isPermissionCode("access:manage")).toBe(true);
   expect(isPermissionCode("payroll:pay")).toBe(false);
   expect(isPermissionCode("unknown:manage")).toBe(false);
 });
@@ -43,10 +37,10 @@ it("compacts redundant read while returning effective permissions", () => {
   expect(compactStoredPermissions([
     "hr:read",
     "hr:manage",
-    "payroll-payment:read",
+    "resource:read",
   ])).toEqual({
-    stored: ["hr:manage", "payroll-payment:read"],
-    effective: ["hr:manage", "hr:read", "payroll-payment:read"],
+    stored: ["hr:manage", "resource:read"],
+    effective: ["hr:manage", "hr:read", "resource:read"],
   });
 });
 
@@ -60,7 +54,7 @@ it("rejects every invalid code instead of silently dropping it", () => {
 
 it("manage expands to read without crossing feature boundaries", () => {
   expect(
-    [...expandEffectivePermissions(["finance-wallet:manage", "finance-receivable:read"])].sort(),
-  ).toEqual(["finance-receivable:read", "finance-wallet:manage", "finance-wallet:read"]);
+    [...expandEffectivePermissions(["resource:manage", "meetings:read"])].sort(),
+  ).toEqual(["meetings:read", "resource:manage", "resource:read"]);
 });
 });

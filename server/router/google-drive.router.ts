@@ -6,15 +6,6 @@ import { requireModule } from "../middleware/require-module";
 
 export const googleDriveRouter = Router();
 
-// Route lấy link đăng nhập Google OAuth
-googleDriveRouter.get("/auth-url", requireAuth as any, requireModule("resource"), requirePermission("resource:manage") as any, googleDriveController.initOAuth as any);
-
-// Route callback tiếp nhận redirect từ Google (không cần requireAuth vì Google gọi trực tiếp)
-googleDriveRouter.get("/callback", googleDriveController.oauthCallback as any);
-
-// Route ngắt kết nối Google Drive
-googleDriveRouter.post("/disconnect", requireAuth as any, requireModule("resource"), requirePermission("resource:manage") as any, googleDriveController.disconnect as any);
-
 // Route lấy danh sách tài nguyên cá nhân
 googleDriveRouter.get("/resources", requireAuth as any, requireModule("resource"), requirePermission("resource:read") as any, googleDriveController.getResources as any);
 

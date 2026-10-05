@@ -1,298 +1,22 @@
 import { Response } from "express";
 import { google } from "googleapis";
 import { AuthenticatedRequest } from "../middleware/auth";
-import { GoogleDriveService } from "../service/personal-google-drive.service";
+import { DriveFileService } from "../service/drive-file.service";
+import { getCompanyDriveContext } from "../service/company-drive-context.service";
 import { UserModel } from "../model/user.model";
 import { ResourceModel } from "../model/resource.model";
 import { ChatRoomModel } from "../model/chat-room.model";
 import { canAccessPersonalDriveTarget } from "../utils/personal-drive-access";
 
-/**
- * Helper lấy OAuth2 Client và rootFolderId dựa trên Google Drive của doanh nghiệp (hoặc cá nhân làm fallback).
- */
-async function getDriveClientAndRoot(companyCode: string, userId: string) {
-  const { CompanyModel } = await import("../model/company.model");
-  const company = await CompanyModel.findOne({ code: companyCode.toUpperCase() });
-
-  if (company && company.driveOAuth?.refreshToken) {
-    const { googleOAuthService } = await import("../service/google-oauth.service");
-    const accessToken = await googleOAuthService.getAccessToken(company.driveOAuth.refreshToken);
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
-    );
-    oauth2Client.setCredentials({
-      access_token: accessToken,
-      refresh_token: company.driveOAuth.refreshToken
-    });
-
-    if (!company.driveFolderId) {
-      const { googleDriveService } = await import("../service/google-drive.service");
-      const folder = await googleDriveService.createFolder(
-        accessToken,
-        `iGen Connect - Tài liệu ${company.name || company.code}`
-      );
-      company.driveFolderId = folder.id;
-      company.driveFolderLink = folder.webViewLink || "";
-      await company.save();
-    }
-
-    return {
-      authClient: oauth2Client,
-      rootFolderId: company.driveFolderId,
-      isConnected: true,
-      email: company.driveOAuth.connectedEmail || "Company Google Drive",
-      isCompanyDrive: true
-    };
-  }
-
-  // Fallback sang Google Drive cá nhân
-  const user = await UserModel.findById(userId);
-  if (user && user.googleDriveIntegration?.isConnected) {
-    const authClient = await GoogleDriveService.getClientForUser(userId);
-    return {
-      authClient,
-      rootFolderId: user.googleDriveIntegration.rootFolderId,
-      isConnected: true,
-      email: user.googleDriveIntegration.driveEmail || "",
-      isCompanyDrive: false
-    };
-  }
-
-  return {
-    authClient: null,
-    rootFolderId: "",
-    isConnected: false,
-    email: "",
-    isCompanyDrive: false
-  };
-}
-
-/**
- * Helper lấy OAuth2 Client và rootFolderId của tài khoản Google Drive quản trị doanh nghiệp
- */
-async function getAdminDriveClient(companyCode: string, loggedInUserId?: string) {
-  const { CompanyModel } = await import("../model/company.model");
-  const company = await CompanyModel.findOne({ code: companyCode.toUpperCase() });
-
-  if (company && company.driveOAuth?.refreshToken) {
-    const { googleOAuthService } = await import("../service/google-oauth.service");
-    const accessToken = await googleOAuthService.getAccessToken(company.driveOAuth.refreshToken);
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
-    );
-    oauth2Client.setCredentials({
-      access_token: accessToken,
-      refresh_token: company.driveOAuth.refreshToken
-    });
-
-    if (!company.driveFolderId) {
-      const { googleDriveService } = await import("../service/google-drive.service");
-      const folder = await googleDriveService.createFolder(
-        accessToken,
-        `iGen Connect - Tài liệu ${company.name || company.code}`
-      );
-      company.driveFolderId = folder.id;
-      company.driveFolderLink = folder.webViewLink || "";
-      await company.save();
-    }
-
-    return {
-      authClient: oauth2Client,
-      rootFolderId: company.driveFolderId,
-      adminUser: { displayName: "Doanh nghiệp", email: company.ownerEmail || "" }
-    };
-  }
-
-  let adminUser = null;
-
-  // 1. Nếu có loggedInUserId, kiểm tra xem người này có phải là admin và đã kết nối Drive không
-  if (loggedInUserId) {
-    adminUser = await UserModel.findOne({
-      _id: loggedInUserId,
-      companyCode,
-      role: "admin",
-      "googleDriveIntegration.isConnected": true,
-    });
-  }
-
-  // 2. Fallback: Tìm tài khoản admin đầu tiên của công ty đã kết nối Drive
-  if (!adminUser) {
-    adminUser = await UserModel.findOne({
-      companyCode,
-      role: "admin",
-      "googleDriveIntegration.isConnected": true,
-    });
-  }
-
-  if (!adminUser || !adminUser.googleDriveIntegration || !adminUser.googleDriveIntegration.isConnected) {
-    throw new Error("Doanh nghiệp chưa cấu hình/liên kết tài khoản Google Drive quản trị (Admin). Vui lòng cấu hình ở cài đặt cá nhân của Admin.");
-  }
-
-  const authClient = await GoogleDriveService.getClientForUser(adminUser._id.toString());
-  return {
-    authClient,
-    rootFolderId: adminUser.googleDriveIntegration.rootFolderId,
-    adminUser,
-  };
+// Resolve all resource operations against the company Drive connection.
+const getDriveClientAndRoot = (companyCode: string, _userId?: string) => getCompanyDriveContext(companyCode);
+async function getAdminDriveClient(companyCode: string, _loggedInUserId?: string) {
+  const context = await getCompanyDriveContext(companyCode);
+  if (!context.isConnected) throw new Error("Doanh nghiệp chưa kết nối Google Drive. Vui lòng cấu hình trong Cài đặt doanh nghiệp.");
+  return { ...context, adminUser: { displayName: "Doanh nghiệp", email: context.email } };
 }
 
 export const googleDriveController = {
-  /**
-   * GET /api/v1/integrations/google-drive/auth-url
-   * Lấy URL màn hình xin quyền Google OAuth2
-   */
-  async initOAuth(req: AuthenticatedRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ status: "error", message: "Người dùng chưa xác thực." });
-      }
-
-      const authUrl = GoogleDriveService.getAuthUrl(userId);
-      return res.status(200).json({ status: "success", authUrl });
-    } catch (error: any) {
-      console.error("[googleDriveController.initOAuth] Error:", error);
-      return res.status(500).json({
-        status: "error",
-        message: "Lỗi tạo URL liên kết Google Drive.",
-        details: error.message,
-      });
-    }
-  },
-
-  /**
-   * GET /api/v1/integrations/google-drive/callback
-   * Tiếp nhận callback chuyển hướng từ Google
-   */
-  async oauthCallback(req: AuthenticatedRequest, res: Response) {
-    const sendHtmlResponse = (status: "success" | "error", message: string, data?: any) => {
-      const payload = { type: status === "success" ? "GOOGLE_DRIVE_CONNECTED" : "GOOGLE_DRIVE_FAILED", ...data, error: status === "error" ? message : undefined };
-      return res.status(status === "success" ? 200 : 500).send(`
-        <!DOCTYPE html>
-        <html lang="vi">
-        <head>
-          <meta charset="UTF-8" />
-          <title>${status === "success" ? "Kết nối thành công" : "Lỗi kết nối"}</title>
-          <style>
-            body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: ${status === "success" ? "#f0fdf4" : "#fef2f2"}; margin: 0; }
-            .box { text-align: center; background: white; padding: 40px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 400px; }
-            h2 { color: ${status === "success" ? "#16a34a" : "#dc2626"}; margin-top: 0; }
-            p { color: #4b5563; font-size: 14px; line-height: 1.5; }
-          </style>
-        </head>
-        <body>
-          <div class="box">
-            <h2>${status === "success" ? "✅ Kết nối thành công" : "❌ Kết nối thất bại"}</h2>
-            <p>${message}</p>
-          </div>
-          <script>
-            if (window.opener) {
-              window.opener.postMessage(${JSON.stringify(payload)}, '*');
-            }
-            setTimeout(() => window.close(), 1500);
-          </script>
-        </body>
-        </html>
-      `);
-    };
-
-    try {
-      const { code, error, error_description, state } = req.query;
-
-      if (error) {
-        return sendHtmlResponse("error", String(error_description || error));
-      }
-
-      if (!code) {
-        return sendHtmlResponse("error", "Không tìm thấy mã code từ Google.");
-      }
-
-      const userId = GoogleDriveService.getUserIdFromOAuthState(String(state || ""));
-      if (!userId) {
-        return sendHtmlResponse("error", "Mã trạng thái userId không hợp lệ.");
-      }
-
-      const user = await UserModel.findById(userId);
-      if (!user) {
-        return sendHtmlResponse("error", "Không tìm thấy tài khoản người dùng tương ứng.");
-      }
-
-      // Đổi code lấy tokens
-      const tokens = await GoogleDriveService.getTokensFromCode(String(code));
-      if (!tokens.access_token || !tokens.refresh_token) {
-        return sendHtmlResponse("error", "Không thể lấy đủ access token hoặc refresh token từ Google. Bạn cần xóa ứng dụng trong cài đặt tài khoản Google của bạn và cấp quyền lại để sinh refresh token.");
-      }
-
-      // Lấy email google đã kết nối
-      const driveEmail = await GoogleDriveService.getDriveEmail(tokens.access_token);
-
-      // Tạo client tạm thời để tạo thư mục root cho User nếu chưa có
-      const oauth2Client = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
-        process.env.GOOGLE_REDIRECT_URI
-      );
-      oauth2Client.setCredentials(tokens);
-
-      const folderId = await GoogleDriveService.createFolder(oauth2Client, "iGen Connect Resources");
-
-      // Cập nhật thông tin vào DB
-      user.googleDriveIntegration = {
-        isConnected: true,
-        driveEmail,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        tokenExpiredAt: new Date(tokens.expiry_date!),
-        rootFolderId: folderId,
-        connectedAt: new Date(),
-      };
-
-      await user.save();
-
-      return sendHtmlResponse("success", `Tài khoản ${driveEmail} đã được liên kết thành công với iGen Connect. Cửa sổ này sẽ tự đóng sau giây lát.`, { driveEmail });
-    } catch (err: any) {
-      console.error("[googleDriveController.oauthCallback] Error:", err);
-      return sendHtmlResponse("error", err.message || "Lỗi xử lý luồng Callback OAuth Google.");
-    }
-  },
-
-  /**
-   * POST /api/v1/integrations/google-drive/disconnect
-   * Hủy liên kết Google Drive của User
-   */
-  async disconnect(req: AuthenticatedRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ status: "error", message: "Người dùng chưa xác thực." });
-      }
-
-      const user = await UserModel.findById(userId);
-      if (!user) {
-        return res.status(404).json({ status: "error", message: "Không tìm thấy người dùng." });
-      }
-
-      user.googleDriveIntegration = null;
-      await user.save();
-
-      return res.status(200).json({
-        status: "success",
-        message: "Hủy liên kết tài khoản Google Drive cá nhân thành công.",
-      });
-    } catch (error: any) {
-      console.error("[googleDriveController.disconnect] Error:", error);
-      return res.status(500).json({
-        status: "error",
-        message: "Lỗi hủy liên kết Google Drive.",
-        details: error.message,
-      });
-    }
-  },
-
   /**
    * GET /api/v1/integrations/google-drive/resources
    * Lấy danh sách tài nguyên từ Google Drive của User (hỗ trợ điều hướng thư mục)
@@ -429,7 +153,7 @@ export const googleDriveController = {
       const parentFolderId = (folderId && folderId !== "root" && folderId !== "personal") ? folderId : driveInfo.rootFolderId;
 
       // Upload lên Google Drive
-      const driveFile = await GoogleDriveService.uploadFile(
+      const driveFile = await DriveFileService.uploadFile(
         authClient,
         fileBuffer,
         name,
@@ -504,7 +228,7 @@ export const googleDriveController = {
       if (!chatRoom.driveFolderId) {
         try {
           // Tạo thư mục "iGen Shared Groups" trong root folder của Admin nếu chưa có
-          const sharedGroupsFolderId = await GoogleDriveService.createFolder(adminInfo.authClient, "iGen Shared Groups");
+          const sharedGroupsFolderId = await DriveFileService.createFolder(adminInfo.authClient, "iGen Shared Groups");
           
           // Tạo thư mục cụ thể cho phòng chat này
           const fileMetadata = {
@@ -562,7 +286,7 @@ export const googleDriveController = {
         if (isPermissionOrNotFound && targetFolderId === chatRoom.driveFolderId) {
           console.warn("[getGroupResources] Phát hiện lỗi quyền truy cập hoặc thư mục không tồn tại. Tiến hành khởi tạo lại thư mục mới...");
           try {
-            const sharedGroupsFolderId = await GoogleDriveService.createFolder(adminInfo.authClient, "iGen Shared Groups");
+            const sharedGroupsFolderId = await DriveFileService.createFolder(adminInfo.authClient, "iGen Shared Groups");
             const newFolder = await drive.files.create({
               requestBody: {
                 name: chatRoom.name || `Nhóm_${roomId}`,
@@ -703,7 +427,7 @@ export const googleDriveController = {
       let driveFile;
       let actualParentId = parentFolderId;
       try {
-        driveFile = await GoogleDriveService.uploadFile(
+        driveFile = await DriveFileService.uploadFile(
           authClient,
           fileBuffer,
           name,
@@ -717,7 +441,7 @@ export const googleDriveController = {
         if (isPermissionOrNotFound && actualParentId === chatRoom.driveFolderId) {
           console.warn("[uploadGroupResource] Thư mục cha không hợp lệ hoặc thiếu quyền. Tiến hành khởi tạo lại thư mục mới...");
           try {
-            const sharedGroupsFolderId = await GoogleDriveService.createFolder(authClient, "iGen Shared Groups");
+            const sharedGroupsFolderId = await DriveFileService.createFolder(authClient, "iGen Shared Groups");
             const drive = google.drive({ version: "v3", auth: authClient });
             const newFolder = await drive.files.create({
               requestBody: {
@@ -742,7 +466,7 @@ export const googleDriveController = {
             actualParentId = chatRoom.driveFolderId;
 
             // Thử upload lại tệp lên thư mục mới
-            driveFile = await GoogleDriveService.uploadFile(
+            driveFile = await DriveFileService.uploadFile(
               authClient,
               fileBuffer,
               name,
@@ -935,10 +659,10 @@ export const googleDriveController = {
           if (driveInfo.isConnected) {
             authClient = driveInfo.authClient;
           } else {
-            authClient = await GoogleDriveService.getClientForUser(uploadedByUserId);
+            throw new Error("Doanh nghiệp chưa kết nối Google Drive.");
           }
         }
-        await GoogleDriveService.deleteFile(authClient, driveFileIdToDelete);
+        await DriveFileService.deleteFile(authClient, driveFileIdToDelete);
       } catch (err: any) {
         // Log và cho phép xóa tiếp ở DB nếu file đã bị xóa trên Drive thủ công từ trước
         console.warn(`[googleDriveController.deleteResource] File không tìm thấy trên Drive hoặc không thể xóa:`, err.message);
@@ -1047,7 +771,7 @@ export const googleDriveController = {
         if (driveInfo.isConnected) {
           authClient = driveInfo.authClient;
         } else {
-          authClient = await GoogleDriveService.getClientForUser(userId);
+          throw new Error("Doanh nghiệp chưa kết nối Google Drive.");
         }
       }
 
@@ -1141,7 +865,7 @@ export const googleDriveController = {
         // Khởi tạo thư mục nhóm nếu chưa có
         if (!chatRoom.driveFolderId) {
           const adminInfo = await getAdminDriveClient(companyCode, req.user?.id);
-          const sharedGroupsFolderId = await GoogleDriveService.createFolder(adminInfo.authClient, "iGen Shared Groups");
+          const sharedGroupsFolderId = await DriveFileService.createFolder(adminInfo.authClient, "iGen Shared Groups");
           const drive = google.drive({ version: "v3", auth: adminInfo.authClient });
           const folder = await drive.files.create({
             requestBody: {
@@ -1271,7 +995,7 @@ export const googleDriveController = {
           if (isPermissionOrNotFound && spaceType === "group" && actualParentId === chatRoom.driveFolderId) {
             console.warn("[createFile] Thư mục cha không hợp lệ hoặc thiếu quyền. Tiến hành khởi tạo lại thư mục mới...");
             try {
-              const sharedGroupsFolderId = await GoogleDriveService.createFolder(authClient, "iGen Shared Groups");
+              const sharedGroupsFolderId = await DriveFileService.createFolder(authClient, "iGen Shared Groups");
               const newFolder = await drive.files.create({
                 requestBody: {
                   name: chatRoom.name || `Nhóm_${roomId}`,
@@ -1432,7 +1156,7 @@ export const googleDriveController = {
         if (driveInfo.isConnected) {
           authClient = driveInfo.authClient;
         } else {
-          authClient = await GoogleDriveService.getClientForUser(userId);
+          throw new Error("Doanh nghiệp chưa kết nối Google Drive.");
         }
       }
 

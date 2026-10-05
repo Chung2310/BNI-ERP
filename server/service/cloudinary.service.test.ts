@@ -44,41 +44,6 @@ describe("cloudinaryService private evidence", () => {
     process.env.CLOUDINARY_API_SECRET = "secret";
   });
 
-  it("uploads image buffers as authenticated assets and preserves identifiers", async () => {
-    mocks.uploadStream.mockImplementation((options, callback) => {
-      expect(options).toMatchObject({
-        folder: "attendance/evidence",
-        resource_type: "image",
-        type: "authenticated",
-      });
-      return {
-        end: vi.fn(() => callback(null, {
-          public_id: "attendance/evidence/asset-1",
-          resource_type: "image",
-          type: "authenticated",
-          format: "jpg",
-          bytes: 1234,
-        })),
-      };
-    });
-
-    const result = await cloudinaryService.uploadPrivateImage(
-      Buffer.from("image"),
-      "attendance/evidence",
-    );
-
-    expect(result).toEqual({
-      publicId: "attendance/evidence/asset-1",
-      resourceType: "image",
-      type: "authenticated",
-      format: "jpg",
-      bytes: 1234,
-    });
-    expect(mocks.uploadStream.mock.results[0].value.end).toHaveBeenCalledWith(
-      Buffer.from("image"),
-    );
-  });
-
   it("creates a signed authenticated image URL with an explicit expiry", () => {
     const expiresAt = new Date("2026-07-20T12:00:00.000Z");
     mocks.url.mockReturnValue("https://signed.example/evidence");

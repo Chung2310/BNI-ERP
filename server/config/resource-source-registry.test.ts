@@ -32,7 +32,6 @@ describe("resource source registry", () => {
 
     expect(sourceTypes).toEqual(expect.arrayContaining([
       "hr.contract",
-      "hr.leave",
       "hr.kanban",
       "hr.training",
       "hr.recruitment.job",
@@ -42,15 +41,7 @@ describe("resource source registry", () => {
       "student.assignment",
       "student.submission",
       "student.face",
-      "attendance.student",
-      "attendance.worker",
       "inventory.product",
-      "import.worker",
-      "import.student",
-      "import.partner",
-      "import.exam",
-      "import.inventory-product",
-      "import.inventory-stock",
       "chat.attachment",
       "workflow.attachment",
       "settings.profile",

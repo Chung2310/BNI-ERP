@@ -2,7 +2,7 @@ import { locate } from "../components/meetings/locateForCheckIn";
 import React, { useEffect, useState } from "react";
 import { CheckCircle2, MapPin, CalendarDays, ArrowRight } from "lucide-react";
 
-type MeetingInfo = { title: string; startsAt: string; location?: string; expiresAt: string };
+type MeetingInfo = { title: string; startsAt: string; location?: string; expiresAt: string | null };
 type Mode = "member" | "guest";
 const fieldClass = "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 disabled:bg-slate-50";
 export default function MeetingCheckInPage() {
@@ -20,6 +20,7 @@ export default function MeetingCheckInPage() {
     return () => URL.revokeObjectURL(url);
   }, [avatar]);
   const [success, setSuccess] = useState("");
+  const [checkedInMeeting, setCheckedInMeeting] = useState("");
   const [error, setError] = useState("");
   const [phase, setPhase] = useState<"idle" | "locating" | "submitting">("idle");
   const [now, setNow] = useState(Date.now());
@@ -33,7 +34,7 @@ export default function MeetingCheckInPage() {
     return () => controller.abort();
   }, [token]);
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
-  const expired = !!meeting && new Date(meeting.expiresAt).getTime() <= now;
+  const expired = !!meeting?.expiresAt && new Date(meeting.expiresAt).getTime() <= now;
   const busy = phase !== "idle";
   const switchMode = (value: Mode) => { setMode(value); setError(""); setForm(old => ({ ...old, password: "" })); };
   const submit = async (event: React.FormEvent) => {
@@ -61,6 +62,7 @@ export default function MeetingCheckInPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Không thể check-in. Vui lòng thử lại.");
       setAvatar(null);
+      setCheckedInMeeting(data.data?.meetingTitle || meeting?.title || "");
       setSuccess(data.data?.name || (mode === "guest" ? form.name : "Bạn"));
       setForm(old => ({ ...old, password: "" }));
     } catch (e: any) { setError(e.message); } finally { setPhase("idle"); }
@@ -85,7 +87,7 @@ export default function MeetingCheckInPage() {
           <div className="mx-auto mb-6 grid h-20 w-20 place-items-center rounded-full bg-emerald-50 ring-8 ring-emerald-50/50"><CheckCircle2 aria-hidden="true" className="h-10 w-10 text-emerald-600" strokeWidth={1.75} /></div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Check-in thành công</h2>
           <p className="mt-3 text-base text-slate-600">Chào mừng <strong className="font-semibold text-slate-900">{success}</strong>!</p>
-          <p className="mt-1 text-sm leading-relaxed text-slate-500">Thông tin tham dự của bạn đã được ghi nhận.</p>
+          <p className="mt-1 text-sm leading-relaxed text-slate-500">Thông tin tham dự của bạn đã được ghi nhận{checkedInMeeting ? " cho cuộc họp “" + checkedInMeeting + "”." : "."}</p>
           <div className="mt-7 rounded-2xl bg-cyan-50/70 px-5 py-4 text-sm leading-relaxed text-cyan-900">Bạn có thể đóng trang này và chờ MC mời phát biểu.</div>
         </div> :
           loading ? <p role="status">Đang kiểm tra mã QR…</p> :
@@ -134,7 +136,7 @@ export default function MeetingCheckInPage() {
             <div className="rounded-2xl border border-cyan-100/60 bg-cyan-50/40 p-4"><h2 className="flex items-center gap-2 text-sm font-semibold"><MapPin size={18} />2. Xác nhận tại địa điểm họp</h2><p className="mt-2 text-sm leading-relaxed text-slate-500">Khi bấm Check-in, hãy cho phép truy cập vị trí để xác nhận bạn đang ở gần địa điểm.</p></div>
             {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
             <button disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-3.5 font-semibold text-white shadow-sm shadow-cyan-600/20 transition hover:bg-cyan-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600 disabled:opacity-60">{phase === "locating" ? "Đang xác nhận vị trí…" : phase === "submitting" ? "Đang ghi nhận…" : "Check-in"}{!busy && <ArrowRight aria-hidden="true" size={18} />}</button>
-            <p className="text-center text-xs text-slate-500">QR có hiệu lực đến {new Date(meeting.expiresAt).toLocaleTimeString("vi-VN")}.</p>
+            <p className="text-center text-xs text-slate-500">{meeting.expiresAt ? "QR có hiệu lực đến " + new Date(meeting.expiresAt).toLocaleTimeString("vi-VN") + "." : "QR cố định dùng chung cho các cuộc họp của đơn vị · Không hết hạn."}</p>
           </form>}
       </div>
     </section>

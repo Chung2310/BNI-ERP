@@ -1,4 +1,5 @@
 import { Schema, model } from 'mongoose';
+import { defaultSpeakingTimeSlots } from "../../../src/utils/meetingSpeakingTime";
 
 const speaker = new Schema(
   {
@@ -85,24 +86,24 @@ const meeting = new Schema(
     latitude: Number,
     longitude: Number,
     gpsRadiusMeters: { type: Number, default: 200 },
-    allowDirectCheckIn: { type: Boolean, default: false },
     checkInQrTokenHash: String,
     checkInQrTokenEncrypted: { type: String, select: false },
     checkInQrExpiresAt: Date,
 
     coverImage: String,
     startsAt: { type: Date, required: true },
+    endsAt: Date,
+    startedAt: Date,
+    seriesId: String,
+    originalStartsAt: Date,
     createdBy: String,
     reminderDays: { type: Number, default: 1 },
     reminderMinutes: { type: Number, default: 60 },
     reminderAt: { type: Date, required: true },
     revision: { type: Number, default: 1 },
     tiers: {
-      type: [{ count: Number, seconds: Number, _id: false }],
-      default: [
-        { count: 10, seconds: 30 },
-        { count: 10, seconds: 20 },
-      ],
+      type: [{ startTime: String, endTime: String, count: Number, seconds: Number, _id: false }],
+      default: defaultSpeakingTimeSlots,
     },
     fallbackSeconds: { type: Number, default: 20 },
     status: {
@@ -133,9 +134,20 @@ const meeting = new Schema(
 );
 
 meeting.index({ companyCode: 1, startsAt: -1 });
+meeting.index({ companyCode: 1, seriesId: 1 });
 meeting.index({ status: 1, reminderAt: 1 });
 
 export const MeetingModel = model('Meeting', meeting);
+
+// A reusable QR belongs to the company, independent of individual meetings.
+const checkInQr = new Schema({
+  companyCode: { type: String, required: true, unique: true },
+  tokenHash: { type: String, unique: true, sparse: true },
+  tokenEncrypted: { type: String, select: false },
+  expiresAt: { type: Date, default: null },
+  revokedAt: Date,
+}, { timestamps: true });
+export const MeetingCheckInQrModel = model('MeetingCheckInQr', checkInQr);
 
 const delivery = new Schema(
   {

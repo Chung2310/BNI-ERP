@@ -3,13 +3,13 @@ import type { NextFunction, Request, Response } from "express";
 import { UserActivityEventModel, type UserActivityCategory } from "../model/user-activity-event.model";
 
 const bounded = (value: unknown, max: number) => typeof value === "string" && value.trim() ? value.trim().slice(0, max) : undefined;
-const NOISY = [/\/health(?:\/|$)/, /\/users\/:userId\/activity$/, /\/telegram-link/, /\/socket/, /\/heartbeat/];
+const NOISY = [/\/health(?:\/|$)/, /\/users\/:userId\/activity$/, /\/socket/, /\/heartbeat/];
 
 const moduleName = (route: string) => {
   const entries: Array<[RegExp, string, string]> = [
     [/student|course|batch|exam|assignment/, "học viên", "student"], [/worker/, "lao động", "worker"],
     [/order/, "đơn hàng", "order"], [/product|inventory|warehouse|stock/, "kho và sản phẩm", "inventory"],
-    [/payroll/, "tiền lương", "payroll"], [/timekeeping|attendance|shift/, "chấm công", "timekeeping"],
+    [/payroll/, "tiền lương", "payroll"],
     [/user|role|permission/, "người dùng", "user"], [/chat|message/, "trò chuyện", "chat"],
     [/resource|file|drive/, "tài nguyên", "resource"], [/retail/, "bán lẻ", "retail"],
     [/finance|wallet|receivable/, "tài chính", "finance"], [/setting|config/, "cấu hình", "settings"],

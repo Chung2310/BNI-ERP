@@ -34,7 +34,6 @@ import { ConfirmDialog } from "../common/ConfirmDialog";
 import { VietnameseDatePicker } from "../common/VietnameseDatePicker";
 import { getApiErrorMessage } from "../../utils/errorMessage";
 import { filterOrgChartEmployees, getManagerForEmployee } from "./orgChartUtils";
-import { useIsMobile } from "../../hooks/useMediaQuery";
 
 interface OrgChartTabProps {
   userProfile: any;
@@ -53,29 +52,6 @@ interface OrgChartTabProps {
 const isUrl = (str?: string): boolean => {
   if (!str) return false;
   return str.startsWith("http://") || str.startsWith("https://") || str.startsWith("data:image/") || str.startsWith("/");
-};
-
-const normalizeString = (str: string): string => {
-  return String(str ?? "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "d");
-};
-
-const parseDurationToHours = (durationStr: string): number => {
-  if (!durationStr) return 0;
-  const cleanStr = durationStr.toLowerCase().trim();
-  const match = cleanStr.match(/(\d+(\.\d+)?)/);
-  if (!match) return 0;
-  const value = parseFloat(match[1]);
-
-  if (cleanStr.includes("phut") || cleanStr.includes("m") || cleanStr.includes("minutes") || cleanStr.includes("minute")) {
-    return Number((value / 60).toFixed(1));
-  }
-  return value;
 };
 
 const renderAvatar = (avatar: string, sizeClasses: string = "w-8 h-8", textClass: string = "text-base", nameFallback?: string) => {
@@ -107,82 +83,6 @@ const renderAvatar = (avatar: string, sizeClasses: string = "w-8 h-8", textClass
 };
 
 
-const FUNCTIONAL_CATEGORIES = [
-  { key: "governance", label: "Quản trị", badge: "GOVERNANCE", color: "bg-slate-900", border: "border-t-4 border-slate-900", dot: "#0f172a" },
-  { key: "finance", label: "Tài chính - Pháp lý", badge: "FINANCE", color: "bg-emerald-500", border: "border-t-4 border-emerald-500", dot: "#10b981" },
-  { key: "tech", label: "Hệ thống & Công nghệ", badge: "TECH", color: "bg-indigo-655", border: "border-t-4 border-indigo-650", dot: "#4f46e5" },
-  { key: "operations", label: "Vận hành - Sản xuất", badge: "OPERATIONS", color: "bg-cyan-500", border: "border-t-4 border-cyan-500", dot: "#06b6d4" },
-  { key: "sales", label: "Kinh doanh & Tiếp thị", badge: "SALES", color: "bg-amber-500", border: "border-t-4 border-amber-500", dot: "#f59e0b" },
-  { key: "hr", label: "Hành chính & Nhân sự", badge: "HR", color: "bg-rose-500", border: "border-t-4 border-rose-500", dot: "#f43f5e" },
-  { key: "other", label: "Khác", badge: "OTHER", color: "bg-slate-500", border: "border-t-4 border-slate-500", dot: "#64748b" }
-];
-
-const getCategoryByDivision = (division: string) => {
-  const divLower = (division || "").toLowerCase();
-  if (
-    divLower.includes("quản trị") ||
-    divLower.includes("giám đốc") ||
-    divLower.includes("governance") ||
-    divLower.includes("ceo") ||
-    divLower.includes("coo") ||
-    divLower.includes("hội đồng") ||
-    divLower.includes("kiểm soát")
-  ) {
-    return FUNCTIONAL_CATEGORIES[0];
-  }
-  if (
-    divLower.includes("tài chính") ||
-    divLower.includes("kế toán") ||
-    divLower.includes("pháp lý") ||
-    divLower.includes("finance") ||
-    divLower.includes("legal")
-  ) {
-    return FUNCTIONAL_CATEGORIES[1];
-  }
-  if (
-    divLower.includes("kỹ thuật") ||
-    divLower.includes("công nghệ") ||
-    divLower.includes("hệ thống") ||
-    divLower.includes("tech") ||
-    divLower.includes("it") ||
-    divLower.includes("phần mềm") ||
-    divLower.includes("software")
-  ) {
-    return FUNCTIONAL_CATEGORIES[2];
-  }
-  if (
-    divLower.includes("vận hành") ||
-    divLower.includes("sản xuất") ||
-    divLower.includes("kho") ||
-    divLower.includes("operations") ||
-    divLower.includes("logistics")
-  ) {
-    return FUNCTIONAL_CATEGORIES[3];
-  }
-  if (
-    divLower.includes("kinh doanh") ||
-    divLower.includes("tiếp thị") ||
-    divLower.includes("sales") ||
-    divLower.includes("marketing") ||
-    divLower.includes("csm") ||
-    divLower.includes("cso") ||
-    divLower.includes("thương mại")
-  ) {
-    return FUNCTIONAL_CATEGORIES[4];
-  }
-  if (
-    divLower.includes("nhân sự") ||
-    divLower.includes("hành chính") ||
-    divLower.includes("hr") ||
-    divLower.includes("admin") ||
-    divLower.includes("tuyển dụng") ||
-    divLower.includes("đào tạo")
-  ) {
-    return FUNCTIONAL_CATEGORIES[5];
-  }
-  return FUNCTIONAL_CATEGORIES[5];
-};
-
 export default function OrgChartTab({
   userProfile,
   selectedCompanyCode,
@@ -196,11 +96,6 @@ export default function OrgChartTab({
   loading,
   activeBranchId,
 }: OrgChartTabProps) {
-  const isMobile = useIsMobile();
-  const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const [isFitted, setIsFitted] = useState<boolean>(false);
-  const [preFitZoom, setPreFitZoom] = useState<number>(1);
-  const [isSafari, setIsSafari] = useState<boolean>(false);
   const [confirmState, setConfirmState] = useState<{
     isOpen: boolean;
     title: string;
@@ -229,145 +124,16 @@ export default function OrgChartTab({
       },
     });
   };
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [startY, setStartY] = useState(0);
-  const [scrollLeftState, setScrollLeftState] = useState(0);
-  const [scrollTopState, setScrollTopState] = useState(0);
-
-  const toggleFitScreen = () => {
-    if (!containerRef.current) return;
-    const child = containerRef.current.firstElementChild as HTMLElement;
-    if (!child) return;
-
-    if (isFitted) {
-      setZoomLevel(preFitZoom);
-      setIsFitted(false);
-
-      setTimeout(() => {
-        if (containerRef.current) {
-          containerRef.current.scrollLeft = (containerRef.current.scrollWidth - containerRef.current.clientWidth) / 2;
-          containerRef.current.scrollTop = (containerRef.current.scrollHeight - containerRef.current.clientHeight) / 2;
-        }
-      }, 50);
-    } else {
-      setPreFitZoom(zoomLevel);
-
-      const rect = child.getBoundingClientRect();
-      const unscaledWidth = rect.width / zoomLevel;
-      const unscaledHeight = rect.height / zoomLevel;
-
-      const padding = 40;
-      const viewWidth = containerRef.current.clientWidth - padding;
-      const viewHeight = containerRef.current.clientHeight - padding;
-
-      const fitWidthScale = viewWidth / unscaledWidth;
-      const fitHeightScale = viewHeight / unscaledHeight;
-      let targetZoom = Math.min(fitWidthScale, fitHeightScale);
-
-      targetZoom = Math.max(0.2, Math.min(1.5, targetZoom));
-      targetZoom = Number(targetZoom.toFixed(2));
-
-      setZoomLevel(targetZoom);
-      setIsFitted(true);
-
-      setTimeout(() => {
-        if (containerRef.current) {
-          containerRef.current.scrollLeft = (containerRef.current.scrollWidth - containerRef.current.clientWidth) / 2;
-          containerRef.current.scrollTop = (containerRef.current.scrollHeight - containerRef.current.clientHeight) / 2;
-        }
-      }, 50);
-    }
-  };
-
-  const hasDragMovedRef = useRef(false);
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    if (
-      target.closest("button") ||
-      target.closest("select") ||
-      target.closest("input") ||
-      target.closest("[draggable='true']")
-    ) {
-      return;
-    }
-    hasDragMovedRef.current = false;
-    if (containerRef.current) {
-      setStartX(e.pageX - containerRef.current.offsetLeft);
-      setStartY(e.pageY - containerRef.current.offsetTop);
-      setScrollLeftState(containerRef.current.scrollLeft);
-      setScrollTopState(containerRef.current.scrollTop);
-    }
-    setIsDragging(true);
-  };
-
-  const handleMouseLeaveOrUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging || !containerRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - containerRef.current.offsetLeft;
-    const y = e.pageY - containerRef.current.offsetTop;
-    const walkX = (x - startX) * 1.5;
-    const walkY = (y - startY) * 1.5;
-    // Only activate panning after moving more than 5px (prevents click suppression on laptop trackpads)
-    if (!hasDragMovedRef.current && Math.abs(walkX) < 5 && Math.abs(walkY) < 5) return;
-    hasDragMovedRef.current = true;
-    containerRef.current.scrollLeft = scrollLeftState - walkX;
-    containerRef.current.scrollTop = scrollTopState - walkY;
-  };
-
-  // Lắng nghe sự kiện wheel với passive: false để chặn touchpad/trackpad zoom toàn trang
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleNativeWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const zoomFactor = e.deltaY < 0 ? 0.05 : -0.05;
-      setIsFitted(false);
-      setZoomLevel((prev) => Math.max(0.3, Math.min(1.8, Number((prev + zoomFactor).toFixed(2)))));
-    };
-
-    container.addEventListener("wheel", handleNativeWheel, { passive: false });
-    return () => {
-      container.removeEventListener("wheel", handleNativeWheel);
-    };
-  }, []);
-
-  const [filterDepartment, setFilterDepartment] = useState<string>("Tất cả");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
   const [selectedEmp, setSelectedEmp] = useState<EmployeeNode | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [activeDropdownCardId, setActiveDropdownCardId] = useState<string | null>(null);
-  const [selectedLeaveBalance, setSelectedLeaveBalance] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<"tree" | "list">("list");
   const [listPage, setListPage] = useState<number>(1);
   const listLimit = 15;
 
   useEffect(() => {
     setListPage(1);
-  }, [searchQuery, filterDepartment]);
-
-  useEffect(() => {
-    if (!selectedEmp || !selectedCompanyCode) {
-      setSelectedLeaveBalance(null);
-      return;
-    }
-    const loadLeaveBalance = async () => {
-      try {
-        const res = await fetch(`/api/v1/leave/balance?employeeId=${encodeURIComponent(selectedEmp.id)}&year=${new Date().getFullYear()}`, { headers: { Authorization: `Bearer ${getAccessToken()}` } });
-        if (res.ok) setSelectedLeaveBalance((await res.json()).data || null);
-      } catch (error) { console.error("Không thể tải số phép nhân viên", error); }
-    };
-    loadLeaveBalance();
-  }, [selectedEmp?.id, selectedCompanyCode]);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (selectedEmp) {
@@ -380,7 +146,6 @@ export default function OrgChartTab({
   const closeDetailModal = () => {
     setIsDetailModalOpen(false);
     setSelectedEmp(null);
-    setSelectedLeaveBalance(null);
     setIsEditing(false);
   };
 
@@ -398,7 +163,6 @@ export default function OrgChartTab({
   const [addCompanyName, setAddCompanyName] = useState("");
   const [addIndustry, setAddIndustry] = useState("");
   const [addBirthDate, setAddBirthDate] = useState("");
-  const [addDepartment, setAddDepartment] = useState("Ban Thành viên");
   const [addParentId, setAddParentId] = useState("");
   const [addRole, setAddRole] = useState<"user" | "manager" | "branch_owner" | "admin">("user");
   const [addPhotoURL, setAddPhotoURL] = useState("");
@@ -411,10 +175,8 @@ export default function OrgChartTab({
   // Edit Member States
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
-  const [editRoleText, setEditRoleText] = useState("");
   const [editCompanyName, setEditCompanyName] = useState("");
   const [editIndustry, setEditIndustry] = useState("");
-  const [editDepartment, setEditDepartment] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editBirthDate, setEditBirthDate] = useState("");
@@ -435,10 +197,8 @@ export default function OrgChartTab({
     if (!selectedEmp) return;
     const raw = usersList.find(u => u.uid === selectedEmp.id);
     setEditName(raw?.displayName || selectedEmp.name || "");
-    setEditRoleText(raw?.jobTitle || selectedEmp.role || "");
     setEditCompanyName(raw?.companyName || selectedEmp.companyName || "");
     setEditIndustry(raw?.industry || selectedEmp.industry || "");
-    setEditDepartment(raw?.department || selectedEmp.department || "");
     setEditEmail(raw?.email || selectedEmp.email || "");
     setEditPhone(raw?.phone && raw.phone !== "Chưa cập nhật" ? raw.phone : (selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : ""));
     setEditPhotoURL(raw?.photoURL || selectedEmp.avatar || "");
@@ -560,10 +320,8 @@ export default function OrgChartTab({
     try {
       const updateData: any = {
         displayName: editName.trim(),
-        jobTitle: editRoleText.trim(),
         companyName: editCompanyName.trim(),
         industry: editIndustry.trim(),
-        department: editDepartment.trim(),
         phone: editPhone.trim() || "",
         photoURL: editPhotoURL.trim() || "",
         coverImage: editCoverImage.trim() || "",
@@ -579,10 +337,9 @@ export default function OrgChartTab({
       setSelectedEmp((prev) => prev ? {
         ...prev,
         name: updateData.displayName,
-        role: updateData.jobTitle,
+        role: selectedEmp.role,
         companyName: updateData.companyName,
         industry: updateData.industry,
-        department: updateData.department,
         phone: updateData.phone || "Chưa cập nhật",
         avatar: updateData.photoURL || prev.avatar,
         coverImage: updateData.coverImage || prev.coverImage,
@@ -620,26 +377,6 @@ export default function OrgChartTab({
 
     return currentUserWeight >= selectedUserWeight;
   };
-
-  const toggleCollapse = (nodeId: string) => {
-    setCollapsedNodes(prev => {
-      const next = new Set(prev);
-      if (next.has(nodeId)) next.delete(nodeId);
-      else next.add(nodeId);
-      return next;
-    });
-  };
-
-  const collapseAll = () => {
-    const nodesWithChildren = new Set(
-      employees
-        .filter(e => employees.some(c => c.parentId === e.id))
-        .map(e => e.id)
-    );
-    setCollapsedNodes(nodesWithChildren);
-  };
-
-  const expandAll = () => setCollapsedNodes(new Set());
 
   const canDeleteEmployee = (selectedEmpId: string): boolean => {
     if (!userProfile) return false;
@@ -686,11 +423,6 @@ export default function OrgChartTab({
 
   };
 
-  useEffect(() => {
-    const ua = navigator.userAgent.toLowerCase();
-    const isSaf = ua.includes("safari") && !ua.includes("chrome") && !ua.includes("chromium");
-    setIsSafari(isSaf);
-  }, []);
 
   // Set default parentId when add employee modal is opened
   useEffect(() => {
@@ -739,27 +471,6 @@ export default function OrgChartTab({
       }
     }
   }, [addRole, isAddModalOpen, selectedCompanyCode, userProfile, usersList]);
-
-  // Auto fill department based on manager (addParentId)
-  useEffect(() => {
-    if (isAddModalOpen && addRole === "user" && addParentId) {
-      const selectedManager = usersList.find(u => u.uid === addParentId);
-      if (selectedManager && selectedManager.department) {
-        setAddDepartment(selectedManager.department);
-      }
-    } else if (isAddModalOpen && addRole === "user" && !addParentId) {
-      setAddDepartment("");
-    }
-  }, [addRole, addParentId, usersList, isAddModalOpen]);
-
-  // Reset add form when modal closes
-  useEffect(() => {
-    if (!isAddModalOpen) {
-      setAddDepartment("Phòng Kỹ Thuật");
-      setAddPhotoURL("");
-      setAddCoverImage("");
-    }
-  }, [isAddModalOpen]);
 
 
 
@@ -857,38 +568,27 @@ export default function OrgChartTab({
     const compName = userProfile?.companyName || "";
 
     const manager = addParentId ? employees.find(emp => emp.id === addParentId) : undefined;
-    const managerLevel = manager ? manager.level : undefined;
-    const isDeptScopedRole = addRole === "user" || addRole === "manager";
-    const deptName = isDeptScopedRole ? (addDepartment.trim() || (addRole === "manager" ? "Quản lý" : "Nhân sự")) : undefined;
 
     const finalCompName = addCompanyName.trim() || compName;
     try {
       setIsAddingEmployee(true);
-      const newUid = await authService.registerUserForCompany(
-        addName.trim(),
-        addEmail.trim(),
-        addPassword,
-        addRole,
-        compCode,
-        finalCompName,
-        addParentId || undefined,
-        managerLevel,
-        deptName,
-        deptName,
-        addPhone.trim(),
-        undefined,
-        undefined,
-        activeBranchId || undefined,
-        addBirthDate ? addBirthDate : undefined,
-        undefined,
-        undefined,
-        undefined,
-        {
+      const newUid = await authService.registerUserForCompany({
+          displayName: addName.trim(),
+          email: addEmail.trim(),
+          password: addPassword,
+          role: addRole,
+          companyCode: compCode,
+          companyName: finalCompName,
+          parentId: addParentId || undefined,
+          phone: addPhone.trim(),
+          branchId: activeBranchId || undefined,
+          birthDate: addBirthDate ? addBirthDate : undefined,
+          ...{
           industry: addIndustry.trim() || undefined,
           photoURL: addPhotoURL.trim() || undefined,
           coverImage: addCoverImage.trim() || undefined,
         }
-      );
+        });
 
       toast.success(`Đã thêm thành viên "${addName}" thành công!`);
 
@@ -909,7 +609,6 @@ export default function OrgChartTab({
       setAddCoverImage("");
       setAddParentId("");
       setAddRole("user");
-      setAddDepartment("Ban Thành viên");
 
       await fetchUsers();
       if (compCode) {
@@ -924,384 +623,9 @@ export default function OrgChartTab({
     }
   };
 
-  // Drag & Drop logic for reorganizing reporting structures
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    const isAdmin = userProfile?.role === "admin";
-    const isRoleManager = userProfile?.role === "manager";
-
-    if (!isAdmin && !isRoleManager) {
-      e.preventDefault();
-      return;
-    }
-
-    // Nếu là manager, chỉ cho phép kéo nhân viên thuộc nhánh con của mình
-    if (isRoleManager) {
-      if (id === userProfile?.uid) {
-        toast.warning("Bạn không thể tự kéo thả chính mình!");
-        e.preventDefault();
-        return;
-      }
-
-      const checkIsDescendant = (parentId: string, childId: string): boolean => {
-        const child = employees.find(emp => emp.id === childId);
-        if (!child || !child.parentId) return false;
-        if (child.parentId === parentId) return true;
-        return checkIsDescendant(parentId, child.parentId);
-      };
-
-      if (!checkIsDescendant(userProfile.uid, id)) {
-        toast.warning("Bạn chỉ có quyền thuyên chuyển thành viên thuộc nhánh do mình quản lý!");
-        e.preventDefault();
-        return;
-      }
-    }
-
-    e.dataTransfer.setData("text/plain", id);
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    if (!isManager) return;
-    e.preventDefault();
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    const isAdmin = userProfile?.role === "admin";
-    const isRoleManager = userProfile?.role === "manager";
-
-    if (!isAdmin && !isRoleManager) {
-      toast.warning("Bạn không có quyền thuyên chuyển thành viên!");
-      return;
-    }
-
-    const draggedId = e.dataTransfer.getData("text/plain");
-    if (!draggedId || draggedId === targetId) return;
-
-    // Check circular dependencies helper
-    const checkIsDescendant = (parentId: string, childId: string): boolean => {
-      const child = employees.find(emp => emp.id === childId);
-      if (!child || !child.parentId) return false;
-      if (child.parentId === parentId) return true;
-      return checkIsDescendant(parentId, child.parentId);
-    };
-
-    // Manager specific rules
-    if (isRoleManager && userProfile) {
-      const isTargetValid = targetId === userProfile.uid || checkIsDescendant(userProfile.uid, targetId);
-      const isDraggedValid = checkIsDescendant(userProfile.uid, draggedId);
-
-      if (!isDraggedValid) {
-        toast.error("Không thể thuyên chuyển: Thành viên được chọn không nằm trong nhánh quản lý của bạn!");
-        return;
-      }
-      if (!isTargetValid) {
-        toast.error("Không thể thuyên chuyển: Người quản lý mới phải thuộc phạm vi nhánh do bạn quản lý!");
-        return;
-      }
-    }
-
-    if (checkIsDescendant(draggedId, targetId)) {
-      toast.error("Không thể điều chuyển: Người quản lý mới không được là cấp dưới của thành viên này!");
-      return;
-    }
-
-    const draggedEmp = employees.find(emp => emp.id === draggedId);
-    const targetEmp = employees.find(emp => emp.id === targetId);
-
-    if (!draggedEmp || !targetEmp) return;
-
-    if (draggedEmp.level === 1) {
-      toast.warning("CEO không thể điều chuyển báo cáo cho người khác!");
-      return;
-    }
-
-    // Helper function to dynamically update hierarchy in state list
-    const updateHierarchy = (list: EmployeeNode[], dragged: string, target: string): EmployeeNode[] => {
-      const parent = list.find(emp => emp.id === target);
-      if (!parent) return list;
-
-      const newLevel = parent.level + 1;
-
-      const nextList = list.map(emp => {
-        if (emp.id === dragged) {
-          return { ...emp, parentId: target, level: newLevel };
-        }
-        return emp;
-      });
-
-      const adjust = (currentList: EmployeeNode[]): EmployeeNode[] => {
-        let changed = false;
-        const updated = currentList.map(emp => {
-          if (emp.parentId) {
-            const p = currentList.find(parentEmp => parentEmp.id === emp.parentId);
-            if (p && emp.level !== p.level + 1) {
-              changed = true;
-              return { ...emp, level: p.level + 1 };
-            }
-          }
-          return emp;
-        });
-        return changed ? adjust(updated) : updated;
-      };
-
-      return adjust(nextList);
-    };
-
-    const updatedEmployees = updateHierarchy(employees, draggedId, targetId);
-
-    try {
-      const updates = updatedEmployees
-        .filter(emp => {
-          const original = employees.find(o => o.id === emp.id);
-          return original && (original.parentId !== emp.parentId || original.level !== emp.level);
-        })
-        .map(emp => ({
-          id: emp.id,
-          parentId: emp.parentId || null,
-          level: emp.level
-        }));
-
-      if (updates.length > 0) {
-        await authService.bulkUpdateUsers(updates);
-      }
-      toast.success(`Đã điều chuyển ${draggedEmp.name} báo cáo cho ${targetEmp.name}. Quyền hệ thống được đồng bộ.`);
-      await fetchUsers();
-    } catch (err) {
-      console.error("Lỗi cập nhật cơ cấu:", err);
-      toast.error(getApiErrorMessage(err, "Không thể lưu cập nhật cơ cấu thành viên."));
-    }
-  };
-
-  // Division Tag color schemes — dynamic, using FUNCTIONAL_CATEGORIES
-  const getDivisionBadgeStyles = (division: string) => {
-    const cat = getCategoryByDivision(division);
-    switch (cat.key) {
-      case "governance": return "bg-slate-100 text-slate-800 border-slate-300";
-      case "finance": return "bg-emerald-50 text-emerald-700 border-emerald-200";
-      case "tech": return "bg-indigo-50 text-indigo-700 border-indigo-200";
-      case "operations": return "bg-cyan-50 text-cyan-700 border-cyan-200";
-      case "sales": return "bg-amber-50 text-amber-700 border-amber-200";
-      case "hr": return "bg-rose-50 text-rose-700 border-rose-200";
-      default: return "bg-slate-50 text-slate-700 border-slate-200";
-    }
-  };
-
-  // Danh sách phân khối động lấy từ dữ liệu nhân sự kết hợp các khối mặc định
-  const uniqueDivisions = Array.from(
-    new Set([
-      "Khối Kỹ Thuật",
-      "Khối Vận Hành",
-      "Khối Marketing",
-      "Khối Sales",
-      ...employees.map(e => e.division).filter(Boolean)
-    ])
-  ).sort();
-
-  // Danh sách phòng ban động lấy từ dữ liệu nhân sự hiện có của công ty (không fix cứng)
-  const uniqueDepartments = Array.from(
-    new Set(employees.map(e => e.department).filter(Boolean))
-  ).sort();
-
-  // Filtering matching logic
-  const isMatchingFilter = (emp: EmployeeNode): boolean => {
-    const query = normalizeString(searchQuery);
-    const matchSearch = query === "" ||
-      normalizeString(emp.name).includes(query) ||
-      normalizeString(emp.role).includes(query) ||
-      normalizeString(emp.department).includes(query);
-
-    const matchDepartment = filterDepartment === "Tất cả" || emp.department === filterDepartment;
-
-    return matchSearch && matchDepartment;
-  };
-
-  // Auto-arrange employees without parentId into the correct hierarchy based on role
-  const arrangedEmployees = (() => {
-    const ROLE_LEVEL: Record<string, number> = {
-      branch_owner: 1,
-      manager: 2,
-      user: 3,
-    };
-
-    // Build a mutable copy with virtual parentId for rendering (excluding admin)
-    const list = employees
-      .filter(e => {
-        const u = usersList.find(usr => usr.uid === e.id);
-        return u ? u.role !== "admin" : true;
-      })
-      .map(e => ({ ...e }));
-
-    list.forEach(emp => {
-      // If already has a valid parentId that exists, skip
-      if (emp.parentId && list.some(p => p.id === emp.parentId)) return;
-
-      const myLevel = ROLE_LEVEL[usersList.find(u => u.uid === emp.id)?.role ?? "user"] ?? 3;
-
-      // Find the best parent: highest-level employee that is strictly above this one
-      let bestParent: typeof list[0] | undefined;
-
-      for (let targetLevel = myLevel - 1; targetLevel >= 1; targetLevel--) {
-        const candidates = list.filter(p => {
-          const pRole = usersList.find(u => u.uid === p.id)?.role ?? "user";
-          return ROLE_LEVEL[pRole] === targetLevel && p.id !== emp.id;
-        });
-        if (candidates.length > 0) {
-          bestParent = candidates[0];
-          break;
-        }
-      }
-
-      if (bestParent) {
-        emp.parentId = bestParent.id;
-      } else {
-        // This employee is truly at the top
-        emp.parentId = undefined;
-      }
-    });
-
-    return list;
-  })();
-
-  // Identify root employees (nodes with no parent in the arranged tree)
-  const rootEmployees = arrangedEmployees.filter(e => !e.parentId || !arrangedEmployees.some(p => p.id === e.parentId))
-    .sort((a, b) => (a.level ?? 99) - (b.level ?? 99));
-  const visibleEmployees = filterOrgChartEmployees(employees, searchQuery, filterDepartment);
+  const visibleEmployees = filterOrgChartEmployees(employees, searchQuery);
   const paginatedEmployees = visibleEmployees.slice((listPage - 1) * listLimit, listPage * listLimit);
   const missingValue = "Chưa cập nhật";
-
-  // Recursive Branch rendering component helper
-  const renderBranch = (node: EmployeeNode) => {
-    const children = arrangedEmployees.filter(e => e.parentId === node.id);
-    const isSelected = selectedEmp?.id === node.id;
-    const isMatch = isMatchingFilter(node);
-    const isFilteredOut = (searchQuery.trim() !== "" || filterDepartment !== "Tất cả") && !isMatch;
-    const isCollapsed = collapsedNodes.has(node.id);
-    const directReportsCount = employees.filter(e => e.parentId === node.id).length;
-
-    const category = getCategoryByDivision(node.division);
-
-    const getCategoryBadgeStyles = (key: string) => {
-      switch (key) {
-        case "governance": return "bg-slate-100 text-slate-800 border-slate-200";
-        case "finance": return "bg-emerald-50 text-emerald-700 border-emerald-200";
-        case "tech": return "bg-indigo-50 text-indigo-700 border-indigo-200";
-        case "operations": return "bg-cyan-50 text-cyan-700 border-cyan-200";
-        case "sales": return "bg-amber-50 text-amber-700 border-amber-200";
-        case "hr": return "bg-rose-50 text-rose-700 border-rose-200";
-        default: return "bg-slate-50 text-slate-655 border-slate-200";
-      }
-    };
-
-    const rawUser = usersList.find((u) => u.uid === node.id);
-    const nodeCompanyName = node.companyName || rawUser?.companyName;
-    const nodeIndustry = node.industry || rawUser?.industry;
-
-    return (
-      <div className="flex flex-col items-center" key={node.id}>
-        {/* Smart Employee Card */}
-        <div
-          draggable={isManager ? "true" : "false"}
-          onDragStart={(e) => handleDragStart(e, node.id)}
-          onDragOver={handleDragOver}
-          onDrop={(e) => handleDrop(e, node.id)}
-          onClick={() => setSelectedEmp(node)}
-          onMouseLeave={() => setActiveDropdownCardId(null)}
-          className={`p-3 bg-white text-gray-800 rounded-2xl shadow-xs text-left cursor-pointer relative hover:scale-104 active:scale-95 transition-all duration-300 border border-gray-200 ${category.border} ${isSelected
-            ? "ring-4 ring-blue-500 shadow-blue-100 border-transparent z-10"
-            : "hover:border-blue-300 hover:shadow-md"
-            } ${isFilteredOut ? "opacity-30 blur-[0.5px] scale-98" : "opacity-100"} w-48 sm:w-56`}
-          id={`org_node_${node.id}`}
-        >
-          {/* Online/Offline Dot */}
-          <div className="absolute top-2.5 right-2.5 z-10 flex items-center justify-center">
-            {node.status === "online" ? (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 block border border-white animate-pulse" title="Đang hoạt động" />
-            ) : (
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-300 block border border-white" title="Ngoại tuyến" />
-            )}
-          </div>
-
-          <div className="space-y-2">
-            {/* Top row: Avatar & Member Name */}
-            <div className="flex items-center gap-2.5 pr-4">
-              {renderAvatar(node.avatar, "w-8 h-8", "text-xs", node.name)}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1">
-                  <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate" title={node.name}>
-                    {node.name}
-                  </h4>
-                  {node.isLeader && (
-                    <span className="bg-amber-500 text-white text-[8px] font-extrabold px-1 py-0.2 rounded uppercase tracking-wider font-mono shadow-xs shrink-0" title="Leader">
-                      👑
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom row: Company & Industry */}
-            <div className="pt-2 border-t border-slate-100 space-y-1">
-              <div className="flex items-center gap-1.5 text-slate-600">
-                <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="text-[11px] font-medium text-slate-700 truncate" title={nodeCompanyName || "Chưa cập nhật công ty"}>
-                  {nodeCompanyName || "Chưa cập nhật công ty"}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Briefcase className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                <span className="text-[10.5px] font-medium text-blue-600 truncate" title={nodeIndustry || "Chưa cập nhật lĩnh vực"}>
-                  {nodeIndustry || "Chưa cập nhật lĩnh vực"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Collapse/Expand toggle badge */}
-          {directReportsCount > 0 && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); toggleCollapse(node.id); }}
-              title={isCollapsed ? `Mở rộng ${directReportsCount} thành viên cấp dưới` : `Thu gọn ${directReportsCount} thành viên cấp dưới`}
-              className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 text-white text-[9px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-xs border-2 border-white select-none transition-all cursor-pointer ${isCollapsed ? "bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white"
-                }`}
-            >
-              {isCollapsed ? `+${directReportsCount}` : "^"}
-            </button>
-          )}
-        </div>
-
-        {/* Children Render recursive block */}
-        {children.length > 0 && !isCollapsed && (
-          <>
-            <div className="w-0.5 h-6 bg-slate-300" />
-            <div className="flex relative items-start">
-              {children.map((child, index) => {
-                const isFirst = index === 0;
-                const isLast = index === children.length - 1;
-                const hasSiblings = children.length > 1;
-
-                return (
-                  <div key={child.id} className="flex flex-col items-center px-4 relative">
-                    {/* Horizontal Connector bar */}
-                    {hasSiblings && (
-                      <div className="absolute top-0 left-0 right-0 h-0.5 flex">
-                        <div className={`w-1/2 ${isFirst ? '' : 'border-t-2 border-slate-300'}`} />
-                        <div className={`w-1/2 ${isLast ? '' : 'border-t-2 border-slate-300'}`} />
-                      </div>
-                    )}
-                    <div className="w-0.5 h-6 border-l-2 border-slate-300" />
-
-                    {renderBranch(child)}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
-    );
-  };
 
   return (
     <>
@@ -1312,7 +636,7 @@ export default function OrgChartTab({
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Tìm theo tên hoặc chức danh..."
+              placeholder="Tìm theo tên, doanh nghiệp hoặc ngành nghề..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 border border-gray-200 bg-white rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -1397,13 +721,7 @@ export default function OrgChartTab({
                         {/* Middle: Compact metadata */}
                         <div className="mt-2.5 flex flex-1 flex-col gap-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2">
                           {(() => {
-                            const dept =
-                              employee.department &&
-                              !employee.department.toLowerCase().includes("ban giám đốc") &&
-                              normalizeString(employee.department) !== "nhan su"
-                                ? employee.department
-                                : null;
-                            const companyOrDept = [employee.companyName, dept].filter(Boolean).join(" · ");
+                            const companyOrDept = employee.companyName;
                             if (!companyOrDept) return null;
                             return (
                               <div className="flex items-center gap-1.5 min-w-0 text-slate-600">
@@ -1526,12 +844,9 @@ export default function OrgChartTab({
         const memberAvatar = rawUser?.photoURL || selectedEmp.avatar;
         const memberCover = rawUser?.coverImage || selectedEmp.coverImage;
         const memberName = rawUser?.displayName || selectedEmp.name;
-        const memberRole = (rawUser?.jobTitle && rawUser.jobTitle.trim().toLowerCase() !== "nhân viên")
-          ? rawUser.jobTitle
-          : (selectedEmp.role && selectedEmp.role.trim().toLowerCase() !== "nhân viên" ? selectedEmp.role : "Thành viên");
+        const memberRole = selectedEmp.role || "Thành viên";
         const memberCompany = rawUser?.companyName || selectedEmp.companyName || "Chưa cập nhật";
         const memberIndustry = rawUser?.industry || selectedEmp.industry || "Chưa cập nhật";
-        const memberDept = rawUser?.department || selectedEmp.department || "Ban Thành viên";
         const memberPhone = (rawUser?.phone && rawUser.phone !== "Chưa cập nhật") ? rawUser.phone : (selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : "Chưa cập nhật");
         const memberEmail = rawUser?.email || selectedEmp.email || "Chưa cập nhật";
         const memberBirthDate = rawUser?.birthDate || selectedEmp.birthDate;
@@ -1621,7 +936,7 @@ export default function OrgChartTab({
                         </div>
                         <div>
                           <span className="font-bold text-slate-800 text-sm block">{editName || selectedEmp.name}</span>
-                          <span className="text-[11px] text-gray-500 font-medium">{editRoleText || selectedEmp.role || "Thành viên"}</span>
+                          <span className="text-[11px] text-gray-500 font-medium">{selectedEmp.role || "Thành viên"}</span>
                         </div>
                       </div>
 
@@ -1693,16 +1008,7 @@ export default function OrgChartTab({
                   </div>
 
                   {/* Role in Chapter */}
-                  <div>
-                    <label className="block font-bold text-gray-500 mb-1">Chức vụ trong Chapter</label>
-                    <input
-                      type="text"
-                      placeholder="Ví dụ: Thành viên, Phó Chủ tịch"
-                      value={editRoleText}
-                      onChange={(e) => setEditRoleText(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
-                    />
-                  </div>
+
 
                   {/* Phone & BirthDate */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1804,11 +1110,7 @@ export default function OrgChartTab({
                       <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-0.5 rounded-full">
                         {memberRole}
                       </span>
-                      {selectedEmp.isLeader && (
-                        <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                          👑 Trưởng ban
-                        </span>
-                      )}
+
                     </div>
                   </div>
 

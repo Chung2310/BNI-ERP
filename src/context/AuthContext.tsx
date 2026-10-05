@@ -17,7 +17,7 @@ interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
-  loginWithEmail: (email: string, password: string, rememberMe?: boolean) => Promise<ErpLoginOutcome>;
+  loginWithIdentifier: (identifier: string, password: string, rememberMe?: boolean) => Promise<ErpLoginOutcome>;
   completeErpChallenge: () => Promise<void>;
   registerWithEmail: (email: string, password: string, displayName: string, rememberMe?: boolean) => Promise<void>;
   loginWithGoogle: (rememberMe?: boolean) => Promise<void>;
@@ -29,9 +29,6 @@ interface AuthContextType {
   isModuleEnabled: (key: ModuleKey) => boolean;
   hasPermission: (code: string) => boolean;
 }
-
-const SESSION_REPLACED_EVENT = "auth:session-replaced";
-const SESSION_REPLACED_CODE = "SESSION_REPLACED";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -105,20 +102,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (!userProfile) return;
-    return socketService.on(SESSION_REPLACED_EVENT, (value: unknown) => {
-      const event = value as { code?: string; message?: string };
-      if (event.code && event.code !== SESSION_REPLACED_CODE) return;
-
-      localStorage.removeItem("accessToken");
-      socketService.disconnect();
-      setUser(null);
-      setUserProfile(null);
-      toast.error(event.message || "Phiên đăng nhập đã được sử dụng trên thiết bị khác. Vui lòng đăng nhập lại.");
-    });
-  }, [userProfile?.uid]);
-
-  useEffect(() => {
-    if (!userProfile) return;
     return socketService.onStatusChange((connected) => {
       if (!connected) return;
       void authService.getMe().then((profile) => {
@@ -128,10 +111,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     });
   }, [userProfile?.uid]);
-  const loginWithEmail = async (email: string, password: string, rememberMe: boolean = true): Promise<ErpLoginOutcome> => {
+  const loginWithIdentifier = async (identifier: string, password: string, rememberMe: boolean = true): Promise<ErpLoginOutcome> => {
     setLoading(true);
     try {
-      const result = await authService.loginWithEmail(email, password);
+      const result = await authService.loginWithIdentifier(identifier, password);
       const profile: UserProfile = {
         ...result.user,
         uid: result.user._id,
@@ -149,7 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.success("Đăng nhập tài khoản thành công!");
       return { status: "authenticated", role: meProfile?.role || profile.role };
     } catch (error: any) {
-      console.error("[loginWithEmail] Error:", error);
+      console.error("[loginWithIdentifier] Error:", error);
       const friendlyMsg = parseFirebaseError(error, "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
       toast.error(friendlyMsg);
       throw error;
@@ -174,7 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await authService.registerWithEmail(email, password, displayName);
       // Tự động đăng nhập sau khi đăng ký thành công
-      await loginWithEmail(email, password, rememberMe);
+      await loginWithIdentifier(email, password, rememberMe);
     } catch (error: any) {
       console.error("[registerWithEmail] Error:", error);
       const friendlyMsg = parseFirebaseError(error, "Đăng ký thất bại. Vui lòng thử lại.");
@@ -291,7 +274,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         userProfile,
         loading,
-        loginWithEmail,
+        loginWithIdentifier,
         completeErpChallenge,
         registerWithEmail,
         loginWithGoogle,

@@ -9,14 +9,12 @@ const normalizeOrgChartText = (value?: string): string => String(value || "")
 export const filterOrgChartEmployees = (
   employees: EmployeeNode[],
   searchQuery: string,
-  department: string,
 ): EmployeeNode[] => {
   const query = normalizeOrgChartText(searchQuery);
   return employees.filter((employee) => {
-    const matchesSearch = !query || [employee.name, employee.role, employee.department, employee.division]
+    const matchesSearch = !query || [employee.name, employee.role, employee.companyName, employee.industry, employee.email, employee.phone]
       .some((value) => normalizeOrgChartText(value).includes(query));
-    const matchesDepartment = department === "Tất cả" || employee.department === department;
-    return matchesSearch && matchesDepartment;
+    return matchesSearch;
   });
 };
 

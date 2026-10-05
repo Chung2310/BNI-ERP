@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { FolderTree, Mail, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
+import { Users, Mail, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
 import { HRSubTabType, EmployeeNode, UserProfile } from "../types";
 import { useAuth } from "../context/AuthContext";
 import { authService } from "../services/authService";
@@ -45,7 +45,7 @@ export default function HRTab() {
       setUsersList(data);
     } catch (error) {
       console.error("Lỗi khi tải danh sách thành viên:", error);
-      toast.error(getApiErrorMessage(error, "Không thể tải sơ đồ tổ chức."));
+      toast.error(getApiErrorMessage(error, "Không thể tải danh sách thành viên."));
     } finally {
       setLoading(false);
     }
@@ -61,24 +61,15 @@ export default function HRTab() {
     .map((usr) => ({
       id: usr.uid,
       name: usr.displayName,
-      role: (usr.jobTitle && usr.jobTitle.trim().toLowerCase() !== "nhân viên")
-        ? usr.jobTitle
-        : (usr.role === "manager" ? "Quản lý" : "Thành viên"),
-    department: usr.department || "",
+      role: usr.role === "manager" ? "Quản lý" : "Thành viên",
     email: usr.email,
     phone: usr.phone || "Chưa cập nhật",
     avatar:
       usr.photoURL && (usr.photoURL.startsWith("http") || usr.photoURL.startsWith("/"))
         ? usr.photoURL
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(usr.displayName)}&background=random&color=fff`,
-    level: usr.level || (
-      usr.role === "admin" ? 1 :
-      usr.role === "manager" ? 2 : 3
-    ),
     parentId: usr.parentId,
     status: usr.status || "offline",
-    division: usr.division || "Khối Vận Hành",
-    isLeader: usr.isLeader,
     jobDescriptionLink: usr.jobDescriptionLink || "",
     monthlySalary: usr.monthlySalary,
     companyName: usr.companyName,
@@ -98,7 +89,7 @@ export default function HRTab() {
           <button type="button" aria-label="Cuộn tab sang trái" onClick={() => scrollSubTabs("left")} className="flex h-6 w-5 shrink-0 items-center justify-center text-slate-400 transition-colors hover:text-slate-700 sm:hidden"><ChevronLeft className="h-4 w-4" /></button>
           <div ref={subTabsRef} className="flex min-w-0 max-w-full flex-1 gap-1 overflow-x-auto select-none scrollbar-none -mb-px">
             {[
-              { id: "SƠ ĐỒ TỔ CHỨC", label: "Sơ đồ tổ chức", icon: FolderTree },
+              { id: "SƠ ĐỒ TỔ CHỨC", label: "Thành viên", icon: Users },
               ...(canReadFees ? [{ id: "PHÍ THƯỜNG NIÊN", label: "Phí thường niên", icon: Wallet }] : []),
               ...(canManageCelebration ? [{ id: CELEBRATION_TAB, label: "Email chúc mừng", icon: Mail }] : []),
             ].map((tab) => {

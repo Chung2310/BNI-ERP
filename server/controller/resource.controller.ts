@@ -420,25 +420,11 @@ export const resourceController = {
         if (!userId) {
           return res.status(401).json({ success: false, message: "Unauthorized." });
         }
-        const { GoogleDriveService } = await import("../service/personal-google-drive.service");
-        const { CompanyModel } = await import("../model/company.model");
+        const { getCompanyDriveContext } = await import("../service/company-drive-context.service");
         const { google } = await import("googleapis");
-        
-        let authClient;
-        if (selectedSpace === "personal") {
-          authClient = await GoogleDriveService.getClientForUser(userId);
-        } else {
-          // Group space -> use company drive
-          const company = await CompanyModel.findOne({ code: companyCode });
-          if (!company || !company.driveOAuth?.refreshToken) {
-            throw new Error("Doanh nghiệp chưa kết nối Google Drive.");
-          }
-          const { googleOAuthService } = await import("../service/google-oauth.service");
-          const accessToken = await googleOAuthService.getAccessToken(company.driveOAuth.refreshToken);
-          const oauth2Client = new google.auth.OAuth2();
-          oauth2Client.setCredentials({ access_token: accessToken });
-          authClient = oauth2Client;
-        }
+        const context = await getCompanyDriveContext(companyCode);
+        if (!context.isConnected) throw new Error("Doanh nghiệp chưa kết nối Google Drive.");
+        const authClient = context.authClient;
 
         const drive = google.drive({ version: "v3", auth: authClient });
 

@@ -65,7 +65,7 @@ export function ActiveMembersPanel({ meeting, meetings }: Props) {
           members = [];
         }
       }
-      if (isMounted && members && members.length > 0) {
+      if (isMounted) {
         setChapterMembers(members);
       }
     };
@@ -90,8 +90,9 @@ export function ActiveMembersPanel({ meeting, meetings }: Props) {
     }>();
 
     // 1. Khởi tạo danh sách thành viên trong Chapter
-    chapterMembers.forEach((u) => {
-      const uid = String(u.uid || (u as any)._id || (u as any).id);
+    chapterMembers.filter(member => member.role !== "admin" && member.isActive !== false).forEach((u) => {
+      const uid = String(u.uid || (u as any)._id || (u as any).id || "");
+      if (!uid) return;
       memberMap.set(uid, {
         id: uid,
         name: u.displayName || u.email?.split("@")[0] || "Thành viên",
@@ -121,21 +122,9 @@ export function ActiveMembersPanel({ meeting, meetings }: Props) {
       speakers.forEach((s) => {
         if (!s.userId) return; // Bỏ qua khách mời
         const uid = String(s.userId);
-        let entry = memberMap.get(uid);
-        if (!entry) {
-          entry = {
-            id: uid,
-            name: s.name || s.email || "Thành viên",
-            email: s.email,
-            photoURL: s.photoURL,
-            companyName: "",
-            industry: "",
-            attendedCount: 0,
-            earlyCount: 0,
-            totalEarlyMinutes: 0,
-          };
-          memberMap.set(uid, entry);
-        }
+        const entry = memberMap.get(uid);
+        // Only include eligible roster members; check-in history can also contain admins.
+        if (!entry) return;
 
         entry.attendedCount += 1;
         if (s.checkedInAt) {

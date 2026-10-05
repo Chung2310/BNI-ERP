@@ -3,7 +3,7 @@ import test from "node:test";
 import { sanitizeModuleKeys, DEFAULT_MODULE_KEYS } from "../config/module-keys";
 
 test("giữ nguyên danh sách key hợp lệ, bỏ trùng", () => {
-  assert.deepEqual(sanitizeModuleKeys(["hr", "inventory", "hr"]), ["hr", "inventory"]);
+  assert.deepEqual(sanitizeModuleKeys(["hr", "resource", "hr"]), ["hr", "resource"]);
 });
 
 test("loại key rác", () => {
