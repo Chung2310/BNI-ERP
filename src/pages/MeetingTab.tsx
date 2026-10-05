@@ -1176,6 +1176,15 @@ export default function MeetingTab() {
               {/* Actions */}
               <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
                 {canModifyActiveMeeting && (
+                  <MeetingScheduleActions
+                    status={activeMeeting.status}
+                    onCancel={() => setCancellingMeeting(activeMeeting)}
+                    onReschedule={() => setReschedulingMeeting(activeMeeting)}
+                    onDelete={() => setDeletingMeeting(activeMeeting)}
+                  />
+                )}
+
+                {canModifyActiveMeeting && (
                   <button
                     type="button"
                     title="Sửa cuộc họp"
