@@ -27,12 +27,16 @@ export interface UserProfile {
   displayName: string;
   photoURL?: string;
   coverImage?: string;
+  galleryImages?: string[];
   industry?: string;
   role: "user" | "teacher" | "manager" | "branch_owner" | "admin";
   permissions?: string[];
   createdAt: import("../utils/dateValue").DateValue;
   updatedAt?: import("../utils/dateValue").DateValue;
   birthDate?: string;
+  gender?: "male" | "female" | "other";
+  address?: string;
+  targetMarket?: string;
   jobDescriptionLink?: string;
   phone?: string;
   parentId?: string;

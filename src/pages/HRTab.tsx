@@ -67,7 +67,11 @@ export default function HRTab() {
     companyName: usr.companyName,
     industry: usr.industry,
     birthDate: usr.birthDate,
+    gender: usr.gender,
+    address: usr.address,
+    targetMarket: usr.targetMarket,
     coverImage: usr.coverImage,
+    galleryImages: usr.galleryImages,
   }));
 
 

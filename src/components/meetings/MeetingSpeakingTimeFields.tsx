@@ -2,18 +2,20 @@ import React from "react";
 import { Plus, X } from "lucide-react";
 import { validateSpeakingTimeSlots, type SpeakingTimeSlot } from "../../utils/meetingSpeakingTime";
 
-export function MeetingSpeakingTimeFields({ value, onChange, fallbackSeconds, onFallbackChange }: {
+export function MeetingSpeakingTimeFields({ value, onChange, fallbackSeconds, onFallbackChange, hideTitle = false }: {
   value: SpeakingTimeSlot[];
   onChange: (slots: SpeakingTimeSlot[]) => void;
   fallbackSeconds: number;
   onFallbackChange: (seconds: number) => void;
+  hideTitle?: boolean;
 }) {
   const error = validateSpeakingTimeSlots(value);
   const field = "mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-800";
   const update = (index: number, change: Partial<SpeakingTimeSlot>) => onChange(value.map((slot, i) => i === index ? { ...slot, ...change } : slot));
   return (
     <fieldset className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-3">
-      <legend className="px-1 font-bold text-slate-700">Thời lượng phát biểu theo giờ check-in</legend>
+      {!hideTitle && <legend className="px-1 font-bold text-slate-700">Thời lượng phát biểu theo giờ check-in</legend>}
+      <p className="text-xs text-slate-500">Áp dụng cho thành viên và khách mời, theo giờ Việt Nam. Tính từ giờ bắt đầu đến trước giờ kết thúc của mỗi khung.</p>
       {value.map((slot, index) => (
         <div key={index} className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
           <label className="text-xs text-slate-600">Từ giờ

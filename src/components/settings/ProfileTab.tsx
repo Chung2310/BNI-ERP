@@ -12,7 +12,6 @@ import {
   Camera,
   Shield,
   BadgeCheck,
-  Sparkles,
   Clock,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -209,26 +208,15 @@ function ProfileForm({
       {/* 1. HERO PROFILE BANNER CARD */}
       <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xs">
         {/* Cover Photo Area */}
-        <section aria-label="Ảnh bìa hồ sơ" className="relative aspect-[21/9] sm:aspect-[24/7] min-h-[160px] sm:min-h-[220px] w-full overflow-hidden bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-700">
-          {form.coverImage ? (
+        <section aria-label="Ảnh bìa hồ sơ" className="relative aspect-[21/9] sm:aspect-[24/7] min-h-[160px] sm:min-h-[220px] w-full overflow-hidden bg-primary">
+          {form.coverImage && (
             <img
+              key={form.coverImage}
               src={form.coverImage}
+              onError={event => { event.currentTarget.style.display = "none"; }}
               alt="Ảnh bìa hồ sơ"
               className="h-full w-full object-cover transition-transform duration-500 hover:scale-[1.02]"
             />
-          ) : (
-            <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
-              <div
-                className="absolute inset-0 opacity-15"
-                style={{
-                  backgroundImage: `radial-gradient(circle at 20% 50%, rgba(255,255,255,0.8) 0%, transparent 40%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.4) 0%, transparent 40%)`,
-                }}
-              />
-              <div className="relative z-10 flex flex-col items-center gap-1 text-white/90">
-                <Sparkles className="h-6 w-6 text-cyan-200" />
-                <span className="text-xs font-semibold tracking-wide uppercase text-cyan-100">Chưa có ảnh bìa cá nhân</span>
-              </div>
-            </div>
           )}
 
           {/* Floating Actions for Cover Photo */}

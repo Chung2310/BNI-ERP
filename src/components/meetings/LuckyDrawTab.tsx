@@ -41,10 +41,11 @@ interface LuckyDrawTabProps {
 
 export function LuckyDrawTab({
   meeting,
-  canManage,
+  canManage: hasManagementPermission,
   onRefreshMeeting,
   onStartMeeting,
 }: LuckyDrawTabProps) {
+  const canManage = hasManagementPermission && meeting.status !== "ended";
   const [luckyConfig, setLuckyConfig] = useState<LuckyDrawConfig>(
     meeting.luckyDraw || {
       enabled: true,
@@ -171,6 +172,7 @@ export function LuckyDrawTab({
   // Save Prize Form
   const handleSavePrize = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     if (!prizeName.trim()) {
       toast.warning("Vui lòng nhập tên giải thưởng!");
       return;
@@ -230,6 +232,7 @@ export function LuckyDrawTab({
   // RANDOM.ORG STYLE SPIN LOGIC
   // ========================================================
   const handleSpin = async () => {
+    if (!canManage) return;
     if (!isMeetingStarted) {
       toast.warning("Cuộc họp chưa bắt đầu! Chỉ có thể quay thưởng khi cuộc họp đã bắt đầu.");
       return;
@@ -478,7 +481,7 @@ export function LuckyDrawTab({
         </div>
 
         {/* Game Options */}
-        <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {canManage && <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Game 1: Vòng quay may mắn */}
           <div className="group rounded-xl border border-slate-200 bg-slate-50/50 p-4 transition-all duration-200 hover:border-[#cf142b]/40 hover:shadow-sm flex flex-col justify-between">
             <div>
@@ -540,10 +543,10 @@ export function LuckyDrawTab({
               </a>
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* Bốc thăm nhanh tại chỗ */}
-        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+        {canManage && <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
             <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
               <Sparkles className="h-4 w-4 text-[#cf142b]" />
@@ -615,7 +618,7 @@ export function LuckyDrawTab({
               )}
             </button>
           </div>
-        </div>
+        </div>}
       </div>
 
       {/* Danh sách giải thưởng */}
@@ -1023,7 +1026,7 @@ export function LuckyDrawTab({
       )}
 
       {/* ADD / EDIT PRIZE MODAL */}
-      {isPrizeModalOpen && (
+      {canManage && isPrizeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
             <div className="bg-white border-b border-slate-100 p-5 flex items-center justify-between">
@@ -1132,7 +1135,7 @@ export function LuckyDrawTab({
       )}
 
       {/* CUSTOM CONFIRM POPUP (replaces window.confirm) */}
-      {confirmModal && (
+      {canManage && confirmModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-xl bg-white shadow-xl border border-slate-200 overflow-hidden">
             <div className="p-5">

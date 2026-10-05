@@ -20,6 +20,19 @@ test("slides include guest contact details and use current member profile fields
   assert.equal(member.bio, "Current bio");
 });
 
+test("slides read new member fields, limit gallery to five and honor empty overrides", () => {
+  const profile = { address: "Bắc Ninh", targetMarket: "Doanh nghiệp", galleryImages: Array.from({ length: 6 }, (_, i) => `https://example.com/${i}.jpg`) };
+  const member = buildProfileSlide({ id: "m", userId: "u" }, profile);
+  assert.equal(member.address, profile.address);
+  assert.equal(member.targetMarket, profile.targetMarket);
+  assert.deepEqual(member.galleryImages, profile.galleryImages.slice(0, 5));
+  const overridden = buildProfileSlide({ id: "m", userId: "u", slideProfile: { address: "", targetMarket: "", galleryImages: [] } }, profile);
+  assert.equal(overridden.address, "");
+  assert.equal(overridden.targetMarket, "");
+  assert.deepEqual(overridden.galleryImages, []);
+  assert.deepEqual(buildProfileSlide({ id: "g" }).galleryImages, []);
+});
+
 test("member slide uses latest profile and explicit blank overrides; guest keeps check-in company", () => {
   const member = buildProfileSlide({ id: "s", userId: "u", name: "Old", slideProfile: { company: "", bio: "Giới thiệu" } },
     { displayName: "Nguyễn An", companyName: "ACME", phone: "0901234567", industry: "Thiết kế" });
@@ -39,6 +52,9 @@ test("slide input rejects oversized phone numbers, script URLs, oversized bio an
   const profile = { name: "An", company: "", photoURL: "", coverImage: "", phone: "", industry: "", bio: "" };
   assert.equal(slideProfileInput.validate({ version: 0, profile }).error, undefined);
   assert.equal(slideProfileInput.validate({ version: 0, profile: null }).error, undefined);
+  assert.equal(slideProfileInput.validate({ version: 0, profile: { ...profile, address: "Bắc Ninh", targetMarket: "Doanh nghiệp", galleryImages: ["https://example.com/product.jpg"] } }).error, undefined);
+  assert.ok(slideProfileInput.validate({ version: 0, profile: { ...profile, galleryImages: Array(6).fill("https://example.com/product.jpg") } }).error);
+  assert.ok(slideProfileInput.validate({ version: 0, profile: { ...profile, galleryImages: ["javascript:alert(1)"] } }).error);
   for (const patch of [{ phone: "1".repeat(41) }, { photoURL: "javascript:alert(1)" }, { bio: "x".repeat(1001) }, { userId: "other" }]) {
     assert.ok(slideProfileInput.validate({ version: 0, profile: { ...profile, ...patch } }).error);
   }
@@ -52,10 +68,15 @@ test("slide reads scope both meeting and profile queries to the requesting compa
   t.mock.method(UserModel, "find", (query) => {
     assert.equal(query.companyCode, "ACME");
     assert.deepEqual(query.isActive, { $ne: false });
-    return { select: () => ({ lean: async () => [{ _id: "507f1f77bcf86cd799439011", displayName: "Current" }] }) };
+    return { select: (fields: string) => {
+      for (const field of ["address", "targetMarket", "galleryImages"]) assert.ok(fields.split(" ").includes(field));
+      return { lean: async () => [{ _id: "507f1f77bcf86cd799439011", displayName: "Current", address: "Bắc Ninh", galleryImages: ["https://example.com/product.jpg"] }] };
+    } };
   });
   const deck = await getMeetingSlides("ACME", "meeting-1");
   assert.equal(deck.slides[0].name, "Current");
+  assert.equal(deck.slides[0].address, "Bắc Ninh");
+  assert.deepEqual(deck.slides[0].galleryImages, ["https://example.com/product.jpg"]);
   assert.equal(deck.version, 2);
 });
 

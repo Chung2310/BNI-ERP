@@ -15,7 +15,10 @@ import {
   Upload,
   CalendarDays,
   Camera,
-  Image as ImageIcon
+  Image as ImageIcon,
+  UserRound,
+  Target,
+  MapPin,
 } from "lucide-react";
 import { EmployeeNode, UserProfile, TrainingCourse } from "../../types";
 import { authService, getAccessToken } from "../../services/authService";
@@ -43,6 +46,9 @@ const isUrl = (str?: string): boolean => {
   if (!str) return false;
   return str.startsWith("http://") || str.startsWith("https://") || str.startsWith("data:image/") || str.startsWith("/");
 };
+
+type MemberGalleryImage = { url: string; uploadToken?: string };
+const MAX_MEMBER_GALLERY_IMAGES = 5;
 
 const renderAvatar = (avatar: string, sizeClasses: string = "w-8 h-8", textClass: string = "text-base", nameFallback?: string) => {
   if (isUrl(avatar)) {
@@ -159,14 +165,20 @@ export default function OrgChartTab({
   const [addCompanyName, setAddCompanyName] = useState("");
   const [addIndustry, setAddIndustry] = useState("");
   const [addBirthDate, setAddBirthDate] = useState("");
+  const [addGender, setAddGender] = useState<"" | "male" | "female" | "other">("");
+  const [addAddress, setAddAddress] = useState("");
+  const [addTargetMarket, setAddTargetMarket] = useState("");
   const [addParentId, setAddParentId] = useState("");
   const [addRole, setAddRole] = useState<"user" | "manager" | "branch_owner" | "admin">("user");
   const [addPhotoURL, setAddPhotoURL] = useState("");
   const [addCoverImage, setAddCoverImage] = useState("");
+  const [addGalleryImages, setAddGalleryImages] = useState<MemberGalleryImage[]>([]);
   const [uploadingAddAvatar, setUploadingAddAvatar] = useState(false);
   const [uploadingAddCover, setUploadingAddCover] = useState(false);
+  const [uploadingAddGallery, setUploadingAddGallery] = useState(false);
   const addAvatarFileInputRef = useRef<HTMLInputElement>(null);
   const addCoverFileInputRef = useRef<HTMLInputElement>(null);
+  const addGalleryInputRef = useRef<HTMLInputElement>(null);
 
   // Edit Member States
   const [isEditing, setIsEditing] = useState(false);
@@ -176,12 +188,18 @@ export default function OrgChartTab({
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editBirthDate, setEditBirthDate] = useState("");
+  const [editGender, setEditGender] = useState<"" | "male" | "female" | "other">("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editTargetMarket, setEditTargetMarket] = useState("");
   const [editPhotoURL, setEditPhotoURL] = useState("");
   const [editCoverImage, setEditCoverImage] = useState("");
+  const [editGalleryImages, setEditGalleryImages] = useState<MemberGalleryImage[]>([]);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingEditCover, setUploadingEditCover] = useState(false);
+  const [uploadingEditGallery, setUploadingEditGallery] = useState(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const editCoverFileInputRef = useRef<HTMLInputElement>(null);
+  const editGalleryInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Reset editing state when selected employee changes
@@ -198,10 +216,14 @@ export default function OrgChartTab({
     setEditName(raw?.displayName || selectedEmp.name || "");
     setEditCompanyName(raw?.companyName || selectedEmp.companyName || "");
     setEditIndustry(raw?.industry || selectedEmp.industry || "");
+    setEditGender(raw?.gender || selectedEmp.gender || "");
+    setEditAddress(raw?.address || selectedEmp.address || "");
+    setEditTargetMarket(raw?.targetMarket || selectedEmp.targetMarket || "");
     setEditEmail(raw?.email || selectedEmp.email || "");
     setEditPhone(raw?.phone && raw.phone !== "Chưa cập nhật" ? raw.phone : (selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : ""));
     setEditPhotoURL(raw?.photoURL || selectedEmp.avatar || "");
     setEditCoverImage(raw?.coverImage || selectedEmp.coverImage || "");
+    setEditGalleryImages((raw?.galleryImages || selectedEmp.galleryImages || []).slice(0, MAX_MEMBER_GALLERY_IMAGES).map(url => ({ url })));
     setEditBirthDate(
       raw?.birthDate
         ? (typeof raw.birthDate === "string" ? raw.birthDate.split("T")[0] : new Date(raw.birthDate).toISOString().split("T")[0])
@@ -252,6 +274,56 @@ export default function OrgChartTab({
     } finally {
       setUploadingEditCover(false);
     }
+  };
+
+  const uploadMemberGalleryFiles = async (
+    files: File[],
+    currentImages: MemberGalleryImage[],
+    setImages: React.Dispatch<React.SetStateAction<MemberGalleryImage[]>>,
+    setUploading: (uploading: boolean) => void,
+  ) => {
+    const remaining = MAX_MEMBER_GALLERY_IMAGES - currentImages.length;
+    if (remaining <= 0) {
+      toast.warning("Album chỉ chứa tối đa 5 ảnh.");
+      return;
+    }
+    if (files.length > remaining) {
+      toast.info(`Chỉ có thể thêm ${remaining} ảnh nữa.`);
+    }
+
+    setUploading(true);
+    const uploaded: MemberGalleryImage[] = [];
+    try {
+      const compCode = selectedCompanyCode || userProfile?.companyCode;
+      for (const file of files.slice(0, remaining)) {
+        try {
+          const result = await authService.uploadManagedFile(
+            file,
+            "profile.gallery",
+            compCode === "SYSTEM" ? undefined : compCode,
+          );
+          uploaded.push({ url: result.url, uploadToken: result.uploadToken });
+        } catch (err: any) {
+          toast.error(err?.message || `Không thể tải ảnh ${file.name}.`);
+          break;
+        }
+      }
+      if (uploaded.length > 0) setImages(previous => [...previous, ...uploaded].slice(0, MAX_MEMBER_GALLERY_IMAGES));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleAddGalleryFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (files.length) void uploadMemberGalleryFiles(files, addGalleryImages, setAddGalleryImages, setUploadingAddGallery);
+  };
+
+  const handleEditGalleryFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (files.length) void uploadMemberGalleryFiles(files, editGalleryImages, setEditGalleryImages, setUploadingEditGallery);
   };
 
   const handleAddAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -324,7 +396,12 @@ export default function OrgChartTab({
         phone: editPhone.trim() || "",
         photoURL: editPhotoURL.trim() || "",
         coverImage: editCoverImage.trim() || "",
+        galleryImages: editGalleryImages.map(image => image.url),
+        galleryUploadTokens: editGalleryImages.flatMap((image, index) => image.uploadToken ? [{ index, uploadToken: image.uploadToken }] : []),
         birthDate: editBirthDate || undefined,
+        gender: editGender || undefined,
+        address: editAddress.trim(),
+        targetMarket: editTargetMarket.trim(),
       };
 
       await authService.updateUser(selectedEmp.id, updateData);
@@ -341,8 +418,12 @@ export default function OrgChartTab({
         industry: updateData.industry,
         phone: updateData.phone || "Chưa cập nhật",
         avatar: updateData.photoURL || prev.avatar,
-        coverImage: updateData.coverImage || prev.coverImage,
+        coverImage: updateData.coverImage ?? prev.coverImage,
+        galleryImages: updateData.galleryImages,
         birthDate: updateData.birthDate,
+        gender: updateData.gender,
+        address: updateData.address,
+        targetMarket: updateData.targetMarket,
       } : null);
     } catch (err) {
       console.error(err);
@@ -588,10 +669,15 @@ export default function OrgChartTab({
           phone: addPhone.trim(),
           branchId: activeBranchId || undefined,
           birthDate: addBirthDate ? addBirthDate : undefined,
+          gender: addGender || undefined,
+          address: addAddress.trim(),
+          targetMarket: addTargetMarket.trim(),
           ...{
           industry: addIndustry.trim() || undefined,
           photoURL: addPhotoURL.trim() || undefined,
           coverImage: addCoverImage.trim() || undefined,
+          galleryImages: addGalleryImages.map(image => image.url),
+          galleryUploadTokens: addGalleryImages.flatMap((image, index) => image.uploadToken ? [{ index, uploadToken: image.uploadToken }] : []),
         }
         });
 
@@ -610,8 +696,12 @@ export default function OrgChartTab({
       setAddCompanyName("");
       setAddIndustry("");
       setAddBirthDate("");
+      setAddGender("");
+      setAddAddress("");
+      setAddTargetMarket("");
       setAddPhotoURL("");
       setAddCoverImage("");
+      setAddGalleryImages([]);
       setAddParentId("");
       setAddRole("user");
 
@@ -847,11 +937,15 @@ export default function OrgChartTab({
       {isDetailModalOpen && selectedEmp && (() => {
         const rawUser = usersList.find(u => u.uid === selectedEmp.id);
         const memberAvatar = rawUser?.photoURL || selectedEmp.avatar;
-        const memberCover = rawUser?.coverImage || selectedEmp.coverImage;
+        const memberCover = (rawUser ? rawUser.coverImage : selectedEmp.coverImage)?.trim();
         const memberName = rawUser?.displayName || selectedEmp.name;
         const memberRole = selectedEmp.role || "Thành viên";
         const memberCompany = rawUser?.companyName || selectedEmp.companyName || "Chưa cập nhật";
         const memberIndustry = rawUser?.industry || selectedEmp.industry || "Chưa cập nhật";
+        const memberGender = rawUser?.gender || selectedEmp.gender;
+        const memberAddress = rawUser?.address || selectedEmp.address || "Chưa cập nhật";
+        const memberTargetMarket = rawUser?.targetMarket || selectedEmp.targetMarket || "Chưa cập nhật";
+        const memberGalleryImages = (rawUser?.galleryImages || selectedEmp.galleryImages || []).slice(0, MAX_MEMBER_GALLERY_IMAGES);
         const memberPhone = (rawUser?.phone && rawUser.phone !== "Chưa cập nhật") ? rawUser.phone : (selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : "Chưa cập nhật");
         const memberEmail = rawUser?.email || selectedEmp.email || "Chưa cập nhật";
         const memberBirthDate = rawUser?.birthDate || selectedEmp.birthDate;
@@ -874,6 +968,7 @@ export default function OrgChartTab({
                     <div className="relative h-28 sm:h-32 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 overflow-hidden">
                       {editCoverImage ? (
                         <img
+                          key={editCoverImage}
                           src={editCoverImage}
                           alt="Ảnh bìa"
                           className="w-full h-full object-cover"
@@ -960,7 +1055,7 @@ export default function OrgChartTab({
                           className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 font-bold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50 text-[11px]"
                         >
                           {uploadingAvatar ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                          <span>{uploadingAvatar ? "Đang tải..." : (editPhotoURL ? "Đổi avatar" : "Tải avatar")}</span>
+                          <span>{uploadingAvatar ? "Đang tải..." : (editPhotoURL ? "Đổi ảnh đại diện" : "Tải ảnh đại diện")}</span>
                         </button>
                         {editPhotoURL && (
                           <button
@@ -1010,6 +1105,81 @@ export default function OrgChartTab({
                         className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
                       />
                     </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <label className="block font-bold text-gray-600">Ảnh sản phẩm hoặc hoạt động</label>
+                        <span className="text-[11px] text-slate-500">Tối đa 5 ảnh</span>
+                      </div>
+                      <input ref={editGalleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleEditGalleryFiles} />
+                      <button
+                        type="button"
+                        onClick={() => editGalleryInputRef.current?.click()}
+                        disabled={uploadingEditGallery || editGalleryImages.length >= MAX_MEMBER_GALLERY_IMAGES}
+                        className="shrink-0 rounded-xl border border-sky-200 bg-white px-3 py-2 text-[11px] font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50"
+                      >
+                        {uploadingEditGallery ? "Đang tải..." : "Thêm ảnh"}
+                      </button>
+                    </div>
+                    {editGalleryImages.length > 0 && (
+                      <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2">
+                        {editGalleryImages.map((image, index) => (
+                          <div key={`${image.url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-white">
+                            <img src={image.url} alt={`Ảnh sản phẩm hoặc hoạt động ${index + 1}`} className="h-full w-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => setEditGalleryImages(previous => previous.filter((_, imageIndex) => imageIndex !== index))}
+                              aria-label={`Xóa ảnh ${index + 1}`}
+                              className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-600 shadow hover:bg-rose-50 hover:text-rose-600"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-gray-500 mb-1">Giới tính</label>
+                      <select
+                        aria-label="Giới tính"
+                        value={editGender}
+                        onChange={(e) => setEditGender(e.target.value as typeof editGender)}
+                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                      >
+                        <option value="">Chưa cập nhật</option>
+                        <option value="male">Nam</option>
+                        <option value="female">Nữ</option>
+                        <option value="other">Khác</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-bold text-gray-500 mb-1">Thị trường mục tiêu</label>
+                      <input
+                        type="text"
+                        maxLength={500}
+                        value={editTargetMarket}
+                        onChange={(e) => setEditTargetMarket(e.target.value)}
+                        placeholder="Ví dụ: Doanh nghiệp vừa và nhỏ"
+                        className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-gray-500 mb-1">Địa chỉ</label>
+                    <textarea
+                      rows={2}
+                      maxLength={300}
+                      value={editAddress}
+                      onChange={(e) => setEditAddress(e.target.value)}
+                      placeholder="Nhập địa chỉ"
+                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white resize-y"
+                    />
                   </div>
 
                   {/* Role in Chapter */}
@@ -1065,7 +1235,7 @@ export default function OrgChartTab({
                   </button>
                   <button
                     type="button"
-                    disabled={isSaving}
+                    disabled={isSaving || uploadingEditGallery}
                     onClick={handleEditEmployeeSave}
                     className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
                   >
@@ -1083,9 +1253,9 @@ export default function OrgChartTab({
             ) : (
               <div className="bg-white border border-slate-100 rounded-3xl shadow-2xl w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto relative text-left animate-in fade-in zoom-in-95 duration-200">
                 {/* Header Cover Banner */}
-                <div className="relative h-28 w-full overflow-hidden rounded-t-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500">
+                <div className="relative h-28 w-full overflow-hidden rounded-t-3xl bg-primary">
                   {memberCover && (
-                    <img src={memberCover} alt="Cover" className="w-full h-full object-cover opacity-90" />
+                    <img key={memberCover} src={memberCover} alt="" className="w-full h-full object-cover" onError={event => { event.currentTarget.style.display = "none"; }} />
                   )}
                   <button
                     type="button"
@@ -1139,6 +1309,32 @@ export default function OrgChartTab({
                       </div>
 
                       <div className="flex items-start gap-2.5">
+                        <UserRound className="w-4 h-4 text-violet-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Giới tính</span>
+                          <strong className="text-slate-800 text-xs font-bold block">
+                            {memberGender === "male" ? "Nam" : memberGender === "female" ? "Nữ" : memberGender === "other" ? "Khác" : "Chưa cập nhật"}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2.5">
+                        <Target className="w-4 h-4 text-cyan-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thị trường mục tiêu</span>
+                          <strong className="text-slate-800 text-xs font-bold block break-words">{memberTargetMarket}</strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2.5 sm:col-span-2">
+                        <MapPin className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Địa chỉ</span>
+                          <strong className="text-slate-800 text-xs font-bold block break-words">{memberAddress}</strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2.5">
                         <CalendarDays className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                         <div className="min-w-0">
                           <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ngày sinh</span>
@@ -1167,6 +1363,24 @@ export default function OrgChartTab({
                           </a>
                         </div>
                       </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-100 bg-white p-3.5">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ảnh sản phẩm hoặc hoạt động</span>
+                        <span className="text-[10px] text-slate-400">{memberGalleryImages.length}/5</span>
+                      </div>
+                      {memberGalleryImages.length > 0 ? (
+                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                          {memberGalleryImages.map((image, index) => (
+                            <a key={`${image}-${index}`} href={image} target="_blank" rel="noreferrer" className="block aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                              <img src={image} alt={`Ảnh sản phẩm hoặc hoạt động ${index + 1}`} className="h-full w-full object-cover transition-transform hover:scale-105" />
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400">Chưa có ảnh</p>
+                      )}
                     </div>
 
                     {/* Subordinates */}
@@ -1252,6 +1466,7 @@ export default function OrgChartTab({
                 <div className="relative h-28 sm:h-32 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 overflow-hidden">
                   {addCoverImage ? (
                     <img
+                      key={addCoverImage}
                       src={addCoverImage}
                       alt="Ảnh bìa"
                       className="w-full h-full object-cover"
@@ -1338,7 +1553,7 @@ export default function OrgChartTab({
                       className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 font-bold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50 text-[11px]"
                     >
                       {uploadingAddAvatar ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                      <span>{uploadingAddAvatar ? "Đang tải..." : (addPhotoURL ? "Đổi avatar" : "Tải avatar")}</span>
+                      <span>{uploadingAddAvatar ? "Đang tải..." : (addPhotoURL ? "Đổi ảnh đại diện" : "Tải ảnh đại diện")}</span>
                     </button>
                     {addPhotoURL && (
                       <button
@@ -1389,6 +1604,81 @@ export default function OrgChartTab({
                     className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
                   />
                 </div>
+              </div>
+
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <label className="block font-bold text-gray-600">Ảnh sản phẩm hoặc hoạt động</label>
+                    <span className="text-[11px] text-slate-500">Tối đa 5 ảnh</span>
+                  </div>
+                  <input ref={addGalleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddGalleryFiles} />
+                  <button
+                    type="button"
+                    onClick={() => addGalleryInputRef.current?.click()}
+                    disabled={uploadingAddGallery || addGalleryImages.length >= MAX_MEMBER_GALLERY_IMAGES}
+                    className="shrink-0 rounded-xl border border-sky-200 bg-white px-3 py-2 text-[11px] font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50"
+                  >
+                    {uploadingAddGallery ? "Đang tải..." : "Thêm ảnh"}
+                  </button>
+                </div>
+                {addGalleryImages.length > 0 && (
+                  <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2">
+                    {addGalleryImages.map((image, index) => (
+                      <div key={`${image.url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        <img src={image.url} alt={`Ảnh sản phẩm hoặc hoạt động ${index + 1}`} className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setAddGalleryImages(previous => previous.filter((_, imageIndex) => imageIndex !== index))}
+                          aria-label={`Xóa ảnh ${index + 1}`}
+                          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-600 shadow hover:bg-rose-50 hover:text-rose-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-500 mb-1">Giới tính</label>
+                  <select
+                    aria-label="Giới tính"
+                    value={addGender}
+                    onChange={(e) => setAddGender(e.target.value as typeof addGender)}
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 bg-white"
+                  >
+                    <option value="">Chưa cập nhật</option>
+                    <option value="male">Nam</option>
+                    <option value="female">Nữ</option>
+                    <option value="other">Khác</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-gray-500 mb-1">Thị trường mục tiêu</label>
+                  <input
+                    type="text"
+                    maxLength={500}
+                    value={addTargetMarket}
+                    onChange={(e) => setAddTargetMarket(e.target.value)}
+                    placeholder="Ví dụ: Doanh nghiệp vừa và nhỏ"
+                    className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-500 mb-1">Địa chỉ</label>
+                <textarea
+                  rows={2}
+                  maxLength={300}
+                  value={addAddress}
+                  onChange={(e) => setAddAddress(e.target.value)}
+                  placeholder="Nhập địa chỉ"
+                  className="w-full px-3.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 resize-y"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1456,7 +1746,7 @@ export default function OrgChartTab({
               </button>
               <button
                 type="submit"
-                disabled={isAddingEmployee}
+                disabled={isAddingEmployee || uploadingAddGallery}
                 className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
               >
                 {isAddingEmployee ? (

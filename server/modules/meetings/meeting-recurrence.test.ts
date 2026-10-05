@@ -4,6 +4,7 @@ import { recurringMeetingDates, meetingMonthRange, vietnamDateTime } from "../..
 import { createRecurringMeetings, updateMeeting, controlMeeting } from "./meeting.service";
 import { MeetingModel } from "./meeting.model";
 import { recurringMeetingInput } from "./meeting.validation";
+import * as sequence from "./meeting-sequence";
 afterEach(() => vi.restoreAllMocks());
 const rule = { startDate: "2030-01-01", months: 6, weekday: 3, time: "07:00" };
 const details = { title: "Họp tuần", tiers: [{ startTime: "07:00", endTime: "08:00", seconds: 30 }], fallbackSeconds:20, reminderDays:1 };
@@ -21,8 +22,29 @@ it("handles month ends, leap day and year rollover without local timezone depend
 });
 it.each([{...rule,months:0},{...rule,months:13},{...rule,weekday:7},{...rule,startDate:"2030-02-30"},{...rule,time:"24:00"}])("rejects invalid recurrence %j", rule => expect(() => recurringMeetingDates(rule)).toThrow());
 it("validates common meeting details and recurrence before creating the series", () => {
+ expect(recurringMeetingInput.validate({...details,title:undefined,recurrence:rule}).error).toBeUndefined();
+ expect(recurringMeetingInput.validate({...details,title:"",recurrence:rule}).error).toBeUndefined();
  expect(recurringMeetingInput.validate({...details,recurrence:rule}).error).toBeUndefined();
  expect(recurringMeetingInput.validate({...details,recurrence:{...rule,months:13}}).error).toBeDefined();
+});
+it("automatically numbers each occurrence in date order and continues across batches", async () => {
+ const reserve = vi.spyOn(sequence, "reserveMeetingNumbers").mockResolvedValueOnce(1).mockResolvedValueOnce(27);
+ vi.spyOn(MeetingModel,"insertMany").mockImplementation(async (rows:any) => rows as any);
+ const first = await createRecurringMeetings("BNI", "actor", { ...details, title: undefined, recurrence: rule });
+ expect(first.map(row => row.title)).toEqual(Array.from({ length: 26 }, (_, index) => `BNI Chapter #${index + 1}`));
+ const next = await createRecurringMeetings("BNI", "actor", { ...details, title: "", recurrence: { ...rule, startDate: "2030-07-01" } });
+ expect(next[0].title).toBe("BNI Chapter #27");
+ expect(reserve).toHaveBeenNthCalledWith(1, "BNI", 26);
+ expect(reserve).toHaveBeenNthCalledWith(2, "BNI", next.length);
+});
+
+it("allows renaming an automatically named occurrence independently", async () => {
+ const meeting = { ...item(), title: "BNI Chapter #1" };
+ vi.spyOn(MeetingModel,"findOne").mockResolvedValue(meeting as any);
+ await updateMeeting("BNI", "one", { title: "Buổi giao lưu", version: 0 });
+ expect(meeting.title).toBe("Buổi giao lưu");
+ expect(meeting.seriesId).toBe("series");
+ expect(meeting.save).toHaveBeenCalledOnce();
 });
 it("creates separate scoped meetings with one series identifier and per-date reminders", async () => {
  const insert = vi.spyOn(MeetingModel,"insertMany").mockImplementation(async (rows) => rows as never);

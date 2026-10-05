@@ -22,11 +22,15 @@ export interface IUser extends Document {
   displayName: string;
   photoURL?: string;
   coverImage?: string;
+  galleryImages?: string[];
   industry?: string;
   role: string;
   createdAt: Date;
   updatedAt?: Date;
   birthDate?: Date;
+  gender?: "male" | "female" | "other";
+  address?: string;
+  targetMarket?: string;
   jobDescriptionLink?: string;
   phone?: string;
   parentId?: string;

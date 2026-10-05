@@ -37,6 +37,7 @@ it("keeps paused meetings ongoing and advances meeting duration while the speake
     await screen.findByText("Đang diễn ra 96 phút");
     expect(screen.queryByText(/Tạm dừng •/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Tiếp tục điều hành" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
     expect(screen.getAllByText("Đang diễn ra 96 phút")).toHaveLength(2);
     expect(screen.queryByText("Đang tạm dừng")).toBeNull();
     expect(screen.getByText("00:19")).toBeTruthy();
@@ -56,6 +57,7 @@ it("uses avatars instead of covers for current, upcoming and listed attendees", 
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
   expect(screen.getAllByAltText("An")).toHaveLength(2);
   expect(screen.getAllByAltText("Bình")).toHaveLength(2);
   for (const img of screen.getAllByAltText("An")) expect(img.getAttribute("src")).toBe(people[0].photoURL);
@@ -79,6 +81,7 @@ it("checks multiple people in operations and submits their IDs in one request", 
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
   fireEvent.click(screen.getByLabelText("Chọn An"));
   fireEvent.click(screen.getByLabelText("Chọn Bình"));
   expect((screen.getByLabelText("Chọn An") as HTMLInputElement).checked).toBe(true);
@@ -115,6 +118,7 @@ it("defers from the operation list and starts fullscreen from the selected atten
     render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
     fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
     fireEvent.click(screen.getByRole("button", { name: "Để cuối lượt: An đang bận" }));
     await waitFor(() => expect(item.__v).toBe(1));
     await waitFor(() => expect((screen.getByLabelText("Bắt đầu từ Chi khách mời") as HTMLInputElement).disabled).toBe(false));
@@ -144,6 +148,7 @@ it.each(["Escape", "fullscreen"])("returns to the slides presentation tab after 
     render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
     fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
     fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
     await screen.findByRole("dialog", { name: "Trình chiếu hồ sơ" });
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/presentation"))).toBe(true));
@@ -189,6 +194,7 @@ it("shares manual navigation and operating mode between slides and MC controls",
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
   fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
   await screen.findByText("Người đầu");
   await waitFor(() => expect((screen.getByRole("button", { name: "Slide tiếp" }) as HTMLButtonElement).disabled).toBe(false));
@@ -208,19 +214,28 @@ it("shares manual navigation and operating mode between slides and MC controls",
   expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/control")).map(([, options]) => JSON.parse(options.body).action)).toEqual(["next", "previous"]);
   vi.restoreAllMocks();
 });
-it("opens check-in for a scheduled meeting and keeps QR separate from MC controls", async () => {
+it.each(["scheduled", "live", "paused", "ended", "cancelled"])("remembers the current step when reopening a %s meeting or reloading the page", async status => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, status }] }) }));
+  localStorage.setItem("bni_meeting_flow_order", JSON.stringify(["luckyDraw", "checkin", "presentation", "activeMembers"]));
+  const view = render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+  const openLabel = status === "scheduled" ? "Mở buổi họp & check-in" : ["live", "paused"].includes(status) ? "Tiếp tục điều hành" : "Xem buổi họp";
+  fireEvent.click(await screen.findByRole("button", { name: openLabel }));
+  expect(screen.getByRole("button", { name: "Bước 2: Check-in" }).getAttribute("aria-current")).toBe("step");
+  for (const label of ["Bước 3: Thuyết trình", "Bước 2: Check-in", "Bước 1: Quay thưởng"]) {
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    fireEvent.click(screen.getByTitle("Đóng popup"));
+    fireEvent.click(screen.getByRole("button", { name: openLabel }));
+    expect(screen.getByRole("button", { name: label }).getAttribute("aria-current")).toBe("step");
+  }
+  view.unmount();
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
-  fireEvent.click(await screen.findByRole("button", {name:"Mở buổi họp & check-in"}));
-  expect(screen.getByText("Đón tiếp & check-in")).toBeTruthy();
-  expect(screen.queryByText("Diễn giả hiện tại")).toBeNull();
-  expect(screen.queryByText("Quay thưởng đang mở")).toBeNull();
-  fireEvent.click(screen.getByRole("button", {name:/^Tiếp tục: Thuyết trình/}));
-  expect(screen.getByText("Diễn giả hiện tại")).toBeTruthy();
-  expect(screen.queryByText("Mở QR khi bắt đầu đón khách")).toBeNull();
-  fireEvent.click(screen.getByRole("button", {name:/^Bước \d+: Quay thưởng$/}));
+  fireEvent.click(await screen.findByRole("button", { name: openLabel }));
+  expect(screen.getByRole("button", { name: "Bước 1: Quay thưởng" }).getAttribute("aria-current")).toBe("step");
   expect(screen.getByText("Quay thưởng đang mở")).toBeTruthy();
 });
+
 it("preserves zero-day reminders when editing a meeting", async () => {
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
@@ -265,6 +280,7 @@ it("inserting priority one shifts the existing waiting speaker down", async () =
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
   expect(screen.queryByLabelText("Chọn người để sắp xếp")).toBeNull();
   expect(screen.queryByLabelText("Thứ tự ưu tiên")).toBeNull();
   fireEvent.click(screen.getAllByTitle("Sửa cuộc họp").at(-1)!);
@@ -288,6 +304,7 @@ it("manual overtime stops at zero; completing the last speaker opens BNI notice 
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
   expect(screen.getByText("Hết giờ")).toBeTruthy();
   expect(screen.queryByText("00:00")).toBeNull();
   expect(screen.queryByText("+00:05")).toBeNull();
@@ -310,8 +327,7 @@ it("shows server-completed speeches without sending another automatic control co
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
-  item = { ...item, __v: 1, currentIndex: 1, speakerStartedAt: undefined, speechesCompletedAt: new Date().toISOString() };
-  act(() => meetingEvents.forEach(callback => callback()));
+  fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
   await screen.findByRole("dialog", { name: "Hoàn tất phần phát biểu" });
   expect(item.status).toBe("live");
   expect(fetchMock.mock.calls.every(([, options]) => options?.method !== "POST")).toBe(true);
@@ -330,7 +346,7 @@ it("launches the current profile from MC controls and explains the post-speech d
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
-  expect(screen.getByText(/Đây là thời gian chờ chuyển lượt/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
   expect((screen.getByLabelText("Số giây chờ chuyển slide sau khi hết giờ") as HTMLInputElement).value).toBe("3");
   const requestFullscreen = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(document.documentElement, "requestFullscreen", { configurable: true, value: requestFullscreen });
@@ -424,6 +440,14 @@ it.each([0, 3, 150])("persists slide delay %s without a second browser auto-adva
     return { ok: true, json: async () => ({ data: [item] }) };
   });
   vi.stubGlobal("fetch", fetchMock);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
+  await screen.findByText("Đầu tiên");
+
   try {
     render(<MeetingTab />);
     fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
@@ -455,6 +479,7 @@ it("opening a paused presentation resumes the countdown from its remaining time"
     render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
     fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
     fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
     await screen.findByText("Khách đang nói");
     fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
@@ -629,6 +654,7 @@ it("does not show one minute elapsed before a future meeting without an actual s
   await screen.findByText("Chưa đến giờ họp");
   expect(screen.queryByText("Đang diễn ra 1 phút")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Tiếp tục điều hành" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
   expect(screen.getAllByText("Chưa đến giờ họp")).toHaveLength(2);
 });
 it("creates a weekly series from its own popup and returns to the calendar", async () => {
@@ -637,13 +663,25 @@ it("creates a weekly series from its own popup and returns to the calendar", asy
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Tạo lịch định kỳ" }));
-  const dialog = within(screen.getByRole("dialog", { name: "Tạo lịch định kỳ hằng tuần" }));
+  const dialog = within(screen.getByRole("dialog", { name: "Tạo lịch định kì" }));
   expect(dialog.queryByPlaceholderText("Chọn ngày...")).toBeNull();
   expect(dialog.queryByLabelText("Giờ kết thúc cuộc họp")).toBeNull();
   expect(dialog.queryByRole("checkbox", { name: "Tạo lịch định kỳ hằng tuần" })).toBeNull();
   expect(dialog.queryByRole("checkbox", { name: /Cho phép điểm danh trực tiếp/ })).toBeNull();
-  fireEvent.change(dialog.getByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40"), { target: { value: "Họp tuần" } });
-  fireEvent.change(dialog.getByLabelText("Ngày bắt đầu chu kỳ"), { target: { value: "2030-01-01" } });
+  expect(dialog.queryByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40")).toBeNull();
+  fireEvent.click(dialog.getByRole("button", { name: "Ngày bắt đầu chu kỳ" }));
+  const calendar = within(dialog.getByRole("dialog", { name: "Chọn ngày" }));
+  fireEvent.click(within(calendar.getByRole("group", { name: "Năm" })).getByRole("button", { name: "2030" }));
+  fireEvent.click(within(calendar.getByRole("group", { name: "Tháng" })).getByRole("button", { name: "01" }));
+  fireEvent.click(within(calendar.getByRole("group", { name: "Ngày" })).getByRole("button", { name: "01" }));
+  fireEvent.click(calendar.getByRole("button", { name: "Xong" }));
+  expect(dialog.getByText("01/01/2030")).toBeTruthy();
+  expect(dialog.queryByText("Giờ bắt đầu (Việt Nam)")).toBeNull();
+  fireEvent.click(dialog.getByRole("button", { name: "Giờ bắt đầu chu kỳ" }));
+  const timePicker = within(dialog.getByRole("dialog", { name: "Chọn giờ" }));
+  fireEvent.click(within(timePicker.getByRole("group", { name: "Giờ" })).getByRole("button", { name: "19" }));
+  fireEvent.click(within(timePicker.getByRole("group", { name: "Phút" })).getByRole("button", { name: "07" }));
+  expect(dialog.getByRole("button", { name: "Giờ bắt đầu chu kỳ" }).textContent).toBe("19:07");
   expect(dialog.getByText(/Sẽ tạo 26 buổi/)).toBeTruthy();
   fireEvent.click(dialog.getByRole("button", { name: "Tạo lịch định kỳ" }));
   await waitFor(() => expect(fetchMock.mock.calls.some(([url, options]) => String(url).endsWith("/series") && options?.method === "POST")).toBe(true));
@@ -651,47 +689,29 @@ it("creates a weekly series from its own popup and returns to the calendar", asy
   const payload = JSON.parse(request[1].body);
   expect(payload.tiers).toEqual([{ startTime: "07:00", endTime: "08:00", seconds: 30 }, { startTime: "08:00", endTime: "09:00", seconds: 20 }]);
   expect(payload).not.toHaveProperty("allowDirectCheckIn");
-  expect(payload).toMatchObject({ title: "Họp tuần", recurrence: { startDate: "2030-01-01", months: 6, weekday: 3, time: "07:00" } });
+  expect(payload).not.toHaveProperty("title");
+  expect(payload).toMatchObject({ recurrence: { startDate: "2030-01-01", months: 6, weekday: 3, time: "19:07" } });
   expect(payload).not.toHaveProperty("startsAt");
   expect(payload).not.toHaveProperty("endsAt");
-  await waitFor(() => expect((screen.getByLabelText("Tháng xem lịch") as HTMLInputElement).value).toBe("2030-01"));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Tháng xem lịch" }).textContent).toBe("Tháng 1, 2030"));
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
-it("creates only one meeting after cancelling the recurring popup", async () => {
-  const fetchMock = vi.fn(async (_url, options) => ({
+it("cancels the recurring popup without creating meetings", async () => {
+  const fetchMock = vi.fn(async (_url: any, options: any) => ({
     ok: true, json: async () => ({ data: options?.method === "POST" ? meeting : [meeting] }),
   }));
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Tạo lịch định kỳ" }));
-  const recurringDialog = within(screen.getByRole("dialog", { name: "Tạo lịch định kỳ hằng tuần" }));
-  fireEvent.change(recurringDialog.getByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40"), { target: { value: "Lịch định kỳ chưa lưu" } });
-  fireEvent.change(recurringDialog.getByLabelText("Ngày bắt đầu chu kỳ"), { target: { value: "2030-01-01" } });
+  const recurringDialog = within(screen.getByRole("dialog", { name: "Tạo lịch định kì" }));
+  fireEvent.click(recurringDialog.getByRole("button", { name: "Ngày bắt đầu chu kỳ" }));
+  fireEvent.click(recurringDialog.getByRole("button", { name: "Hôm nay" }));
   fireEvent.click(recurringDialog.getByRole("button", { name: "Hủy" }));
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(fetchMock.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
-  fireEvent.click(screen.getByRole("button", { name: "Tạo cuộc họp mới" }));
-  const dialog = within(screen.getByRole("dialog", { name: "Tạo cuộc họp BNI mới" }));
-  expect(dialog.queryByLabelText("Ngày bắt đầu chu kỳ")).toBeNull();
-  expect(dialog.queryByRole("checkbox", { name: "Tạo lịch định kỳ hằng tuần" })).toBeNull();
-  expect(dialog.queryByRole("checkbox", { name: /Cho phép điểm danh trực tiếp/ })).toBeNull();
-  const titleInput = dialog.getByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40");
-  expect((titleInput as HTMLInputElement).value).toBe("");
-  fireEvent.change(titleInput, { target: { value: "Họp một lần" } });
-  const startInput = dialog.getByPlaceholderText("Chọn ngày...");
-  fireEvent.change(startInput, { target: { value: "02/01/2030 07:00" } });
-  fireEvent.blur(startInput);
-  expect((dialog.getByLabelText("Giờ kết thúc cuộc họp") as HTMLInputElement).value).toBe("2030-01-02T09:00");
-  fireEvent.click(dialog.getByRole("button", { name: "Tạo cuộc họp" }));
-  await waitFor(() => expect(fetchMock.mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(1));
-  const request = fetchMock.mock.calls.find(([, options]) => options?.method === "POST")!;
-  expect(request[0]).toBe("/api/v1/meetings");
-  const payload = JSON.parse(request[1].body);
-  expect(payload.tiers).toEqual([{ startTime: "07:00", endTime: "08:00", seconds: 30 }, { startTime: "08:00", endTime: "09:00", seconds: 20 }]);
-  expect(payload).not.toHaveProperty("allowDirectCheckIn");
-  expect(payload).toMatchObject({ title: "Họp một lần", startsAt: "2030-01-02T00:00:00.000Z", endsAt: "2030-01-02T02:00:00.000Z" });
-  expect(payload).not.toHaveProperty("recurrence");
+  expect(screen.queryByRole("button", { name: "Tạo cuộc họp mới" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Tạo lịch định kỳ" })).toBeTruthy();
 });
 
 it("edits time slots, blocks overlaps and saves the configured fallback", async () => {

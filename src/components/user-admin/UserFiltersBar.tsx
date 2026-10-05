@@ -1,3 +1,5 @@
+import { Search } from "lucide-react";
+
 ﻿interface Props {
   searchQuery: string;
   filterStartDate: string;
@@ -27,7 +29,9 @@ export function UserFiltersBar(props: Props) {
     <div className="bg-white border-b border-gray-200 px-6 py-3.5 flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center shrink-0">
       <div className="flex flex-wrap items-center gap-3 flex-1">
         <div className="relative min-w-[240px] flex-1 max-w-sm">
-          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">🔍</span>
+          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+            <Search className="h-3.5 w-3.5" strokeWidth={2.2} />
+          </span>
           <input
             type="text"
             placeholder="Tìm theo tên hoặc email..."

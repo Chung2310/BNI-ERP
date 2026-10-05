@@ -380,6 +380,8 @@ export const authService = {
     companyCode: string; companyName: string; parentId?: string; phone?: string;
     jobDescriptionLink?: string; branchId?: string; birthDate?: string; monthlySalary?: number;
     jobDescriptionUploadToken?: string; industry?: string; photoURL?: string; coverImage?: string;
+    gender?: "male" | "female" | "other"; address?: string; targetMarket?: string;
+    galleryImages?: string[]; galleryUploadTokens?: Array<{ index: number; uploadToken: string }>;
   }): Promise<string> {
     const res = await fetch("/api/v1/auth/register-user", {
       method: "POST",

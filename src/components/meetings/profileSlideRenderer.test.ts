@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
-import { renderProfileSlide } from "./profileSlideRenderer";
+import { renderProfileSlide, textBox } from "./profileSlideRenderer";
 import type { ProfileSlide } from "./slideTypes";
-
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
-
-it.each(["guest", "member"] as const)("renders populated %s fields without field headings or empty cards", async kind => {
+it.each(["guest", "member"] as const)("fills the template with %s data and hides missing sections", async kind => {
   vi.stubGlobal("Image", class {
     naturalWidth = 1920; naturalHeight = 1080;
     onload?: () => void;
@@ -13,20 +11,57 @@ it.each(["guest", "member"] as const)("renders populated %s fields without field
   });
   Object.defineProperty(document, "fonts", { configurable: true, value: { load: vi.fn().mockResolvedValue([]) } });
   const ctx = { font: "", fillText: vi.fn(), drawImage: vi.fn(), fillRect: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(),
-    save: vi.fn(), restore: vi.fn(), arc: vi.fn(), clip: vi.fn(), measureText: (text: string) => ({ width: text.length * 12 }) };
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue((ctx as unknown as Parameters<((value: ReturnType<typeof HTMLCanvasElement.prototype.getContext>) => void)>[0]));
-  const slide: ProfileSlide = { id: kind, kind, name: "An", company: "ACME", industry: "Thiết kế", phone: "0901234567", email: "an@example.com", bio: "Giới thiệu của An", photoURL: "", coverImage: "" };
-  await renderProfileSlide(slide);
-  const text = ctx.fillText.mock.calls.map(call => call[0]);
-  for (const value of ["ACME", "Thiết kế", "0901234567", "an@example.com", "Giới thiệu của An"]) expect(text.join(" ")).toContain(value);
-  for (const label of ["BIO / GIỚI THIỆU NGẮN", "LĨNH VỰC", "LOẠI HÌNH DỊCH VỤ", "SỐ ĐIỆN THOẠI"]) expect(text).not.toContain(label);
-  const bioY = ctx.fillText.mock.calls.find(call => call[0] === slide.bio)![2];
-  expect(ctx.roundRect).toHaveBeenCalledTimes(1); // Only the member/guest badge remains.
-  ctx.fillText.mockClear(); ctx.roundRect.mockClear();
-  await renderProfileSlide({ ...slide, company: " ", industry: "", phone: " ", email: "" });
-  expect(ctx.fillText.mock.calls.find(call => call[0] === slide.bio)![2]).toBeLessThan(bioY);
-  expect(ctx.roundRect).toHaveBeenCalledTimes(1);
-  ctx.fillText.mockClear();
-  await renderProfileSlide({ ...slide, company: "", industry: "", phone: "", email: "", bio: " " });
-  expect(ctx.fillText.mock.calls.map(call => call[0])).not.toContain(slide.bio);
+    rect: vi.fn(), createLinearGradient: () => ({ addColorStop: vi.fn() }),
+    moveTo: vi.fn(), lineTo: vi.fn(), closePath: vi.fn(), save: vi.fn(), restore: vi.fn(), arc: vi.fn(), clip: vi.fn(), measureText: (text: string) => ({ width: text.length * 12 }) };
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(ctx as any);
+  const slide: ProfileSlide = { id: kind, kind, name: "Nguyễn An", company: "ACME", industry: "Thiết kế", phone: "0901234567", bio: "", photoURL: "/avatar.png", coverImage: "", address: "Bắc Ninh", targetMarket: "Doanh nghiệp", galleryImages: Array.from({ length: 6 }, (_, i) => `/product-${i}.png`) };
+  const { canvas, warnings } = await renderProfileSlide(slide);
+  expect([canvas.width, canvas.height]).toEqual([1920, 1080]);
+  expect(warnings).toEqual([]);
+  const text = ctx.fillText.mock.calls.map(call => call[0]).join(" ");
+  for (const value of ["NGUYỄN AN", "ACME", "THIẾT KẾ", "HOTLINE: 0901234567", "Bắc Ninh", "Doanh nghiệp", "SẢN PHẨM TIÊU BIỂU"]) expect(text).toContain(value);
+  expect(ctx.arc).toHaveBeenCalledWith(338, 468, 180, 0, Math.PI * 2);
+  expect(document.fonts.load).toHaveBeenCalledWith('700 32px "Be Vietnam Pro"', expect.any(String));
+  expect(document.fonts.load).toHaveBeenCalledWith('700 32px "Faustina"', expect.any(String));
+  expect(text).toContain(kind === "member" ? "THÔNG TIN THÀNH VIÊN" : "THÔNG TIN KHÁCH MỜI");
+  expect(ctx.drawImage.mock.calls.filter(call => call.length === 5 && call[2] >= 504 && call[2] < 740)).toHaveLength(5);
+  ctx.fillText.mockClear(); ctx.arc.mockClear(); ctx.drawImage.mockClear();
+  await renderProfileSlide({ ...slide, company: " ", industry: "", phone: " ", address: "", targetMarket: " ", galleryImages: [], photoURL: "" });
+  const sparseText = ctx.fillText.mock.calls.map(call => call[0]).join(" ");
+  for (const value of ["HOTLINE", "LĨNH VỰC HOẠT ĐỘNG", "THỊ TRƯỜNG MỤC TIÊU", "SẢN PHẨM TIÊU BIỂU", "ACME"]) expect(sparseText).not.toContain(value);
+  expect(ctx.arc).not.toHaveBeenCalled();
+  expect(ctx.drawImage).toHaveBeenCalledWith(expect.anything(), 100, 247, 480, 456);
+});
+
+it("shrinks long Vietnamese text within both width and height, with a bounded fallback", () => {
+  const drawn: { text: string; size: number; y: number }[] = [];
+  const ctx = {
+    font: "", textAlign: "center", fillStyle: "",
+    save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), rect: vi.fn(), clip: vi.fn(),
+    measureText(text: string) { return { width: Array.from(text).length * Number(this.font.match(/(\d+)px/)?.[1]) * 0.55 }; },
+    fillText(text: string, _x: number, y: number) { drawn.push({ text, y, size: Number(this.font.match(/(\d+)px/)?.[1]) }); },
+  };
+  textBox(ctx as unknown as CanvasRenderingContext2D, "Doanh nghiệp ứng dụng trí tuệ nhân tạo ".repeat(30), 300, 100, 400, 5, 40, 17, "#003b67", 700, 120);
+  expect(drawn.length).toBeGreaterThan(0);
+  expect(drawn[0].size).toBeLessThan(40);
+  for (const line of drawn) {
+    expect(ctx.measureText(line.text).width).toBeLessThanOrEqual(400);
+    expect(line.y).toBeGreaterThanOrEqual(100);
+    expect(line.y + line.size * 0.2).toBeLessThanOrEqual(220);
+  }
+  expect(drawn.at(-1)?.text).toMatch(/…$/);
+  expect(ctx.rect).toHaveBeenCalledWith(100, 100, 400, 120);
+});
+
+it("centers accented glyphs inside a title plaque without clipping accents", () => {
+  const ctx = {
+    font: "", textAlign: "center", textBaseline: "top",
+    save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), rect: vi.fn(), clip: vi.fn(),
+    measureText: () => ({ width: 200, actualBoundingBoxAscent: 29, actualBoundingBoxDescent: 5 }),
+    fillText: vi.fn(),
+  };
+  textBox(ctx as unknown as CanvasRenderingContext2D, "THỊ TRƯỜNG MỤC TIÊU", 300, 100, 470, 1, 27, 18, "#fff", 700, 54);
+  const baseline = ctx.fillText.mock.calls[0][2];
+  expect(ctx.textBaseline).toBe("alphabetic");
+  expect(baseline - 29 - 100).toBe(154 - (baseline + 5));
 });

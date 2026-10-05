@@ -14,7 +14,11 @@ export interface EmployeeNode {
   companyName?: string;
   industry?: string;
   birthDate?: string;
+  gender?: "male" | "female" | "other";
+  address?: string;
+  targetMarket?: string;
   coverImage?: string;
+  galleryImages?: string[];
 }
 
 
