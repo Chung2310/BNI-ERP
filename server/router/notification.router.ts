@@ -13,43 +13,41 @@ export const notificationRouter = Router();
 // Lấy danh sách thông báo phân trang của user
 notificationRouter.get(
   "/",
-  requireAuth as any,
+  requireAuth,
   validateRequest(getNotificationsSchema),
-  notificationController.getList as any
+  notificationController.getList
 );
 
 // Tạo thông báo mới (Test/System)
 notificationRouter.post(
   "/",
-  requireAuth as any,
-  requirePermission("chat:manage") as any,
+  requireAuth,
+  requirePermission("chat:manage"),
   validateRequest(createNotificationSchema),
-  notificationController.create as any
+  notificationController.create
 );
 
+// Các thao tác hộp thư cá nhân được giới hạn theo recipientUid trong service.
 // Đánh dấu đọc tất cả thông báo
 notificationRouter.patch(
   "/read-all",
-  requireAuth as any,
-  requirePermission("chat:read") as any,
-  notificationController.markAllRead as any
+  requireAuth,
+  notificationController.markAllRead
 );
 
 // Đánh dấu đọc một thông báo
 notificationRouter.patch(
   "/:id/read",
-  requireAuth as any,
-  requirePermission("chat:read") as any,
+  requireAuth,
   validateRequest(notificationIdParamsSchema),
-  notificationController.markRead as any
+  notificationController.markRead
 );
 
 // Xóa thông báo
 notificationRouter.delete(
   "/:id",
-  requireAuth as any,
-  requirePermission("chat:manage") as any,
+  requireAuth,
   validateRequest(notificationIdParamsSchema),
-  notificationController.delete as any
+  notificationController.delete
 );
 export default notificationRouter;

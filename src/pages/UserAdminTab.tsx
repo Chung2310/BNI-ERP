@@ -21,8 +21,14 @@ import { RoleModal } from "../components/user-admin/RoleModal";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { getPermissionLabel, getRoleDisplayName } from "../utils/permissionUtils";
 import { resolveUserAdminBranchId } from "../components/user-admin/userBranchScope";
+import { parseDateValue } from "../utils/dateValue";
 
 const UserImportModal = React.lazy(() => import("../components/user-admin/UserImportModal"));
+
+function parseUserRole(role: string): UserProfile["role"] {
+  const validRoles: UserProfile["role"][] = ["user", "teacher", "manager", "branch_owner", "admin"];
+  return validRoles.includes(role as UserProfile["role"]) ? role as UserProfile["role"] : "user";
+}
 
 export default function UserAdminTab() {
   const { userProfile } = useAuth();
@@ -255,7 +261,7 @@ export default function UserAdminTab() {
 
     if (filterStartDate || filterEndDate) {
       if (!usr.createdAt) return false;
-      const userDate = new Date(usr.createdAt);
+      const userDate = parseDateValue(usr.createdAt);
       userDate.setHours(0, 0, 0, 0);
 
       if (filterStartDate) {
@@ -309,7 +315,7 @@ export default function UserAdminTab() {
           email: userEmail.trim() || undefined,
           password: userPassword.trim() ? userPassword.trim() : undefined,
           ...(userRole !== editingUser.role && userProfile?.role === "admin" && editingUser.uid !== userProfile.uid && editingUser.role !== "admin"
-            ? { role: userRole } : {}),
+            ? { role: parseUserRole(userRole) } : {}),
         });
 
         toast.success(`Đã cập nhật tài khoản "${userDisplayName}".`);
@@ -318,7 +324,7 @@ export default function UserAdminTab() {
           displayName: userDisplayName.trim(),
           email: userEmail.trim(),
           password: userPassword,
-          role: userRole as any,
+          role: parseUserRole(userRole),
           companyCode: userCompanyCode,
           companyName: compName,
           parentId: userParentId || undefined,
@@ -341,7 +347,7 @@ export default function UserAdminTab() {
       resetUserForm();
       // Refresh lists
       await fetchUsers();
-    } catch (error: any) {
+    } catch (error) {
       console.error(editingUser ? "Lỗi cập nhật người dùng:" : "Lỗi đăng ký người dùng:", error);
       const errMsg = parseFirebaseError(
         error,
@@ -388,7 +394,7 @@ export default function UserAdminTab() {
       await rolePermissionService.deleteRolePermission(role, code);
       toast.success("Xóa cấu hình vai trò thành công!");
       await fetchRolePermissions();
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
       toast.error(error.message || "Xóa vai trò thất bại.");
     }
@@ -424,7 +430,7 @@ export default function UserAdminTab() {
       toast.success(`Đã xóa người dùng "${userToDelete.displayName}".`);
       setIsDeleteUserModalOpen(false);
       setUserToDelete(null);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Lỗi xóa người dùng:", error);
       toast.error(error.message || "Không thể xóa người dùng.");
     } finally {
@@ -507,12 +513,12 @@ export default function UserAdminTab() {
               {/* Supported roles: Admin and Member (stored as user). */}
               {(() => {
                 const defaultRolesList = [
-                  { role: "admin", displayName: "Admin", level: 1, isDefault: true, permissions: ["dashboard:manage", "people:manage", "relationship:manage", "hr:manage", "meetings:manage", "resource:manage", "chat:manage", "settings:manage", "access:manage"] },
-                  { role: "user", displayName: "Member", level: 3, isDefault: true, permissions: ["access:read", "hr:read", "people:read", "meetings:read", "chat:read", "resource:read"] },
+                  { role: "admin", displayName: "Admin", level: 1, isDefault: true, companyCode: userProfile?.companyCode || "", permissions: ["dashboard:manage", "people:manage", "relationship:manage", "hr:manage", "meetings:manage", "resource:manage", "chat:manage", "settings:manage", "access:manage"] },
+                  { role: "user", displayName: "Member", level: 3, isDefault: true, companyCode: userProfile?.companyCode || "", permissions: ["access:read", "hr:read", "people:read", "meetings:read", "chat:read", "resource:read"] },
                 ];
                 const rolesToDisplay = defaultRolesList.map(role => {
                   const saved = rolePermissionsList.find(item => item.role === role.role);
-                  return { ...role, permissions: saved?.permissions ?? role.permissions, level: saved?.level ?? role.level, _id: saved?._id };
+                  return { ...role, companyCode: saved?.companyCode ?? userProfile?.companyCode ?? "", permissions: saved?.permissions ?? role.permissions, level: saved?.level ?? role.level, _id: saved?._id };
                 });
 
                 const canEditRole = (roleInfo: { role: string; level: number }) => {
@@ -570,7 +576,7 @@ export default function UserAdminTab() {
                         {canEditRole(roleInfo) && (
                           <button
                             onClick={() => {
-                              setEditingRole(roleInfo as any);
+                              setEditingRole(roleInfo);
                               setRoleSlug(roleInfo.role);
                               setRoleDisplayName(roleInfo.displayName);
                               setRoleLevel(roleInfo.level);

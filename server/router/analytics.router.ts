@@ -77,26 +77,26 @@ const operatingExpenseSchema = {
  */
 const readPermission = requirePermission("dashboard:read");
 const managePermission = requirePermission("dashboard:manage");
-async function readPermissionGuard(req: any, res: any, next: any) { return readPermission(req, res, next); }
-async function managePermissionGuard(req: any, res: any, next: any) { return managePermission(req, res, next); }
+async function readPermissionGuard(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) { return readPermission(req, res, next); }
+async function managePermissionGuard(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) { return managePermission(req, res, next); }
 
-analyticsRouter.use(requireAuth as any);
+analyticsRouter.use(requireAuth);
 
 // Metadata: báo cáo nào đang dùng được, nguồn dữ liệu nào còn thiếu điều kiện
-analyticsRouter.get("/meta", readPermissionGuard as any, analyticsController.getMeta as any);
+analyticsRouter.get("/meta", readPermissionGuard, analyticsController.getMeta);
 
 // Doanh thu học phí + bán hàng theo thời gian, kèm so sánh kỳ trước
 analyticsRouter.get(
   "/revenue",
-  readPermissionGuard as any,
+  readPermissionGuard,
   validateRequest(revenueSchema),
-  analyticsController.getRevenue as any
+  analyticsController.getRevenue
 );
 
-analyticsRouter.get("/receivables", readPermissionGuard as any, validateRequest(receivablesSchema), analyticsController.getReceivables as any);
-analyticsRouter.get("/expenses", readPermissionGuard as any, validateRequest(dateRangeSchema), analyticsController.getExpenses as any);
-analyticsRouter.get("/operating-expenses", readPermissionGuard as any, validateRequest(dateRangeSchema), analyticsController.listOperatingExpenses as any);
-analyticsRouter.post("/operating-expenses", managePermissionGuard as any, validateRequest(operatingExpenseSchema), analyticsController.createOperatingExpense as any);
-analyticsRouter.delete("/operating-expenses/:id", managePermissionGuard as any, analyticsController.voidOperatingExpense as any);
-analyticsRouter.get("/pnl", readPermissionGuard as any, validateRequest(dateRangeSchema), analyticsController.getProfitAndLoss as any);
-analyticsRouter.get("/export", readPermissionGuard as any, validateRequest(exportSchema), analyticsController.exportReport as any);
+analyticsRouter.get("/receivables", readPermissionGuard, validateRequest(receivablesSchema), analyticsController.getReceivables);
+analyticsRouter.get("/expenses", readPermissionGuard, validateRequest(dateRangeSchema), analyticsController.getExpenses);
+analyticsRouter.get("/operating-expenses", readPermissionGuard, validateRequest(dateRangeSchema), analyticsController.listOperatingExpenses);
+analyticsRouter.post("/operating-expenses", managePermissionGuard, validateRequest(operatingExpenseSchema), analyticsController.createOperatingExpense);
+analyticsRouter.delete("/operating-expenses/:id", managePermissionGuard, analyticsController.voidOperatingExpense);
+analyticsRouter.get("/pnl", readPermissionGuard, validateRequest(dateRangeSchema), analyticsController.getProfitAndLoss);
+analyticsRouter.get("/export", readPermissionGuard, validateRequest(exportSchema), analyticsController.exportReport);

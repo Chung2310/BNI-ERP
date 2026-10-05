@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "./AuthContext";
 import { socketService } from "../services/socketService";
@@ -64,7 +64,7 @@ export function ChatUnreadProvider({ children }: { children: React.ReactNode }) 
     const isChatEnabled = userProfile?.enabledModules?.includes("chat");
     if (!isChatEnabled) return;
 
-    const unsubscribeNewMessage = socketService.on("internal_new_message", (data: any) => {
+    const unsubscribeNewMessage = socketService.on<{ message: import("../services/internalChatService").ChatMessage; roomId: string }>("internal_new_message", (data) => {
       const msg = data?.message;
       const roomId = data?.roomId as string | undefined;
       if (!msg || !roomId) return;

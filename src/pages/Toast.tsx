@@ -75,9 +75,9 @@ export function ToastContainer() {
     };
   }, []);
 
-  const removeToast = (id: string) => {
+  function removeToast(id: string) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
+  }
 
   if (toasts.length === 0) return null;
 

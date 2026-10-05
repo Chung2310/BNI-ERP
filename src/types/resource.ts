@@ -7,6 +7,8 @@ export type ResourceStorageAccess = "public" | "authenticated";
 
 export interface ResourceItem {
   _id: string;
+  id?: string;
+  driveFileId?: string;
   companyCode: string;
   section: ResourceSection;
   type: ResourceType;

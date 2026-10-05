@@ -14,12 +14,12 @@ describe("UserListTable activity action", () => {
       email: "a@example.com",
       role: "user",
       companyCode: "ACME",
-    } as any;
+    };
     const onViewActivity = vi.fn();
 
     render(<UserListTable
-      users={[user]}
-      currentUser={{ uid: "admin-1", role: "admin" } as any}
+      users={([user] as unknown as React.ComponentProps<typeof UserListTable>["users"])}
+      currentUser={({ uid: "admin-1", role: "admin" } as unknown as React.ComponentProps<typeof UserListTable>["currentUser"])}
       userPage={1}
       totalUserPages={1}
       onPageChange={vi.fn()}

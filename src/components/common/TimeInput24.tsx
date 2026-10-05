@@ -25,7 +25,7 @@ export function TimeInput24({
   value,
   onChange,
   className = "",
-  required,
+  required: _required,
   disabled,
   variant = "default",
 }: TimeInput24Props) {

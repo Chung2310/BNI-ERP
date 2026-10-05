@@ -31,7 +31,7 @@ export interface TrainingCourse {
   instructor?: string;
   companyCode?: string;
   creatorUid?: string;
-  createdAt?: any;
+  createdAt?: import("../utils/dateValue").DateValue;
   enrolledCount?: number;
   companyProgress?: number;
   autoAssignOnboarding?: boolean;

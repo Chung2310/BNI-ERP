@@ -9,7 +9,6 @@ import {
   Building2,
   Briefcase,
   Phone,
-  Calendar,
   Image as ImageIcon,
   Camera,
 } from "lucide-react";
@@ -117,7 +116,7 @@ export function UserFormModal({
       );
       setUserPhotoURL(uploaded.url);
       toast.success("Đã tải lên ảnh đại diện thành công.");
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error?.message || "Tải ảnh đại diện thất bại.");
     } finally {
       setUploadingAvatar(false);
@@ -138,7 +137,7 @@ export function UserFormModal({
       );
       setUserCoverImage(uploaded.url);
       toast.success("Đã tải lên ảnh bìa thành công.");
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error?.message || "Tải ảnh bìa thất bại.");
     } finally {
       setUploadingCover(false);

@@ -6,7 +6,7 @@ let sharedAudioCtx: AudioContext | null = null;
 
 export function playChatNotificationSound() {
   try {
-    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    const Ctx = window.AudioContext || (window).webkitAudioContext;
     if (!Ctx) return;
     if (!sharedAudioCtx) sharedAudioCtx = new Ctx();
     const ctx = sharedAudioCtx;

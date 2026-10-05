@@ -22,7 +22,7 @@ export interface IChatMessage extends Document {
   attachments?: IChatAttachment[];
   readBy: (Types.ObjectId | string)[];
   reactions?: IChatReaction[];
-  replyTo?: Types.ObjectId | string | any;
+  replyTo?: Types.ObjectId | string | IChatMessage;
   isDeleted?: boolean;
   editedAt?: Date | null;
   createdAt: Date;

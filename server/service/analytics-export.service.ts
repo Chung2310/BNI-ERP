@@ -3,17 +3,18 @@ import XLSX from "xlsx";
 export type AnalyticsExportReport = "overview" | "revenue" | "receivables" | "expenses" | "pnl";
 export type AnalyticsExportFormat = "xlsx" | "csv";
 
-type ExportData = {
-  revenue?: any;
-  receivables?: any;
-  expenses?: any;
-  pnl?: any;
+type AmountCount = { amount: number; count: number };
+export type ExportData = {
+  revenue?: { tuitionTotal?: number; goodsTotal?: number; goodsGrossProfit?: number | null; series: Array<{ bucket: string; tuitionAmount: number; goodsAmount: number; amount: number; tuitionCount: number; goodsCount: number }>; goodsBreakdown?: Array<{ category: string; revenue: number; grossProfit: number | null; quantity: number }> };
+  receivables?: { aging: Array<AmountCount & { bucket: string }> };
+  expenses?: { payroll: AmountCount; commission: AmountCount; operating?: AmountCount; total: number };
+  pnl?: { tuitionRevenue: number; goodsRevenue: number; goodsGrossProfit: number | null; payrollExpense: number; commissionExpense: number; generalOperatingExpense?: number; operatingResult: number | null };
 };
 
 const money = (value: unknown) => typeof value === "number" ? value : "Chưa đủ dữ liệu";
 
-function revenueRows(report: any) {
-  return report.series.map((row: any) => ({
+function revenueRows(report: ExportData["revenue"]) {
+  return report.series.map((row) => ({
     "Kỳ": row.bucket,
     "Doanh thu học phí": row.tuitionAmount,
     "Doanh thu bán hàng": row.goodsAmount,
@@ -23,12 +24,12 @@ function revenueRows(report: any) {
   }));
 }
 
-function receivableRows(report: any) {
+function receivableRows(report: ExportData["receivables"]) {
   const labels: Record<string, string> = { notScheduled: "Chưa đặt hạn", notDue: "Chưa đến hạn", "0-30": "0-30 ngày", "31-60": "31-60 ngày", "60+": "Trên 60 ngày" };
-  return report.aging.map((row: any) => ({ "Nhóm tuổi": labels[row.bucket] || row.bucket, "Số tiền": row.amount, "Số đợt": row.count, "Cơ sở tính tuổi": "Ngày đến hạn" }));
+  return report.aging.map((row) => ({ "Nhóm tuổi": labels[row.bucket] || row.bucket, "Số tiền": row.amount, "Số đợt": row.count, "Cơ sở tính tuổi": "Ngày đến hạn" }));
 }
 
-function expenseRows(report: any) {
+function expenseRows(report: ExportData["expenses"]) {
   return [
     { "Loại chi phí": "Lương đã thanh toán", "Số tiền": report.payroll.amount, "Số khoản": report.payroll.count },
     { "Loại chi phí": "Hoa hồng đã chi", "Số tiền": report.commission.amount, "Số khoản": report.commission.count },
@@ -37,7 +38,7 @@ function expenseRows(report: any) {
   ];
 }
 
-function pnlRows(report: any) {
+function pnlRows(report: ExportData["pnl"]) {
   return [
     { "Chỉ tiêu": "Doanh thu học phí", "Số tiền": report.tuitionRevenue },
     { "Chỉ tiêu": "Doanh thu bán hàng", "Số tiền": report.goodsRevenue },
@@ -57,7 +58,7 @@ export function buildAnalyticsWorkbook(report: AnalyticsExportReport, data: Expo
   const workbook = XLSX.utils.book_new();
   if ((report === "overview" || report === "revenue") && data.revenue) {
     appendSheet(workbook, revenueRows(data.revenue), "Doanh thu theo thời gian");
-    appendSheet(workbook, data.revenue.goodsBreakdown.map((row: any) => ({ "Nhóm sản phẩm": row.category, "Doanh thu": row.revenue, "Lãi gộp": money(row.grossProfit), "Số lượng": row.quantity })), "Nhóm sản phẩm");
+    appendSheet(workbook, (data.revenue.goodsBreakdown || []).map((row) => ({ "Nhóm sản phẩm": row.category, "Doanh thu": row.revenue, "Lãi gộp": money(row.grossProfit), "Số lượng": row.quantity })), "Nhóm sản phẩm");
   }
   if ((report === "overview" || report === "receivables") && data.receivables) appendSheet(workbook, receivableRows(data.receivables), "Công nợ");
   if ((report === "overview" || report === "expenses") && data.expenses) appendSheet(workbook, expenseRows(data.expenses), "Chi phí");

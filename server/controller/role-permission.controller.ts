@@ -77,7 +77,7 @@ export const rolePermissionController = {
         message: "Cập nhật cấu hình phân quyền vai trò thành công.",
         data: rolePermission,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[rolePermissionController.save] Error:", error);
       return res.status(400).json({
         status: "error",
@@ -101,8 +101,8 @@ export const rolePermissionController = {
         });
       }
 
-      const { page, limit, role } = req.query as any;
-      const filter: any = {};
+      const { page, limit, role } = req.query;
+      const filter: Record<string, unknown> = {};
       filter.companyCode = user.companyCode;
 
       if (role) {
@@ -110,15 +110,15 @@ export const rolePermissionController = {
       }
 
       const result = await rolePermissionService.getRolePermissions(filter, {
-        page: page ? parseInt(page, 10) : undefined,
-        limit: limit ? parseInt(limit, 10) : undefined,
+        page: page ? parseInt(String(page), 10) : undefined,
+        limit: limit ? parseInt(String(limit), 10) : undefined,
       });
 
       return res.status(200).json({
         status: "success",
         ...result,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[rolePermissionController.getList] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -156,7 +156,7 @@ export const rolePermissionController = {
         status: "success",
         data: rolePermission,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[rolePermissionController.getDetail] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -231,7 +231,7 @@ export const rolePermissionController = {
         status: "success",
         message: "Xóa cấu hình phân quyền vai trò thành công.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[rolePermissionController.delete] Error:", error);
       return res.status(400).json({
         status: "error",

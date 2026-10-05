@@ -14,7 +14,7 @@ it.each(["guest", "member"] as const)("renders populated %s fields without field
   Object.defineProperty(document, "fonts", { configurable: true, value: { load: vi.fn().mockResolvedValue([]) } });
   const ctx = { font: "", fillText: vi.fn(), drawImage: vi.fn(), fillRect: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(),
     save: vi.fn(), restore: vi.fn(), arc: vi.fn(), clip: vi.fn(), measureText: (text: string) => ({ width: text.length * 12 }) };
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(ctx as any);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue((ctx as unknown as Parameters<((value: ReturnType<typeof HTMLCanvasElement.prototype.getContext>) => void)>[0]));
   const slide: ProfileSlide = { id: kind, kind, name: "An", company: "ACME", industry: "Thiết kế", phone: "0901234567", email: "an@example.com", bio: "Giới thiệu của An", photoURL: "", coverImage: "" };
   await renderProfileSlide(slide);
   const text = ctx.fillText.mock.calls.map(call => call[0]);

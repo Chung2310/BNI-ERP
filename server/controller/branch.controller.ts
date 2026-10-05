@@ -1,4 +1,4 @@
-﻿import { Response } from "express";
+import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { BranchModel } from "../model/branch.model";
 import { UserModel } from "../model/user.model";
@@ -12,7 +12,7 @@ async function ensureDefaultBranch(companyCode: string) {
   if (existing) return existing;
   try {
     return await BranchModel.create({ companyCode, code: "MAIN", name: "Trụ sở chính", isActive: true });
-  } catch (error: any) {
+  } catch (error) {
     if (error?.code !== 11000) throw error;
     return BranchModel.findOne({ companyCode, code: "MAIN" }).lean();
   }
@@ -43,7 +43,7 @@ export const branchController = {
     const companyCode = company(req);
     const branch = await BranchModel.findOne({ _id: req.params.id, companyCode, pendingOwnerSetup: true, managerId: { $in: ["", null] } }).lean();
     if (!branch) return res.status(404).json({ status: "error", message: "Không tìm thấy chi nhánh chưa có Chủ chi nhánh." });
-    let owner: any;
+    let owner: import("../interface/user.interface").IUser;
     try {
       const { displayName, email, password, phone, birthDate } = req.body;
       owner = await authService.registerUserForCompany({
@@ -62,7 +62,7 @@ export const branchController = {
       const ownerData = owner.toObject();
       delete ownerData.password;
       return res.status(201).json({ status: "success", data: { branch: linkedBranch, owner: ownerData } });
-    } catch (error: any) {
+    } catch (error) {
       if (owner?._id) await UserModel.deleteOne({ _id: owner._id }).catch(() => undefined);
       return res.status(400).json({ status: "error", message: error.message || "Không thể tạo Chủ chi nhánh." });
     }
@@ -77,13 +77,13 @@ export const branchController = {
     if (!canManage(req)) return res.status(403).json({ status: "error", message: "Không có quyền quản lý chi nhánh." });
     const filter: Record<string, unknown> = { _id: req.params.id, companyCode: company(req) };
     if (req.user?.role === "branch_owner" && req.user.branchId) filter._id = req.user.branchId;
-    const updates: Record<string, unknown> = {};
+    const updates: Partial<import("../interface/branch.interface").IBranch> = {};
     for (const field of ["code", "name", "address", "phone", "managerId", "locationConfig", "isActive"]) {
       if (Object.prototype.hasOwnProperty.call(req.body, field)) updates[field] = req.body[field];
     }
     if (typeof updates.code === "string") updates.code = updates.code.toUpperCase();
     if (updates.locationConfig) {
-      const config = updates.locationConfig as any;
+      const config = updates.locationConfig;
       updates.locationConfig = { ...config, allowedPublicIps: config.allowedPublicIps.map(normalizeAllowedNetwork) };
     }
     const data = await BranchModel.findOneAndUpdate(filter, { $set: updates }, { returnDocument: 'after', runValidators: true }).lean();

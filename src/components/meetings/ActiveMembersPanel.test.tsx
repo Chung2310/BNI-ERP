@@ -9,11 +9,11 @@ vi.mock("../../services/authService", () => ({ authService: { getUsersByCompany:
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 it("excludes admins and inactive accounts from the meeting flow ranking and its check-in history", async () => {
-  vi.mocked(authService.getUsersByCompany).mockResolvedValue([
+  vi.mocked(authService.getUsersByCompany).mockResolvedValue(([
     { uid: "admin", role: "admin", displayName: "Admin Account" },
     { uid: "inactive", role: "user", isActive: false, displayName: "Inactive Member" },
     { uid: "member", role: "user", displayName: "Active Member" },
-  ] as any);
+  ] as unknown as Parameters<((value: Awaited<ReturnType<typeof authService.getUsersByCompany>>) => void)>[0]));
   const meeting = {
     _id: "meeting", status: "live", startsAt: "2026-10-01T01:00:00Z",
     speakers: [

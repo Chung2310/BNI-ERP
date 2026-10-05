@@ -36,7 +36,7 @@ export function RoleModal({
   setRoleLevel,
   selectedPermissions,
   setSelectedPermissions,
-  userProfile,
+  userProfile: _userProfile,
   systemPermissions,
   submittingRole,
   onSubmit,

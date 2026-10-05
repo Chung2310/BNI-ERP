@@ -66,7 +66,7 @@ export default function UserImportModal({
       const data = parseUserImportExcel(await file.arrayBuffer());
       setRows(data);
       await preview(data);
-    } catch (e: any) {
+    } catch (e) {
       setError(e.message || "Không thể đọc file Excel.");
     } finally {
       setBusy(false);
@@ -79,7 +79,7 @@ export default function UserImportModal({
     setProgress("");
     try {
       await preview(rows);
-    } catch (e: any) {
+    } catch (e) {
       setError(e.message);
     } finally {
       setBusy(false);
@@ -103,7 +103,7 @@ export default function UserImportModal({
         setResults((old) => old.map((row) => changes.get(row.rowNumber) || row));
       }
       setProgress("Đã xử lý xong. Xem kết quả từng dòng bên dưới.");
-    } catch (e: any) {
+    } catch (e) {
       setError((e.message || "Kết nối bị gián đoạn.") + " Một số tài khoản có thể đã được tạo. Bấm Kiểm tra lại trước khi nhập tiếp.");
     } finally {
       setBusy(false);

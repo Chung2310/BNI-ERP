@@ -41,15 +41,15 @@ test("register-company persists general business type and core modules", async (
   const originalCompanySave = CompanyModel.prototype.save;
   const originalUserFindOne = UserModel.findOne;
   const originalUserSave = UserModel.prototype.save;
-  let savedCompany: any;
+  let savedCompany: { businessType?: string; enabledModules?: string[] } | undefined;
 
-  (CompanyModel as any).findOne = async () => null;
-  (CompanyModel.prototype as any).save = async function () {
-    savedCompany = this;
+  (CompanyModel).findOne = (async () => null) as unknown as typeof CompanyModel.findOne;
+  (CompanyModel.prototype).save = async function () {
+    savedCompany = { businessType: this.businessType, enabledModules: this.enabledModules };
     return this;
   };
-  (UserModel as any).findOne = async () => null;
-  (UserModel.prototype as any).save = async function () { return this; };
+  (UserModel).findOne = (async () => null) as unknown as typeof UserModel.findOne;
+  (UserModel.prototype).save = async function () { return this; };
 
   try {
     await authService.registerCompanyAndAdmin({
@@ -61,8 +61,8 @@ test("register-company persists general business type and core modules", async (
       businessType: "general",
       enabledModules: ["hr", "resource", "chat"],
     });
-    assert.equal(savedCompany.businessType, "general");
-    assert.deepEqual(savedCompany.enabledModules, ["hr", "resource", "chat"]);
+    assert.equal(savedCompany?.businessType, "general");
+    assert.deepEqual(savedCompany?.enabledModules, ["hr", "resource", "chat"]);
   } finally {
     CompanyModel.findOne = originalCompanyFindOne;
     CompanyModel.prototype.save = originalCompanySave;

@@ -47,4 +47,4 @@ const swaggerDocument = {
 export const swaggerRouter = Router();
 
 // Phục vụ tài liệu Swagger UI tại đường dẫn /api-docs
-swaggerRouter.use("/", swaggerUi.serve as any, swaggerUi.setup(swaggerDocument) as any);
+swaggerRouter.use("/", swaggerUi.serve, swaggerUi.setup(swaggerDocument));

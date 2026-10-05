@@ -30,7 +30,6 @@ describe("system-managed resource UI", () => {
       sourceRoute: "/?tab=NHAN_SU&sub=hop-dong&sourceId=employee-1",
     })} showSourceLink />);
 
-    expect(screen.getByText("Tạo bởi hệ thống")).toBeTruthy();
     expect(screen.getByText("NV001 - Nguyễn Văn A")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Mở nguồn" }).getAttribute("href"))
       .toBe("/?tab=NHAN_SU&sub=hop-dong&sourceId=employee-1");

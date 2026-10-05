@@ -1,4 +1,4 @@
-﻿import webpush from "web-push";
+import webpush from "web-push";
 import { PushSubscriptionModel } from "../model/push-subscription.model";
 
 export interface PushPayload {
@@ -64,7 +64,7 @@ export const pushService = {
             { endpoint: sub.endpoint, keys: sub.keys },
             data
           );
-        } catch (error: any) {
+        } catch (error) {
           // 404/410 = subscription đã hết hạn hoặc bị người dùng thu hồi — dọn khỏi DB
           if (error?.statusCode === 404 || error?.statusCode === 410) {
             await PushSubscriptionModel.deleteOne({ _id: sub._id });

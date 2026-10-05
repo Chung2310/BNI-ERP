@@ -6,7 +6,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("resourceService system-managed guards", () => {
   it("blocks share management even for an admin", async () => {
-    vi.spyOn(ResourceItemModel, "findOne").mockReturnValue({
+    vi.spyOn(ResourceItemModel, "findOne").mockReturnValue(({
       lean: async () => ({
         _id: "507f1f77bcf86cd799439011",
         companyCode: "ACME",
@@ -14,7 +14,7 @@ describe("resourceService system-managed guards", () => {
         creatorUid: "system",
         shares: [],
       }),
-    } as any);
+    } as unknown as Parameters<((value: ReturnType<typeof ResourceItemModel.findOne>) => void)>[0]));
 
     await expect(resourceService.getShares(
       "ACME",

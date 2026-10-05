@@ -1,6 +1,6 @@
 export type CompanyModuleNotifyDeps = {
   clearModuleCache: (companyCode?: string) => void;
-  emitToCompany: (companyCode: string, eventName: string, data: any) => void | Promise<void>;
+  emitToCompany: (companyCode: string, eventName: string, data: unknown) => void | Promise<void>;
 };
 
 /** Shared by every route that changes a company's enabledModules so clients stay in sync. */

@@ -15,10 +15,12 @@ export interface CompanyDriveStatus {
   isConnected: boolean;
   driveEmail: string;
   rootFolderId?: string;
-  connectedAt?: any | null;
+  connectedAt?: import("../utils/dateValue").DateValue | null;
 }
 
 export interface UserProfile {
+  id?: string;
+  _id?: string;
   companyDrive?: CompanyDriveStatus;
   uid: string;
   email: string;
@@ -28,8 +30,8 @@ export interface UserProfile {
   industry?: string;
   role: "user" | "teacher" | "manager" | "branch_owner" | "admin";
   permissions?: string[];
-  createdAt: any;
-  updatedAt?: any;
+  createdAt: import("../utils/dateValue").DateValue;
+  updatedAt?: import("../utils/dateValue").DateValue;
   birthDate?: string;
   jobDescriptionLink?: string;
   phone?: string;
@@ -50,7 +52,7 @@ export interface CompanyProfile {
   id: string;
   code: string;
   name: string;
-  createdAt: any;
+  createdAt: import("../utils/dateValue").DateValue;
   ownerEmail: string;
   enabledModules?: string[];
   businessType?: "education" | "labor" | "service" | "recruitment" | "general";

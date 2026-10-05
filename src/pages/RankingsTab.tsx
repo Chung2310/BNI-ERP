@@ -99,7 +99,6 @@ export default function RankingsTab() {
         <Trophy className="h-6 w-6 shrink-0 text-amber-500" aria-hidden="true" />
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-slate-900 md:text-2xl">Bảng xếp hạng</h1>
-          <p className="mt-1 text-xs text-slate-500">Theo dõi mức độ tham gia, vắng mặt và check-in muộn của thành viên.</p>
         </div>
       </div>
 

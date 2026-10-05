@@ -16,8 +16,8 @@ test('wheel and bingo results survive serialization and retry without duplicates
     const input = { id: source, winnerId: 'guest', name: 'Old name', prizeName: 'Prize', source,
       ticketNumber: source === 'bingo' ? 7 : undefined, wonAt: new Date().toISOString() };
     assert.equal(gameWinnerInput.validate(input).error, undefined);
-    await recordGameWinner(item, input, 'operator');
-    await recordGameWinner(item, input, 'operator');
+    await recordGameWinner(item, (input as unknown as Parameters<typeof recordGameWinner>[1]), 'operator');
+    await recordGameWinner(item, (input as unknown as Parameters<typeof recordGameWinner>[1]), 'operator');
   }
   const restored = new MeetingModel(item.toObject());
   assert.equal(saves, 2);

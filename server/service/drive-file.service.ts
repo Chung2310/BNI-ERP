@@ -2,7 +2,7 @@ import { google } from "googleapis";
 import { Readable } from "stream";
 
 export class DriveFileService {
-  public static async createFolder(auth: any, name: string): Promise<string> {
+  public static async createFolder(auth: InstanceType<typeof google.auth.OAuth2>, name: string): Promise<string> {
     const drive = google.drive({ version: "v3", auth });
     
     // Tìm xem thư mục đã tồn tại chưa để tránh tạo trùng
@@ -32,7 +32,7 @@ export class DriveFileService {
    * Tải tệp lên Google Drive
    */
   public static async uploadFile(
-    auth: any,
+    auth: InstanceType<typeof google.auth.OAuth2>,
     buffer: Buffer,
     name: string,
     mimeType: string,
@@ -70,7 +70,7 @@ export class DriveFileService {
           type: "anyone",
         },
       });
-    } catch (err: any) {
+    } catch (err) {
       console.warn("Không thể thiết lập quyền công khai cho file:", err.message);
     }
 
@@ -80,7 +80,7 @@ export class DriveFileService {
   /**
    * Xóa file khỏi Google Drive
    */
-  public static async deleteFile(auth: any, fileId: string): Promise<void> {
+  public static async deleteFile(auth: InstanceType<typeof google.auth.OAuth2>, fileId: string): Promise<void> {
     const drive = google.drive({ version: "v3", auth });
     await drive.files.delete({ fileId });
   }

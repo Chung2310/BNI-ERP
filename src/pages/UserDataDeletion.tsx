@@ -30,8 +30,9 @@ interface DeletionStatus {
 const lastUpdated = "June 30, 2026";
 
 export default function UserDataDeletion() {
-  const [code, setCode] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [initialCode] = useState(() => { const params = new URLSearchParams(window.location.search); return params.get("code") || params.get("id") || ""; });
+  const [code, setCode] = useState(initialCode);
+  const [loading, setLoading] = useState(!!initialCode);
   const [error, setError] = useState<string | null>(null);
   const [statusResult, setStatusResult] = useState<DeletionStatus | null>(null);
 
@@ -43,15 +44,21 @@ export default function UserDataDeletion() {
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const codeParam = params.get("code") || params.get("id");
-    if (codeParam) {
-      setCode(codeParam);
-      void handleCheckStatus(codeParam);
-    }
-  }, []);
+    if (!initialCode) return;
+    let active = true;
+    fetch(`/api/v1/facebook/data-deletion-status/${initialCode.trim()}`)
+      .then(async response => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "Deletion request code not found.");
+        return result.data as DeletionStatus;
+      })
+      .then(result => { if (active) setStatusResult(result); })
+      .catch(error => { if (active) setError(getApiErrorMessage(error, "Không thể kiểm tra trạng thái yêu cầu xóa dữ liệu.")); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [initialCode]);
 
-  const handleCheckStatus = async (checkCode: string) => {
+  async function handleCheckStatus(checkCode: string) {
     const activeCode = checkCode || code;
     if (!activeCode.trim()) {
       setError("Please enter a deletion request code.");
@@ -71,12 +78,12 @@ export default function UserDataDeletion() {
       }
 
       setStatusResult(result.data);
-    } catch (err: any) {
+    } catch (err) {
       setError(getApiErrorMessage(err, "Không thể kiểm tra trạng thái yêu cầu xóa dữ liệu."));
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6">

@@ -6,7 +6,7 @@ import { ConfirmDialog } from "../common/ConfirmDialog";
 import { useAuth } from "../../context/AuthContext";
 
 interface CompanyDriveConfigCardProps {
-  userProfile: any;
+  userProfile: import("../../types").UserProfile;
 }
 
 /**
@@ -23,26 +23,30 @@ export default function CompanyDriveConfigCard({ userProfile }: CompanyDriveConf
   const [connected, setConnected] = useState(false);
   const [email, setEmail] = useState("");
   const [folderLink, setFolderLink] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!!companyCode);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
 
   const popupRef = useRef<Window | null>(null);
 
+  const [requestInputs, setRequestInputs] = useState(() => [companyCode]);
+  if (!Object.is(requestInputs[0], companyCode)) {
+    setRequestInputs([companyCode]);
+    setLoading(!!companyCode); setConnected(false); setEmail(""); setFolderLink("");
+  }
   const loadConfig = useCallback(async () => {
     if (!companyCode) return;
-    setLoading(true);
-    try {
-      const config = await authService.getCompanyDriveConfig(companyCode);
+    return authService.getCompanyDriveConfig(companyCode).then(async (config) => {
       setConnected(config.driveConnected);
       setEmail(config.driveConnectedEmail || "");
       setFolderLink(config.driveFolderLink || "");
-    } catch (err: any) {
+    
+}).catch(err => {
       console.error("[CompanyDriveConfigCard] load error:", err);
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [companyCode]);
 
   useEffect(() => {
@@ -105,7 +109,7 @@ export default function CompanyDriveConfigCard({ userProfile }: CompanyDriveConf
           setConnecting(false);
         }
       }, 800);
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err.message || "Không mở được cửa sổ kết nối Google Drive.");
       setConnecting(false);
     }
@@ -120,7 +124,7 @@ export default function CompanyDriveConfigCard({ userProfile }: CompanyDriveConf
       setEmail("");
       setFolderLink("");
       setShowDisconnectConfirm(false);
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err.message || "Không ngắt kết nối được. Vui lòng thử lại.");
     } finally {
       setDisconnecting(false);

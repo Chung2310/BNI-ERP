@@ -9,22 +9,22 @@ import { getJwtAccessSecret } from "../config/env";
 function makeResponse() {
   return {
     statusCode: 200,
-    body: undefined as any,
+    body: undefined,
     status(code: number) { this.statusCode = code; return this; },
     json(body: unknown) { this.body = body; return this; },
   };
 }
 
 function invoke(token: string, activeSessionId: string, userExists = true) {
-  vi.spyOn(UserModel, "findById").mockReturnValue({
+  vi.spyOn(UserModel, "findById").mockReturnValue(({
     select: () => ({
       lean: async () => userExists ? ({ branchId: "branch-1", activeSessionId, displayName: "Nguyễn An" }) : null,
     }),
-  } as any);
-  const req = { headers: { authorization: `Bearer ${token}` }, method: "GET", originalUrl: "/api/v1/auth/me" } as any;
+  } as unknown as Parameters<((value: ReturnType<typeof UserModel.findById>) => void)>[0]));
+  const req = { headers: { authorization: `Bearer ${token}` }, method: "GET", originalUrl: "/api/v1/auth/me" } as Parameters<typeof requireAuth>[0];
   const res = makeResponse();
   let passed = false;
-  return requireAuth(req, res as unknown as Response, () => { passed = true; }).then(() => ({ req, res, passed }));
+  return requireAuth((req as unknown as Parameters<typeof requireAuth>[0]), res as unknown as Response, () => { passed = true; }).then(() => ({ req, res, passed }));
 }
 
 describe("requireAuth concurrent device sessions", () => {

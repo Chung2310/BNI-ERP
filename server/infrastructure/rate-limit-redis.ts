@@ -3,6 +3,9 @@ import type { Options, Store } from "express-rate-limit";
 
 export interface RateLimitRedisClient {
   status?: string;
+  get?(key: string): Promise<string | null>;
+  set?(key: string, value: string, expiryMode: 'EX', seconds: number): Promise<unknown>;
+  incr?(key: string): Promise<number>;
   eval(script: string, keyCount: number, ...args: string[]): Promise<unknown>;
   decr(key: string): Promise<number>;
   del(key: string): Promise<number>;
@@ -17,13 +20,13 @@ local ttl = redis.call('PTTL', KEYS[1])
 return { count, ttl }
 `;
 
-let sharedClient: Redis | null = null;
+let sharedClient: RateLimitRedisClient | null = null;
 let lastRedisWarningAt = 0;
 
-export function getRateLimitRedisClient(): Redis {
+export function getRateLimitRedisClient(): RateLimitRedisClient {
   if (sharedClient) return sharedClient;
 
-  sharedClient = new Redis({
+  const client = new Redis({
     host: process.env.REDIS_HOST || "127.0.0.1",
     port: Number(process.env.REDIS_PORT) || 6379,
     password: process.env.REDIS_PASSWORD || undefined,
@@ -32,7 +35,7 @@ export function getRateLimitRedisClient(): Redis {
     retryStrategy: (times) => Math.min(times * 250, 5000),
   });
 
-  sharedClient.on("error", (error) => {
+  client.on("error", (error) => {
     const now = Date.now();
     if (now - lastRedisWarningAt >= 60_000) {
       lastRedisWarningAt = now;
@@ -40,11 +43,12 @@ export function getRateLimitRedisClient(): Redis {
     }
   });
 
+  sharedClient = client;
   return sharedClient;
 }
 
 export function isRateLimitRedisReady(client?: RateLimitRedisClient | Redis): boolean {
-  const target = (client as any) || sharedClient;
+  const target = (client) || sharedClient;
   if (!target) return false;
   if (typeof target.status === "string") {
     return target.status === "ready";
@@ -52,7 +56,7 @@ export function isRateLimitRedisReady(client?: RateLimitRedisClient | Redis): bo
   return true;
 }
 
-export function setRateLimitRedisClientForTesting(client: any) {
+export function setRateLimitRedisClientForTesting(client: RateLimitRedisClient) {
   sharedClient = client;
 }
 

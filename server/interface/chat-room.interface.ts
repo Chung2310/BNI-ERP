@@ -18,7 +18,7 @@ export interface IChatRoom extends Document {
   members: IChatRoomMember[];
   lastMessage?: Types.ObjectId | string;
   avatarURL?: string;
-  pinnedMessageIds?: (Types.ObjectId | string | any)[];
+  pinnedMessageIds?: (Types.ObjectId | string | import("./chat-message.interface").IChatMessage)[];
   onlyAdminsCanMessage?: boolean;
   isChatbot?: boolean;
   driveFolderId?: string;

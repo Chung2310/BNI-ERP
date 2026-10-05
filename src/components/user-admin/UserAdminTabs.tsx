@@ -8,7 +8,7 @@ interface Props {
   userProfile?: UserProfile | null;
 }
 
-export function UserAdminTabs({ activeTab, onChange, userProfile }: Props) {
+export function UserAdminTabs({ activeTab, onChange, userProfile: _userProfile }: Props) {
   return (
     <div className="border-b border-slate-200/80 bg-white px-5 pt-2 pb-0 text-xs flex justify-between items-center shrink-0" id="user_admin_subtabs">
       <div className="flex gap-1 overflow-x-auto select-none">

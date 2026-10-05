@@ -187,8 +187,6 @@ export const PUBLIC_SEO_PAGES: SeoMeta[] = [
   DEFAULT_SEO,
   TAB_SEO_MAP["TỔNG QUAN"],
   TAB_SEO_MAP["NHÂN SỰ"],
-  TAB_SEO_MAP["KHO & SẢN PHẨM"],
-  TAB_SEO_MAP["QUẢN LÝ HỌC VIÊN"],
 ];
 
 export function getSeoForTab(tab: TabType): SeoMeta {

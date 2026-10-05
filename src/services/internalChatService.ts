@@ -26,7 +26,7 @@ export interface ChatMessage {
   attachments?: ChatAttachment[];
   readBy: string[];
   reactions?: { emoji: string; userId: string }[];
-  replyTo?: any;
+  replyTo?: ChatMessage;
   isDeleted?: boolean;
   editedAt?: string | null;
   createdAt: string;
@@ -45,6 +45,7 @@ export interface ChatRoomMember {
   role: "admin" | "deputy" | "member";
   joinedAt: string;
   isPinned?: boolean;
+  canUploadDrive?: boolean;
 }
 
 export interface ChatRoom {
@@ -54,6 +55,8 @@ export interface ChatRoom {
   blockedBy?: string[];
   companyCode: string;
   creatorId: string;
+  createdBy?: string;
+  driveFolderId?: string;
   members: ChatRoomMember[];
   lastMessage?: ChatMessage;
   avatarURL?: string;

@@ -3,7 +3,7 @@ import { MODULE_READ_PERMISSIONS } from "../config/modules";
 import type { ComponentType, LazyExoticComponent } from "react";
 import type { TabType, UserProfile } from "../types";
 
-export type LazyPageComponent = LazyExoticComponent<ComponentType<any>>;
+export type LazyPageComponent = LazyExoticComponent<ComponentType>;
 
 export type AppRoute = {
   tab: TabType;

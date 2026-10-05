@@ -1,5 +1,15 @@
 import Joi from 'joi';
 import { validateSpeakingTimeSlots } from "../../../src/utils/meetingSpeakingTime";
+export const presentationStateInput = Joi.object({
+  version: Joi.number().integer().min(0).required(),
+  view: Joi.string().valid("checkin", "speaker", "luckyDraw", "activeMembers", "waiting"),
+  autoAdvance: Joi.boolean(),
+  autoAdvanceDelay: Joi.number().integer().min(0).max(3600),
+}).or("view", "autoAdvance", "autoAdvanceDelay");
+export const presentationDrawInput = Joi.object({
+  version: Joi.number().integer().min(0).required(),
+  prizeId: Joi.string().max(100).required(),
+});
 export const gameWinnerInput = Joi.object({
   id: Joi.string().max(100).required(),
   winnerId: Joi.string().max(150).required(),

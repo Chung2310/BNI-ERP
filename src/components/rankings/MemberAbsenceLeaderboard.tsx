@@ -1,3 +1,4 @@
+import { useNow } from "../../hooks/useNow";
 import { useMemo, useState } from "react";
 import { UserX } from "lucide-react";
 import type { UserProfile } from "../../types/common";
@@ -5,17 +6,16 @@ import type { Meeting } from "../../services/meetingService";
 import { buildMemberAbsenceRanking } from "./memberAbsenceRanking";
 
 export function MemberAbsenceLeaderboard({ members, meetings, loading }: { members: UserProfile[]; meetings: Meeting[]; loading: boolean }) {
-  const rankings = useMemo(() => buildMemberAbsenceRanking(members, meetings), [members, meetings]);
+  const now = useNow();
+  const rankings = useMemo(() => buildMemberAbsenceRanking(members, meetings, now), [members, meetings, now]);
   const [search, setSearch] = useState("");
   const [limit, setLimit] = useState(10);
   const query = search.trim().toLocaleLowerCase("vi");
   const matches = rankings.filter(member => !query || [member.name, member.email, member.companyName].some(value => value?.toLocaleLowerCase("vi").includes(query)));
-  const completedCount = meetings.filter(meeting => meeting.status === "ended" && new Date(meeting.startsAt).getTime() <= Date.now()).length;
+  const completedCount = meetings.filter(meeting => meeting.status === "ended" && new Date(meeting.startsAt).getTime() <= now).length;
   return <section aria-label="BXH thành viên lười nhất" className="rounded-2xl border border-orange-200/80 bg-white p-4 sm:p-5 shadow-2xs">
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3.5">
       <div><h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><UserX aria-hidden="true" className="h-4 w-4 text-orange-600" />BXH thành viên “lười” nhất</h3>
-        <p className="mt-1 text-xs text-slate-500">Vắng nhiều nhất → nhiều lần check-in muộn nhất → tổng số phút muộn nhiều nhất.</p>
-        <p className="mt-1 text-xs text-slate-400">Tính {completedCount} cuộc họp đã kết thúc theo bộ lọc hiện tại, từ ngày tạo tài khoản. Check-in sau giờ bắt đầu được tính là muộn. Không tính admin, khách mời và thành viên đã ngừng hoạt động.</p>
       </div>
       <input aria-label="Tìm thành viên trong BXH lười" value={search} onChange={event => { setSearch(event.target.value); setLimit(10); }} placeholder="Tìm tên, email, công ty…" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs sm:w-60" />
     </div>

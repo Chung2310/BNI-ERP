@@ -1,3 +1,4 @@
+type TaskNotification = { title: string; companyCode: string; assigneeUid?: string; creatorUid?: string; dueDate?: string | Date; status?: string };
 import { NotificationModel } from "../model/notification.model";
 import { INotification, NotifType } from "../interface/notification.interface";
 import { UserModel } from "../model/user.model";
@@ -16,7 +17,7 @@ export const notificationService = {
     const limit = query.limit || 20;
     const skip = (page - 1) * limit;
 
-    const filter: any = {
+    const filter: Record<string, unknown> = {
       recipientUid,
       companyCode,
     };
@@ -184,7 +185,7 @@ export const notificationService = {
   /**
    * Giao khóa đào tạo mới: gửi tới học viên được gán
    */
-  async notifyTaskReassigned(task: any, previousAssigneeUid?: string) {
+  async notifyTaskReassigned(task: TaskNotification, previousAssigneeUid?: string) {
     if (!task.assigneeUid || task.assigneeUid === previousAssigneeUid) return;
     await this.createNotification({
       title: "Công việc được giao lại",
@@ -194,7 +195,7 @@ export const notificationService = {
     });
   },
 
-  async notifyTaskDeadlineChanged(task: any) {
+  async notifyTaskDeadlineChanged(task: TaskNotification) {
     if (!task.assigneeUid) return;
     await this.createNotification({
       title: "Hạn chót công việc đã thay đổi",
@@ -204,7 +205,7 @@ export const notificationService = {
     });
   },
 
-  async notifyTaskStatusChanged(task: any, actorUid: string) {
+  async notifyTaskStatusChanged(task: TaskNotification, actorUid: string) {
     const recipients = new Set<string>();
     if (task.creatorUid && task.creatorUid !== actorUid) recipients.add(task.creatorUid);
     if (task.assigneeUid && task.assigneeUid !== actorUid) recipients.add(task.assigneeUid);

@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const userFacingFiles = [
-  "src/pages/WalletTab.tsx",
   "src/pages/Header.tsx",
   "src/pages/Sidebar.tsx",
   "src/seo/seo-config.ts",
@@ -15,6 +14,6 @@ test("user-facing payment copy does not expose the PayOS provider name", () => {
     assert.doesNotMatch(source, /["'`][^"'`\r\n]*payos[^"'`\r\n]*["'`]/i, file);
   }
 
-  const walletController = readFileSync("server/controller/wallet.controller.ts", "utf8");
-  assert.doesNotMatch(walletController, /message\s*:\s*["'`]Lỗi kết nối[^"'`]*payos/i);
+  assert.equal(existsSync("src/pages/WalletTab.tsx"), false, "Legacy wallet page must remain retired");
+  assert.equal(existsSync("server/controller/wallet.controller.ts"), false, "Legacy wallet controller must remain retired");
 });

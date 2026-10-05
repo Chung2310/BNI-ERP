@@ -9,7 +9,7 @@ const holiday = { name: "National Day", date: "2027-09-02", enabled: true };
 const config = { birthdayEnabled: false, holidayEnabled: true, sendTime: "08:00", holidayTemplate: { subject: "Happy {{holidayName}}", html: "<p>{{employeeName}}: {{holidayName}}</p>" }, holidayOverrides: [holiday] };
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.spyOn(CompanyModel, "find").mockReturnValue({ lean: mocks.companies } as any);
+  vi.spyOn(CompanyModel, "find").mockReturnValue(({ lean: mocks.companies } as unknown as Parameters<((value: ReturnType<typeof CompanyModel.find>) => void)>[0]));
   mocks.companies.mockResolvedValue([{ code: "ACME", name: "Acme", celebrationConfig: config }]);
   mocks.users.mockResolvedValue([{ _id: "member1", displayName: "An", email: "an@example.com" }]);
   mocks.create.mockResolvedValue({ _id: "delivery" });

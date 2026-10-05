@@ -1,3 +1,4 @@
+import { entityId } from "../../src/utils/entityId";
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { chatService } from "../service/chat.service";
@@ -13,11 +14,11 @@ export const chatController = {
     try {
       const room = await chatService.setRoomBlocked(req.params.roomId, req.user!.id, req.user!.companyCode || "SYSTEM", req.body.blocked);
       for (const member of room.members) {
-        const user = member.userId as any;
-        emitToUser(String(user._id || user), "internal_room_updated", room);
+        const user = member.userId;
+        emitToUser(entityId(user), "internal_room_updated", room);
       }
       return res.status(200).json({ status: "success", data: room });
-    } catch (error: any) {
+    } catch (error) {
       return res.status(400).json({ status: "error", message: error.message || "Không thể cập nhật trạng thái chặn." });
     }
   },
@@ -30,7 +31,7 @@ export const chatController = {
       const url = (req.query.url as string) || "";
       const data = await linkPreviewService.fetchPreview(url);
       return res.status(200).json({ status: "success", data });
-    } catch (error: any) {
+    } catch (error) {
       return res.status(400).json({ status: "error", message: error.message || "Không lấy được xem trước liên kết." });
     }
   },
@@ -48,7 +49,7 @@ export const chatController = {
         status: "success",
         data: rooms,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.getRooms] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -72,7 +73,7 @@ export const chatController = {
         status: "success",
         data: room,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.getRoomById] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -106,15 +107,15 @@ export const chatController = {
       }
 
       // Phát sự kiện tới tất cả thành viên trong phòng về việc có phòng chat mới được tạo/kết nối
-      room.members.forEach((member: any) => {
-        emitToUser(member.userId._id ? member.userId._id.toString() : member.userId.toString(), "internal_room_updated", room);
+      room.members.forEach((member) => {
+        emitToUser(entityId(member.userId), "internal_room_updated", room);
       });
 
       return res.status(201).json({
         status: "success",
         data: room,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.createRoom] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -136,15 +137,15 @@ export const chatController = {
       const room = await chatService.updateGroupRoom(roomId, userId, { name, avatarURL, onlyAdminsCanMessage }, companyCode);
 
       // Phát sự kiện cập nhật tới các thành viên
-      room.members.forEach((member: any) => {
-        emitToUser(member.userId._id ? member.userId._id.toString() : member.userId.toString(), "internal_room_updated", room);
+      room.members.forEach((member) => {
+        emitToUser(entityId(member.userId), "internal_room_updated", room);
       });
 
       return res.status(200).json({
         status: "success",
         data: room,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.updateRoom] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -166,15 +167,15 @@ export const chatController = {
       const room = await chatService.addMembersToGroup(roomId, userId, memberIds, companyCode);
 
       // Phát sự kiện cập nhật phòng mới cho mọi thành viên (kể cả thành viên vừa được thêm)
-      room.members.forEach((member: any) => {
-        emitToUser(member.userId._id ? member.userId._id.toString() : member.userId.toString(), "internal_room_updated", room);
+      room.members.forEach((member) => {
+        emitToUser(entityId(member.userId), "internal_room_updated", room);
       });
 
       return res.status(200).json({
         status: "success",
         data: room,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.addMembers] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -198,15 +199,15 @@ export const chatController = {
       emitToUser(targetUserId, "internal_room_deleted", { roomId });
 
       // Phát sự kiện cập nhật tới các thành viên còn lại
-      room.members.forEach((member: any) => {
-        emitToUser(member.userId._id ? member.userId._id.toString() : member.userId.toString(), "internal_room_updated", room);
+      room.members.forEach((member) => {
+        emitToUser(entityId(member.userId), "internal_room_updated", room);
       });
 
       return res.status(200).json({
         status: "success",
         data: room,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.removeMember] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -231,8 +232,8 @@ export const chatController = {
 
       if (room) {
         // Thông báo cho các thành viên còn lại
-        room.members.forEach((member: any) => {
-          emitToUser(member.userId._id ? member.userId._id.toString() : member.userId.toString(), "internal_room_updated", room);
+        room.members.forEach((member) => {
+          emitToUser(entityId(member.userId), "internal_room_updated", room);
         });
       }
 
@@ -240,7 +241,7 @@ export const chatController = {
         status: "success",
         message: "Bạn đã rời khỏi nhóm chat thành công.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.leaveRoom] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -260,7 +261,7 @@ export const chatController = {
 
       // Lấy danh sách thành viên trước khi xóa để gửi tin Socket
       const roomDetails = await chatService.getRoomById(roomId, userId, companyCode);
-      const memberIds = roomDetails.members.map((m: any) => m.userId._id ? m.userId._id.toString() : m.userId.toString());
+      const memberIds = roomDetails.members.map((m) => entityId(m.userId));
 
       await chatService.deleteGroup(roomId, userId, companyCode);
 
@@ -273,7 +274,7 @@ export const chatController = {
         status: "success",
         message: "Giải tán nhóm chat thành công.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.deleteRoom] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -297,8 +298,8 @@ export const chatController = {
 
       // 2. Kiểm tra nếu chỉ Trưởng/Phó nhóm mới được nhắn tin
       if (room.isGroup && room.onlyAdminsCanMessage) {
-        const member = room.members.find((m: any) => {
-          const mId = m.userId._id ? m.userId._id.toString() : m.userId.toString();
+        const member = room.members.find((m) => {
+          const mId = entityId(m.userId);
           return mId === senderId;
         });
         if (!member || (member.role !== "admin" && member.role !== "deputy")) {
@@ -312,8 +313,8 @@ export const chatController = {
       const message = await chatService.sendMessage(roomId, senderId, content, attachments, companyCode, replyTo);
 
       // Phát sự kiện tin nhắn mới (internal_new_message) đến toàn bộ các thành viên trong phòng
-      room.members.forEach((member: any) => {
-        const memId = member.userId._id ? member.userId._id.toString() : member.userId.toString();
+      room.members.forEach((member) => {
+        const memId = entityId(member.userId);
         emitToUser(memId, "internal_new_message", {
           roomId,
           message,
@@ -324,7 +325,7 @@ export const chatController = {
       // Đẩy Web Push cho các thành viên đang offline (đã đóng web) — chạy nền, không chặn phản hồi
       void (async () => {
         try {
-          const senderName = (message as any).senderName || "Đồng nghiệp";
+          const senderName = (message).senderName || "Đồng nghiệp";
           const preview =
             content && String(content).trim()
               ? String(content).slice(0, 120)
@@ -336,13 +337,13 @@ export const chatController = {
           );
 
           await Promise.all(
-            room.members.map(async (member: any) => {
-              const memId = member.userId._id ? member.userId._id.toString() : member.userId.toString();
+            room.members.map(async (member) => {
+              const memId = entityId(member.userId);
               if (memId === senderId) return;
               if (await isUserOnline(memId)) return; // Đang mở web — socket + Notification API đã lo
 
               const memberUser = member.userId;
-              const hasPersonalMention = content && memberUser && typeof memberUser === "object" && memberUser.displayName && content.includes(`@${memberUser.displayName}`);
+              const hasPersonalMention = content && memberUser && typeof memberUser === "object" && "displayName" in memberUser && typeof memberUser.displayName === "string" && memberUser.displayName && content.includes(`@${memberUser.displayName}`);
               const isMentioned = room.isGroup && (hasMentionAll || hasPersonalMention);
 
               const pushTitle = isMentioned
@@ -377,7 +378,7 @@ export const chatController = {
 
             // 3.2. Lấy 20 tin nhắn gần nhất và đảo thứ tự để làm context
             const history = await chatService.getMessages(roomId, senderId, companyCode, 20);
-            const chatbotMessages = history.slice().reverse().map((msg: any) => {
+            const chatbotMessages = history.slice().reverse().map((msg) => {
               const isUser = msg.senderId.toString() === senderId;
               return {
                 role: isUser ? ("user" as const) : ("assistant" as const),
@@ -435,7 +436,7 @@ export const chatController = {
         status: "success",
         data: message,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.sendMessage] Error:", error);
       return res.status(error.statusCode === 403 ? 403 : 500).json({
         status: "error",
@@ -460,7 +461,7 @@ export const chatController = {
         status: "success",
         data: messages,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.getMessages] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -482,8 +483,8 @@ export const chatController = {
 
       // Emit read status event to all other room members
       const room = await chatService.getRoomById(roomId, userId, companyCode);
-      room.members.forEach((member: any) => {
-        const memId = member.userId._id ? member.userId._id.toString() : member.userId.toString();
+      room.members.forEach((member) => {
+        const memId = entityId(member.userId);
         if (memId !== userId) {
           emitToUser(memId, "internal_messages_read", { roomId, userId });
         }
@@ -493,7 +494,7 @@ export const chatController = {
         status: "success",
         message: "Đã đánh dấu các tin nhắn đã đọc.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.markAsRead] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -522,8 +523,8 @@ export const chatController = {
       const room = await chatService.transferAdmin(roomId, currentAdminId, newAdminId, companyCode);
 
       // Thông báo cập nhật phòng đến tất cả thành viên
-      room.members.forEach((member: any) => {
-        const memId = member.userId._id ? member.userId._id.toString() : member.userId.toString();
+      room.members.forEach((member) => {
+        const memId = entityId(member.userId);
         emitToUser(memId, "internal_room_updated", room);
       });
 
@@ -531,7 +532,7 @@ export const chatController = {
         status: "success",
         data: room,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.transferAdmin] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -553,8 +554,8 @@ export const chatController = {
       const room = await chatService.updateMemberRole(roomId, currentAdminId, userId, role, companyCode);
 
       // Thông báo cập nhật phòng đến tất cả thành viên
-      room.members.forEach((member: any) => {
-        const memId = member.userId._id ? member.userId._id.toString() : member.userId.toString();
+      room.members.forEach((member) => {
+        const memId = entityId(member.userId);
         emitToUser(memId, "internal_room_updated", room);
       });
 
@@ -562,7 +563,7 @@ export const chatController = {
         status: "success",
         data: room,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.updateMemberRole] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -584,8 +585,8 @@ export const chatController = {
       const room = await chatService.pinMessage(roomId, adminId, messageId, companyCode);
 
       // Thông báo cập nhật phòng đến tất cả thành viên
-      room.members.forEach((member: any) => {
-        const memId = member.userId._id ? member.userId._id.toString() : member.userId.toString();
+      room.members.forEach((member) => {
+        const memId = entityId(member.userId);
         emitToUser(memId, "internal_room_updated", room);
       });
 
@@ -593,7 +594,7 @@ export const chatController = {
         status: "success",
         data: room,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.pinMessage] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -615,8 +616,8 @@ export const chatController = {
       const room = await chatService.unpinMessage(roomId, adminId, messageId, companyCode);
 
       // Thông báo cập nhật phòng đến tất cả thành viên
-      room.members.forEach((member: any) => {
-        const memId = member.userId._id ? member.userId._id.toString() : member.userId.toString();
+      room.members.forEach((member) => {
+        const memId = entityId(member.userId);
         emitToUser(memId, "internal_room_updated", room);
       });
 
@@ -624,7 +625,7 @@ export const chatController = {
         status: "success",
         data: room,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.unpinMessage] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -648,8 +649,8 @@ export const chatController = {
       const room = await chatService.getRoomById(roomId, userId, companyCode);
 
       // Phát sự kiện tin nhắn bị thu hồi (internal_message_deleted) đến toàn bộ thành viên
-      room.members.forEach((member: any) => {
-        const memId = member.userId._id ? member.userId._id.toString() : member.userId.toString();
+      room.members.forEach((member) => {
+        const memId = entityId(member.userId);
         emitToUser(memId, "internal_message_deleted", {
           roomId,
           messageId,
@@ -662,7 +663,7 @@ export const chatController = {
         status: "success",
         data: message,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.deleteMessage] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -686,13 +687,13 @@ export const chatController = {
 
       // Phát sự kiện cập nhật reaction đến toàn bộ thành viên phòng
       const room = await chatService.getRoomById(roomId, userId, companyCode);
-      room.members.forEach((member: any) => {
-        const memId = member.userId._id ? member.userId._id.toString() : member.userId.toString();
+      room.members.forEach((member) => {
+        const memId = entityId(member.userId);
         emitToUser(memId, "internal_message_reaction", { roomId, messageId, message });
       });
 
       return res.status(200).json({ status: "success", data: message });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.reactToMessage] Error:", error);
       return res.status(error.statusCode === 403 ? 403 : 400).json({
         status: "error",
@@ -716,13 +717,13 @@ export const chatController = {
 
       // Phát sự kiện tin nhắn đã sửa đến toàn bộ thành viên phòng
       const room = await chatService.getRoomById(roomId, userId, companyCode);
-      room.members.forEach((member: any) => {
-        const memId = member.userId._id ? member.userId._id.toString() : member.userId.toString();
+      room.members.forEach((member) => {
+        const memId = entityId(member.userId);
         emitToUser(memId, "internal_message_edited", { roomId, messageId, message });
       });
 
       return res.status(200).json({ status: "success", data: message });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.editMessage] Error:", error);
       return res.status(error.statusCode === 403 ? 403 : 400).json({
         status: "error",
@@ -740,7 +741,8 @@ export const chatController = {
       const companyCode = req.user!.companyCode || "SYSTEM";
       const { roomId } = req.params;
       const query = (req.query.query as string) || "";
-      const type = (req.query.type as any) || "all";
+      const rawType = req.query.type;
+      const type = rawType === "text" || rawType === "link" || rawType === "file" || rawType === "media" ? rawType : "all";
 
       const results = await chatService.searchMessages(roomId, userId, companyCode, query, type);
 
@@ -748,7 +750,7 @@ export const chatController = {
         status: "success",
         data: results,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.searchMessages] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -771,7 +773,7 @@ export const chatController = {
         status: "success",
         data: room,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[chatController.togglePinRoom] Error:", error);
       return res.status(500).json({
         status: "error",

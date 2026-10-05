@@ -51,7 +51,7 @@ function getFreeLlmConfig(): { baseUrl: string; apiKey: string; model: string } 
 }
 
 /** Lỗi mà đổi model cũng không cứu được (sai key / hết credit) → không fallback */
-function isNonFallbackableError(error: any): boolean {
+function isNonFallbackableError(error: { status?: number; message?: string }): boolean {
   const status = error?.status ?? 0;
   return status === 401 || status === 402;
 }
@@ -111,7 +111,7 @@ export async function openrouterChat(params: OpenRouterChatParams): Promise<{ te
     if (sysIdx >= 0) {
       messages[sysIdx] = {
         role: "system",
-        content: (messages[sysIdx] as any).content + "\n\n" + schemaInstruction,
+        content: (messages[sysIdx]).content + "\n\n" + schemaInstruction,
       };
     } else {
       messages = [{ role: "system", content: schemaInstruction }, ...messages];
@@ -120,13 +120,13 @@ export async function openrouterChat(params: OpenRouterChatParams): Promise<{ te
 
   const jsonRequested = Boolean(jsonMode || responseSchema);
 
-  let lastError: any;
+  let lastError: Error;
 
   // Tầng 1 + 2: OpenRouter (model chính → model fallback)
   if (apiKey) {
     try {
       return await chatWithRetries(OPENROUTER_BASE_URL, apiKey, mappedModel, messages, temperature, jsonRequested, maxRetries);
-    } catch (error: any) {
+    } catch (error) {
       lastError = error;
       const fallbackModel = getFallbackModel();
 
@@ -136,7 +136,7 @@ export async function openrouterChat(params: OpenRouterChatParams): Promise<{ te
         );
         try {
           return await chatWithRetries(OPENROUTER_BASE_URL, apiKey, fallbackModel, messages, temperature, jsonRequested, 2);
-        } catch (fallbackError: any) {
+        } catch (fallbackError) {
           lastError = fallbackError;
         }
       }
@@ -163,7 +163,7 @@ async function chatWithRetries(
   jsonMode: boolean,
   maxRetries: number
 ): Promise<{ text: string }> {
-  const body: Record<string, any> = {
+  const body: Record<string, unknown> = {
     model,
     messages,
     temperature,
@@ -173,7 +173,7 @@ async function chatWithRetries(
     body.response_format = { type: "json_object" };
   }
 
-  let lastError: any;
+  let lastError: Error & { status?: number };
   let delay = 1000;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -189,17 +189,17 @@ async function chatWithRetries(
 
       if (!response.ok) {
         const errText = await response.text();
-        const err = new Error(`OpenRouter API lỗi ${response.status}: ${errText}`) as any;
+        const err: Error & { status?: number } = new Error(`OpenRouter API lỗi ${response.status}: ${errText}`);
         err.status = response.status;
         throw err;
       }
 
-      const data = (await response.json()) as any;
+      const data = (await response.json());
       const text: string = data.choices?.[0]?.message?.content || "";
       const elapsed = Date.now() - startTime;
       console.log(`[OpenRouter] Success | model=${data.model || model} | ${elapsed}ms | len=${text.length}`);
       return { text };
-    } catch (error: any) {
+    } catch (error) {
       lastError = error;
       const status = error?.status ?? 0;
       const msg = error?.message || String(error);
@@ -261,7 +261,7 @@ export async function openrouterGenerateImage(params: OpenRouterImageParams): Pr
   const finalPrompt = `${params.prompt}\n\n${aspectRatioInstruction}`;
 
   // Build message content — text prompt + optional reference images
-  const content: any[] = [{ type: "text", text: finalPrompt }];
+  const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [{ type: "text", text: finalPrompt }];
   for (const img of params.referenceImages || []) {
     content.push({ type: "image_url", image_url: { url: img } });
   }
@@ -270,7 +270,7 @@ export async function openrouterGenerateImage(params: OpenRouterImageParams): Pr
 
   try {
     return await generateImageWithRetries(apiKey, model, content, dimensions, 3);
-  } catch (error: any) {
+  } catch (error) {
     const fallbackModel = getFallbackImageModel();
     if (isNonFallbackableError(error) || fallbackModel === model) throw error;
 
@@ -284,11 +284,11 @@ export async function openrouterGenerateImage(params: OpenRouterImageParams): Pr
 async function generateImageWithRetries(
   apiKey: string,
   model: string,
-  content: any[],
+  content: Array<{ type: string; text?: string; image_url?: { url: string } }>,
   dimensions: { width: number; height: number },
   maxAttempts: number
 ): Promise<{ url: string }> {
-  const body: Record<string, any> = {
+  const body: Record<string, unknown> = {
     model,
     messages: [{ role: "user", content }],
     // Trigger image generation theo cách chính thức của OpenRouter SDK
@@ -300,7 +300,7 @@ async function generateImageWithRetries(
     },
   };
 
-  let lastError: any;
+  let lastError: Error & { status?: number };
   let delay = 1000;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -313,12 +313,12 @@ async function generateImageWithRetries(
 
       if (!response.ok) {
         const errText = await response.text();
-        const err = new Error(`[OpenRouter] Image generation lỗi ${response.status}: ${errText}`) as any;
+        const err: Error & { status?: number } = new Error(`[OpenRouter] Image generation lỗi ${response.status}: ${errText}`);
         err.status = response.status;
         throw err;
       }
 
-      const data = (await response.json()) as any;
+      const data = (await response.json());
       console.log("[OpenRouter Image Debug] Raw response:", JSON.stringify(data).slice(0, 1000));
 
       // OpenRouter trả ảnh trong message.images (non-standard field), không phải message.content
@@ -344,7 +344,7 @@ async function generateImageWithRetries(
       }
 
       throw new Error("[OpenRouter] Image response không chứa ảnh.");
-    } catch (error: any) {
+    } catch (error) {
       lastError = error;
       const status = error?.status ?? 0;
       const msg = error?.message || String(error);
