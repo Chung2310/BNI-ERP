@@ -114,13 +114,25 @@ export function MeetingStage({ snapshot, now, fill = false }: { snapshot: Meetin
     }
   }, [meeting.currentIndex, meeting.speakers, slides]);
   if (meeting.status === "ended" || meeting.status === "cancelled") return <StageMessage title={meeting.title} text={meeting.status === "ended" ? "Cuộc họp đã kết thúc" : "Cuộc họp đã hủy"} />;
+
   const view = presentationState(meeting.presentation).view;
-  if (view === "checkin") return <CheckInStage meeting={meeting} />;
-  if (view === "activeMembers") return <RankingStage meeting={meeting} />;
-  if (view === "luckyDraw") return <DrawStage meeting={meeting} />;
-  if (view === "waiting") return <StageMessage title={meeting.title} text="Vui lòng chờ" />;
   const speaker = meeting.speakers[meeting.currentIndex];
-  return <SpeakerPresentationFrame meeting={meeting} slides={slides} speakerId={speaker?.id} now={now} fill={fill}>
+  let activeStage: React.ReactNode;
+
+  if (view === "checkin") activeStage = <CheckInStage meeting={meeting} />;
+  else if (view === "activeMembers") activeStage = <RankingStage meeting={meeting} />;
+  else if (view === "waiting") activeStage = <StageMessage title={meeting.title} text="Vui lòng chờ" />;
+  else activeStage = <SpeakerPresentationFrame meeting={meeting} slides={slides} speakerId={speaker?.id} now={now} fill={fill}>
     <SpeakerStage meeting={meeting} slide={slides.find(item => item.id === speaker?.id)} now={now} />
   </SpeakerPresentationFrame>;
+
+  return <div className={`relative w-full overflow-hidden bg-slate-950 ${fill && view === "speaker" ? "h-full" : "aspect-video"}`}>
+    <div
+      className={`absolute inset-0 ${view === "luckyDraw" ? "visible" : "invisible pointer-events-none"}`}
+      aria-hidden={view !== "luckyDraw"}
+    >
+      <DrawStage meeting={meeting} />
+    </div>
+    {view !== "luckyDraw" && <div className="absolute inset-0">{activeStage}</div>}
+  </div>;
 }
