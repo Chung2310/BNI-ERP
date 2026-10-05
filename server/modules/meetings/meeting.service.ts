@@ -1,4 +1,5 @@
 import { recurringMeetingDates } from "../../../src/utils/meetingRecurrence";
+import { normalizeLoginIdentifier } from "../../../src/utils/loginIdentifier";
 import { reserveMeetingNumbers } from "./meeting-sequence";
 import { randomBytes, randomInt, randomUUID, createHash } from 'node:crypto';
 import bcrypt from 'bcryptjs';
@@ -56,9 +57,54 @@ export async function saveMeeting(item: MeetingDocument) {
     }
     throw error;
   }
+  const meeting = typeof item.toObject === 'function' ? item.toObject() : item;
   emitToCompany(item.companyCode, 'meeting_updated', {
     id: String(item._id),
     version: item.__v,
+    serverNow: Date.now(),
+    // Include the display state so connected screens can switch immediately,
+    // without rebuilding every profile slide after each controller action.
+    live: {
+      _id: String(item._id),
+      companyCode: item.companyCode,
+      title: item.title,
+      startsAt: item.startsAt,
+      status: item.status,
+      speakers: item.speakers.map((speaker) => {
+        const person = typeof speaker.toObject === 'function' ? speaker.toObject() : speaker;
+        return {
+          id: person.id, userId: person.userId, name: person.name,
+          company: person.company, industry: person.industry, photoURL: person.photoURL,
+          checkedInAt: person.checkedInAt, seconds: person.seconds,
+          spokenSeconds: person.spokenSeconds, deferred: person.deferred,
+        };
+      }),
+      presentation: meeting.presentation,
+      currentIndex: item.currentIndex,
+      speakerStartedAt: item.speakerStartedAt,
+      speechesCompletedAt: item.speechesCompletedAt,
+      elapsedSeconds: item.elapsedSeconds,
+      endedAt: item.endedAt,
+      luckyDraw: item.luckyDraw ? {
+        enabled: item.luckyDraw.enabled,
+        allowRepeatWinners: item.luckyDraw.allowRepeatWinners,
+        drawMode: item.luckyDraw.drawMode,
+        numberMin: item.luckyDraw.numberMin,
+        numberMax: item.luckyDraw.numberMax,
+        prizes: (item.luckyDraw.prizes || []).map((prize) => ({
+          id: prize.id, name: prize.name, reward: prize.reward, quantity: prize.quantity,
+          order: prize.order, imageUrl: prize.imageUrl, color: prize.color,
+          winners: (prize.winners || []).map((winner) => ({
+            source: winner.source, id: winner.id, prizeId: winner.prizeId,
+            prizeName: winner.prizeName, winnerId: winner.winnerId,
+            userId: winner.userId, name: winner.name, photoURL: winner.photoURL,
+            coverImage: winner.coverImage, ticketNumber: winner.ticketNumber,
+            wonAt: winner.wonAt, reward: winner.reward,
+          })),
+        })),
+      } : undefined,
+      __v: item.__v,
+    },
   });
   return item;
 }
@@ -285,7 +331,7 @@ export async function checkIn(item: MeetingDocument, input: CheckInInput, actorI
     photoURL: person?.photoURL || input.photoURL,
     coverImage: person?.coverImage || input.coverImage,
     checkedInAt,
-    seconds: speakingSeconds(checkedInAt, item.tiers.map(tier => ({ ...tier.toObject(), seconds: tier.seconds ?? item.fallbackSeconds })), item.fallbackSeconds, item.speakers.length),
+    seconds: speakingSeconds(checkedInAt, item.tiers.map(tier => ({ ...(typeof tier.toObject === 'function' ? tier.toObject() : tier), seconds: tier.seconds ?? item.fallbackSeconds })), item.fallbackSeconds, item.speakers.length),
   });
   if (['live', 'paused'].includes(item.status) && (item.currentIndex === -1 || item.speechesCompletedAt)) {
     item.currentIndex = item.speechesCompletedAt ? item.speakers.length - 1 : 0;
@@ -861,11 +907,32 @@ export async function getPublicQrMeeting(token: string) {
     endsAt: meetingEndsAt(item.startsAt, item.endsAt), location: item.location, expiresAt };
 }
 
-export async function qrCheckInMember(token: string, input: CheckInInput & { password: string }) {
+export async function qrCheckInMember(token: string, input: CheckInInput & { password: string; identifier?: string }) {
   let { item } = await resolveQrMeeting(token);
   validateCheckInLocation(item, input);
-  const email = String(input.email || '').trim().toLowerCase();
-  const person = await UserModel.findOne({ email, companyCode: item.companyCode, isActive: { $ne: false } }).select('+password displayName email photoURL coverImage password').lean();
+  const rawIdentifier = String(input.identifier || input.email || '').trim();
+  const normalized = normalizeLoginIdentifier(rawIdentifier);
+  if (!normalized) throw new MeetingError(401, 'Tài khoản hoặc mật khẩu không đúng với thành viên của đơn vị tổ chức.');
+  let person: (Partial<IUser> & { password?: string }) | null = null;
+  if (normalized.includes("@")) {
+    person = await UserModel.findOne({ email: normalized, companyCode: item.companyCode, isActive: { $ne: false } })
+      .select('+password displayName email photoURL coverImage password')
+      .lean();
+  } else {
+    const alternatives = /^0\d{9,10}$/.test(normalized)
+      ? [normalized, "84" + normalized.slice(1), "+84" + normalized.slice(1)] : [normalized];
+    const separator = "[\\s().-]*";
+    const patterns = alternatives.map(value => [...value].map(char => char === "+" ? "\\+" : char).join(separator));
+    const phone = new RegExp("^" + separator + "(?:" + patterns.join("|") + ")" + separator + "$");
+    const users = await UserModel.find({ phone, companyCode: item.companyCode, isActive: { $ne: false } })
+      .select('+password displayName email photoURL coverImage password')
+      .limit(2)
+      .lean();
+    if (users.length > 1) {
+      throw new MeetingError(400, "Số điện thoại được dùng cho nhiều tài khoản. Vui lòng check-in bằng email.");
+    }
+    person = users[0] || null;
+  }
   if (!person?.password || !(await bcrypt.compare(input.password, person.password))) throw new MeetingError(401, 'Tài khoản hoặc mật khẩu không đúng với thành viên của đơn vị tổ chức.');
   const current = await resolveQrMeeting(token);
   if (String(current.item._id) !== String(item._id)) throw new MeetingError(409, 'Cuộc họp đã thay đổi. Vui lòng quét lại QR.');

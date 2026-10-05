@@ -87,22 +87,19 @@ function RankingStage({ meeting }: { meeting: Meeting }) {
   </div>;
 }
 
-function DrawStage({ meeting, now }: { meeting: Meeting; now: number }) {
-  const state = presentationState(meeting.presentation);
-  const winner = meeting.luckyDraw?.prizes.flatMap(prize => prize.winners || []).find(item => item.id === state.drawWinnerId);
-  const spinning = !!winner && now < Date.parse(state.drawRevealsAt || "");
-  if (!winner) return <StageMessage title={meeting.title} text="Sẵn sàng quay thưởng" />;
-  // Both screens use the same server clock and persisted result, including after reload.
-  const index = Math.max(0, Math.floor((now - Date.parse(state.drawStartedAt || "")) / 100));
-  const rollingName = meeting.luckyDraw?.drawMode === "numbers"
-    ? "#" + ((meeting.luckyDraw.numberMin || 1) + index % Math.max(1, (meeting.luckyDraw.numberMax || 100) - (meeting.luckyDraw.numberMin || 1) + 1))
-    : meeting.speakers[index % Math.max(1, meeting.speakers.length)]?.name;
-  return <div className="flex aspect-video w-full flex-col items-center justify-center gap-4 bg-amber-50 p-6 text-center text-amber-950">
-    <p className="text-lg font-semibold md:text-3xl">{winner.prizeName}</p>
-    <p className="text-sm uppercase tracking-widest">{spinning ? "Đang quay thưởng" : "Chúc mừng người trúng thưởng"}</p>
-    {!spinning && winner.photoURL && <img src={winner.photoURL} alt="" className="h-20 w-20 rounded-full object-cover md:h-40 md:w-40" />}
-    <p className="text-3xl font-black md:text-6xl">{spinning ? rollingName || "…" : winner.name}</p>
-    {!spinning && winner.ticketNumber && <p className="text-lg">Số may mắn: {winner.ticketNumber}</p>}
+function DrawStage({ meeting }: { meeting: Meeting }) {
+  const params = new URLSearchParams({
+    meetingId: meeting._id,
+    game: "wheel",
+    presentation: "1",
+  });
+  return <div className="aspect-video w-full overflow-hidden bg-slate-950">
+    <iframe
+      src={`/quay-thuong?${params.toString()}`}
+      title="Màn hình quay thưởng"
+      className="h-full w-full border-0 pointer-events-none"
+      allow="fullscreen"
+    />
   </div>;
 }
 
@@ -121,7 +118,7 @@ export function MeetingStage({ snapshot, now }: { snapshot: MeetingLiveSnapshot;
   const view = presentationState(meeting.presentation).view;
   if (view === "checkin") return <CheckInStage meeting={meeting} />;
   if (view === "activeMembers") return <RankingStage meeting={meeting} />;
-  if (view === "luckyDraw") return <DrawStage meeting={meeting} now={now} />;
+  if (view === "luckyDraw") return <DrawStage meeting={meeting} />;
   if (view === "waiting") return <StageMessage title={meeting.title} text="Vui lòng chờ" />;
   const speaker = meeting.speakers[meeting.currentIndex];
   const upcoming = meeting.speakers.slice(meeting.currentIndex + 1, meeting.currentIndex + 4);

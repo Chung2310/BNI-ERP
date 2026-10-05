@@ -29,6 +29,9 @@ import { UserProfile } from "../types";
 import { playTickSound, playWinFanfare, playSuspenseSound } from "../utils/soundEffects";
 import { launchConfetti } from "../utils/confetti";
 import { BRAND_NAME, BRAND_LOGO_PATH } from "../config/brand";
+import { useMeetingLive } from "../components/meetings/useMeetingLive";
+import type { ProfileSlide } from "../components/meetings/slideTypes";
+import { meetingLiveApi } from "../services/meetingLiveService";
 
 async function loadChapterUsers(companyCode?: string): Promise<UserProfile[]> {
   if (companyCode) {
@@ -51,6 +54,10 @@ interface Participant {
   isCustom?: boolean;
   type?: ParticipantType;
   checkedInAt?: string;
+  phone?: string;
+  email?: string;
+  industry?: string;
+  bio?: string;
 }
 
 interface WinnerRecord {
@@ -212,6 +219,9 @@ export default function WheelOfNamesPage() {
   const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const urlMeetingId = searchParams?.get("meetingId") || searchParams?.get("id");
   const urlGame = searchParams?.get("game");
+  const presentationMode = searchParams?.get("presentation") === "1";
+  const liveState = useMeetingLive(presentationMode ? urlMeetingId || "" : "", true);
+  const [presentationSlides, setPresentationSlides] = useState<ProfileSlide[]>([]);
 
   // State
   const [selectedGame, setSelectedGame] = useState<"wheel" | "bingo">(
@@ -265,6 +275,7 @@ export default function WheelOfNamesPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const currentAngleRef = useRef(0);
   const animationFrameIdRef = useRef<number | null>(null);
+  const lastPresentedDrawIdRef = useRef<string | null>(null);
   const lastTickIndexRef = useRef<number>(-1);
   const pointerBounceRef = useRef(0);
   const lightPhaseRef = useRef(0);
@@ -282,7 +293,29 @@ export default function WheelOfNamesPage() {
   const categoryParticipants = useMemo(() => participants.filter((p) => matchesFilterCategory(p, filterCategory)), [participants, filterCategory]);
 
   // Active selected participants on the wheel
-  const activeParticipants = useMemo(() => categoryParticipants.filter((p) => p.selected), [categoryParticipants]);
+  const liveMeeting = liveState.snapshot?.meeting;
+  const currentDrawWinner = liveMeeting?.luckyDraw?.prizes.flatMap(prize => prize.winners || []).find(winner => winner.id === liveMeeting.presentation?.drawWinnerId);
+  const remoteSpinActive = Boolean(currentDrawWinner && liveMeeting?.presentation?.drawRevealsAt && liveState.now < Date.parse(liveMeeting.presentation.drawRevealsAt));
+  const activeParticipants = useMemo(() => {
+    const selected = categoryParticipants.filter(participant => participant.selected);
+    if (!presentationMode || !liveMeeting) return selected;
+    const previousWinnerIds = new Set<string>();
+    if (!liveMeeting.luckyDraw?.allowRepeatWinners) {
+      for (const prize of liveMeeting.luckyDraw?.prizes || []) {
+        for (const winner of prize.winners || []) {
+          previousWinnerIds.add(liveMeeting.luckyDraw.drawMode === "numbers" && winner.ticketNumber
+            ? "ticket-" + winner.ticketNumber
+            : String(winner.winnerId));
+        }
+      }
+    }
+    if (remoteSpinActive && currentDrawWinner) {
+      previousWinnerIds.delete(liveMeeting.luckyDraw?.drawMode === "numbers" && currentDrawWinner.ticketNumber
+        ? "ticket-" + currentDrawWinner.ticketNumber
+        : String(currentDrawWinner.winnerId));
+    }
+    return selected.filter(participant => !previousWinnerIds.has(participant.id));
+  }, [categoryParticipants, presentationMode, liveMeeting, remoteSpinActive, currentDrawWinner]);
 
   // Participant counts by category
   const countAll = participants.length;
@@ -457,13 +490,66 @@ export default function WheelOfNamesPage() {
     }).finally(() => {
       setLoadingUsers(false);
     });
-  }, [userProfile]);
+  }, [userProfile, urlMeetingId]);
 
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && !presentationMode) {
       loadSystemUsers();
     }
-  }, [authLoading, loadSystemUsers]);
+  }, [authLoading, presentationMode, loadSystemUsers]);
+
+  useEffect(() => {
+    if (!presentationMode || !urlMeetingId) return;
+    let active = true;
+    void meetingLiveApi<{ slides: ProfileSlide[] }>("/" + urlMeetingId + "/slides")
+      .then(deck => { if (active) setPresentationSlides(deck.slides || []); })
+      .catch(error => console.warn("Could not load draw participant profiles:", error));
+    return () => { active = false; };
+  }, [presentationMode, urlMeetingId]);
+
+  useEffect(() => {
+    if (!presentationMode) return;
+    if (!liveMeeting) return;
+    const slideById = new Map(presentationSlides.map(slide => [slide.id, slide]));
+    const luckyDraw = liveMeeting.luckyDraw;
+    const nextParticipants: Participant[] = luckyDraw?.drawMode === "numbers"
+      ? Array.from({ length: Math.min(5000, Math.max(0, (luckyDraw.numberMax || 100) - (luckyDraw.numberMin || 1) + 1)) }, (_, index) => {
+          const number = (luckyDraw.numberMin || 1) + index;
+          return { id: "ticket-" + number, name: "#" + number, companyName: "Lucky number", selected: true, type: "guest" };
+        })
+      : liveMeeting.speakers.map(speaker => {
+          const slide = slideById.get(speaker.id);
+          return {
+            id: speaker.id,
+            name: slide?.name || speaker.name,
+            avatar: slide?.photoURL || speaker.photoURL || speaker.coverImage,
+            companyName: slide?.company || speaker.company || speaker.slideProfile?.company,
+            role: speaker.userId ? "Member" : "Guest",
+            selected: true,
+            type: speaker.userId ? "member_present" : "guest",
+            checkedInAt: speaker.checkedInAt,
+            phone: slide?.phone || speaker.phone || speaker.slideProfile?.phone,
+            email: slide?.email || speaker.email,
+            industry: slide?.industry || speaker.industry || speaker.slideProfile?.industry,
+            bio: slide?.bio,
+          };
+        });
+    const drawRecord = luckyDraw?.prizes.flatMap(prize => prize.winners || []).find(winner => winner.id === liveMeeting.presentation?.drawWinnerId);
+    const availablePrize = drawRecord?.prizeName || luckyDraw?.prizes.find(prize => prize.winners.length < prize.quantity)?.name || luckyDraw?.prizes[0]?.name;
+    const syncedWinners = (luckyDraw?.prizes || []).flatMap(prize => prize.winners || []).map<WinnerRecord>(winner => ({
+      source: "wheel", id: winner.id, name: winner.name, prizeName: winner.prizeName,
+      avatar: winner.photoURL, companyName: liveMeeting.speakers.find(speaker => speaker.id === winner.winnerId)?.company, wonAt: winner.wonAt,
+    })).reverse();
+    const syncFrame = requestAnimationFrame(() => {
+      setParticipants(nextParticipants);
+      setMeetingTitle(liveMeeting.title);
+      setSelectedGame("wheel");
+      if (availablePrize) { setCurrentPrize(availablePrize); setPrizeInput(availablePrize); }
+      setWinners(syncedWinners);
+      setLoadingUsers(false);
+    });
+    return () => cancelAnimationFrame(syncFrame);
+  }, [presentationMode, liveMeeting, presentationSlides]);
 
   // 2. Fullscreen Toggle
   function toggleFullscreen() {
@@ -490,7 +576,7 @@ export default function WheelOfNamesPage() {
       }
       if (e.code === "Space" || e.code === "Enter") {
         e.preventDefault();
-        if (!isSpinning && !winnerModal && activeParticipants.length > 0) {
+        if (!presentationMode && !isSpinning && !winnerModal && activeParticipants.length > 0) {
           handleStartSpin();
         }
       } else if (e.code === "KeyF") {
@@ -504,7 +590,7 @@ export default function WheelOfNamesPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isSpinning, winnerModal, activeParticipants.length]);
+  }, [presentationMode, isSpinning, winnerModal, activeParticipants.length]);
 
   // Synchronize Bingo balls with active participants
   useEffect(() => {
@@ -1368,7 +1454,7 @@ export default function WheelOfNamesPage() {
   }, [isDrawerOpen, drawWheel]);
 
   // 4A. Wheel Spin Mechanics
-  function handleStartSpinWheel() {
+  function handleStartSpinWheel(controlled?: { winnerId: string; startedAt: string; revealsAt: string; prizeName: string; displayWinner?: Participant }) {
     if (isSpinning || activeParticipants.length === 0) return;
 
     setIsSpinning(true);
@@ -1382,7 +1468,8 @@ export default function WheelOfNamesPage() {
     const arc = (2 * Math.PI) / count;
 
     // Pick random winning index
-    const winningIndex = Math.floor(Math.random() * count);
+    const winningIndex = controlled ? slices.findIndex(slice => slice.participant.id === controlled.winnerId) : Math.floor(Math.random() * count);
+    if (winningIndex < 0) { setIsSpinning(false); return; }
     const winner = slices[winningIndex].participant;
 
     const currentAngle = currentAngleRef.current % (2 * Math.PI);
@@ -1394,8 +1481,9 @@ export default function WheelOfNamesPage() {
       (targetSliceCenter - currentAngle) +
       (currentAngle > targetSliceCenter ? 2 * Math.PI : 0);
 
-    const startTime = performance.now();
-    const durationMs = spinDuration * 1000;
+    const elapsedBeforeMount = controlled ? Math.max(0, liveState.now - Date.parse(controlled.startedAt)) : 0;
+    const startTime = performance.now() - elapsedBeforeMount;
+    const durationMs = controlled ? Math.max(200, Date.parse(controlled.revealsAt) - Date.parse(controlled.startedAt)) : spinDuration * 1000;
     const startAngle = currentAngleRef.current;
 
     const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
@@ -1436,7 +1524,7 @@ export default function WheelOfNamesPage() {
         const record: WinnerRecord = {
           id: crypto.randomUUID(),
           name: winner.name,
-          prizeName: currentPrize,
+          prizeName: controlled?.prizeName || currentPrize,
           avatar: winner.avatar,
           companyName: winner.companyName,
           wonAt: new Date().toISOString(),
@@ -1444,7 +1532,7 @@ export default function WheelOfNamesPage() {
 
         record.source = "wheel";
         setWinners((prev) => [record, ...prev]);
-        persistWinner(record, winner, "wheel");
+        if (!presentationMode) persistWinner(record, winner, "wheel");
 
         if (soundEnabled) {
           playWinFanfare();
@@ -1453,7 +1541,7 @@ export default function WheelOfNamesPage() {
 
         setWinnerModal({
           winner,
-          prize: currentPrize,
+          prize: controlled?.prizeName || currentPrize,
         });
       }
     };
@@ -1461,6 +1549,26 @@ export default function WheelOfNamesPage() {
     animationFrameIdRef.current = requestAnimationFrame(animateSpin);
   }
 
+  useEffect(() => {
+    const startedAt = liveMeeting?.presentation?.drawStartedAt;
+    const revealsAt = liveMeeting?.presentation?.drawRevealsAt;
+    if (!presentationMode || !remoteSpinActive || !currentDrawWinner || !startedAt || !revealsAt || isSpinning) return;
+    if (lastPresentedDrawIdRef.current === currentDrawWinner.id) return;
+    const participantId = liveMeeting?.luckyDraw?.drawMode === "numbers" && currentDrawWinner.ticketNumber != null
+      ? "ticket-" + currentDrawWinner.ticketNumber
+      : String(currentDrawWinner.winnerId);
+    if (!activeParticipants.some(participant => participant.id === participantId)) return;
+    const animationFrame = requestAnimationFrame(() => {
+      lastPresentedDrawIdRef.current = currentDrawWinner.id;
+      handleStartSpinWheel({
+        winnerId: participantId,
+        startedAt,
+        revealsAt,
+        prizeName: currentDrawWinner.prizeName,
+      });
+    });
+    return () => cancelAnimationFrame(animationFrame);
+  }, [presentationMode, remoteSpinActive, currentDrawWinner, liveMeeting, activeParticipants, isSpinning]);
   // 4B. Bingo Cage Spin Mechanics with 3D Tumbling & Dropping Ball
   function handleStartSpinBingo() {
     if (isSpinning || activeParticipants.length === 0) return;

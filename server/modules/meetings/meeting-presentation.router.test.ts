@@ -35,6 +35,16 @@ it("returns a read-only snapshot with server time and no cache", async () => {
   expect(find).toHaveBeenCalledWith({ _id: id, companyCode: "BNI" });
   expect(item.save).not.toHaveBeenCalled();
 });
+it("returns a lightweight live state without rebuilding profile slides", async () => {
+  const { find } = seed();
+  const response = await fetch(base + "/live/state");
+  const data = await response.json();
+  expect(response.status).toBe(200);
+  expect(response.headers.get("cache-control")).toBe("no-store");
+  expect(data.data).toMatchObject({ meeting: { _id: id, __v: 2 } });
+  expect(data.data).not.toHaveProperty("slides");
+  expect(find).toHaveBeenCalledWith({ _id: id, companyCode: "BNI" });
+});
 it("scopes both reads and control changes to the authenticated company", async () => {
   const { item } = seed();
   for (const path of ["/live", "/presentation-state"]) {
@@ -45,7 +55,7 @@ it("scopes both reads and control changes to the authenticated company", async (
   }
   expect(item.save).not.toHaveBeenCalled();
 });
-it.each([["/live", "GET"], ["/presentation-state", "PATCH"], ["/presentation-draw", "POST"]])("requires organizer permission for %s", async (path, method) => {
+it.each([["/live", "GET"], ["/live/state", "GET"], ["/presentation-state", "PATCH"], ["/presentation-draw", "POST"]])("requires organizer permission for %s", async (path, method) => {
   const { find } = seed();
   const response = await fetch(base + path, { method, headers: { "x-role": "member" } });
   expect(response.status).toBe(403); expect(find).not.toHaveBeenCalled();

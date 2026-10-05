@@ -3,6 +3,7 @@ import { Crown, Trophy, Users } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { authService } from "../../services/authService";
 import { UserProfile } from "../../types/common";
+import { UserAvatar } from "./SpeakerAvatar";
 import { MEMBER_RANKING_PODIUM } from "../../config/memberRankingPodium";
 
 type FlowSpeaker = {
@@ -244,22 +245,13 @@ export function ActiveMembersPanel({ meeting, meetings }: Props) {
                         <Crown className="h-4 w-4 text-sky-500 fill-sky-300 drop-shadow-xs -mb-0.5" />
                       )}
                       <div className="relative mb-1.5">
-                        {m.photoURL ? (
-                          <img
-                            src={m.photoURL}
-                            alt={m.name}
-                            className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover shadow-2xs ${slot.ringColor}`}
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                            }}
-                          />
-                        ) : (
-                          <div
-                            className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-slate-100 font-semibold text-slate-600 text-xs sm:text-sm shadow-2xs ${slot.ringColor}`}
-                          >
-                            {(m.name || "?").trim().charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                        <UserAvatar
+                          name={m.name}
+                          photoURL={m.photoURL}
+                          className="h-10 w-10 sm:h-12 sm:w-12 rounded-full"
+                          textClassName="text-xs sm:text-sm font-semibold"
+                          ringClassName={`shadow-2xs ${slot.ringColor}`}
+                        />
                         <span
                           className={`absolute -bottom-1 -right-1 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full text-[10px] sm:text-xs ${slot.badgeColor}`}
                         >
@@ -334,20 +326,13 @@ export function ActiveMembersPanel({ meeting, meetings }: Props) {
                         <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 font-mono font-medium text-slate-600 text-xs">
                           #{rankNum}
                         </span>
-                        {m.photoURL ? (
-                          <img
-                            src={m.photoURL}
-                            alt={m.name}
-                            className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                            }}
-                          />
-                        ) : (
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 font-medium text-slate-600 text-xs shrink-0">
-                            {(m.name || "?").trim().charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                        <UserAvatar
+                          name={m.name}
+                          photoURL={m.photoURL}
+                          className="h-8 w-8 rounded-full"
+                          textClassName="text-xs font-medium"
+                          ringClassName="border border-slate-200 shrink-0"
+                        />
                         <div className="min-w-0">
                           <p className="font-semibold text-slate-800 truncate">{m.name}</p>
                           {m.companyName && (

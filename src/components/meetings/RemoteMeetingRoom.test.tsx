@@ -19,6 +19,15 @@ beforeEach(() => {
       presentation: { view: "speaker", autoAdvance: false, autoAdvanceDelay: 3 },
       speakers: [{ id: "a", name: "An", seconds: 30 }, { id: "b", name: "Binh", seconds: 20 }], luckyDraw: { prizes: [] } } } as unknown as import("../../services/meetingLiveService").MeetingLiveSnapshot;
   vi.stubGlobal("fetch", vi.fn(async (url, options) => {
+    if (String(url).endsWith("/lucky-draw/prizes") && options.method === "POST") {
+      const body = JSON.parse(options.body);
+      const prize = { id: "quick-prize", reward: "", winners: [], ...body };
+      snapshot.meeting.luckyDraw = {
+        enabled: true, allowRepeatWinners: false, drawMode: "attendees", numberMin: 1, numberMax: 100,
+        prizes: [...(snapshot.meeting.luckyDraw?.prizes || []), prize],
+      };
+      return { ok: true, json: async () => ({ data: snapshot.meeting.luckyDraw }) };
+    }
     if (options.method !== "GET") {
       const body = JSON.parse(options.body);
       snapshot.meeting.__v++;
@@ -48,6 +57,35 @@ it("publishes view selection and keeps the phone outside fullscreen", async () =
   await screen.findByText("Đang chiếu: activeMembers");
   expect(full).not.toHaveBeenCalled();
   Reflect.deleteProperty(HTMLElement.prototype, "requestFullscreen");
+});
+it("selects the next available prize automatically so the organizer can start with one tap", async () => {
+  snapshot.meeting.luckyDraw = {
+    enabled: true, allowRepeatWinners: false, drawMode: "attendees", numberMin: 1, numberMax: 100,
+    prizes: [{ id: "prize-1", name: "Quà đầu tiên", reward: "Gift", quantity: 1, order: 0, winners: [] }],
+  };
+  render(<RemoteMeetingRoom meetingId="m" mode="control" />);
+  await screen.findByText("Đang chiếu: speaker");
+  const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
+  await waitFor(() => expect(selects[1].value).toBe("prize-1"));
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu quay" }));
+  await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/presentation-draw"))).toBe(true));
+  const drawCall = vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith("/presentation-draw"));
+  expect(JSON.parse(String(drawCall?.[1]?.body)).prizeId).toBe("prize-1");
+});
+it("creates and selects a quick prize from the control panel", async () => {
+  snapshot.meeting.luckyDraw = {
+    enabled: true, allowRepeatWinners: false, drawMode: "attendees", numberMin: 1, numberMax: 100, prizes: [],
+  };
+  render(<RemoteMeetingRoom meetingId="m" mode="control" />);
+  await screen.findByText("Đang chiếu: speaker");
+  fireEvent.click(screen.getByRole("button", { name: "Tạo giải nhanh" }));
+  fireEvent.change(screen.getByDisplayValue("Giải thưởng may mắn"), { target: { value: "Giải khách mời" } });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo và chọn giải này" }));
+  await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/lucky-draw/prizes"))).toBe(true));
+  const prizeSelect = screen.getByRole("combobox", { name: "Giải thưởng" }) as HTMLSelectElement;
+  await waitFor(() => expect(prizeSelect.value).toBe("quick-prize"));
+  expect(screen.getByRole("option", { name: /Giải khách mời/ })).toBeTruthy();
+  await waitFor(() => expect((screen.getByRole("button", { name: "Bắt đầu quay" }) as HTMLButtonElement).disabled).toBe(false));
 });
 it("opens the display without starting a timer and shares the same meeting with the phone", async () => {
   render(<RemoteMeetingRoom meetingId="m" mode="display" />);
