@@ -131,8 +131,9 @@ export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas:
   if (avatar) {
     ctx.save(); ctx.beginPath(); ctx.arc(337, 465, 191, 0, Math.PI * 2); ctx.clip();
     cover(ctx, avatar, 146, 274, 382, 382, true); ctx.restore();
-    if (frame) ctx.drawImage(frame, 100, 247, 480, 456);
   }
+  // The frame belongs to the template, even when the profile has no photo yet.
+  if (frame) ctx.drawImage(frame, 100, 247, 480, 456);
   if (slide.name?.trim()) {
     ctx.fillStyle = RED; ctx.beginPath(); ctx.roundRect(60, 702, 575, 65, 18); ctx.fill();
     textBox(ctx, slide.name.trim().toLocaleUpperCase("vi-VN"), 347, 717, 550, 1, 34, 20, "#fff", 800);

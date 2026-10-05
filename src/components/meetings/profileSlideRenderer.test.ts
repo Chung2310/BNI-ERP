@@ -21,9 +21,10 @@ it.each(["guest", "member"] as const)("fills the template with %s data and hides
   for (const value of ["NGUYỄN AN", "ACME", "THIẾT KẾ", "HOTLINE: 0901234567", "Bắc Ninh", "Doanh nghiệp", "SẢN PHẨM TIÊU BIỂU"]) expect(text).toContain(value);
   expect(ctx.clip).toHaveBeenCalledOnce();
   expect(ctx.drawImage.mock.calls.filter(call => call.length === 5 && call[2] >= 504 && call[2] < 740)).toHaveLength(5);
-  ctx.fillText.mockClear(); ctx.clip.mockClear();
+  ctx.fillText.mockClear(); ctx.clip.mockClear(); ctx.drawImage.mockClear();
   await renderProfileSlide({ ...slide, company: " ", industry: "", phone: " ", address: "", targetMarket: " ", galleryImages: [], photoURL: "" });
   const sparseText = ctx.fillText.mock.calls.map(call => call[0]).join(" ");
   for (const value of ["HOTLINE", "LĨNH VỰC HOẠT ĐỘNG", "THỊ TRƯỜNG MỤC TIÊU", "SẢN PHẨM TIÊU BIỂU", "ACME"]) expect(sparseText).not.toContain(value);
   expect(ctx.clip).not.toHaveBeenCalled();
+  expect(ctx.drawImage).toHaveBeenCalledWith(expect.anything(), 100, 247, 480, 456);
 });
