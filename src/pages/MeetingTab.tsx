@@ -2143,7 +2143,7 @@ export default function MeetingTab() {
         await api(`/${reschedulingMeeting._id}`, "PUT", { startsAt, version: reschedulingMeeting.__v });
         setCalendarMonth(vietnamDateTime(startsAt).slice(0, 7));
         await refresh();
-        toast.success("Đã chuyển cuộc họp sang ngày mới.");
+        toast.success("Dời lịch thành công");
       }} />}
       <ConfirmDialog isOpen={Boolean(cancellingMeeting)} title="Hủy buổi họp này?" description={`Hủy cuộc họp “${cancellingMeeting?.title || ""}”? Cuộc họp sẽ được đánh dấu Đã hủy. Các buổi khác không thay đổi.`} confirmLabel="Hủy buổi họp" cancelLabel="Giữ lịch" isSubmitting={isCancelling} onClose={() => setCancellingMeeting(null)} onConfirm={async () => {
         if (!cancellingMeeting || isCancelling) return;
