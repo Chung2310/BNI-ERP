@@ -1,3 +1,4 @@
+import { normalizeLoginIdentifier } from "../../src/utils/loginIdentifier";
 import { Router } from "express";
 import Joi from "joi";
 import { authController } from "../controller/auth.controller";
@@ -12,7 +13,7 @@ import { importUsers, UserImportError } from "../service/user-import.service";
 
 export const authRouter = Router();
 
-authRouter.post("/users/import", requireAuth as any, requireRole(["admin"]) as any, requirePermission("access:manage") as any, async (req: any, res) => {
+authRouter.post("/users/import", requireAuth, requireRole(["admin"]), requirePermission("access:manage"), async (req, res) => {
   try { res.json({ data: await importUsers(req.body, req.user) }); }
   catch (error) { res.status(error instanceof UserImportError ? error.status : 500).json({ message: error instanceof UserImportError ? error.message : "Không thể nhập tài khoản. Vui lòng thử lại." }); }
 });
@@ -50,7 +51,6 @@ export const createBranchOwnerSchema = { body: Joi.object({
   password: Joi.string().min(6).required(),
   phone: Joi.string().trim().max(32).allow("").optional(),
   birthDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow(""),
-  qualification: Joi.string().trim().max(200).allow("").optional(),
 }).unknown(false) };
 
 const registerSchema = {
@@ -72,15 +72,11 @@ const registerSchema = {
     photoURL: Joi.string().uri().optional().allow("").messages({
       "string.uri": "photoURL phải là một đường dẫn URL hợp lệ.",
     }),
-    // Lưu ý bảo mật: KHÔNG cho phép client tự đặt role/companyCode/level/parentId qua
+    // Lưu ý bảo mật: KHÔNG cho phép client tự đặt role/companyCode/parentId qua
     // endpoint đăng ký công khai này — các trường đó chỉ được gán qua
     // register-company/register-user (đã kiểm tra xác thực + phân quyền).
     companyName: Joi.string().optional().allow(""),
     branchId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow(""),
-    jobTitle: Joi.string().optional().allow(""),
-    qualification: Joi.string().max(200).optional().allow(""),
-    department: Joi.string().optional().allow(""),
-    division: Joi.string().optional().allow(""),
     monthlySalary: Joi.number().min(0).optional(),
     phone: Joi.string().pattern(vnPhoneRegex).optional().allow("").messages({
       "string.pattern.base": "Số điện thoại Việt Nam không đúng định dạng (ví dụ: 0987654321).",
@@ -88,18 +84,13 @@ const registerSchema = {
   }),
 };
 
-const loginSchema = {
+const loginIdentifierSchema = Joi.string().trim().max(254).custom((value, helpers) => normalizeLoginIdentifier(value) ? value : helpers.error("any.invalid"));
+export const loginSchema = {
   body: Joi.object({
-    email: Joi.string().pattern(emailRegex).required().messages({
-      "any.required": "Trường 'email' là bắt buộc và không thể thiếu.",
-      "string.empty": "Trường 'email' không được để trống.",
-      "string.pattern.base": "Địa chỉ email không đúng định dạng.",
-    }),
-    password: Joi.string().required().messages({
-      "any.required": "Trường 'password' là bắt buộc và không thể thiếu.",
-      "string.empty": "Trường 'password' không được để trống.",
-    }),
-  }),
+    identifier: loginIdentifierSchema,
+    email: loginIdentifierSchema,
+    password: Joi.string().required(),
+  }).xor("identifier", "email"),
 };
 
 const updateProfileSchema = {
@@ -114,53 +105,12 @@ const updateProfileSchema = {
     industry: Joi.string().optional().allow(""),
     phone: Joi.string().pattern(vnPhoneRegex).optional().allow(""),
     birthDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow("", null),
+    gender: Joi.string().valid("male", "female", "other").optional().allow(""),
+    address: Joi.string().trim().max(300).optional().allow(""),
+    targetMarket: Joi.string().trim().max(500).optional().allow(""),
     companyName: Joi.string().optional().allow(""),
     photoUploadToken: Joi.string().trim().optional(),
     coverUploadToken: Joi.string().trim().optional(),
-    facebookIntegration: Joi.object({
-      isConnected: Joi.boolean().required(),
-      pageId: Joi.string().allow(""),
-      pageName: Joi.string().allow(""),
-      pageAccessToken: Joi.string().allow(""),
-      connectedAt: Joi.date().optional(),
-      isMock: Joi.boolean().optional(),
-    }).optional().allow(null),
-    tiktokIntegration: Joi.object({
-      isConnected: Joi.boolean().required(),
-      username: Joi.string().allow(""),
-      displayName: Joi.string().allow(""),
-      avatarUrl: Joi.string().uri().optional().allow(""),
-      accessToken: Joi.string().allow(""),
-      refreshToken: Joi.string().optional().allow(""),
-      tokenExpiredAt: Joi.date().optional().allow(null),
-      clientKey: Joi.string().optional().allow(""),
-      clientSecret: Joi.string().optional().allow(""),
-      scopes: Joi.array().items(Joi.string()).optional(),
-      connectedAt: Joi.date().optional(),
-      privacyLevel: Joi.string().optional(),
-      isMock: Joi.boolean().optional(),
-    }).optional().allow(null),
-    zaloIntegration: Joi.object({
-      isConnected: Joi.boolean().required(),
-      oaId: Joi.string().allow(""),
-      oaName: Joi.string().allow(""),
-      accessToken: Joi.string().allow(""),
-      refreshToken: Joi.string().allow(""),
-      tokenExpiredAt: Joi.date().optional(),
-      connectedAt: Joi.date().optional(),
-      isMock: Joi.boolean().optional(),
-    }).optional().allow(null),
-    aiAutoReplyConfig: Joi.object({
-      enabled: Joi.boolean().required(),
-      autoClassify: Joi.boolean().required(),
-      autoCloseDeal: Joi.boolean().required(),
-      autoFeedback: Joi.boolean().required(),
-      replyDelay: Joi.number().required(),
-      advancedInstructions: Joi.string().allow(""),
-      trainingKnowledge: Joi.string().allow(""),
-      model: Joi.string().allow("").optional(),
-      disabledAt: Joi.string().isoDate().allow(null).optional(),
-    }).optional().allow(null),
   }),
 };
 
@@ -174,24 +124,21 @@ authRouter.post("/login", loginAccountRateLimiter, authRateLimiter, validateRequ
 authRouter.post("/refresh-token", refreshTokenRateLimiter, authController.refreshToken);
 
 // Đăng xuất tài khoản (yêu cầu Access Token)
-authRouter.post("/logout", requireAuth as any, authController.logout as any);
+authRouter.post("/logout", requireAuth, authController.logout);
 
 // Lấy thông tin tài khoản hiện tại (yêu cầu Access Token)
-authRouter.get("/me", requireAuth as any, authController.getMe as any);
+authRouter.get("/me", requireAuth, authController.getMe);
 const deleteOwnAccountSchema = {
   body: Joi.object({
     password: Joi.string().max(1024).required(),
     confirmation: Joi.string().valid("XÓA TÀI KHOẢN").required(),
   }),
 };
-authRouter.delete("/me", requireAuth as any, authRateLimiter, validateRequest(deleteOwnAccountSchema), authController.deleteOwnAccount as any);
+authRouter.delete("/me", requireAuth, authRateLimiter, validateRequest(deleteOwnAccountSchema), authController.deleteOwnAccount);
 
-authRouter.get("/telegram-link", requireAuth as any, authController.getTelegramLinkStatus as any);
-authRouter.post("/telegram-link", requireAuth as any, authController.createTelegramLinkCode as any);
-authRouter.delete("/telegram-link", requireAuth as any, authController.unlinkTelegram as any);
 
 // Cập nhật thông tin tài khoản hiện tại (yêu cầu Access Token)
-authRouter.patch("/profile", requireAuth as any, validateRequest(updateProfileSchema), authController.updateProfile as any);
+authRouter.patch("/profile", requireAuth, validateRequest(updateProfileSchema), authController.updateProfile);
 
 const changePasswordSchema = {
   body: Joi.object({
@@ -204,7 +151,7 @@ const changePasswordSchema = {
 };
 
 // Thay đổi mật khẩu người dùng hiện tại (yêu cầu Access Token)
-authRouter.post("/change-password", authRateLimiter, requireAuth as any, validateRequest(changePasswordSchema), authController.changePassword as any);
+authRouter.post("/change-password", authRateLimiter, requireAuth, validateRequest(changePasswordSchema), authController.changePassword);
 
 const registerCompanySchema = {
   body: Joi.object({
@@ -237,7 +184,7 @@ const registerCompanySchema = {
 };
 
 // Đăng ký doanh nghiệp và tài khoản Admin (yêu cầu Access Token và vai trò admin)
-authRouter.post("/register-company", requireAuth as any, requireRole(["admin"]) as any, validateRequest(registerCompanySchema), authController.registerCompany as any);
+authRouter.post("/register-company", requireAuth, requireRole(["admin"]), validateRequest(registerCompanySchema), authController.registerCompany);
 
 const registerUserSchema = {
   body: Joi.object({
@@ -263,31 +210,28 @@ const registerUserSchema = {
     industry: Joi.string().optional().allow(""),
     photoURL: Joi.string().optional().allow(""),
     coverImage: Joi.string().optional().allow(""),
+    galleryImages: Joi.array().items(Joi.string().uri()).max(5).optional(),
+    galleryUploadTokens: Joi.array().items(Joi.object({
+      index: Joi.number().integer().min(0).max(4).required(),
+      uploadToken: Joi.string().trim().required(),
+    }).unknown(false)).max(5).optional(),
     parentId: Joi.string().optional().allow(""),
-    level: Joi.number().integer().optional(),
-    department: Joi.string().optional().allow(""),
-    division: Joi.string().optional().allow(""),
-    isLeader: Joi.boolean().optional(),
-    heygenAccess: Joi.object({
-      avatarIds: Joi.array().items(Joi.string().allow("")).optional(),
-      avatarId: Joi.string().optional().allow(""),
-      voiceId: Joi.string().optional().allow(""),
-      apiKey: Joi.string().optional().allow(""),
-    }).optional(),
     monthlySalary: Joi.number().min(0).optional(),
     birthDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow("", null),
+    gender: Joi.string().valid("male", "female", "other").optional().allow(""),
+    address: Joi.string().trim().max(300).optional().allow(""),
+    targetMarket: Joi.string().trim().max(500).optional().allow(""),
     phone: Joi.string().pattern(vnPhoneRegex).optional().allow("").messages({
       "string.pattern.base": "Số điện thoại Việt Nam không đúng định dạng (ví dụ: 0987654321).",
     }),
     branchId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow("", null),
     jobDescriptionLink: Joi.string().uri().optional().allow(""),
     jobDescriptionUploadToken: Joi.string().trim().optional(),
-    qualification: Joi.string().max(200).optional().allow(""),
   }),
 };
 
 // Đăng ký thành viên mới của doanh nghiệp (yêu cầu Access Token và quyền access:manage)
-authRouter.post("/register-user", requireAuth as any, requirePermission("access:manage") as any, validateRequest(registerUserSchema), authController.registerUser as any);
+authRouter.post("/register-user", requireAuth, requirePermission("access:manage"), validateRequest(registerUserSchema), authController.registerUser);
 
 const getUsersSchema = {
   query: Joi.object({
@@ -297,22 +241,22 @@ const getUsersSchema = {
 };
 
 // Lấy danh sách thành viên cùng công ty cho tất cả user (để dùng trong tính năng chia sẻ tài nguyên, chat...)
-authRouter.get("/users/colleagues", requireAuth as any, authController.getColleagues as any);
+authRouter.get("/users/colleagues", requireAuth, authController.getColleagues);
 
 // Lấy danh sách thành viên doanh nghiệp (yêu cầu Access Token và quyền access:read)
 // hr:read cũng được chấp nhận: xem danh sách nhân sự là một phần tự nhiên của "Xem nhân sự"
 // (sơ đồ tổ chức, lịch, giao việc trong module HR đều cần roster này để hiển thị).
-authRouter.get("/users", requireAuth as any, requirePermission(["access:read", "hr:read"]) as any, validateRequest(getUsersSchema), authController.getUsers as any);
-authRouter.get("/users/:id/activity", requireAuth as any, requireRole(["admin"]) as any, async (_req: any, res) => {
+authRouter.get("/users", requireAuth, requirePermission(["access:read", "hr:read"]), validateRequest(getUsersSchema), authController.getUsers);
+authRouter.get("/users/:id/activity", requireAuth, requireRole(["admin"]), async (_req, res) => {
   return res.json({ items: [], total: 0 });
 });
 
-authRouter.get("/current-ip", requireAuth as any, requirePermission("access:manage") as any, branchController.currentIp as any);
-authRouter.get("/branches", requireAuth as any, requirePermission(["access:read", "hr:read"]) as any, branchController.list as any);
-authRouter.post("/branches", requireAuth as any, requirePermission("access:manage") as any, validateRequest(createBranchSchema), branchController.create as any);
-authRouter.post("/branches/:id/owner", requireAuth as any, requirePermission("access:manage") as any, validateRequest(createBranchOwnerSchema), branchController.createOwner as any);
-authRouter.delete("/branches/:id/pending", requireAuth as any, requirePermission("access:manage") as any, branchController.removePending as any);
-authRouter.patch("/branches/:id", requireAuth as any, requirePermission("access:manage") as any, validateRequest(updateBranchSchema), branchController.update as any);
+authRouter.get("/current-ip", requireAuth, requirePermission("access:manage"), branchController.currentIp);
+authRouter.get("/branches", requireAuth, requirePermission(["access:read", "hr:read"]), branchController.list);
+authRouter.post("/branches", requireAuth, requirePermission("access:manage"), validateRequest(createBranchSchema), branchController.create);
+authRouter.post("/branches/:id/owner", requireAuth, requirePermission("access:manage"), validateRequest(createBranchOwnerSchema), branchController.createOwner);
+authRouter.delete("/branches/:id/pending", requireAuth, requirePermission("access:manage"), branchController.removePending);
+authRouter.patch("/branches/:id", requireAuth, requirePermission("access:manage"), validateRequest(updateBranchSchema), branchController.update);
 
 const companyCodeParamSchema = {
   params: Joi.object({
@@ -327,30 +271,30 @@ const companyCodeParamSchema = {
 // Lưu ý: callback phải đặt TRƯỚC route "/companies/:code/drive" để không bị nuốt bởi ":code".
 authRouter.get(
   "/companies/drive/oauth-callback",
-  authController.driveOAuthCallback as any
+  authController.driveOAuthCallback
 );
 
 authRouter.get(
   "/companies/:code/drive",
-  requireAuth as any,
+  requireAuth,
   validateRequest(companyCodeParamSchema),
-  authController.getCompanyDriveConfig as any
+  authController.getCompanyDriveConfig
 );
 
 authRouter.get(
   "/companies/:code/drive/oauth-url",
-  requireAuth as any,
-  requirePermission("resource:manage") as any,
+  requireAuth,
+  requirePermission("resource:manage"),
   validateRequest(companyCodeParamSchema),
-  authController.getDriveOAuthUrl as any
+  authController.getDriveOAuthUrl
 );
 
 authRouter.post(
   "/companies/:code/drive/disconnect",
-  requireAuth as any,
-  requirePermission("resource:manage") as any,
+  requireAuth,
+  requirePermission("resource:manage"),
   validateRequest(companyCodeParamSchema),
-  authController.disconnectDrive as any
+  authController.disconnectDrive
 );
 
 
@@ -363,12 +307,7 @@ const bulkUpdateUsersSchema = {
           "string.pattern.base": "ID người dùng không đúng định dạng.",
         }),
         parentId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow(null, ""),
-        level: Joi.number().integer().optional(),
         role: Joi.string().optional(),
-        department: Joi.string().optional().allow(""),
-        division: Joi.string().optional().allow(""),
-        jobTitle: Joi.string().optional().allow(""),
-    qualification: Joi.string().max(200).optional().allow(""),
       })
     ).required().messages({
       "any.required": "Danh sách 'updates' là bắt buộc.",
@@ -386,12 +325,6 @@ const updateUserSchema = {
   body: Joi.object({
     role: Joi.string().optional(),
     parentId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow(null, ""),
-    level: Joi.number().integer().optional(),
-    department: Joi.string().optional().allow(""),
-    division: Joi.string().optional().allow(""),
-    jobTitle: Joi.string().optional().allow(""),
-    qualification: Joi.string().max(200).optional().allow(""),
-    isLeader: Joi.boolean().optional(),
     displayName: Joi.string().optional().allow(""),
     email: Joi.string().pattern(emailRegex).optional(),
     password: Joi.string().min(6).optional().allow(""),
@@ -400,13 +333,15 @@ const updateUserSchema = {
     industry: Joi.string().optional().allow(""),
     photoURL: Joi.string().optional().allow(""),
     coverImage: Joi.string().optional().allow(""),
+    galleryImages: Joi.array().items(Joi.string().uri()).max(5).optional(),
+    galleryUploadTokens: Joi.array().items(Joi.object({
+      index: Joi.number().integer().min(0).max(4).required(),
+      uploadToken: Joi.string().trim().required(),
+    }).unknown(false)).max(5).optional(),
+    gender: Joi.string().valid("male", "female", "other").optional().allow(""),
+    address: Joi.string().trim().max(300).optional().allow(""),
+    targetMarket: Joi.string().trim().max(500).optional().allow(""),
     branchId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow("", null),
-    heygenAccess: Joi.object({
-      avatarIds: Joi.array().items(Joi.string().allow("")).optional(),
-      avatarId: Joi.string().optional().allow(""),
-      voiceId: Joi.string().optional().allow(""),
-      apiKey: Joi.string().optional().allow(""),
-    }).optional(),
     monthlySalary: Joi.number().min(0).optional(),
     birthDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow("", null),
     phone: Joi.string().pattern(vnPhoneRegex).optional().allow("").messages({
@@ -427,10 +362,10 @@ const deleteUserSchema = {
 };
 
 // Cập nhật cấu trúc sơ đồ tổ chức hàng loạt (yêu cầu Access Token và quyền access:manage)
-authRouter.patch("/users/bulk", requireAuth as any, requirePermission("access:manage") as any, validateRequest(bulkUpdateUsersSchema), authController.bulkUpdateUsers as any);
+authRouter.patch("/users/bulk", requireAuth, requirePermission("access:manage"), validateRequest(bulkUpdateUsersSchema), authController.bulkUpdateUsers);
 
 // Cập nhật chi tiết một thành viên (yêu cầu Access Token, quyền access:manage, thuộc cùng công ty và thuộc nhánh quản lý nếu là manager)
-authRouter.patch("/users/:id", requireAuth as any, requirePermission("access:manage") as any, requireCompanyAccess(UserModel, "id") as any, requireHierarchyAccess("id") as any, validateRequest(updateUserSchema), authController.updateUser as any);
+authRouter.patch("/users/:id", requireAuth, requirePermission("access:manage"), requireCompanyAccess(UserModel, "id"), requireHierarchyAccess("id"), validateRequest(updateUserSchema), authController.updateUser);
 
 // Xóa thành viên và điều chuyển cấp dưới (yêu cầu Access Token, quyền access:manage, thuộc cùng công ty và thuộc nhánh quản lý nếu là manager)
-authRouter.delete("/users/:id", requireAuth as any, requirePermission("access:manage") as any, requireCompanyAccess(UserModel, "id") as any, requireHierarchyAccess("id") as any, validateRequest(deleteUserSchema), authController.deleteUser as any);
+authRouter.delete("/users/:id", requireAuth, requirePermission("access:manage"), requireCompanyAccess(UserModel, "id"), requireHierarchyAccess("id"), validateRequest(deleteUserSchema), authController.deleteUser);

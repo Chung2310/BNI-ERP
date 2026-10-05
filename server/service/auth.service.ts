@@ -1,3 +1,5 @@
+import { findLoginAccount } from "../utils/login-account";
+import { stripLegacyUserFields } from "../utils/legacy-user-fields";
 import { verifySelfAccountDeletion } from "./self-account-deletion";
 import { PushSubscriptionModel } from "../model/push-subscription.model";
 import jwt from "jsonwebtoken";
@@ -7,12 +9,9 @@ import { UserModel } from "../model/user.model";
 import { normalizeBirthDate } from "./birth-date";
 import { CompanyModel } from "../model/company.model";
 import { RolePermissionModel } from "../model/role-permission.model";
-import { TelegramSessionModel } from "../model/telegram-session.model";
-import { TelegramLinkTokenModel } from "../model/telegram-link-token.model";
 import { DEFAULT_ROLE_LEVELS } from "../middleware/auth";
 import { IUser } from "../interface/user.interface";
 import { ICompany } from "../interface/company.interface";
-import { TelegramLinkStatus } from "../interface/telegram-link.interface";
 import { pickSelfServiceProfileUpdate } from "../utils/self-service-profile-update";
 import { filterModulesForBusinessType, resolveBusinessType } from "../config/business-types";
 import { resolveCompanyModuleUpdate } from "./auth-company-modules";
@@ -20,23 +19,6 @@ import { clearModuleCache } from "../middleware/require-module";
 import { createCompanyAdminUser } from "../utils/company-admin-user";
 
 import { getJwtAccessSecret, getJwtRefreshSecret } from "../config/env";
-const TELEGRAM_LINK_CODE_TTL_MS = 5 * 60 * 1000;
-export const REGULAR_SESSION_REPLACED_CODE = "SESSION_REPLACED";
-export const REGULAR_SESSION_REPLACED_EVENT = "auth:session-replaced";
-export const REGULAR_SESSION_REPLACED_MESSAGE = "Phiên đăng nhập đã được sử dụng trên thiết bị khác. Vui lòng đăng nhập lại.";
-
-function assertRegularSessionCurrent(user: IUser, sessionId?: string) {
-  if (!sessionId || user.activeSessionId !== sessionId) {
-    const error = new Error(REGULAR_SESSION_REPLACED_MESSAGE);
-    (error as Error & { code?: string }).code = REGULAR_SESSION_REPLACED_CODE;
-    throw error;
-  }
-}
-
-function generateTelegramLinkCode() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase();
-}
-
 /**
  * Chặn đăng nhập/làm mới token cho tài khoản bị vô hiệu hoá hoặc thuộc doanh nghiệp không còn active.
  */
@@ -61,8 +43,6 @@ export const authService = {
     // The user record no longer exists, so existing access/refresh tokens cannot authenticate.
     try { disconnectUserSockets(userId); } catch (error) { console.error("[deleteOwnAccount] Socket cleanup failed", error); }
     const cleanup = await Promise.allSettled([
-      TelegramSessionModel.deleteMany({ userId }),
-      TelegramLinkTokenModel.deleteMany({ userId }),
       PushSubscriptionModel.deleteMany({ uid: userId }),
     ]);
     if (cleanup.some((result) => result.status === "rejected")) {
@@ -90,7 +70,7 @@ export const authService = {
   /**
    * Đăng ký tài khoản người dùng mới
    */
-  async register(data: any): Promise<IUser> {
+  async register(data: Partial<IUser>): Promise<IUser> {
     const emailLower = data.email.toLowerCase().trim();
     const existingUser = await UserModel.findOne({ email: emailLower });
 
@@ -104,16 +84,13 @@ export const authService = {
     }
 
     // Đăng ký công khai (không xác thực): chỉ nhận các trường hồ sơ cơ bản,
-    // TUYỆT ĐỐI không cho client tự đặt role/companyCode/level/parentId —
+    // TUYỆT ĐỐI không cho client tự đặt role/companyCode/parentId —
     // các trường này chỉ được gán qua register-company/register-user (đã kiểm tra phân quyền).
     const newUser = new UserModel({
       email: emailLower,
       password: hashedPassword,
       displayName: data.displayName,
       photoURL: data.photoURL,
-      jobTitle: data.jobTitle,
-      department: data.department,
-      division: data.division,
       phone: data.phone,
       role: "user",
     });
@@ -124,11 +101,10 @@ export const authService = {
   /**
    * Đăng nhập tài khoản
    */
-  async login(email: string, password?: string, requestMetadata?: any) {
-    const emailLower = email.toLowerCase().trim();
-    const user = await UserModel.findOne({ email: emailLower });
+  async login(identifier: string, password?: string) {
+    const user = await findLoginAccount(identifier);
 
-    if (!user) {
+    if (!user || !user.password) {
       throw new Error("Tài khoản hoặc mật khẩu không chính xác.");
     }
 
@@ -143,25 +119,8 @@ export const authService = {
 
     await assertAccountUsable(user);
 
-    const previousSessionId = user.activeSessionId;
-    const sessionId = crypto.randomUUID();
-    const now = new Date();
-    user.activeSessionId = sessionId;
-    user.activeSessionIssuedAt = now;
-    user.activeSessionLastSeenAt = now;
-    user.activeSessionUserAgent = requestMetadata?.userAgent || "";
-    user.activeSessionIp = requestMetadata?.sourceIp || "";
-    await user.save();
-
-    if (previousSessionId && previousSessionId !== sessionId) {
-      const { emitToUserSession } = await import("../socket");
-      emitToUserSession(previousSessionId, REGULAR_SESSION_REPLACED_EVENT, {
-        code: REGULAR_SESSION_REPLACED_CODE,
-        message: REGULAR_SESSION_REPLACED_MESSAGE,
-      });
-    }
-
-    const tokens = this.generateTokens(user, sessionId);
+    // Each device gets its own token pair without replacing other devices' sessions.
+    const tokens = this.generateTokens(user, crypto.randomUUID());
     return { kind: "authenticated" as const, user, ...tokens };
   },
 
@@ -170,7 +129,8 @@ export const authService = {
    */
   async refresh(token: string) {
     try {
-      const decoded = jwt.verify(token, getJwtRefreshSecret()) as any;
+      const decoded = jwt.verify(token, getJwtRefreshSecret());
+      if (typeof decoded === "string") throw new Error("Invalid token payload");
       const user = await UserModel.findById(decoded.id);
 
       if (!user) {
@@ -178,7 +138,6 @@ export const authService = {
       }
 
       await assertAccountUsable(user);
-      assertRegularSessionCurrent(user, decoded.sid);
 
       const payload = {
         id: user._id,
@@ -190,7 +149,7 @@ export const authService = {
 
       const accessToken = jwt.sign(payload, getJwtAccessSecret(), { expiresIn: "15m" });
       return { accessToken };
-    } catch (error) {
+    } catch  {
       throw new Error("Mã làm mới (Refresh Token) đã hết hạn hoặc không hợp lệ.");
     }
   },
@@ -202,74 +161,15 @@ export const authService = {
     return await UserModel.findById(id).select("-password");
   },
 
-  async getTelegramLinkStatus(id: string): Promise<TelegramLinkStatus> {
-    const [session, pendingCode] = await Promise.all([
-      TelegramSessionModel.findOne({ userId: id }).lean(),
-      TelegramLinkTokenModel.findOne({ userId: id }).lean(),
-    ]);
-
-    return {
-      linked: !!session,
-      telegramChatId: session?.telegramChatId ?? null,
-      telegramUserId: session?.telegramUserId ?? null,
-      linkedAt: session?.linkedAt ?? null,
-      pendingCode: pendingCode?.code ?? null,
-      pendingCodeExpiresAt: pendingCode?.expiresAt ?? null,
-      botUsername: String(process.env.TELEGRAM_BOT_USERNAME || "iGEN_ERP_Bot").trim(),
-    };
-  },
-
-  async createTelegramLinkCode(id: string): Promise<TelegramLinkStatus> {
-    const user = await UserModel.findById(id).select("email displayName");
-    if (!user) {
-      throw new Error("Không tìm thấy người dùng.");
-    }
-
-    await TelegramLinkTokenModel.deleteMany({ userId: user._id });
-
-    let created = null;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      try {
-        created = await TelegramLinkTokenModel.create({
-          userId: user._id,
-          email: user.email,
-          displayName: user.displayName || user.email,
-          code: generateTelegramLinkCode(),
-          expiresAt: new Date(Date.now() + TELEGRAM_LINK_CODE_TTL_MS),
-        });
-        break;
-      } catch (error: any) {
-        if (error?.code !== 11000) {
-          throw error;
-        }
-      }
-    }
-
-    if (!created) {
-      throw new Error("Không thể tạo mã liên kết Telegram. Vui lòng thử lại.");
-    }
-
-    return this.getTelegramLinkStatus(id);
-  },
-
-  async unlinkTelegram(id: string): Promise<TelegramLinkStatus> {
-    await Promise.all([
-      TelegramSessionModel.deleteMany({ userId: id }),
-      TelegramLinkTokenModel.deleteMany({ userId: id }),
-    ]);
-
-    return this.createTelegramLinkCode(id);
-  },
-
   /**
    * Cập nhật thông tin tài khoản người dùng (tự phục vụ - self-service).
    * Chỉ cho phép cập nhật các trường hồ sơ cá nhân, KHÔNG bao giờ cho phép
-   * client tự đổi role/companyCode/level/parentId qua endpoint này (chặn leo thang đặc quyền).
+   * client tự đổi role/companyCode/parentId qua endpoint này (chặn leo thang đặc quyền).
    */
-  async updateProfile(id: string, updateData: any): Promise<IUser | null> {
+  async updateProfile(id: string, updateData: Partial<IUser>): Promise<IUser | null> {
     const safeUpdateData = pickSelfServiceProfileUpdate(updateData);
     if (safeUpdateData.birthDate !== undefined) {
-      safeUpdateData.birthDate = normalizeBirthDate(safeUpdateData.birthDate as any);
+      safeUpdateData.birthDate = normalizeBirthDate(safeUpdateData.birthDate);
     }
     safeUpdateData.updatedAt = new Date();
     return await UserModel.findByIdAndUpdate(id, { $set: safeUpdateData }, { returnDocument: 'after' }).select("-password");
@@ -286,7 +186,7 @@ export const authService = {
   /**
    * Đăng ký doanh nghiệp mới và tài khoản admin tương ứng
    */
-  async registerCompanyAndAdmin(data: any): Promise<any> {
+  async registerCompanyAndAdmin(data: { companyName: string; companyCode: string; ownerName: string; ownerEmail: string; ownerPassword: string; enabledModules?: string[]; businessType?: string; entityPreset?: string }) {
     const { companyName, companyCode, ownerName, ownerEmail, ownerPassword, enabledModules, businessType: businessTypeInput, entityPreset } = data;
     const normalizedCode = companyCode.toUpperCase().trim();
     const emailLower = ownerEmail.toLowerCase().trim();
@@ -327,130 +227,10 @@ export const authService = {
   },
 
   /**
-   * Lấy danh sách người dùng theo bộ lọc, tự động seed cấu trúc sơ đồ mẫu nếu doanh nghiệp mới trống
+   * Lấy danh sách thành viên theo bộ lọc
    */
   async getUsers(filter: { companyCode?: string } = {}): Promise<IUser[]> {
-    let users = await UserModel.find(filter).select("-password").sort({ createdAt: -1 });
-
-    // Tự động seed sơ đồ tổ chức mẫu nếu cấu hình SEED_MOCK_USERS=true và có <= 1 thành viên
-    if (process.env.SEED_MOCK_USERS === "true" && filter.companyCode && filter.companyCode !== "SYSTEM" && users.length <= 1) {
-      const companyCode = filter.companyCode;
-      let ceo = users.find(u => u.role === "admin");
-      if (!ceo) {
-        ceo = users[0];
-      }
-
-      if (ceo) {
-        const companyName = ceo.companyName || companyCode;
-
-        // 1. Cập nhật CEO gốc
-        await UserModel.findByIdAndUpdate(ceo._id, {
-          $set: {
-            jobTitle: "CEO",
-            department: "Ban Giám Đốc",
-            division: "Ban Giám Đốc",
-            phone: ceo.phone || "0901234567",
-            photoURL: ceo.photoURL || "👨‍💼",
-            level: 1,
-            status: "online"
-          }
-        });
-
-        // 2. Danh sách nhân sự mẫu
-        const mockEmployees = [
-          { email: `hai.nl@${companyCode.toLowerCase()}.vn`, displayName: "Nguyễn Lê Hải", jobTitle: "Chief Operations Officer (COO)", department: "Ban Giám Đốc", phone: "0901112223", photoURL: "👨‍💻", level: 2, parentId: ceo._id.toString(), role: "admin", division: "Khối Vận Hành", status: "online" },
-          { email: `anh.tm@${companyCode.toLowerCase()}.vn`, displayName: "Trần Mai Anh", jobTitle: "Chief CMO", department: "Ban Giám Đốc", phone: "0903334445", photoURL: "👩‍💼", level: 2, parentId: ceo._id.toString(), role: "admin", division: "Khối Marketing", status: "online" },
-          { email: `huy.hg@${companyCode.toLowerCase()}.vn`, displayName: "Hoàng Gia Huy", jobTitle: "Trưởng phòng Kho vận", department: "Phòng Kho Vận", phone: "0905556667", photoURL: "📦", level: 3, role: "user", division: "Khối Vận Hành", status: "online" },
-          { email: `tuan.lq@${companyCode.toLowerCase()}.vn`, displayName: "Lưu Quốc Tuấn", jobTitle: "Trưởng phòng Marketing", department: "Phòng Marketing", phone: "0907778889", photoURL: "📣", level: 3, role: "user", division: "Khối Marketing", status: "offline" },
-          { email: `vy.nb@${companyCode.toLowerCase()}.vn`, displayName: "Nguyễn Bích Vy", jobTitle: "Trưởng phòng Sales CRM", department: "Phòng Sales", phone: "0908889990", photoURL: "👩‍💻", level: 3, role: "user", division: "Khối Sales", status: "online" },
-          { email: `sang.ln@${companyCode.toLowerCase()}.vn`, displayName: "Lê Ngọc Sang", jobTitle: "Chuyên viên Vận chuyển", department: "Phòng Kho Vận", phone: "0909990001", photoURL: "🚛", level: 4, role: "user", division: "Khối Vận Hành", status: "offline" },
-          { email: `nam.pd@${companyCode.toLowerCase()}.vn`, displayName: "Phan Đình Nam", jobTitle: "AI Copywriter Specialist", department: "Phòng Marketing", phone: "0909990002", photoURL: "💡", level: 4, role: "user", division: "Khối Marketing", status: "online" },
-          { email: `linh.vt@${companyCode.toLowerCase()}.vn`, displayName: "Vũ Thùy Linh", jobTitle: "Chăm sóc khách hàng VIP", department: "Phòng Sales", phone: "0909990003", photoURL: "👩‍⚕️", level: 4, role: "user", division: "Khối Sales", status: "online" }
-        ];
-
-        // Tạo COO & CMO
-        const createdUsers: Record<string, string> = {};
-
-        const coo = new UserModel({
-          ...mockEmployees[0],
-          companyCode,
-          companyName,
-          password: await bcrypt.hash("123456", 10)
-        });
-        await coo.save();
-        createdUsers["MOCK_hai"] = coo._id.toString();
-
-        const cmo = new UserModel({
-          ...mockEmployees[1],
-          companyCode,
-          companyName,
-          password: await bcrypt.hash("123456", 10)
-        });
-        await cmo.save();
-        createdUsers["MOCK_anh"] = cmo._id.toString();
-
-        // Tạo các phòng ban
-        const lpKv = new UserModel({
-          ...mockEmployees[2],
-          companyCode,
-          companyName,
-          password: await bcrypt.hash("123456", 10),
-          parentId: createdUsers["MOCK_hai"]
-        });
-        await lpKv.save();
-        createdUsers["MOCK_huy"] = lpKv._id.toString();
-
-        const lpMkt = new UserModel({
-          ...mockEmployees[3],
-          companyCode,
-          companyName,
-          password: await bcrypt.hash("123456", 10),
-          parentId: createdUsers["MOCK_anh"]
-        });
-        await lpMkt.save();
-        createdUsers["MOCK_tuan"] = lpMkt._id.toString();
-
-        const lpSales = new UserModel({
-          ...mockEmployees[4],
-          companyCode,
-          companyName,
-          password: await bcrypt.hash("123456", 10),
-          parentId: createdUsers["MOCK_hai"]
-        });
-        await lpSales.save();
-        createdUsers["MOCK_vy"] = lpSales._id.toString();
-
-        // Tạo cấp dưới trực thuộc
-        const cvVc = new UserModel({
-          ...mockEmployees[5],
-          companyCode,
-          companyName,
-          password: await bcrypt.hash("123456", 10),
-          parentId: createdUsers["MOCK_huy"]
-        });
-        await cvVc.save();
-
-        const aiCopy = new UserModel({
-          ...mockEmployees[6],
-          companyCode,
-          companyName,
-          password: await bcrypt.hash("123456", 10),
-          parentId: createdUsers["MOCK_tuan"]
-        });
-        await aiCopy.save();
-
-        const csKh = new UserModel({
-          ...mockEmployees[7],
-          companyCode,
-          companyName,
-          password: await bcrypt.hash("123456", 10),
-          parentId: createdUsers["MOCK_vy"]
-        });
-        await csKh.save();
-
-        users = await UserModel.find(filter).select("-password").sort({ createdAt: -1 });
-      }
-    }
+    const users = await UserModel.find(filter).select("-password").sort({ createdAt: -1 });
 
     return users;
   },
@@ -495,7 +275,7 @@ export const authService = {
 
     // 2. Cập nhật cơ sở dữ liệu cascade nếu thay đổi mã hoặc tên doanh nghiệp
     if ((newCode && newCode !== oldCode) || (newName && newName !== oldName)) {
-      const codeToUse = newCode || oldCode;
+      
       const nameToUse = newName || oldName;
 
       // Cập nhật Users
@@ -528,7 +308,7 @@ export const authService = {
     return savedCompany;
   },
 
-  async getCompanyDriveConfig(companyCode: string): Promise<any> {
+  async getCompanyDriveConfig(companyCode: string) {
     const normalizedCode = String(companyCode || "").trim().toUpperCase();
     const company = await CompanyModel.findOne({ code: normalizedCode });
     if (!company) {
@@ -544,7 +324,7 @@ export const authService = {
   },
 
   /** Lưu OAuth Google Drive sau khi công ty kết nối thành công. */
-  async saveDriveOAuth(companyCode: string, data: { refreshToken: string; email: string }): Promise<any> {
+  async saveDriveOAuth(companyCode: string, data: { refreshToken: string; email: string }) {
     const normalizedCode = String(companyCode || "").trim().toUpperCase();
     const company = await CompanyModel.findOne({ code: normalizedCode });
     if (!company) {
@@ -563,7 +343,7 @@ export const authService = {
   },
 
   /** Ngắt kết nối Google Drive của doanh nghiệp. */
-  async disconnectDrive(companyCode: string): Promise<any> {
+  async disconnectDrive(companyCode: string) {
     const normalizedCode = String(companyCode || "").trim().toUpperCase();
     const company = await CompanyModel.findOne({ code: normalizedCode });
     if (!company) {
@@ -576,7 +356,7 @@ export const authService = {
     return this.getCompanyDriveConfig(normalizedCode);
   },
 
-  async registerUserForCompany(data: any, callerCompanyCode?: string, callerRole?: string): Promise<IUser> {
+  async registerUserForCompany(data: Omit<Partial<IUser>, "birthDate"> & { birthDate?: string | Date }, callerCompanyCode?: string, callerRole?: string): Promise<IUser> {
     const {
       displayName,
       email,
@@ -585,14 +365,11 @@ export const authService = {
       companyCode,
       companyName,
       parentId,
-      level,
-      department,
-      division,
+
       phone,
       jobDescriptionLink,
       branchId,
       birthDate,
-      qualification,
       monthlySalary,
     } = data;
 
@@ -633,13 +410,12 @@ export const authService = {
       }
     }
 
-    const salaryValue = monthlySalary === undefined || monthlySalary === null || monthlySalary === "" ? undefined : Number(monthlySalary);
+    const salaryValue = monthlySalary === undefined || monthlySalary === null || String(monthlySalary) === "" ? undefined : Number(monthlySalary);
     if (salaryValue !== undefined && (!Number.isFinite(salaryValue) || salaryValue < 0)) {
       throw new Error("Lương tháng không hợp lệ.");
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const finalDept = department || (role === "admin" ? "Ban Giám Đốc" : (role === "manager" ? "Quản lý" : "Nhân sự"));
     const newUser = new UserModel({
       email: emailLower,
       password: hashedPassword,
@@ -650,29 +426,21 @@ export const authService = {
       industry: data.industry?.trim() || "",
       branchId: branchId || undefined,
       parentId: parentId || undefined,
-      level: level || (role === "admin" ? 1 : (role === "manager" ? 3 : 4)),
-      department: finalDept,
-      division: division || (role === "admin" ? "Ban Giám Đốc" : (role === "manager" ? "Quản lý" : "Nhân sự")),
-      qualification: qualification?.trim() || "",
+
       monthlySalary: salaryValue,
-      jobTitle: role === "admin" ? "CEO" : (role === "manager" ? "Quản lý phòng ban" : "Nhân viên"),
       phone: phone || "Chưa cập nhật",
       jobDescriptionLink: jobDescriptionLink || "",
       birthDate: normalizeBirthDate(birthDate) || undefined,
+      gender: data.gender || undefined,
+      address: data.address?.trim() || "",
+      targetMarket: data.targetMarket?.trim() || "",
+      galleryImages: Array.isArray(data.galleryImages) ? data.galleryImages.slice(0, 5) : [],
       createdAt: new Date(),
       updatedAt: new Date(),
       status: "offline",
       photoURL: data.photoURL?.trim() || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName.trim())}&background=random&color=fff`,
       coverImage: data.coverImage?.trim() || "",
-      isLeader: data.isLeader || false
     });
-
-    if (data.isLeader === true && finalDept) {
-      await UserModel.updateMany(
-        { companyCode: finalCompanyCode, department: finalDept },
-        { $set: { isLeader: false } }
-      );
-    }
 
     return await newUser.save();
   },
@@ -680,12 +448,13 @@ export const authService = {
   /**
    * Cập nhật thông tin chi tiết một nhân sự (Admin)
    */
-  async updateUser(userId: string, updateData: any, callerCompanyCode: string, callerRole: string, callerId?: string): Promise<IUser | null> {
+  async updateUser(userId: string, updateData: Partial<IUser>, callerCompanyCode: string, callerRole: string, callerId?: string): Promise<IUser | null> {
     const user = await UserModel.findById(userId);
     if (!user) {
       throw new Error("Không tìm thấy người dùng");
     }
 
+    stripLegacyUserFields(updateData);
     if (updateData.birthDate !== undefined) updateData.birthDate = normalizeBirthDate(updateData.birthDate);
 
     const isSelf = Boolean(callerId && user._id.toString() === callerId);
@@ -711,10 +480,8 @@ export const authService = {
       // Self-service may update profile fields, never organizational authority.
       delete updateData.role;
       delete updateData.parentId;
-      delete updateData.level;
       delete updateData.companyCode;
       delete updateData.branchId;
-      delete updateData.isLeader;
       delete updateData.monthlySalary;
     } else {
       delete updateData.companyCode;
@@ -761,27 +528,16 @@ export const authService = {
       }
     }
 
-
-    if (updateData.isLeader === true) {
-      const targetCompany = user.companyCode;
-      const targetDept = updateData.department !== undefined ? updateData.department : user.department;
-      if (targetDept) {
-        await UserModel.updateMany(
-          { companyCode: targetCompany, department: targetDept, _id: { $ne: userId } },
-          { $set: { isLeader: false } }
-        );
-      }
-    }
-
     return await UserModel.findByIdAndUpdate(userId, { $set: updateData }, { returnDocument: 'after' }).select("-password");
   },
 
   /**
    * Cập nhật hàng loạt thông tin nhân sự (ví dụ: kéo thả thay đổi sơ đồ)
    */
-  async bulkUpdateUsers(updates: any[], callerCompanyCode: string, callerRole: string): Promise<void> {
+  async bulkUpdateUsers(updates: Array<Partial<IUser> & { id: string }>, callerCompanyCode: string, callerRole: string): Promise<void> {
     for (const update of updates) {
       const { id, ...data } = update;
+      stripLegacyUserFields(data);
       const user = await UserModel.findById(id);
       if (!user) continue;
 
@@ -833,7 +589,7 @@ export const authService = {
   /**
    * Xóa nhân sự và điều chuyển cấp dưới trực thuộc
    */
-  async deleteUser(userId: string, callerCompanyCode: string, callerRole: string): Promise<void> {
+  async deleteUser(userId: string, callerCompanyCode: string, _callerRole: string): Promise<void> {
     const user = await UserModel.findById(userId);
     if (!user) {
       throw new Error("Không tìm thấy người dùng");
@@ -847,17 +603,10 @@ export const authService = {
     }
 
     const parentId = user.parentId || null;
-    let parentLevel = 1;
-    if (parentId) {
-      const parentUser = await UserModel.findById(parentId);
-      parentLevel = parentUser?.level || 1;
-    }
-
     // Cập nhật tất cả cấp dưới trực thuộc của nhân sự bị xóa
     const children = await UserModel.find({ parentId: userId });
     for (const child of children) {
       child.parentId = parentId || undefined;
-      child.level = parentLevel + 1;
       await child.save();
     }
 

@@ -22,16 +22,11 @@ export function useTabRouter(options?: { enabled?: boolean }) {
 
   console.log(`[useTabRouter] Render: activeTab="${activeTab}", enabled=${enabled}, pathname="${window.location.pathname}"`);
 
-  // Sync tab state when router becomes enabled (e.g. after auth loading finishes)
-  useEffect(() => {
-    if (enabled) {
-      const currentTab = resolveTabFromPath(window.location.pathname);
-      if (activeTab !== currentTab) {
-        console.log(`[useTabRouter] Syncing activeTab from path: pathname="${window.location.pathname}", tab="${currentTab}"`);
-        setActiveTab(currentTab);
-      }
-    }
-  }, [enabled]);
+  const [wasEnabled, setWasEnabled] = useState(enabled);
+  if (wasEnabled !== enabled) {
+    setWasEnabled(enabled);
+    if (enabled) setActiveTab(resolveTabFromPath(window.location.pathname));
+  }
 
   useEffect(() => {
     if (!enabled) return;

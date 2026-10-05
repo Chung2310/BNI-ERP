@@ -1,9 +1,17 @@
+import { findLoginAccount } from "../utils/login-account";
+import type { IUser } from "../interface/user.interface";
 import { Request, Response } from "express";
 import { authService } from "../service/auth.service";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { UserModel } from "../model/user.model";
 import { googleOAuthService } from "../service/google-oauth.service";
 import { CompanyModel } from "../model/company.model";
+
+type UserProfileResponse = Omit<IUser, "businessType"> & {
+  businessType?: string;
+  enabledModules?: string[];
+  companyDrive?: { isConnected: boolean; driveEmail: string; rootFolderId: string; connectedAt?: Date };
+};
 
 function getRequestMetadata(req: Request) {
   return {
@@ -75,7 +83,7 @@ export const authController = {
       await authService.deleteOwnAccount(req.user.id, req.body.password, req.body.confirmation);
       res.clearCookie("refreshToken", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict" });
       return res.status(200).json({ status: "success", message: "Đã xóa tài khoản của bạn." });
-    } catch (error: any) {
+    } catch (error) {
       return res.status(400).json({ status: "error", message: error.message || "Không thể xóa tài khoản." });
     }
   },
@@ -85,7 +93,7 @@ export const authController = {
   async register(req: Request, res: Response) {
     try {
       const user = await authService.register(req.body);
-      const userObj = user.toObject();
+      const userObj = user.toObject() as UserProfileResponse;
       delete userObj.password;
 
       return res.status(201).json({
@@ -93,7 +101,7 @@ export const authController = {
         message: "Đăng ký tài khoản thành công",
         data: userObj,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.register] Error:", error);
       return res.status(400).json({
         status: "error",
@@ -107,8 +115,8 @@ export const authController = {
    */
   async login(req: Request, res: Response) {
     try {
-      const { email, password } = req.body;
-      const result = await authService.login(email, password, getRequestMetadata(req));
+      const { identifier, email, password } = req.body;
+      const result = await authService.login(identifier ?? email, password);
       const { user, accessToken, refreshToken } = result;
 
       // Lưu Refresh Token vào HTTPOnly Cookie bảo mật
@@ -119,14 +127,14 @@ export const authController = {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
       });
 
-      const userObj = user.toObject();
+      const userObj = user.toObject() as UserProfileResponse;
       delete userObj.password;
 
       const company = userObj.companyCode && userObj.companyCode !== "SYSTEM"
         ? await CompanyModel.findOne({ code: userObj.companyCode }).select("driveOAuth driveFolderId").lean()
         : null;
       if (company && company.driveOAuth?.refreshToken) {
-        userObj.googleDriveIntegration = {
+        userObj.companyDrive = {
           isConnected: true,
           driveEmail: company.driveOAuth.connectedEmail || "Company Google Drive",
           rootFolderId: company.driveFolderId || "root",
@@ -146,9 +154,9 @@ export const authController = {
         accessToken,
         user: userObj,
       });
-    } catch (error: any) {
-      const attemptedEmail = String(req.body?.email || "").trim().toLowerCase();
-      if (attemptedEmail) void UserModel.findOne({ email: attemptedEmail }).select("_id companyCode").lean().then((attemptedUser: any) => {
+    } catch (error) {
+      const attemptedIdentifier = req.body?.identifier ?? req.body?.email;
+      if (attemptedIdentifier) void findLoginAccount(attemptedIdentifier).then((attemptedUser) => {
         if (attemptedUser) return recordUserActivity({
           userId: String(attemptedUser._id), companyCode: attemptedUser.companyCode || "SYSTEM", actionType: "auth.login",
           category: "authentication", result: "failure", method: "POST", route: "/api/v1/auth/login",
@@ -183,7 +191,7 @@ export const authController = {
         status: "success",
         accessToken,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.refreshToken] Error:", error);
       return res.status(401).json({
         status: "error",
@@ -197,14 +205,7 @@ export const authController = {
    */
   async logout(req: AuthenticatedRequest, res: Response) {
     try {
-      const userId = req.user?.id;
-      if (userId) {
-        const activeSessionClear = req.user?.sessionId
-          ? { $set: { status: "offline" }, $unset: { activeSessionId: "", activeSessionIssuedAt: "", activeSessionLastSeenAt: "", activeSessionUserAgent: "", activeSessionIp: "" } }
-          : { $set: { status: "offline" } };
-        await UserModel.updateOne({ _id: userId, ...(req.user?.sessionId ? { activeSessionId: req.user.sessionId } : {}) }, activeSessionClear);
-      }
-
+      // Clear only this browser's cookie. Socket disconnect handles presence across devices.
       res.clearCookie("refreshToken", {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -215,7 +216,7 @@ export const authController = {
         status: "success",
         message: "Đăng xuất tài khoản thành công",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.logout] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -248,8 +249,7 @@ export const authController = {
         });
       }
 
-      // console.log(`[Auth getMe] Trả về profile cho user ${user.email}. FBConnected=${user.facebookIntegration?.isConnected}, FBPageId=${user.facebookIntegration?.pageId}`);
-      const userObj = user.toObject();
+      const userObj = user.toObject() as UserProfileResponse;
       const company = userObj.companyCode && userObj.companyCode !== "SYSTEM"
         ? await CompanyModel.findOne({ code: userObj.companyCode }).select("enabledModules businessType driveOAuth driveFolderId").lean()
         : null;
@@ -259,7 +259,7 @@ export const authController = {
       userObj.permissions = await resolveProfilePermissions(userId, userObj.role, userObj.companyCode);
 
       if (company && company.driveOAuth?.refreshToken) {
-        userObj.googleDriveIntegration = {
+        userObj.companyDrive = {
           isConnected: true,
           driveEmail: company.driveOAuth.connectedEmail || "Company Google Drive",
           rootFolderId: company.driveFolderId || "root",
@@ -271,58 +271,13 @@ export const authController = {
         status: "success",
         user: userObj,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[Auth getMe] Error:", error);
       return res.status(500).json({
         status: "error",
         message: "Không thể lấy thông tin người dùng",
         details: error.message,
       });
-    }
-  },
-
-  async getTelegramLinkStatus(req: AuthenticatedRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ status: "error", message: "Người dùng chưa xác thực." });
-      }
-
-      const data = await authService.getTelegramLinkStatus(userId);
-      return res.status(200).json({ status: "success", data });
-    } catch (error: any) {
-      console.error("[authController.getTelegramLinkStatus] Error:", error);
-      return res.status(500).json({ status: "error", message: error.message || "Không thể lấy trạng thái liên kết Telegram." });
-    }
-  },
-
-  async createTelegramLinkCode(req: AuthenticatedRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ status: "error", message: "Người dùng chưa xác thực." });
-      }
-
-      const data = await authService.createTelegramLinkCode(userId);
-      return res.status(200).json({ status: "success", message: "Đã tạo mã liên kết Telegram.", data });
-    } catch (error: any) {
-      console.error("[authController.createTelegramLinkCode] Error:", error);
-      return res.status(500).json({ status: "error", message: error.message || "Không thể tạo mã liên kết Telegram." });
-    }
-  },
-
-  async unlinkTelegram(req: AuthenticatedRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ status: "error", message: "Người dùng chưa xác thực." });
-      }
-
-      const data = await authService.unlinkTelegram(userId);
-      return res.status(200).json({ status: "success", message: "Đã hủy liên kết Telegram.", data });
-    } catch (error: any) {
-      console.error("[authController.unlinkTelegram] Error:", error);
-      return res.status(500).json({ status: "error", message: error.message || "Không thể hủy liên kết Telegram." });
     }
   },
 
@@ -340,13 +295,6 @@ export const authController = {
         });
       }
 
-      if (req.body.facebookIntegration) {
-        // console.log(`[Auth updateProfile] Đang cập nhật Facebook Integration cho User ${userId}:`, JSON.stringify(req.body.facebookIntegration));
-      }
-      if (req.body.tiktokIntegration) {
-        // console.log(`[Auth updateProfile] Đang cập nhật TikTok Integration cho User ${userId}:`, JSON.stringify(req.body.tiktokIntegration));
-      }
-
       const updatedUser = await authService.updateProfile(userId, req.body);
       if (!updatedUser) {
         console.warn(`[Auth updateProfile] Không tìm thấy user với ID: ${userId}`);
@@ -356,7 +304,7 @@ export const authController = {
         });
       }
 
-      const userObj = updatedUser.toObject();
+      const userObj = updatedUser.toObject() as UserProfileResponse;
       if (req.body.photoUploadToken) {
         await profileResourceService.finalizeAvatar({
           companyCode: userObj.companyCode,
@@ -382,7 +330,7 @@ export const authController = {
       userObj.permissions = await resolveProfilePermissions(userId, userObj.role, userObj.companyCode);
 
       if (company && company.driveOAuth?.refreshToken) {
-        userObj.googleDriveIntegration = {
+        userObj.companyDrive = {
           isConnected: true,
           driveEmail: company.driveOAuth.connectedEmail || "Company Google Drive",
           rootFolderId: company.driveFolderId || "root",
@@ -390,13 +338,12 @@ export const authController = {
         };
       }
 
-      // console.log(`[Auth updateProfile] Cập nhật thành công cho user ${updatedUser.email}. FBConnected=${updatedUser.facebookIntegration?.isConnected}, FBPageId=${updatedUser.facebookIntegration?.pageId}`);
       return res.status(200).json({
         status: "success",
         message: "Cập nhật hồ sơ người dùng thành công",
         user: userObj,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[Auth updateProfile] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -426,7 +373,7 @@ export const authController = {
         status: "success",
         message: "Thay đổi mật khẩu thành công",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.changePassword] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -454,7 +401,7 @@ export const authController = {
           admin: adminObj,
         },
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.registerCompany] Error:", error);
       return res.status(400).json({
         status: "error",
@@ -484,13 +431,21 @@ export const authController = {
           actorName: req.user!.email,
         }, userObj, req.body.jobDescriptionUploadToken);
       }
+      if (Array.isArray(req.body.galleryUploadTokens) && req.body.galleryUploadTokens.length > 0) {
+        await profileResourceService.finalizeGallery({
+          companyCode: userObj.companyCode,
+          branchId: userObj.branchId,
+          actorId: req.user!.id,
+          actorName: req.user!.email,
+        }, userObj, req.body.galleryUploadTokens);
+      }
 
       return res.status(201).json({
         status: "success",
         message: "Đăng ký thành viên doanh nghiệp thành công",
         data: userObj,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.registerUser] Error:", error);
       return res.status(400).json({
         status: "error",
@@ -513,7 +468,7 @@ export const authController = {
         status: "success",
         data: users,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.getUsers] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -534,7 +489,7 @@ export const authController = {
         status: "success",
         data: companies,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.getCompanies] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -565,7 +520,7 @@ export const authController = {
         message: "Cập nhật doanh nghiệp thành công",
         data: updatedCompany,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.updateCompany] Error:", error);
       return res.status(400).json({
         status: "error",
@@ -581,7 +536,7 @@ export const authController = {
       }
       const result = await authService.getCompanyDriveConfig(req.params.code);
       return res.status(200).json({ status: "success", data: result });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.getCompanyDriveConfig] Error:", error);
       return res.status(400).json({ status: "error", message: error.message || "Không thể lấy cấu hình Google Drive doanh nghiệp" });
     }
@@ -599,7 +554,7 @@ export const authController = {
       const redirectUri = buildDriveRedirectUri(req);
       const url = googleOAuthService.buildAuthUrl(redirectUri, req.params.code);
       return res.status(200).json({ status: "success", data: { url } });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.getDriveOAuthUrl] Error:", error);
       return res.status(400).json({ status: "error", message: error.message || "Không tạo được link kết nối Google Drive" });
     }
@@ -616,7 +571,7 @@ export const authController = {
       const { refreshToken, email } = await googleOAuthService.exchangeCode(String(code), redirectUri);
       await authService.saveDriveOAuth(String(state), { refreshToken, email });
       return res.send(driveOAuthResultHtml(true, email || "Google Drive"));
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.driveOAuthCallback] Error:", error);
       return res.send(driveOAuthResultHtml(false, error.message || "Kết nối Google Drive thất bại."));
     }
@@ -633,7 +588,7 @@ export const authController = {
       }
       const result = await authService.disconnectDrive(req.params.code);
       return res.status(200).json({ status: "success", message: "Đã ngắt kết nối Google Drive", data: result });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.disconnectDrive] Error:", error);
       return res.status(400).json({ status: "error", message: error.message || "Không thể ngắt kết nối Google Drive" });
     }
@@ -650,7 +605,7 @@ export const authController = {
         status: "success",
         message: "Cập nhật cấu trúc nhân sự thành công",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.bulkUpdateUsers] Error:", error);
       return res.status(400).json({
         status: "error",
@@ -668,7 +623,16 @@ export const authController = {
       const callerRole = req.user?.role;
       const callerCompanyCode = req.user?.companyCode;
 
-      const updatedUser = await authService.updateUser(id, req.body, callerCompanyCode!, callerRole!, req.user?.id);
+      const { galleryUploadTokens = [], ...updateData } = req.body;
+      const updatedUser = await authService.updateUser(id, updateData, callerCompanyCode!, callerRole!, req.user?.id);
+      if (updatedUser && Array.isArray(galleryUploadTokens) && galleryUploadTokens.length > 0) {
+        await profileResourceService.finalizeGallery({
+          companyCode: updatedUser.companyCode,
+          branchId: updatedUser.branchId,
+          actorId: req.user!.id,
+          actorName: req.user!.email,
+        }, updatedUser, galleryUploadTokens);
+      }
       if (updatedUser && req.body.jobDescriptionUploadToken) {
         await employeeDocumentResourceService.finalizeJobDescription({
           companyCode: updatedUser.companyCode,
@@ -683,7 +647,7 @@ export const authController = {
         message: "Cập nhật thông tin nhân sự thành công",
         data: updatedUser,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.updateUser] Error:", error);
       return res.status(400).json({
         status: "error",
@@ -714,7 +678,7 @@ export const authController = {
         status: "success",
         message: "Xóa nhân sự thành công",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.deleteUser] Error:", error);
       return res.status(400).json({
         status: "error",
@@ -736,23 +700,20 @@ export const authController = {
 
       const colleagues = await UserModel.find(
         { companyCode, isDeleted: { $ne: true } },
-        { _id: 1, displayName: 1, email: 1, photoURL: 1, jobTitle: 1, qualification: 1, department: 1, role: 1, isActive: 1 }
+        { _id: 1, displayName: 1, email: 1, photoURL: 1, role: 1, isActive: 1 }
       ).lean();
 
-      const safeColleagues = colleagues.map((colleague: any) => ({
+      const safeColleagues = colleagues.map((colleague) => ({
         _id: colleague._id,
         displayName: colleague.displayName,
         email: colleague.email,
         isActive: colleague.isActive !== false,
         ...(colleague.photoURL ? { photoURL: colleague.photoURL } : {}),
-        ...(colleague.jobTitle ? { jobTitle: colleague.jobTitle } : {}),
-        ...(colleague.qualification ? { qualification: colleague.qualification } : {}),
-        ...(colleague.department ? { department: colleague.department } : {}),
         ...(colleague.role ? { role: colleague.role } : {}),
       }));
 
       return res.status(200).json({ status: "success", data: safeColleagues });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[authController.getColleagues] Error:", error);
       return res.status(500).json({ status: "error", message: "Không thể lấy danh sách đồng nghiệp." });
     }

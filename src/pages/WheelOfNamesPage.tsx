@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Sparkles,
   Trophy,
-  Gift,
   Volume2,
   VolumeX,
   Maximize2,
@@ -11,17 +10,12 @@ import {
   UserPlus,
   Trash2,
   Shuffle,
-  RotateCcw,
   Search,
   X,
   Download,
   Check,
-  Play,
   UserMinus,
-  Settings2,
-  Award,
   ChevronRight,
-  ChevronLeft,
   ArrowLeft,
   RefreshCw,
   Clock,
@@ -35,6 +29,17 @@ import { UserProfile } from "../types";
 import { playTickSound, playWinFanfare, playSuspenseSound } from "../utils/soundEffects";
 import { launchConfetti } from "../utils/confetti";
 import { BRAND_NAME, BRAND_LOGO_PATH } from "../config/brand";
+import { useMeetingLive } from "../components/meetings/useMeetingLive";
+import type { ProfileSlide } from "../components/meetings/slideTypes";
+import { meetingLiveApi } from "../services/meetingLiveService";
+
+async function loadChapterUsers(companyCode?: string): Promise<UserProfile[]> {
+  if (companyCode) {
+    try { return await authService.getUsersByCompany(companyCode); }
+    catch { return authService.getColleagues(); }
+  }
+  try { return await authService.getColleagues(); } catch { return []; }
+}
 
 export type ParticipantType = "member_present" | "member_absent" | "guest";
 export type ParticipantFilterCategory = "all" | "all_members" | "present_members" | "guests";
@@ -43,12 +48,16 @@ interface Participant {
   id: string;
   name: string;
   avatar?: string;
-  department?: string;
+  companyName?: string;
   role?: string;
   selected: boolean;
   isCustom?: boolean;
   type?: ParticipantType;
   checkedInAt?: string;
+  phone?: string;
+  email?: string;
+  industry?: string;
+  bio?: string;
 }
 
 interface WinnerRecord {
@@ -57,7 +66,7 @@ interface WinnerRecord {
   name: string;
   prizeName: string;
   avatar?: string;
-  department?: string;
+  companyName?: string;
   wonAt: string;
 }
 
@@ -129,7 +138,7 @@ export const initBingoBalls = (active: Participant[], cageRadius: number): Bingo
     const y = Math.sin(phi) * dist;
 
     return {
-      participant: p,
+      participant: { ...p },
       ballNumber: i + 1,
       x,
       y,
@@ -151,8 +160,8 @@ export const drawCanvasRoundRect = (
   r: number
 ) => {
   ctx.beginPath();
-  if (typeof (ctx as any).roundRect === "function") {
-    (ctx as any).roundRect(x, y, w, h, r);
+  if (typeof (ctx).roundRect === "function") {
+    (ctx).roundRect(x, y, w, h, r);
   } else {
     ctx.moveTo(x + r, y);
     ctx.lineTo(x + w - r, y);
@@ -210,6 +219,9 @@ export default function WheelOfNamesPage() {
   const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const urlMeetingId = searchParams?.get("meetingId") || searchParams?.get("id");
   const urlGame = searchParams?.get("game");
+  const presentationMode = searchParams?.get("presentation") === "1";
+  const liveState = useMeetingLive(presentationMode ? urlMeetingId || "" : "", true);
+  const [presentationSlides, setPresentationSlides] = useState<ProfileSlide[]>([]);
 
   // State
   const [selectedGame, setSelectedGame] = useState<"wheel" | "bingo">(
@@ -233,7 +245,7 @@ export default function WheelOfNamesPage() {
     setUnsavedResults(previous => [...previous, entry]);
     void saveResult(entry);
   };
-  const [meetingTitle, setMeetingTitle] = useState<string>("");
+  const [, setMeetingTitle] = useState<string>("");
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [winners, setWinners] = useState<WinnerRecord[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -263,6 +275,7 @@ export default function WheelOfNamesPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const currentAngleRef = useRef(0);
   const animationFrameIdRef = useRef<number | null>(null);
+  const lastPresentedDrawIdRef = useRef<string | null>(null);
   const lastTickIndexRef = useRef<number>(-1);
   const pointerBounceRef = useRef(0);
   const lightPhaseRef = useRef(0);
@@ -277,10 +290,32 @@ export default function WheelOfNamesPage() {
   } | null>(null);
 
   // Filtered by Category
-  const categoryParticipants = participants.filter((p) => matchesFilterCategory(p, filterCategory));
+  const categoryParticipants = useMemo(() => participants.filter((p) => matchesFilterCategory(p, filterCategory)), [participants, filterCategory]);
 
   // Active selected participants on the wheel
-  const activeParticipants = categoryParticipants.filter((p) => p.selected);
+  const liveMeeting = liveState.snapshot?.meeting;
+  const currentDrawWinner = liveMeeting?.luckyDraw?.prizes.flatMap(prize => prize.winners || []).find(winner => winner.id === liveMeeting.presentation?.drawWinnerId);
+  const remoteSpinActive = Boolean(currentDrawWinner && liveMeeting?.presentation?.drawRevealsAt && liveState.now < Date.parse(liveMeeting.presentation.drawRevealsAt));
+  const activeParticipants = useMemo(() => {
+    const selected = categoryParticipants.filter(participant => participant.selected);
+    if (!presentationMode || !liveMeeting) return selected;
+    const previousWinnerIds = new Set<string>();
+    if (!liveMeeting.luckyDraw?.allowRepeatWinners) {
+      for (const prize of liveMeeting.luckyDraw?.prizes || []) {
+        for (const winner of prize.winners || []) {
+          previousWinnerIds.add(liveMeeting.luckyDraw.drawMode === "numbers" && winner.ticketNumber
+            ? "ticket-" + winner.ticketNumber
+            : String(winner.winnerId));
+        }
+      }
+    }
+    if (remoteSpinActive && currentDrawWinner) {
+      previousWinnerIds.delete(liveMeeting.luckyDraw?.drawMode === "numbers" && currentDrawWinner.ticketNumber
+        ? "ticket-" + currentDrawWinner.ticketNumber
+        : String(currentDrawWinner.winnerId));
+    }
+    return selected.filter(participant => !previousWinnerIds.has(participant.id));
+  }, [categoryParticipants, presentationMode, liveMeeting, remoteSpinActive, currentDrawWinner]);
 
   // Participant counts by category
   const countAll = participants.length;
@@ -291,23 +326,13 @@ export default function WheelOfNamesPage() {
   const countGuests = participants.filter((p) => p.type === "guest").length;
 
   // 1. Fetch Users & Today's Meeting Check-in status directly from system
-  const loadSystemUsers = useCallback(async () => {
+  const [requestInputs, setRequestInputs] = useState(() => [authLoading, userProfile]);
+  if (!Object.is(requestInputs[0], authLoading) || !Object.is(requestInputs[1], userProfile)) {
+    setRequestInputs([authLoading, userProfile]);
     setLoadingUsers(true);
-    try {
-      let users: UserProfile[] = [];
-      if (userProfile?.companyCode) {
-        try {
-          users = await authService.getUsersByCompany(userProfile.companyCode);
-        } catch {
-          users = await authService.getColleagues();
-        }
-      } else {
-        try {
-          users = await authService.getColleagues();
-        } catch {
-          users = [];
-        }
-      }
+  }
+  const loadSystemUsers = useCallback(async () => {
+    return loadChapterUsers(userProfile?.companyCode).then(async (users) => {
 
       // Fetch meetings to get check-in attendees (speakers & guests)
       let meetings: Meeting[] = [];
@@ -377,7 +402,7 @@ export default function WheelOfNamesPage() {
       }
 
       // Collect speakers from target meeting, or fallback merge all speakers from recent meetings if target has none
-      let speakers: Speaker[] = targetMeeting?.speakers || [];
+      const speakers: Speaker[] = [...(targetMeeting?.speakers || [])];
       if (speakers.length === 0) {
         const seenSpeakerIds = new Set<string>();
         for (const m of meetings) {
@@ -391,17 +416,17 @@ export default function WheelOfNamesPage() {
       }
 
       // Build chapter members roster from DB users
-      const userMap = new Map<string, { id: string; name: string; avatar?: string; department?: string; role?: string }>();
+      const userMap = new Map<string, { id: string; name: string; avatar?: string; companyName?: string; role?: string }>();
 
       // Add DB users
       for (const u of users) {
-        const uid = String(u.uid || (u as any).id || (u as any)._id || u.email || "").trim();
+        const uid = String(u.uid || (u).id || (u)._id || u.email || "").trim();
         const uName = (u.displayName || u.email?.split("@")[0] || "Thành viên").trim();
         userMap.set(uName.toLowerCase(), {
           id: uid || `user-${Math.random()}`,
           name: uName,
           avatar: u.photoURL,
-          department: u.department || u.branchName || "Ban Giám Đốc",
+          companyName: u.companyName || u.branchName || "",
           role: u.role === "admin" ? "Chủ tịch / Admin" : u.role || "Thành viên",
         });
       }
@@ -435,7 +460,7 @@ export default function WheelOfNamesPage() {
           id: m.id,
           name: m.name,
           avatar: m.avatar || (matchedSpeaker ? matchedSpeaker.photoURL || matchedSpeaker.coverImage : undefined),
-          department: m.department,
+          companyName: m.companyName,
           role: m.role,
           selected: true,
           type: isPresent ? "member_present" : "member_absent",
@@ -450,7 +475,7 @@ export default function WheelOfNamesPage() {
           id: `guest-speaker-${s.id}`,
           name: s.name.trim(),
           avatar: s.photoURL || s.coverImage,
-          department: (s as any).company || (s as any).slideProfile?.company || "Khách tham dự",
+          companyName: (s).company || (s).slideProfile?.company || "Khách tham dự",
           role: "Khách mời",
           selected: true,
           type: "guest" as const,
@@ -458,28 +483,82 @@ export default function WheelOfNamesPage() {
         }));
 
       setParticipants([...loadedMembers, ...guestSpeakers]);
-    } catch (err) {
+    
+}).catch(err => {
       console.error("Lỗi khi tải danh sách người dùng cho vòng quay:", err);
       setParticipants([]);
-    } finally {
+    }).finally(() => {
       setLoadingUsers(false);
-    }
-  }, [userProfile]);
+    });
+  }, [userProfile, urlMeetingId]);
 
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && !presentationMode) {
       loadSystemUsers();
     }
-  }, [authLoading, loadSystemUsers]);
+  }, [authLoading, presentationMode, loadSystemUsers]);
+
+  useEffect(() => {
+    if (!presentationMode || !urlMeetingId) return;
+    let active = true;
+    void meetingLiveApi<{ slides: ProfileSlide[] }>("/" + urlMeetingId + "/slides")
+      .then(deck => { if (active) setPresentationSlides(deck.slides || []); })
+      .catch(error => console.warn("Could not load draw participant profiles:", error));
+    return () => { active = false; };
+  }, [presentationMode, urlMeetingId]);
+
+  useEffect(() => {
+    if (!presentationMode) return;
+    if (!liveMeeting) return;
+    const slideById = new Map(presentationSlides.map(slide => [slide.id, slide]));
+    const luckyDraw = liveMeeting.luckyDraw;
+    const nextParticipants: Participant[] = luckyDraw?.drawMode === "numbers"
+      ? Array.from({ length: Math.min(5000, Math.max(0, (luckyDraw.numberMax || 100) - (luckyDraw.numberMin || 1) + 1)) }, (_, index) => {
+          const number = (luckyDraw.numberMin || 1) + index;
+          return { id: "ticket-" + number, name: "#" + number, companyName: "Lucky number", selected: true, type: "guest" };
+        })
+      : liveMeeting.speakers.map(speaker => {
+          const slide = slideById.get(speaker.id);
+          return {
+            id: speaker.id,
+            name: slide?.name || speaker.name,
+            avatar: slide?.photoURL || speaker.photoURL || speaker.coverImage,
+            companyName: slide?.company || speaker.company || speaker.slideProfile?.company,
+            role: speaker.userId ? "Member" : "Guest",
+            selected: true,
+            type: speaker.userId ? "member_present" : "guest",
+            checkedInAt: speaker.checkedInAt,
+            phone: slide?.phone || speaker.phone || speaker.slideProfile?.phone,
+            email: slide?.email || speaker.email,
+            industry: slide?.industry || speaker.industry || speaker.slideProfile?.industry,
+            bio: slide?.bio,
+          };
+        });
+    const drawRecord = luckyDraw?.prizes.flatMap(prize => prize.winners || []).find(winner => winner.id === liveMeeting.presentation?.drawWinnerId);
+    const availablePrize = drawRecord?.prizeName || luckyDraw?.prizes.find(prize => prize.winners.length < prize.quantity)?.name || luckyDraw?.prizes[0]?.name;
+    const syncedWinners = (luckyDraw?.prizes || []).flatMap(prize => prize.winners || []).map<WinnerRecord>(winner => ({
+      source: "wheel", id: winner.id, name: winner.name, prizeName: winner.prizeName,
+      avatar: winner.photoURL, companyName: liveMeeting.speakers.find(speaker => speaker.id === winner.winnerId)?.company, wonAt: winner.wonAt,
+    })).reverse();
+    const syncFrame = requestAnimationFrame(() => {
+      setParticipants(nextParticipants);
+      setMeetingTitle(liveMeeting.title);
+      setSelectedGame("wheel");
+      if (availablePrize) { setCurrentPrize(availablePrize); setPrizeInput(availablePrize); }
+      setWinners(syncedWinners);
+      setLoadingUsers(false);
+    });
+    return () => cancelAnimationFrame(syncFrame);
+  }, [presentationMode, liveMeeting, presentationSlides]);
 
   // 2. Fullscreen Toggle
-  const toggleFullscreen = () => {
+  function toggleFullscreen() {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
     } else {
       document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
     }
-  };
+  }
 
   useEffect(() => {
     const handleFsChange = () => {
@@ -497,7 +576,7 @@ export default function WheelOfNamesPage() {
       }
       if (e.code === "Space" || e.code === "Enter") {
         e.preventDefault();
-        if (!isSpinning && !winnerModal && activeParticipants.length > 0) {
+        if (!presentationMode && !isSpinning && !winnerModal && activeParticipants.length > 0) {
           handleStartSpin();
         }
       } else if (e.code === "KeyF") {
@@ -511,7 +590,7 @@ export default function WheelOfNamesPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isSpinning, winnerModal, activeParticipants.length]);
+  }, [presentationMode, isSpinning, winnerModal, activeParticipants.length]);
 
   // Synchronize Bingo balls with active participants
   useEffect(() => {
@@ -1375,7 +1454,7 @@ export default function WheelOfNamesPage() {
   }, [isDrawerOpen, drawWheel]);
 
   // 4A. Wheel Spin Mechanics
-  const handleStartSpinWheel = () => {
+  function handleStartSpinWheel(controlled?: { winnerId: string; startedAt: string; revealsAt: string; prizeName: string; displayWinner?: Participant }) {
     if (isSpinning || activeParticipants.length === 0) return;
 
     setIsSpinning(true);
@@ -1389,7 +1468,8 @@ export default function WheelOfNamesPage() {
     const arc = (2 * Math.PI) / count;
 
     // Pick random winning index
-    const winningIndex = Math.floor(Math.random() * count);
+    const winningIndex = controlled ? slices.findIndex(slice => slice.participant.id === controlled.winnerId) : Math.floor(Math.random() * count);
+    if (winningIndex < 0) { setIsSpinning(false); return; }
     const winner = slices[winningIndex].participant;
 
     const currentAngle = currentAngleRef.current % (2 * Math.PI);
@@ -1401,8 +1481,9 @@ export default function WheelOfNamesPage() {
       (targetSliceCenter - currentAngle) +
       (currentAngle > targetSliceCenter ? 2 * Math.PI : 0);
 
-    const startTime = performance.now();
-    const durationMs = spinDuration * 1000;
+    const elapsedBeforeMount = controlled ? Math.max(0, liveState.now - Date.parse(controlled.startedAt)) : 0;
+    const startTime = performance.now() - elapsedBeforeMount;
+    const durationMs = controlled ? Math.max(200, Date.parse(controlled.revealsAt) - Date.parse(controlled.startedAt)) : spinDuration * 1000;
     const startAngle = currentAngleRef.current;
 
     const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
@@ -1443,15 +1524,15 @@ export default function WheelOfNamesPage() {
         const record: WinnerRecord = {
           id: crypto.randomUUID(),
           name: winner.name,
-          prizeName: currentPrize,
+          prizeName: controlled?.prizeName || currentPrize,
           avatar: winner.avatar,
-          department: winner.department,
+          companyName: winner.companyName,
           wonAt: new Date().toISOString(),
         };
 
         record.source = "wheel";
         setWinners((prev) => [record, ...prev]);
-        persistWinner(record, winner, "wheel");
+        if (!presentationMode) persistWinner(record, winner, "wheel");
 
         if (soundEnabled) {
           playWinFanfare();
@@ -1460,16 +1541,36 @@ export default function WheelOfNamesPage() {
 
         setWinnerModal({
           winner,
-          prize: currentPrize,
+          prize: controlled?.prizeName || currentPrize,
         });
       }
     };
 
     animationFrameIdRef.current = requestAnimationFrame(animateSpin);
-  };
+  }
 
+  useEffect(() => {
+    const startedAt = liveMeeting?.presentation?.drawStartedAt;
+    const revealsAt = liveMeeting?.presentation?.drawRevealsAt;
+    if (!presentationMode || !remoteSpinActive || !currentDrawWinner || !startedAt || !revealsAt || isSpinning) return;
+    if (lastPresentedDrawIdRef.current === currentDrawWinner.id) return;
+    const participantId = liveMeeting?.luckyDraw?.drawMode === "numbers" && currentDrawWinner.ticketNumber != null
+      ? "ticket-" + currentDrawWinner.ticketNumber
+      : String(currentDrawWinner.winnerId);
+    if (!activeParticipants.some(participant => participant.id === participantId)) return;
+    const animationFrame = requestAnimationFrame(() => {
+      lastPresentedDrawIdRef.current = currentDrawWinner.id;
+      handleStartSpinWheel({
+        winnerId: participantId,
+        startedAt,
+        revealsAt,
+        prizeName: currentDrawWinner.prizeName,
+      });
+    });
+    return () => cancelAnimationFrame(animationFrame);
+  }, [presentationMode, remoteSpinActive, currentDrawWinner, liveMeeting, activeParticipants, isSpinning]);
   // 4B. Bingo Cage Spin Mechanics with 3D Tumbling & Dropping Ball
-  const handleStartSpinBingo = () => {
+  function handleStartSpinBingo() {
     if (isSpinning || activeParticipants.length === 0) return;
     setIsSpinning(true);
     winningBallDropRef.current = null;
@@ -1604,7 +1705,7 @@ export default function WheelOfNamesPage() {
             name: winningParticipant.name,
             prizeName: currentPrize,
             avatar: winningParticipant.avatar,
-            department: winningParticipant.department,
+            companyName: winningParticipant.companyName,
             wonAt: new Date().toISOString(),
           };
 
@@ -1630,17 +1731,17 @@ export default function WheelOfNamesPage() {
     };
 
     animationFrameIdRef.current = requestAnimationFrame(animateBingo);
-  };
+  }
 
   // Unified start spin action
-  const handleStartSpin = () => {
+  function handleStartSpin() {
     if (isSpinning || activeParticipants.length === 0) return;
     if (selectedGame === "wheel") {
       handleStartSpinWheel();
     } else {
       handleStartSpinBingo();
     }
-  };
+  }
 
   // Remove winner from wheel (action in modal)
   const handleRemoveWinnerFromWheel = (winnerId: string) => {
@@ -1657,7 +1758,7 @@ export default function WheelOfNamesPage() {
     const newParticipant: Participant = {
       id: `guest-${Date.now()}`,
       name: trimmed,
-      department: "Khách mời",
+      companyName: "Khách mời",
       role: "Khách tham dự",
       selected: true,
       isCustom: true,
@@ -1719,11 +1820,11 @@ export default function WheelOfNamesPage() {
   // Export winners to CSV
   const handleExportWinners = () => {
     if (winners.length === 0) return;
-    const header = "STT,Tên người trúng giải,Giải thưởng,Phòng ban / Vai trò,Thời gian trúng\n";
+    const header = "STT,Tên người trúng giải,Giải thưởng,Doanh nghiệp / Vai trò,Thời gian trúng\n";
     const rows = winners
       .map(
         (w, idx) =>
-          `${idx + 1},"${w.name}","${w.prizeName}","${w.department || ""}","${w.wonAt}"`
+          `${idx + 1},"${w.name}","${w.prizeName}","${w.companyName || ""}","${w.wonAt}"`
       )
       .join("\n");
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + encodeURIComponent(header + rows);
@@ -1739,7 +1840,7 @@ export default function WheelOfNamesPage() {
   const filteredParticipants = categoryParticipants.filter(
     (p) =>
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.department && p.department.toLowerCase().includes(searchQuery.toLowerCase()))
+      (p.companyName && p.companyName.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -2268,8 +2369,8 @@ export default function WheelOfNamesPage() {
                               </span>
                             )}
                           </div>
-                          {p.department && (
-                            <div className="truncate text-[10px] text-slate-500">{p.department}</div>
+                          {p.companyName && (
+                            <div className="truncate text-[10px] text-slate-500">{p.companyName}</div>
                           )}
                         </div>
                       </label>
@@ -2410,9 +2511,9 @@ export default function WheelOfNamesPage() {
                 {winnerModal.winner.name}
               </h2>
 
-              {winnerModal.winner.department && (
+              {winnerModal.winner.companyName && (
                 <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium">
-                  {winnerModal.winner.department}
+                  {winnerModal.winner.companyName}
                 </p>
               )}
             </div>

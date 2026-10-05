@@ -9,12 +9,10 @@ import {
   Building2,
   Briefcase,
   Phone,
-  Calendar,
   Image as ImageIcon,
   Camera,
 } from "lucide-react";
 import { CompanyProfile, UserProfile } from "../../types";
-import { BranchRecord } from "../../services/branchService";
 import { authService } from "../../services/authService";
 import { toast } from "../../pages/Toast";
 import { VietnameseDatePicker } from "../common/VietnameseDatePicker";
@@ -49,10 +47,6 @@ export interface UserFormModalProps {
   setUserBranchId: (val: string) => void;
   userParentId: string;
   setUserParentId: (val: string) => void;
-  userDepartment: string;
-  userQualification: string;
-  setUserDepartment: (val: string) => void;
-  setUserQualification: (val: string) => void;
   userJobDescriptionLink: string;
   userMonthlySalary: string;
   setUserMonthlySalary: (val: string) => void;
@@ -61,7 +55,6 @@ export interface UserFormModalProps {
   getAvailableRoles: () => Array<{ role: string; displayName: string; level: number }>;
   userProfile: UserProfile | null;
   companies?: CompanyProfile[];
-  branches: BranchRecord[];
   usersList: UserProfile[];
   onSubmit: (e: React.FormEvent) => void;
   submittingUser: boolean;
@@ -123,7 +116,7 @@ export function UserFormModal({
       );
       setUserPhotoURL(uploaded.url);
       toast.success("Đã tải lên ảnh đại diện thành công.");
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error?.message || "Tải ảnh đại diện thất bại.");
     } finally {
       setUploadingAvatar(false);
@@ -144,7 +137,7 @@ export function UserFormModal({
       );
       setUserCoverImage(uploaded.url);
       toast.success("Đã tải lên ảnh bìa thành công.");
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error?.message || "Tải ảnh bìa thất bại.");
     } finally {
       setUploadingCover(false);

@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
-const guards = vi.hoisted(() => new Map<any, string | string[]>());
+const guards = vi.hoisted(() => new Map<import("express").RequestHandler, string | string[]>());
 
 vi.mock("../middleware/auth", async (importOriginal) => {
-  const actual: any = await importOriginal();
+  const actual = await importOriginal<typeof import("../middleware/auth")>();
   return {
     ...actual,
     requirePermission: (permission: string | string[]) => {
-      const guard = (_req: any, _res: any, next: any) => next();
+      const guard = (_req: import("express").Request, _res: import("express").Response, next: import("express").NextFunction) => next();
       guards.set(guard, permission);
       return guard;
     },
@@ -17,12 +17,12 @@ vi.mock("../middleware/auth", async (importOriginal) => {
 import { notificationRouter } from "./notification.router";
 import { rolePermissionRouter } from "./role-permission.router";
 
-function permissionOf(router: any, method: string, path: string) {
-  const layer = router.stack.find((item: any) => (
+function permissionOf(router: import("express").Router, method: string, path: string) {
+  const layer = router.stack.find((item) => (
     item.route?.path === path && item.route?.methods?.[method.toLowerCase()]
   ));
   return layer?.route.stack
-    .map((handler: any) => guards.get(handler.handle))
+    .map((handler) => guards.get(handler.handle))
     .find((permission: string | undefined) => permission !== undefined);
 }
 

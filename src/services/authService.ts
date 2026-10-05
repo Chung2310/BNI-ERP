@@ -1,4 +1,4 @@
-import { UserProfile, CompanyProfile, TelegramLinkStatus } from "../types";
+import { UserProfile, CompanyProfile } from "../types";
 
 function getDeviceId(): string {
   const key = "igen_device_id";
@@ -27,7 +27,7 @@ export const authService = {
       throw new Error(result.message || "Không thể xóa tài khoản.");
     }
   },
-  async getUserActivity(userId: string, filters: Record<string, string | number | undefined> = {}): Promise<any> {
+  async getUserActivity(userId: string, filters: Record<string, string | number | undefined> = {}) {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== "") query.set(key, String(value));
     const res = await fetch(`/api/v1/auth/users/${encodeURIComponent(userId)}/activity?${query}`, { headers: { Authorization: `Bearer ${getAccessToken()}` } });
@@ -36,7 +36,7 @@ export const authService = {
     return data;
   },
   // Đăng ký bằng Email & Mật khẩu
-  async registerWithEmail(email: string, password: string, displayName: string): Promise<any> {
+  async registerWithEmail(email: string, password: string, displayName: string) {
     const res = await fetch("/api/v1/auth/register", {
       method: "POST",
       headers: {
@@ -54,15 +54,15 @@ export const authService = {
     return result.data;
   },
 
-  // Đăng nhập bằng Email & Mật khẩu
-  async loginWithEmail(email: string, password: string): Promise<any> {
+  // Đăng nhập bằng số điện thoại hoặc email và mật khẩu
+  async loginWithIdentifier(identifier: string, password: string) {
     const res = await fetch("/api/v1/auth/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-device-id": getDeviceId(),
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identifier, password }),
     });
 
     if (!res.ok) {
@@ -79,7 +79,7 @@ export const authService = {
   },
 
   // Đăng nhập bằng Google (Chuyển sang JWT nên tạm thời báo không hỗ trợ)
-  async loginWithGoogle(): Promise<any> {
+  async loginWithGoogle() {
     throw new Error("Đăng nhập bằng Google hiện không khả dụng. Vui lòng sử dụng tài khoản Email.");
   },
 
@@ -187,7 +187,7 @@ export const authService = {
     }
 
     const result = await res.json();
-    return (result.data || []).map((u: any) => ({
+    return (result.data || []).map((u) => ({
       ...u,
       uid: u._id,
     }));
@@ -209,7 +209,7 @@ export const authService = {
     }
 
     const result = await res.json();
-    return (result.data || []).map((u: any) => ({
+    return (result.data || []).map((u) => ({
       ...u,
       uid: u._id,
     }));
@@ -229,7 +229,7 @@ export const authService = {
     }
 
     const result = await res.json();
-    return (result.data || []).filter((u: any) => u.isActive !== false).map((u: any) => ({
+    return (result.data || []).filter((u) => u.isActive !== false).map((u) => ({
       ...u,
       uid: u._id,
     }));
@@ -266,7 +266,7 @@ export const authService = {
     }
 
     const result = await res.json();
-    return (result.data || []).map((item: any) => ({
+    return (result.data || []).map((item) => ({
       ...item,
       id: item._id || item.id,
     }));
@@ -295,7 +295,7 @@ export const authService = {
   },
 
   // Cập nhật chi tiết thông tin một nhân sự
-  async updateUser(uid: string, updateData: any): Promise<void> {
+  async updateUser(uid: string, updateData: Partial<UserProfile> & { password?: string; photoUploadToken?: string; coverUploadToken?: string }): Promise<void> {
     const res = await fetch(`/api/v1/auth/users/${uid}`, {
       method: "PATCH",
       headers: {
@@ -312,7 +312,7 @@ export const authService = {
   },
 
   // Cập nhật hàng loạt thông tin cấu trúc sơ đồ tổ chức
-  async bulkUpdateUsers(updates: any[]): Promise<void> {
+  async bulkUpdateUsers(updates: Array<Partial<UserProfile> & { id: string }>): Promise<void> {
     const res = await fetch("/api/v1/auth/users/bulk", {
       method: "PATCH",
       headers: {
@@ -375,65 +375,21 @@ export const authService = {
   },
 
   // Đăng ký người dùng mới cho doanh nghiệp qua REST API
-  async registerUserForCompany(
-    displayName: string,
-    email: string,
-    password: string,
-    role: "user" | "teacher" | "manager" | "branch_owner" | "admin",
-    companyCode: string,
-    companyName: string,
-    parentId?: string,
-    managerLevel?: number,
-    department?: string,
-    division?: string,
-    phone?: string,
-    heygenAccess?: {
-      avatarIds?: string[];
-      avatarId?: string;
-      voiceId?: string;
-      apiKey?: string;
-    },
-    jobDescriptionLink?: string,
-    branchId?: string,
-    birthDate?: string,
-    qualification?: string,
-    monthlySalary?: number,
-    jobDescriptionUploadToken?: string,
-    extraFields?: {
-      industry?: string;
-      photoURL?: string;
-      coverImage?: string;
-    }
-  ): Promise<string> {
+  async registerUserForCompany(input: {
+    displayName: string; email: string; password: string; role: UserProfile["role"];
+    companyCode: string; companyName: string; parentId?: string; phone?: string;
+    jobDescriptionLink?: string; branchId?: string; birthDate?: string; monthlySalary?: number;
+    jobDescriptionUploadToken?: string; industry?: string; photoURL?: string; coverImage?: string;
+    gender?: "male" | "female" | "other"; address?: string; targetMarket?: string;
+    galleryImages?: string[]; galleryUploadTokens?: Array<{ index: number; uploadToken: string }>;
+  }): Promise<string> {
     const res = await fetch("/api/v1/auth/register-user", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${getAccessToken()}`,
       },
-      body: JSON.stringify({
-        displayName,
-        email,
-        password,
-        role,
-        companyCode,
-        companyName,
-        industry: extraFields?.industry,
-        photoURL: extraFields?.photoURL,
-        coverImage: extraFields?.coverImage,
-        parentId,
-        level: parentId && managerLevel ? managerLevel + 1 : undefined,
-        department,
-        division,
-        phone,
-        heygenAccess,
-        jobDescriptionLink,
-        branchId,
-        birthDate,
-        qualification,
-        monthlySalary,
-        jobDescriptionUploadToken,
-      }),
+      body: JSON.stringify(input),
     });
 
     if (!res.ok) {
@@ -451,7 +407,7 @@ export const authService = {
   },
 
   // Cập nhật một hoặc nhiều trường trong hồ sơ qua REST API
-  async updateProfile(updateData: any): Promise<UserProfile> {
+  async updateProfile(updateData: Partial<UserProfile> & { password?: string; photoUploadToken?: string; coverUploadToken?: string }): Promise<UserProfile> {
     const res = await fetch("/api/v1/auth/profile", {
       method: "PATCH",
       headers: {
@@ -525,56 +481,6 @@ export const authService = {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.message || "Không thể ngắt kết nối Google Drive");
     }
-  },
-
-  async getTelegramLinkStatus(): Promise<TelegramLinkStatus> {
-    const res = await fetch("/api/v1/auth/telegram-link", {
-      headers: {
-        "Authorization": `Bearer ${getAccessToken()}`,
-      },
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.message || "Không thể lấy trạng thái liên kết Telegram");
-    }
-
-    const result = await res.json();
-    return result.data;
-  },
-
-  async createTelegramLinkCode(): Promise<TelegramLinkStatus> {
-    const res = await fetch("/api/v1/auth/telegram-link", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${getAccessToken()}`,
-      },
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.message || "Không thể tạo mã liên kết Telegram");
-    }
-
-    const result = await res.json();
-    return result.data;
-  },
-
-  async unlinkTelegram(): Promise<TelegramLinkStatus> {
-    const res = await fetch("/api/v1/auth/telegram-link", {
-      method: "DELETE",
-      headers: {
-        "Authorization": `Bearer ${getAccessToken()}`,
-      },
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.message || "Không thể gỡ liên kết Telegram");
-    }
-
-    const result = await res.json();
-    return result.data;
   },
 
   // Thay đổi mật khẩu người dùng qua REST API

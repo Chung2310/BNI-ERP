@@ -106,7 +106,7 @@ export interface ResourceIndexingRepository {
   ): Promise<number>;
 }
 
-function toRecord(value: any): ResourceIndexingRecord {
+function toRecord(value: Omit<ResourceIndexingRecord, "_id" | "parentId"> & { _id: unknown; parentId?: unknown }): ResourceIndexingRecord {
   return { ...value, _id: String(value._id), parentId: value.parentId ? String(value.parentId) : null };
 }
 

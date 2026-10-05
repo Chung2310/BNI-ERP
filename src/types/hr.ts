@@ -4,22 +4,21 @@ export interface EmployeeNode {
   id: string;
   name: string;
   role: string;
-  department: string;
   email: string;
   phone: string;
-  avatar: string;
-  level: number; // 1 = CEO, 2 = Director, 3 = Manager, 4 = Staff
+  avatar: string; // 1 = CEO, 2 = Director, 3 = Manager, 4 = Staff
   parentId?: string;
   status: "online" | "offline";
-  division: string;
-  isLeader?: boolean;
   jobDescriptionLink?: string;
-  qualification?: string;
   monthlySalary?: number;
   companyName?: string;
   industry?: string;
   birthDate?: string;
+  gender?: "male" | "female" | "other";
+  address?: string;
+  targetMarket?: string;
   coverImage?: string;
+  galleryImages?: string[];
 }
 
 
@@ -36,7 +35,7 @@ export interface TrainingCourse {
   instructor?: string;
   companyCode?: string;
   creatorUid?: string;
-  createdAt?: any;
+  createdAt?: import("../utils/dateValue").DateValue;
   enrolledCount?: number;
   companyProgress?: number;
   autoAssignOnboarding?: boolean;

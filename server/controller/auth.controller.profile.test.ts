@@ -32,9 +32,9 @@ beforeEach(() => {
 it.each([{ displayName: "New name" }, { photoURL: "/new-avatar.png" }])("returns the same access rights as GET /me after updating %j", async (body) => {
   const getRes = response();
   const updateRes = response();
-  const req = { user: { id: "member-1" }, body } as any;
-  await authController.getMe(req, getRes as any);
-  await authController.updateProfile(req, updateRes as any);
+  const req = { user: { id: "member-1" }, body };
+  await authController.getMe((req as unknown as Parameters<typeof authController.getMe>[0]), ((getRes) as unknown as Parameters<typeof authController.getMe>[1]));
+  await authController.updateProfile((req as unknown as Parameters<typeof authController.updateProfile>[0]), ((updateRes) as unknown as Parameters<typeof authController.updateProfile>[1]));
   expect(updateRes.status).toHaveBeenCalledWith(200);
   const updated = updateRes.json.mock.calls[0][0].user;
   expect(updated.permissions).toEqual(["hr:read", "chat:read"]);
@@ -47,7 +47,7 @@ it.each([{ displayName: "New name" }, { photoURL: "/new-avatar.png" }])("returns
 it("returns full resolved permissions for an admin after saving", async () => {
   storedUser.role = "admin";
   const res = response();
-  await authController.updateProfile({ user: { id: "member-1" }, body: {} } as any, res as any);
+  await authController.updateProfile(({ user: { id: "member-1" }, body: {} } as unknown as Parameters<typeof authController.updateProfile>[0]), ((res) as unknown as Parameters<typeof authController.updateProfile>[1]));
   expect(res.json.mock.calls[0][0].user.permissions).toEqual(PERMISSION_CODES);
 });
 
@@ -55,14 +55,14 @@ it("keeps a legitimately empty effective permission set empty", async () => {
   storedUser.permissions = ["hr:read"];
   deps.permissions.mockResolvedValue(new Set());
   const res = response();
-  await authController.updateProfile({ user: { id: "member-1" }, body: {} } as any, res as any);
+  await authController.updateProfile(({ user: { id: "member-1" }, body: {} } as unknown as Parameters<typeof authController.updateProfile>[0]), ((res) as unknown as Parameters<typeof authController.updateProfile>[1]));
   expect(res.json.mock.calls[0][0].user.permissions).toEqual([]);
 });
 
 it("finalizes cover uploads for the authenticated member without losing access rights", async () => {
   const res = response();
   const body = { coverImage: "/new-cover.png", coverUploadToken: "cover-token" };
-  await authController.updateProfile({ user: { id: "member-1" }, body } as any, res as any);
+  await authController.updateProfile(({ user: { id: "member-1" }, body } as unknown as Parameters<typeof authController.updateProfile>[0]), ((res) as unknown as Parameters<typeof authController.updateProfile>[1]));
   expect(deps.updateProfile).toHaveBeenCalledWith("member-1", body);
   expect(deps.finalizeCover).toHaveBeenCalledWith(expect.objectContaining({ actorId: "member-1", companyCode: "BNI" }), expect.objectContaining({ _id: "member-1" }), "cover-token");
   expect(res.json.mock.calls[0][0].user.permissions).toEqual(["hr:read", "chat:read"]);

@@ -1,5 +1,5 @@
-import { Plus, RefreshCw, Users, Upload } from "lucide-react";
-import { CompanyProfile, UserProfile } from "../../types";
+import { Plus, Users, Upload } from "lucide-react";
+import { UserProfile } from "../../types";
 
 interface Props {
   userProfile?: UserProfile | null;
@@ -10,11 +10,11 @@ interface Props {
 }
 
 export function UserAdminHeader({
-  userProfile,
+  userProfile: _userProfile,
   onOpenCreateUserModal,
   onOpenImport,
-  onRefresh,
-  loading,
+  onRefresh: _onRefresh,
+  loading: _loading,
 }: Props) {
   return (
     <div className="border-b border-gray-200 bg-gray-50/50 p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4 shrink-0" id="user_admin_header">
@@ -26,7 +26,6 @@ export function UserAdminHeader({
           <h1 className="font-extrabold text-cyan-700 text-xl lg:text-2xl tracking-tight">
             Quản trị Tài khoản & Phân quyền
           </h1>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">Quản lý danh sách thành viên & phân quyền vai trò</p>
         </div>
       </div>
       <div className="flex items-center gap-2">

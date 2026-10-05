@@ -5,7 +5,7 @@ import { filterEnabledTabs, MODULE_KEYS, MODULE_READ_PERMISSIONS, MODULE_TAB_MAP
 test("maps the hr module to its tab and permissions", () => {
   expect(MODULE_KEYS).toContain("hr");
   expect(MODULE_TAB_MAP.hr).toBe("NHÂN SỰ");
-  expect(MODULE_READ_PERMISSIONS["NHÂN SỰ"]).toEqual(["hr:read", "access:read", "work:read", "timekeeping:read"]);
+  expect(MODULE_READ_PERMISSIONS["NHÂN SỰ"]).toEqual(["hr:read", "access:read", "work:read"]);
 });
 
 const tabs: TabType[] = [

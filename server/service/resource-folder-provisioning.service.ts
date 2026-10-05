@@ -17,6 +17,7 @@ const memberSources = new Map([
   ["hr.contract", "employee"],
   ["profile.avatar", "user"],
   ["profile.cover", "user"],
+  ["profile.gallery", "user"],
 ]);
 const supportedModules = new Set(["hr", "settings", "chat", "resource", "workflow"]);
 

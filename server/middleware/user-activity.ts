@@ -1,15 +1,15 @@
 import { randomUUID } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
-import { UserActivityEventModel, type UserActivityCategory } from "../model/user-activity-event.model";
+import { UserActivityEventModel, type UserActivityInput, type UserActivityCategory } from "../model/user-activity-event.model";
 
 const bounded = (value: unknown, max: number) => typeof value === "string" && value.trim() ? value.trim().slice(0, max) : undefined;
-const NOISY = [/\/health(?:\/|$)/, /\/users\/:userId\/activity$/, /\/telegram-link/, /\/socket/, /\/heartbeat/];
+const NOISY = [/\/health(?:\/|$)/, /\/users\/:userId\/activity$/, /\/socket/, /\/heartbeat/];
 
 const moduleName = (route: string) => {
   const entries: Array<[RegExp, string, string]> = [
     [/student|course|batch|exam|assignment/, "học viên", "student"], [/worker/, "lao động", "worker"],
     [/order/, "đơn hàng", "order"], [/product|inventory|warehouse|stock/, "kho và sản phẩm", "inventory"],
-    [/payroll/, "tiền lương", "payroll"], [/timekeeping|attendance|shift/, "chấm công", "timekeeping"],
+    [/payroll/, "tiền lương", "payroll"],
     [/user|role|permission/, "người dùng", "user"], [/chat|message/, "trò chuyện", "chat"],
     [/resource|file|drive/, "tài nguyên", "resource"], [/retail/, "bán lẻ", "retail"],
     [/finance|wallet|receivable/, "tài chính", "finance"], [/setting|config/, "cấu hình", "settings"],
@@ -26,9 +26,9 @@ function deviceSummary(userAgent?: string) {
   return `${browser} trên ${os}`;
 }
 
-export function buildUserActivityFromRequest(req: Request & { user?: any }, statusCode: number, durationMs?: number) {
+export function buildUserActivityFromRequest(req: Request, statusCode: number, durationMs?: number) {
   const method = String(req.method || "").toUpperCase();
-  const userId = req.user?.id || req.user?._id || req.user?.uid;
+  const userId = req.user?.id;
   if (!userId) return null;
   const routePath = typeof req.route?.path === "string" ? req.route.path : String(req.path || "");
   const route = `${req.baseUrl || ""}${routePath}`;
@@ -65,19 +65,19 @@ export function buildUserActivityFromRequest(req: Request & { user?: any }, stat
   };
 }
 
-export async function recordUserActivity(event: any) {
-  try { await UserActivityEventModel.create({ ...event, occurredAt: event.occurredAt || new Date() } as any); }
+export async function recordUserActivity(event: UserActivityInput) {
+  try { await UserActivityEventModel.create({ ...event, occurredAt: event.occurredAt || new Date() }); }
   catch (error) { console.error("[user activity] Failed to record event:", error); }
 }
 
-type BatchWriter = ((event: any) => Promise<void>) & { flush: () => Promise<void> };
-export function createActivityBatchWriter(
-  insert: (events: any[]) => Promise<unknown>,
+type BatchWriter<T> = ((event: T) => Promise<void>) & { flush: () => Promise<void> };
+export function createActivityBatchWriter<T>(
+  insert: (events: T[]) => Promise<unknown>,
   options: { maxBatchSize?: number; flushIntervalMs?: number } = {},
-): BatchWriter {
+): BatchWriter<T> {
   const maxBatchSize = options.maxBatchSize || 100;
   const flushIntervalMs = options.flushIntervalMs || 500;
-  let queue: any[] = [];
+  const queue: T[] = [];
   let flushing: Promise<void> | null = null;
   const flush = async () => {
     if (flushing) return flushing;
@@ -91,19 +91,19 @@ export function createActivityBatchWriter(
   };
   const timer = setInterval(() => { void flush(); }, flushIntervalMs);
   timer.unref?.();
-  const writer = (async (event: any) => { queue.push(event); if (queue.length >= maxBatchSize) await flush(); }) as BatchWriter;
+  const writer = (async (event) => { queue.push(event); if (queue.length >= maxBatchSize) await flush(); }) as BatchWriter<T>;
   writer.flush = flush;
   return writer;
 }
 
-const routineActivityWriter = createActivityBatchWriter((events) => UserActivityEventModel.insertMany(events));
+const routineActivityWriter = createActivityBatchWriter<UserActivityInput>((events) => UserActivityEventModel.insertMany(events));
 
 export function flushUserActivityQueue() {
   return routineActivityWriter.flush();
 }
 
-export function userActivityMiddleware(writer: (event: any) => Promise<unknown> = routineActivityWriter) {
-  return (req: Request & { user?: any }, res: Response, next: NextFunction) => {
+export function userActivityMiddleware(writer: (event: UserActivityInput) => Promise<unknown> = routineActivityWriter) {
+  return (req: Request, res: Response, next: NextFunction) => {
     const startedAt = Date.now();
     if (!req.headers["x-correlation-id"]) req.headers["x-correlation-id"] = randomUUID();
     res.on("finish", () => {

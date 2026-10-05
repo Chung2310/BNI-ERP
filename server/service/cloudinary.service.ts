@@ -12,7 +12,7 @@ function ensureConfigured() {
   isConfigured = true;
 }
 
-export interface PrivateImageAsset {
+export interface PrivateRawAsset {
   publicId: string;
   resourceType: string;
   type: string;
@@ -20,7 +20,6 @@ export interface PrivateImageAsset {
   bytes: number;
 }
 
-export type PrivateRawAsset = PrivateImageAsset;
 export type PublicRawAsset = { publicId: string; secureUrl: string; bytes: number };
 export interface PublicMediaAsset {
   secureUrl: string;
@@ -65,7 +64,7 @@ export const cloudinaryService = {
         resourceType: response.resource_type,
         bytes: response.bytes,
       };
-    } catch (error: any) {
+    } catch (error) {
       console.error("[cloudinaryService.uploadMedia] Error:", error);
       throw new Error(`Tải lên Cloudinary thất bại: ${error.message || error}`);
     }
@@ -119,52 +118,6 @@ export const cloudinaryService = {
       );
       uploadStream.write(buffer);
       uploadStream.end();
-    });
-  },
-
-  async uploadPrivateImage(buffer: Buffer, folder: string): Promise<PrivateImageAsset> {
-    if (
-      !process.env.CLOUDINARY_CLOUD_NAME ||
-      !process.env.CLOUDINARY_API_KEY ||
-      !process.env.CLOUDINARY_API_SECRET
-    ) {
-      throw new Error("Cloudinary configuration is incomplete");
-    }
-    ensureConfigured();
-
-    return new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: folder || "igen_erp/attendance/evidence",
-          resource_type: "image",
-          type: "authenticated",
-        },
-        (error, result) => {
-          if (error) {
-            reject(new Error(`Private Cloudinary upload failed: ${error.message || error}`));
-            return;
-          }
-          if (
-            !result ||
-            !result.public_id ||
-            !result.resource_type ||
-            !result.type ||
-            !result.format ||
-            typeof result.bytes !== "number"
-          ) {
-            reject(new Error("Cloudinary returned incomplete private asset metadata"));
-            return;
-          }
-          resolve({
-            publicId: result.public_id,
-            resourceType: result.resource_type,
-            type: result.type,
-            format: result.format,
-            bytes: result.bytes,
-          });
-        },
-      );
-      uploadStream.end(buffer);
     });
   },
 

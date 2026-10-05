@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { createHash } from "node:crypto";
 import {
   permissionRouteDiagnostics,
   PUBLIC_ROUTE_EXCEPTIONS,
@@ -26,11 +25,11 @@ describe("permission route inventory", () => {
 
   it("resolves a local permission alias used as route middleware", () => {
     const [route] = scanPermissionRouteSource(`
-      const RETAIL_MANAGE_PERMISSION = "retail:manage";
-      const operate = requirePermission([RETAIL_MANAGE_PERMISSION]);
+      const RESOURCE_MANAGE_PERMISSION = "resource:manage";
+      const operate = requirePermission([RESOURCE_MANAGE_PERMISSION]);
       router.post("/x", operate, handler);
     `, "fixture.router.ts");
-    expect(route.permissionCodes).toEqual(["retail:manage"]);
+    expect(route.permissionCodes).toEqual(["resource:manage"]);
     expect(route.diagnostics).toEqual([]);
   });
 

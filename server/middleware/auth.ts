@@ -7,9 +7,6 @@ import { RolePermissionModel } from "../model/role-permission.model";
 import { getJwtAccessSecret } from "../config/env";
 import { expandEffectivePermissions, normalizeStoredPermissions } from "../config/permission-catalog";
 
-const REGULAR_SESSION_REPLACED_CODE = "SESSION_REPLACED";
-const REGULAR_SESSION_REPLACED_MESSAGE = "Phiên đăng nhập đã được sử dụng trên thiết bị khác. Vui lòng đăng nhập lại.";
-
 export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
@@ -20,8 +17,9 @@ export interface AuthenticatedRequest extends Request {
     sessionId?: string;
     authLevel?: string;
     displayName?: string;
+    companyName?: string;
   };
-  resource?: any; // Để đính kèm tài nguyên sau khi qua requireCompanyAccess
+  resource?: Record<string, unknown>; // Để đính kèm tài nguyên sau khi qua requireCompanyAccess
 }
 
 function shouldSkipRoutineAuthLog(method: string, url: string) {
@@ -33,7 +31,6 @@ function shouldSkipRoutineAuthLog(method: string, url: string) {
   }
 
   const noisyPrefixes = [
-    "/api/v1/auth/telegram-link",
     "/api/v1/crud/marketing-contents",
     "/api/v1/crud/crm-tickets",
     "/api/v1/crud/products",
@@ -48,13 +45,13 @@ function shouldSkipRoutineAuthLog(method: string, url: string) {
  * Danh sách mã quyền mặc định của hệ thống cho từng vai trò
  */
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
-  admin: ["dashboard:manage", "people:manage", "relationship:manage", "hr:manage", "timekeeping:manage", "meetings:manage", "resource:manage", "chat:manage", "settings:manage", "access:manage"],
+  admin: ["dashboard:manage", "people:manage", "relationship:manage", "hr:manage", "meetings:manage", "resource:manage", "chat:manage", "settings:manage", "access:manage"],
   manager: [
     "dashboard:read", "access:read",
-    "hr:read", "people:read", "timekeeping:read", "meetings:read", "chat:read", "resource:read", "settings:manage"
+    "hr:read", "people:read", "meetings:read", "chat:read", "resource:read", "settings:manage"
   ],
   user: [
-    "access:read", "hr:read", "people:read", "timekeeping:read", "meetings:read", "chat:read", "resource:read"
+    "access:read", "hr:read", "people:read", "meetings:read", "chat:read", "resource:read"
   ],
   teacher: ["people:manage"]
 };
@@ -91,19 +88,12 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
   }
 
   try {
-    const decoded = jwt.verify(token, getJwtAccessSecret()) as any;
+    const decoded = jwt.verify(token, getJwtAccessSecret());
+      if (typeof decoded === "string") throw new Error("Invalid token payload");
 
-    const userDoc = await UserModel.findById(decoded.id).select("branchId activeSessionId displayName").lean();
+    const userDoc = await UserModel.findById(decoded.id).select("branchId displayName").lean();
     if (!userDoc) {
       return res.status(401).json({ status: "error", message: "Mã xác thực không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại." });
-    }
-
-    if (!decoded.sid || userDoc.activeSessionId !== decoded.sid) {
-      return res.status(401).json({
-        status: "error",
-        code: REGULAR_SESSION_REPLACED_CODE,
-        message: REGULAR_SESSION_REPLACED_MESSAGE,
-      });
     }
 
     let branchId = userDoc?.branchId ? String(userDoc.branchId) : undefined;
@@ -226,7 +216,7 @@ export function requirePermission(requiredPermission: string | string[]) {
         status: "error",
         message: "Bạn không có quyền thực hiện thao tác này.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[requirePermission] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -240,7 +230,7 @@ export function requirePermission(requiredPermission: string | string[]) {
 /**
  * Middleware bảo vệ tài nguyên theo doanh nghiệp (Tenant isolation ở cấp độ Object-level)
  */
-export function requireCompanyAccess(model: mongoose.Model<any>, idParamName: string = "id") {
+export function requireCompanyAccess<T>(model: mongoose.Model<T>, idParamName: string = "id") {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
@@ -263,7 +253,7 @@ export function requireCompanyAccess(model: mongoose.Model<any>, idParamName: st
         });
       }
 
-      const resource = await model.findById(resourceId).lean();
+      const resource = await model.findById(resourceId).lean<Record<string, unknown>>();
       if (!resource) {
         return res.status(404).json({
           status: "error",
@@ -282,7 +272,7 @@ export function requireCompanyAccess(model: mongoose.Model<any>, idParamName: st
       // Đính kèm tài nguyên vào request để sử dụng ở Controller mà không cần query lại
       req.resource = resource;
       return next();
-    } catch (error: any) {
+    } catch (error) {
       console.error("[requireCompanyAccess] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -367,7 +357,7 @@ export function requireHierarchyAccess(idParamName: string = "id") {
         status: "error",
         message: "Bạn không có quyền thao tác trên hồ sơ nhân sự của người khác.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[requireHierarchyAccess] Error:", error);
       return res.status(500).json({
         status: "error",

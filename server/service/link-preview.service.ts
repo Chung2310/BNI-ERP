@@ -179,7 +179,7 @@ export const linkPreviewService = {
         const html = Buffer.concat(chunks.map((c) => Buffer.from(c))).toString("utf8");
         data = extractMeta(html, parsed.href);
       }
-    } catch (err: any) {
+    } catch (err) {
       if (err?.name === "AbortError") throw new Error("Hết thời gian tải trang xem trước.");
       throw new Error("Không lấy được thông tin xem trước liên kết.");
     } finally {

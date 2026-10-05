@@ -25,6 +25,9 @@ export interface IUserActivityEvent {
   expiresAt: Date;
 }
 
+export type UserActivityInput = Omit<IUserActivityEvent, "userId" | "branchId" | "eventId" | "expiresAt" | "occurredAt"> & {
+ userId: string | Types.ObjectId; branchId?: string | Types.ObjectId; eventId?: string; expiresAt?: Date; occurredAt?: Date;
+};
 const immutable = true;
 const schema = new Schema<IUserActivityEvent>({
   eventId: { type: String, required: true, unique: true, immutable },
@@ -53,11 +56,11 @@ export function activityExpiresAt(occurredAt: Date) {
 }
 
 export const UserActivityEventModel = Object.freeze({
-  create: (event: Omit<IUserActivityEvent, "eventId" | "expiresAt"> & { eventId?: string; expiresAt?: Date }) => {
+  create: (event: UserActivityInput) => {
     const occurredAt = event.occurredAt || new Date();
     return RawUserActivityEventModel.create({ ...event, eventId: event.eventId || randomUUID(), occurredAt, expiresAt: event.expiresAt || activityExpiresAt(occurredAt) });
   },
-  insertMany: (events: any[]) => RawUserActivityEventModel.insertMany(events.map((event) => {
+  insertMany: (events: UserActivityInput[]) => RawUserActivityEventModel.insertMany(events.map((event) => {
     const occurredAt = event.occurredAt || new Date();
     return { ...event, eventId: event.eventId || randomUUID(), occurredAt, expiresAt: event.expiresAt || activityExpiresAt(occurredAt) };
   }), { ordered: false }),

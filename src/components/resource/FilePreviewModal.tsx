@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Download, ExternalLink, Loader2, X, FileQuestion, Share2 } from "lucide-react";
+import { Download, ExternalLink, Loader2, X, Share2 } from "lucide-react";
 import type { ResourceItem } from "../../types";
 import { toast } from "../../pages/Toast";
 import { getFileIcon, getPreviewKind, formatBytes } from "./resourceHelpers";
@@ -24,7 +24,7 @@ interface FilePreviewModalProps {
 }
 
 /** Cửa sổ xem trước tài liệu: ảnh, video, audio, PDF, tài liệu Office, văn bản. */
-export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
+const FilePreviewContent: React.FC<FilePreviewModalProps> = ({
   item,
   onClose,
   hideDownload = false,
@@ -34,9 +34,6 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   // Preview nâng cao (Excel/Word/Text) lỗi → rơi về fallback thay vì màn hình trống
   const [previewFailed, setPreviewFailed] = useState(false);
 
-  useEffect(() => {
-    setPreviewFailed(false);
-  }, [item]);
 
   useEffect(() => {
     if (!item) return;
@@ -89,7 +86,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(blobUrl);
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Download Error]:", err);
       toast.error(err.message || "Tải xuống thất bại.");
     } finally {
@@ -123,7 +120,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
   const handleShare = async () => {
     try {
-      const itemId = item._id || (item as any).id;
+      const itemId = item._id || (item).id;
       const shareUrl = `${window.location.origin}${window.location.pathname}?id=${itemId}`;
 
       if (navigator.share) {
@@ -138,8 +135,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     }
   };
 
-  try {
-    return (
+  return (
       <div
         className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/70 p-4 backdrop-blur-sm"
         onClick={onClose}
@@ -340,17 +336,29 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           </div>
         </div>
       </div>
-    );
-  } catch (err: any) {
-    console.error("FilePreviewModal Render Error:", err);
+    ); 
+};
+
+class FilePreviewErrorBoundary extends React.Component<React.PropsWithChildren<{ onClose: () => void }>, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error) { console.error("File preview failed:", error); }
+  render() {
+    if (!this.state.error) return this.props.children;
     return (
       <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/70 p-4 backdrop-blur-sm">
         <div className="bg-white p-6 rounded-3xl max-w-md text-center max-h-[90dvh] overflow-y-auto overscroll-contain">
           <p className="text-red-500 font-bold mb-2">Đã xảy ra lỗi khi hiển thị tệp</p>
-          <p className="text-xs text-slate-500 mb-4">{err?.message || String(err)}</p>
-          <button onClick={onClose} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-600">Đóng</button>
+          <p className="text-xs text-slate-500 mb-4">{this.state.error.message}</p>
+          <button onClick={this.props.onClose} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-600">Đóng</button>
         </div>
       </div>
     );
   }
-};
+}
+
+export const FilePreviewModal: React.FC<FilePreviewModalProps> = (props) => (
+  <FilePreviewErrorBoundary key={String(props.item?._id || "") + ":" + (props.item?.fileUrl || "")} onClose={props.onClose}>
+    <FilePreviewContent {...props} />
+  </FilePreviewErrorBoundary>
+);

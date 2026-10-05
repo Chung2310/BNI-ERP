@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import React, { Suspense, lazy } from "react";
 import { RefreshCw } from "lucide-react";
 import Sidebar from "./pages/Sidebar";
@@ -89,7 +89,7 @@ function AppContent() {
       }
     })();
 
-    const unsubscribe = socketService.on("internal_new_message", (data: any) => {
+    const unsubscribe = socketService.on<{ message: import("./services/internalChatService").ChatMessage; roomId: string }>("internal_new_message", (data) => {
       const msg = data?.message;
       if (!msg) return;
       const senderId = msg.senderId && typeof msg.senderId === "object" ? msg.senderId._id : msg.senderId;
@@ -114,8 +114,7 @@ function AppContent() {
       });
     });
     return unsubscribe;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, userProfile?.uid]);
+  }, [user, userProfile, setActiveTab]);
 
   React.useEffect(() => {
     if (!user || !userProfile) {

@@ -14,7 +14,7 @@ const slides = [
   { id: "b", kind: "guest", name: "Trần Bình", company: "Guest Co", photoURL: "", coverImage: "", phone: "", industry: "", bio: "" },
 ];
 const meeting = { _id: "m", __v: 1, currentIndex: 1, status: "live", speakers: slides };
-beforeEach(() => vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn() } as any));
+beforeEach(() => vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(({ drawImage: vi.fn() } as unknown as Parameters<((value: ReturnType<typeof HTMLCanvasElement.prototype.getContext>) => void)>[0])));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 it("checks multiple attendees and submits one batch while preserving the selection on failure", async () => {
@@ -38,7 +38,7 @@ it.each([0, 1])("previews selected attendee %s without changing the live turn un
   const start = vi.fn().mockResolvedValue(undefined);
   const initial = { ...meeting, currentIndex: target === 0 ? 1 : 0 };
   const view = render(<MeetingSlides meeting={initial} canManage api={api} onStartPresentation={start} />);
-  fireEvent.click(await screen.findByText(slides[target].name));
+  fireEvent.click(await within(screen.getByRole("complementary")).findByText(slides[target].name));
   expect((await screen.findByRole("img")).getAttribute("aria-label")).toContain(slides[target].name);
   expect(start).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
@@ -111,10 +111,10 @@ it("selects the guest in live mode and saves only slide fields with the server v
   fireEvent.change(screen.getByLabelText("Chế độ trình chiếu"), { target: { value: "live" } });
   expect((await screen.findByRole("img")).getAttribute("aria-label")).toContain("Trần Bình");
   fireEvent.click(screen.getByText("Bổ sung thông tin slide"));
-  fireEvent.change(screen.getByLabelText("Bio / giới thiệu ngắn"), { target: { value: "Kết nối kinh doanh" } });
+  fireEvent.change(screen.getByLabelText("Thị trường mục tiêu"), { target: { value: "Kết nối kinh doanh" } });
   fireEvent.click(screen.getByText("Lưu thông tin slide"));
   await waitFor(() => expect(api).toHaveBeenCalledWith("/m/slides/b", "PUT", {
-    version: 4, profile: { name: "Trần Bình", company: "Guest Co", photoURL: "", coverImage: "", phone: "", industry: "", bio: "Kết nối kinh doanh" },
+    version: 4, profile: { name: "Trần Bình", company: "Guest Co", photoURL: "", coverImage: "", phone: "", industry: "", bio: "", address: "", targetMarket: "Kết nối kinh doanh", galleryImages: [] },
   }));
 });
 
@@ -156,10 +156,8 @@ it("keeps the version captured when editing even if live meeting data refreshes"
 });
 
 it("does not keep showing the last speaker after the meeting ends", async () => {
-  render(<MeetingSlides meeting={{ ...meeting, status: "ended" }} canManage api={vi.fn().mockResolvedValue({ slides, version: 1 })} />);
-  await screen.findByText("Nguyễn An");
-  fireEvent.change(screen.getByLabelText("Chế độ trình chiếu"), { target: { value: "live" } });
-  expect(screen.getByText("Chưa có người đang phát biểu.")).toBeTruthy();
+  render(<MeetingSlides meeting={{ ...meeting, status: "ended" }} canManage api={vi.fn().mockResolvedValue({ slides: [], version: 1 })} />);
+  expect(await screen.findByText("Chưa có người check-in. Hãy check-in thành viên hoặc khách mời trước.")).toBeTruthy();
 });
 
 
@@ -235,8 +233,8 @@ it("StrictMode does not exit an incoming fullscreen request; real unmount still 
     await waitFor(() => expect(exitFullscreen).toHaveBeenCalledTimes(1));
   } finally {
     view.unmount();
-    delete (document as any).fullscreenElement;
-    delete (document as any).exitFullscreen;
+    Reflect.deleteProperty(document, "fullscreenElement");
+    Reflect.deleteProperty(document, "exitFullscreen");
   }
 });
 
@@ -245,7 +243,7 @@ it.each(["Nguyễn An", "Trần Bình"])("starts the selected member or guest %s
   const api = vi.fn().mockResolvedValue({ slides, version: 1 });
   render(<MeetingSlides meeting={{ ...meeting, status: "scheduled" }} canManage api={api} />);
   await screen.findByText("Nguyễn An");
-  fireEvent.click(screen.getByText(name));
+  fireEvent.click(within(screen.getByRole("complementary")).getByText(name));
   await waitFor(() => expect(screen.getByRole("img").getAttribute("aria-label")).toContain(name));
   fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
   const dialog = screen.getByRole("dialog", { name: "Trình chiếu hồ sơ" });

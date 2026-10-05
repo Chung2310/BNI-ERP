@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, {  useState, useRef } from "react";
 import {
   Gift,
   Trophy,
@@ -12,17 +12,9 @@ import {
   Lock,
   Volume2,
   VolumeX,
-  Maximize2,
-  Minimize2,
   RotateCcw,
-  Share2,
-  Users,
-  Hash,
   Download,
-  Calendar,
   Layers,
-  ChevronRight,
-  PartyPopper,
   ExternalLink,
   Dices,
   Play,
@@ -49,10 +41,11 @@ interface LuckyDrawTabProps {
 
 export function LuckyDrawTab({
   meeting,
-  canManage,
+  canManage: hasManagementPermission,
   onRefreshMeeting,
   onStartMeeting,
 }: LuckyDrawTabProps) {
+  const canManage = hasManagementPermission && meeting.status !== "ended";
   const [luckyConfig, setLuckyConfig] = useState<LuckyDrawConfig>(
     meeting.luckyDraw || {
       enabled: true,
@@ -66,7 +59,6 @@ export function LuckyDrawTab({
 
   const [selectedPrizeId, setSelectedPrizeId] = useState<string>("");
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinningDisplay, setSpinningDisplay] = useState<string>("READY");
   const [activeWinnerModal, setActiveWinnerModal] = useState<{
@@ -100,40 +92,27 @@ export function LuckyDrawTab({
   };
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const tickerIntervalRef = useRef<any>(null);
+  const tickerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Kiểm tra điều kiện: CUỘC HỌP ĐÃ BẮT ĐẦU CHƯA?
   const isMeetingStarted =
     meeting.status === "live" || meeting.status === "paused" || meeting.status === "ended";
 
-  useEffect(() => {
+  const [previousInputs1, setPreviousInputs1] = useState<unknown[] | null>(null);
+  if (previousInputs1 === null || !Object.is(previousInputs1[0], meeting)) {
+    setPreviousInputs1([meeting]);
     if (meeting.luckyDraw) {
       setLuckyConfig(meeting.luckyDraw);
       if (!selectedPrizeId && meeting.luckyDraw.prizes?.length) {
         setSelectedPrizeId(meeting.luckyDraw.prizes[0].id);
       }
     }
-  }, [meeting]);
+  
+  }
 
   const selectedPrize = luckyConfig.prizes?.find((p) => p.id === selectedPrizeId);
 
-  // Toggle Fullscreen
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
-    } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
-    }
-  };
 
-  useEffect(() => {
-    const handleFsChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener("fullscreenchange", handleFsChange);
-    return () => document.removeEventListener("fullscreenchange", handleFsChange);
-  }, []);
 
   // Quick Preset Prizes
   const handleApplyPresets = async () => {
@@ -163,7 +142,7 @@ export function LuckyDrawTab({
       }
       toast.success("Đã thêm bộ giải thưởng mẫu thành công!");
       await onRefreshMeeting();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err.message || "Không thể tạo giải thưởng mẫu.");
     }
   };
@@ -193,6 +172,7 @@ export function LuckyDrawTab({
   // Save Prize Form
   const handleSavePrize = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     if (!prizeName.trim()) {
       toast.warning("Vui lòng nhập tên giải thưởng!");
       return;
@@ -212,7 +192,7 @@ export function LuckyDrawTab({
       toast.success(editingPrize ? "Cập nhật giải thưởng thành công!" : "Thêm giải thưởng mới thành công!");
       setIsPrizeModalOpen(false);
       await onRefreshMeeting();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err.message || "Lỗi lưu giải thưởng.");
     } finally {
       setSavingPrize(false);
@@ -230,7 +210,7 @@ export function LuckyDrawTab({
         }
         toast.success("Đã xóa giải thưởng.");
         await onRefreshMeeting();
-      } catch (err: any) {
+      } catch (err) {
         toast.error(err.message || "Xóa giải thưởng thất bại.");
       }
     });
@@ -243,7 +223,7 @@ export function LuckyDrawTab({
       setLuckyConfig(updated);
       toast.success("Đã cập nhật cấu hình quay thưởng.");
       await onRefreshMeeting();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err.message || "Không thể cập nhật cấu hình.");
     }
   };
@@ -252,6 +232,7 @@ export function LuckyDrawTab({
   // RANDOM.ORG STYLE SPIN LOGIC
   // ========================================================
   const handleSpin = async () => {
+    if (!canManage) return;
     if (!isMeetingStarted) {
       toast.warning("Cuộc họp chưa bắt đầu! Chỉ có thể quay thưởng khi cuộc họp đã bắt đầu.");
       return;
@@ -290,10 +271,10 @@ export function LuckyDrawTab({
     if (soundEnabled) playSuspenseSound();
 
     // Call API to generate cryptographic winner
-    let spinResultPromise: Promise<any>;
+    let spinResultPromise: ReturnType<typeof meetingService.spinLuckyDraw>;
     try {
       spinResultPromise = meetingService.spinLuckyDraw(meeting._id, selectedPrize.id);
-    } catch (err: any) {
+    } catch (err) {
       setIsSpinning(false);
       toast.error(err.message || "Không thể kết nối máy chủ quay thưởng.");
       return;
@@ -301,7 +282,7 @@ export function LuckyDrawTab({
 
     // High-speed rolling animation (Random.org style)
     let rollIndex = 0;
-    const startTime = Date.now();
+    
     const duration = 4000; // 4 seconds suspense rolling
 
     const rollingInterval = setInterval(() => {
@@ -351,7 +332,7 @@ export function LuckyDrawTab({
           }, 350);
         }, 300);
       }, duration);
-    } catch (err: any) {
+    } catch (err) {
       clearInterval(rollingInterval);
       setIsSpinning(false);
       setSpinningDisplay("READY");
@@ -368,7 +349,7 @@ export function LuckyDrawTab({
         toast.success("Đã hủy kết quả. Bạn có thể bấm Quay lại giải này.");
         setActiveWinnerModal(null);
         await onRefreshMeeting();
-      } catch (err: any) {
+      } catch (err) {
         toast.error(err.message || "Không thể hủy kết quả.");
       }
     });
@@ -386,7 +367,7 @@ export function LuckyDrawTab({
         setLuckyConfig(updated);
         toast.success("Đã làm mới danh sách người trúng giải.");
         await onRefreshMeeting();
-      } catch (err: any) {
+      } catch (err) {
         toast.error(err.message || "Đặt lại thất bại.");
       }
     });
@@ -433,7 +414,7 @@ export function LuckyDrawTab({
   return (
     <div
       ref={containerRef}
-      className={`space-y-6 ${isFullscreen ? "fixed inset-0 z-50 bg-slate-950 p-6 overflow-y-auto text-white" : ""}`}
+      className="space-y-6"
     >
       {/* Top Banner Alert: CHỈ QUAY KHI CUỘC HỌP ĐÃ BẮT ĐẦU */}
       {!isMeetingStarted && (
@@ -500,7 +481,7 @@ export function LuckyDrawTab({
         </div>
 
         {/* Game Options */}
-        <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {canManage && <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Game 1: Vòng quay may mắn */}
           <div className="group rounded-xl border border-slate-200 bg-slate-50/50 p-4 transition-all duration-200 hover:border-[#cf142b]/40 hover:shadow-sm flex flex-col justify-between">
             <div>
@@ -562,10 +543,10 @@ export function LuckyDrawTab({
               </a>
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* Bốc thăm nhanh tại chỗ */}
-        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+        {canManage && <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
             <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
               <Sparkles className="h-4 w-4 text-[#cf142b]" />
@@ -637,7 +618,7 @@ export function LuckyDrawTab({
               )}
             </button>
           </div>
-        </div>
+        </div>}
       </div>
 
       {/* Danh sách giải thưởng */}
@@ -699,7 +680,7 @@ export function LuckyDrawTab({
                 <span className="font-semibold text-slate-700">Chế độ quay:</span>
                 <select
                   value={luckyConfig.drawMode}
-                  onChange={(e) => handleSaveSettings({ drawMode: e.target.value as any })}
+                  onChange={(e) => handleSaveSettings({ drawMode: e.target.value === 'numbers' ? 'numbers' : 'attendees' })}
                   className="w-full p-2 border border-slate-200 rounded-xl bg-white outline-none"
                 >
                   <option value="attendees">Theo danh sách check-in họp</option>
@@ -1045,7 +1026,7 @@ export function LuckyDrawTab({
       )}
 
       {/* ADD / EDIT PRIZE MODAL */}
-      {isPrizeModalOpen && (
+      {canManage && isPrizeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
             <div className="bg-white border-b border-slate-100 p-5 flex items-center justify-between">
@@ -1154,7 +1135,7 @@ export function LuckyDrawTab({
       )}
 
       {/* CUSTOM CONFIRM POPUP (replaces window.confirm) */}
-      {confirmModal && (
+      {canManage && confirmModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-xl bg-white shadow-xl border border-slate-200 overflow-hidden">
             <div className="p-5">

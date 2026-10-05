@@ -11,7 +11,7 @@ export interface WebNotification {
   recipientUid: string;
   read: boolean;
   action?: {
-    tab: string;
+    tab: import('../types').TabType;
     subTab?: string;
   };
   createdAt: string;
@@ -45,7 +45,7 @@ async function parseApiResponse<T>(res: Response, fallbackMessage: string): Prom
     );
   }
 
-  let data: any;
+  let data: unknown;
   try {
     data = JSON.parse(rawBody);
   } catch {
@@ -53,7 +53,7 @@ async function parseApiResponse<T>(res: Response, fallbackMessage: string): Prom
   }
 
   if (!res.ok) {
-    throw new Error(data.message || fallbackMessage);
+    throw new Error((data && typeof data === "object" && "message" in data && typeof data.message === "string" ? data.message : fallbackMessage));
   }
 
   return data as T;

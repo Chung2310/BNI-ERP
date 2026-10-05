@@ -16,8 +16,9 @@ const guestAvatarUpload = multer({
 
 export const meetingCheckInRouter = Router();
 meetingCheckInRouter.use(publicApiRateLimiter);
-const respondError = (res: any, error: any) => res.status(error instanceof MeetingError ? error.status : 500).json({ message: error.message || 'Không thể check-in.' });
+const respondError = (res: import("express").Response, error: unknown) => res.status(error instanceof MeetingError ? error.status : 500).json({ message: (error instanceof Error ? error.message : '') || 'Không thể check-in.' });
 meetingCheckInRouter.get('/:token', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
   try { res.json({ data: await getPublicQrMeeting(req.params.token) }); } catch (e) { respondError(res, e); }
 });
 meetingCheckInRouter.post('/:token/member', authRateLimiter, loginAccountRateLimiter, async (req, res) => {

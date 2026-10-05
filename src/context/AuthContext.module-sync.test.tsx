@@ -39,7 +39,7 @@ afterEach(cleanup);
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.setItem("accessToken", "token");
-  vi.mocked(authService.getMe).mockResolvedValue(profile as any);
+  vi.mocked(authService.getMe).mockResolvedValue((profile as unknown as Parameters<((value: Awaited<ReturnType<typeof authService.getMe>>) => void)>[0]));
   vi.mocked(socketService.on).mockReturnValue(() => undefined);
   vi.mocked(socketService.onStatusChange).mockImplementation((callback: (connected: boolean) => void) => {
     callback(false);
@@ -77,9 +77,24 @@ describe("AuthContext company module sync", () => {
     render(<AuthProvider><ProfileProbe /></AuthProvider>);
     await waitFor(() => expect(screen.getByLabelText("modules").textContent).toBe("hr,chat"));
 
-    vi.mocked(authService.getMe).mockResolvedValue({ ...profile, enabledModules: ["student"] } as any);
+    vi.mocked(authService.getMe).mockResolvedValue(({ ...profile, enabledModules: ["student"] } as unknown as Parameters<((value: Awaited<ReturnType<typeof authService.getMe>>) => void)>[0]));
+    await waitFor(() => expect(statusListener).toBeTypeOf("function"));
     await act(async () => statusListener?.(true));
 
     await waitFor(() => expect(screen.getByLabelText("modules").textContent).toBe("student"));
   });
+});
+
+it("keeps the authenticated user and token when an old session-replaced event is received", async () => {
+  const listeners = new Map<string, (event: unknown) => void>();
+  vi.mocked(socketService.on).mockImplementation((name, callback) => {
+    listeners.set(name, callback);
+    return () => { listeners.delete(name); };
+  });
+  render(<AuthProvider><ProfileProbe /></AuthProvider>);
+  await waitFor(() => expect(screen.getByLabelText("modules").textContent).toBe("hr,chat"));
+  await act(async () => listeners.get("auth:session-replaced")?.({ code: "SESSION_REPLACED" }));
+  expect(screen.getByLabelText("modules").textContent).toBe("hr,chat");
+  expect(localStorage.getItem("accessToken")).toBe("token");
+  expect(toast.error).not.toHaveBeenCalled();
 });

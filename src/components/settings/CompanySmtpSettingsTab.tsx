@@ -5,11 +5,11 @@ import { toast } from "../../pages/Toast";
 
 const empty = { host: "smtp.gmail.com", port: 587, secure: false, user: "", password: "", fromEmail: "", fromName: "" };
 export default function CompanySmtpSettingsTab() {
-  const [form, setForm] = React.useState<any>(empty);
+  const [form, setForm] = React.useState<typeof empty & { hasPassword?: boolean }>(empty);
   const [busy, setBusy] = React.useState("");
   React.useEffect(() => { companyEmailApi.getSmtp().then((data) => data && setForm({ ...empty, ...data, password: "" })).catch((e) => toast.error(e.message)); }, []);
-  const update = (key: string, value: any) => setForm((current: any) => ({ ...current, [key]: value }));
-  const act = async (name: string, fn: () => Promise<any>, message: string) => { setBusy(name); try { await fn(); toast.success(message); } catch (e: any) { toast.error(e.message); } finally { setBusy(""); } };
+  const update = (key: keyof typeof empty, value: string | number | boolean) => setForm((current) => ({ ...current, [key]: value }));
+  const act = async (name: string, fn: () => Promise<unknown>, message: string) => { setBusy(name); try { await fn(); toast.success(message); } catch (e) { toast.error(e.message); } finally { setBusy(""); } };
   return <section className="space-y-5 bg-white border border-slate-200 p-5 rounded-xl">
     <div>
       <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -50,5 +50,5 @@ export default function CompanySmtpSettingsTab() {
     </div>
   </section>;
 }
-function Field({ label, value, onChange, type = "text", placeholder, required }: any) { return <label className="space-y-1 text-xs font-semibold text-slate-600"><span>{label}{required && <span className="text-red-500 ml-1">*</span>}</span><input type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-cyan-500" /></label>; }
-function Action({ icon: Icon, busy, label, onClick, secondary }: any) { return <button type="button" disabled={busy} onClick={onClick} className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold ${secondary ? "border border-slate-200 text-slate-700" : "bg-cyan-600 text-white"}`}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}{label}</button>; }
+function Field({ label, value, onChange, type = "text", placeholder, required }: { label: string; value: string | number; onChange: (value: string) => void; type?: string; placeholder?: string; required?: boolean }) { return <label className="space-y-1 text-xs font-semibold text-slate-600"><span>{label}{required && <span className="text-red-500 ml-1">*</span>}</span><input type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-cyan-500" /></label>; }
+function Action({ icon: Icon, busy, label, onClick, secondary }: { icon: import("lucide-react").LucideIcon; busy: boolean; label: string; onClick: () => void; secondary?: boolean }) { return <button type="button" disabled={busy} onClick={onClick} className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold ${secondary ? "border border-slate-200 text-slate-700" : "bg-cyan-600 text-white"}`}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}{label}</button>; }

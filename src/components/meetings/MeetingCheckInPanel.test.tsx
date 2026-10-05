@@ -1,56 +1,65 @@
 // @vitest-environment jsdom
 import React from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MeetingCheckInPanel } from "./MeetingCheckInPanel";
+import { CompanyCheckInQrPanel } from "./CompanyCheckInQrPanel";
+
 vi.mock("qrcode", () => ({ default: { toDataURL: async () => "data:image/png;base64,qr" } }));
-const expiry = "2099-01-01T00:00:00Z";
-const meeting = { _id: "a", title: "Buổi A", status: "live", latitude: 10, longitude: 106, checkInQrExpiresAt: expiry, speakers: [] };
-const props = { canManage: true, onRefresh: async () => {}, onConfigure: vi.fn(), onOperate: vi.fn() };
-const result = { checkInUrl: "/meeting-checkin/token-a", expiresAt: expiry };
+
+const meeting = { _id: "a", title: "Buổi A", status: "live", latitude: 10, longitude: 106, speakers: [] };
+const result = { checkInUrl: "/meeting-checkin/shared-token", expiresAt: null, scope: "company" };
+
 afterEach(() => { cleanup(); sessionStorage.clear(); });
 
-it("restores the same QR without browser storage, including after remount", async () => {
+it("lets an organizer open location configuration for meeting check-in", () => {
+  const onConfigure = vi.fn();
+  render(<MeetingCheckInPanel meeting={meeting} canManage api={vi.fn().mockResolvedValue(result)} onConfigure={onConfigure} />);
+  expect(screen.getByText(/kiểm tra vị trí trong bán kính/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Cấu hình địa điểm & thời gian" }));
+  expect(onConfigure).toHaveBeenCalledOnce();
+});
+
+it("tells members to scan the shared QR and confirm their location", () => {
+  render(<MeetingCheckInPanel meeting={meeting} canManage={false} api={vi.fn().mockResolvedValue(result)} onConfigure={vi.fn()} />);
+  expect(screen.getByText(/quét QR chung/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Cấu hình địa điểm & thời gian" })).toBeNull();
+});
+
+it("loads the same permanent company QR after remount without browser storage", async () => {
   const api = vi.fn().mockResolvedValue(result);
-  const first = render(<MeetingCheckInPanel {...props} api={api} meeting={meeting} />);
-  await screen.findByAltText("QR check-in Buổi A");
-  expect(screen.getByRole("link", { name: "Mở trang check-in" }).getAttribute("href")).toContain("/meeting-checkin/token-a");
-  first.unmount(); sessionStorage.clear();
-  render(<MeetingCheckInPanel {...props} api={api} meeting={{ ...meeting, status: "paused" }} />);
-  await screen.findByAltText("QR check-in Buổi A");
-  expect(api.mock.calls).toEqual([["/a/checkin-qr"], ["/a/checkin-qr"]]);
+  const first = render(<CompanyCheckInQrPanel api={api} companyCode="ACME" />);
+  await screen.findByAltText("QR check-in dùng chung");
+  const link = screen.getByRole("link", { name: "Mở trang check-in" }).getAttribute("href");
+  first.unmount();
+  sessionStorage.clear();
+  render(<CompanyCheckInQrPanel api={api} companyCode="ACME" />);
+  await screen.findByAltText("QR check-in dùng chung");
+  expect(screen.getByRole("link", { name: "Mở trang check-in" }).getAttribute("href")).toBe(link);
+  expect(api.mock.calls).toEqual([["/checkin-qr"], ["/checkin-qr"]]);
+  expect(screen.queryByText("Thời hạn QR")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Tạo mã thay thế" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Hủy QR" })).toBeNull();
+  expect(screen.getByText("Sử dụng Zalo để quét mã")).toBeTruthy();
 });
 
-it("hides revoked codes and cannot leak one meeting QR into another", async () => {
-  const api = vi.fn(async path => path === "/a/checkin-qr" ? result : null);
-  const view = render(<MeetingCheckInPanel {...props} api={api} meeting={meeting} />);
-  await screen.findByAltText("QR check-in Buổi A");
-  view.rerender(<MeetingCheckInPanel {...props} api={api} meeting={{ ...meeting, checkInQrExpiresAt: undefined }} />);
-  expect(screen.queryByAltText("QR check-in Buổi A")).toBeNull();
-  view.rerender(<MeetingCheckInPanel {...props} api={api} meeting={{ ...meeting, _id: "b", title: "Buổi B" }} />);
-  await waitFor(() => expect(api).toHaveBeenCalledWith("/b/checkin-qr"));
-  expect(screen.queryByRole("link", { name: "Mở trang check-in" })).toBeNull();
-});
-
-it("migrates an existing cached token without creating a replacement", async () => {
-  sessionStorage.setItem("meeting-qr:a", JSON.stringify({ url: "https://example.com/meeting-checkin/old-token", expiresAt: expiry }));
-  const api = vi.fn().mockResolvedValueOnce({ legacy: true, expiresAt: expiry }).mockResolvedValueOnce(result);
-  render(<MeetingCheckInPanel {...props} api={api} meeting={meeting} />);
-  await screen.findByAltText("QR check-in Buổi A");
-  expect(api).toHaveBeenNthCalledWith(2, "/a/checkin-qr", "PUT", { token: "old-token" });
-});
-
-it("retries a failed restore without rotating the QR", async () => {
+it("retries a failed company QR load without generating a replacement", async () => {
   const api = vi.fn().mockRejectedValueOnce(new Error("Mất kết nối")).mockResolvedValueOnce(result);
-  render(<MeetingCheckInPanel {...props} api={api} meeting={meeting} />);
+  render(<CompanyCheckInQrPanel api={api} companyCode="ACME" />);
   await screen.findByText("Mất kết nối");
   fireEvent.click(screen.getByText("Tải lại mã QR hiện tại"));
-  await screen.findByAltText("QR check-in Buổi A");
-  expect(api.mock.calls.every(call => call.length === 1)).toBe(true);
+  await screen.findByAltText("QR check-in dùng chung");
+  expect(api.mock.calls).toEqual([["/checkin-qr"], ["/checkin-qr"]]);
 });
 
-it("does not fetch privileged QR data for a read-only viewer", () => {
-  const api = vi.fn();
-  render(<MeetingCheckInPanel {...props} canManage={false} api={api} meeting={meeting} />);
-  expect(api).not.toHaveBeenCalled();
+it("discards an old company QR response after switching companies", async () => {
+  let resolveOld!: (value: typeof result) => void;
+  const api = vi.fn()
+    .mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }))
+    .mockResolvedValueOnce({ ...result, checkInUrl: "/meeting-checkin/other-company" });
+  const view = render(<CompanyCheckInQrPanel api={api} companyCode="ACME" />);
+  view.rerender(<CompanyCheckInQrPanel api={api} companyCode="OTHER" />);
+  await screen.findByAltText("QR check-in dùng chung");
+  resolveOld(result);
+  await waitFor(() => expect(screen.getByRole("link", { name: "Mở trang check-in" }).getAttribute("href")).toContain("/other-company"));
 });

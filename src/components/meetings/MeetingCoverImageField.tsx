@@ -30,7 +30,7 @@ export function MeetingCoverImageField({ value, onChange, disabled }: MeetingCov
       const url = await authService.uploadFile(file, "igen_erp/meetings");
       onChange(url);
       toast.success("Đã tải ảnh bìa lên thành công!");
-    } catch (error: any) {
+    } catch (error) {
       console.error("[MeetingCoverImageField] Upload error:", error);
       toast.error(error?.message || "Tải ảnh bìa thất bại.");
     } finally {
@@ -162,16 +162,6 @@ export function MeetingCoverImageField({ value, onChange, disabled }: MeetingCov
           <p className="text-[11px] text-slate-400">PNG, JPG, WEBP, GIF (tối đa 10MB)</p>
         </div>
       )}
-
-      <div>
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled || uploading}
-          placeholder="Hoặc dán URL ảnh trực tiếp (https://...)"
-          className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none disabled:opacity-50"
-        />
-      </div>
     </div>
   );
 }

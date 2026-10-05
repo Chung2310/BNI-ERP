@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { FolderTree, Mail, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
+import { Users, Mail, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
 import { HRSubTabType, EmployeeNode, UserProfile } from "../types";
 import { useAuth } from "../context/AuthContext";
 import { authService } from "../services/authService";
@@ -27,33 +27,25 @@ export default function HRTab() {
   const canManageCelebration = userProfile?.role === "admin" || hasPermission("settings:manage");
 
   const [subTab, setSubTab] = useSubTabRouter<HRSubTabType>(HR_SUB_TAB_ROUTES, "SƠ ĐỒ TỔ CHỨC");
-  const [usersList, setUsersList] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fetchedUsers, setUsersList] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(!!userProfile?.companyCode);
 
   const companyCode = userProfile?.companyCode || "";
 
-  // Fetch users list from API
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      let data: UserProfile[] = [];
-      if (companyCode) {
-        data = await authService.getUsersByCompany(companyCode);
-      } else if (userProfile) {
-        data = [userProfile];
-      }
-      setUsersList(data);
-    } catch (error) {
+  const usersList = companyCode ? fetchedUsers : userProfile ? [userProfile] : [];
+  const [requestInputs, setRequestInputs] = useState(() => [companyCode, userProfile?.uid]);
+  if (!Object.is(requestInputs[0], companyCode) || !Object.is(requestInputs[1], userProfile?.uid)) {
+    setRequestInputs([companyCode, userProfile?.uid]);
+    setLoading(!!companyCode); setUsersList([]);
+  }
+  const fetchUsers = useCallback(() => {
+    if (!companyCode) return;
+    return authService.getUsersByCompany(companyCode).then(setUsersList).catch(error => {
       console.error("Lỗi khi tải danh sách thành viên:", error);
-      toast.error(getApiErrorMessage(error, "Không thể tải sơ đồ tổ chức."));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, [companyCode, userProfile?.uid]);
+      toast.error(getApiErrorMessage(error, "Không thể tải danh sách thành viên."));
+    }).finally(() => setLoading(false));
+  }, [companyCode]);
+  useEffect(() => { void fetchUsers(); }, [fetchUsers, userProfile?.uid]);
 
   // Map user profile to EmployeeNode tree model (excluding admin)
   const employees: EmployeeNode[] = usersList
@@ -61,30 +53,25 @@ export default function HRTab() {
     .map((usr) => ({
       id: usr.uid,
       name: usr.displayName,
-      role: (usr.jobTitle && usr.jobTitle.trim().toLowerCase() !== "nhân viên")
-        ? usr.jobTitle
-        : (usr.role === "manager" ? "Quản lý" : "Thành viên"),
-    department: usr.department || "",
+      role: usr.role === "manager" ? "Quản lý" : "Thành viên",
     email: usr.email,
     phone: usr.phone || "Chưa cập nhật",
     avatar:
       usr.photoURL && (usr.photoURL.startsWith("http") || usr.photoURL.startsWith("/"))
         ? usr.photoURL
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(usr.displayName)}&background=random&color=fff`,
-    level: usr.level || (
-      usr.role === "admin" ? 1 :
-      usr.role === "manager" ? 2 : 3
-    ),
     parentId: usr.parentId,
     status: usr.status || "offline",
-    division: usr.division || "Khối Vận Hành",
-    isLeader: usr.isLeader,
     jobDescriptionLink: usr.jobDescriptionLink || "",
     monthlySalary: usr.monthlySalary,
     companyName: usr.companyName,
     industry: usr.industry,
     birthDate: usr.birthDate,
+    gender: usr.gender,
+    address: usr.address,
+    targetMarket: usr.targetMarket,
     coverImage: usr.coverImage,
+    galleryImages: usr.galleryImages,
   }));
 
 
@@ -98,7 +85,7 @@ export default function HRTab() {
           <button type="button" aria-label="Cuộn tab sang trái" onClick={() => scrollSubTabs("left")} className="flex h-6 w-5 shrink-0 items-center justify-center text-slate-400 transition-colors hover:text-slate-700 sm:hidden"><ChevronLeft className="h-4 w-4" /></button>
           <div ref={subTabsRef} className="flex min-w-0 max-w-full flex-1 gap-1 overflow-x-auto select-none scrollbar-none -mb-px">
             {[
-              { id: "SƠ ĐỒ TỔ CHỨC", label: "Sơ đồ tổ chức", icon: FolderTree },
+              { id: "SƠ ĐỒ TỔ CHỨC", label: "Thành viên", icon: Users },
               ...(canReadFees ? [{ id: "PHÍ THƯỜNG NIÊN", label: "Phí thường niên", icon: Wallet }] : []),
               ...(canManageCelebration ? [{ id: CELEBRATION_TAB, label: "Email chúc mừng", icon: Mail }] : []),
             ].map((tab) => {

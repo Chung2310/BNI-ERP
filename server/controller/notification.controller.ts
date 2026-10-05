@@ -40,7 +40,7 @@ export const notificationController = {
         page: result.page,
         limit: result.limit,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[notificationController.getList] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -85,7 +85,7 @@ export const notificationController = {
         status: "success",
         data: item,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[notificationController.create] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -115,7 +115,7 @@ export const notificationController = {
         status: "success",
         data: item,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[notificationController.markRead] Error:", error);
       return res.status(error.message.includes("Không tìm thấy") ? 404 : 500).json({
         status: "error",
@@ -144,7 +144,7 @@ export const notificationController = {
         status: "success",
         message: "Đã đánh dấu đọc tất cả thông báo.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[notificationController.markAllRead] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -175,7 +175,7 @@ export const notificationController = {
         message: "Xóa thông báo thành công.",
         data: item,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[notificationController.delete] Error:", error);
       return res.status(error.message.includes("Không tìm thấy") ? 404 : 500).json({
         status: "error",

@@ -1,44 +1,26 @@
-import { describe, expect, it, vi } from "vitest";
-import * as crudRouterModule from "./crud.router";
-
-const policy = (crudRouterModule as any).CRUD_MODEL_PERMISSION_POLICY;
-const supportedModels = (crudRouterModule as any).SUPPORTED_CRUD_MODELS;
-
-describe("generic CRUD permission policy", () => {
-  it("defines an explicit read and manage policy for every supported model", () => {
-    expect(Array.isArray(supportedModels)).toBe(true);
-    expect(policy).toBeDefined();
-
-    for (const modelName of supportedModels) {
-      expect(policy[modelName], `missing policy for ${modelName}`).toEqual(
-        expect.objectContaining({ read: expect.anything(), manage: expect.anything() }),
-      );
-    }
-  });
-
-  it("assigns HR permissions to training and workflow mutations", () => {
-    for (const modelName of ["training-courses", "workflows"]) {
-      expect(policy[modelName]).toMatchObject({ read: "hr:read", manage: "hr:manage" });
-    }
-  });
-
-  it("assigns self-service permissions to training enrollments", () => {
-    expect(policy["training-enrollments"]).toMatchObject({ read: "self-service", manage: "self-service" });
-  });
-
-  it("assigns timekeeping management to leave templates and retains leave self-service", () => {
-    expect(policy["hr-leave-templates"]).toMatchObject({ manage: "timekeeping:manage" });
-    expect(policy["hr-leave-applications"]).toMatchObject({ read: "self-service", manage: "self-service" });
-  });
-
-  it("fails closed for a model without a read policy", async () => {
-    const guard = (crudRouterModule as any).crudReadPermissionGuard;
-    const next = vi.fn();
-    const res: any = { status: vi.fn().mockReturnThis(), json: vi.fn() };
-
-    await guard({ params: { modelName: "unsupported-model" } }, res, next);
-
-    expect(next).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(403);
-  });
+import { beforeEach, expect, it, vi } from "vitest";
+const mocks = vi.hoisted(() => ({ permission: vi.fn(), auth: vi.fn() }));
+vi.mock("../middleware/auth", () => ({ requireAuth: mocks.auth, requirePermission: (code: string) => (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => mocks.permission(code, req, res, next) }));
+import { crudRouter, crudReadPermissionGuard } from "./crud.router";
+beforeEach(() => vi.clearAllMocks());
+it.each(["hr-leave-templates", "hr-leave-applications", "timekeeping", "unknown"])("rejects retired or unknown resource %s", (modelName) => {
+  const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+  const next = vi.fn();
+  crudReadPermissionGuard(({ params: { modelName } } as unknown as Parameters<typeof crudReadPermissionGuard>[0]), ((res) as unknown as Parameters<typeof crudReadPermissionGuard>[1]), next);
+  expect(res.status).toHaveBeenCalledWith(404);
+  expect(next).not.toHaveBeenCalled();
+  expect(mocks.permission).not.toHaveBeenCalled();
+});
+it("requires user read permission for the remaining member endpoint", () => {
+  const req = { params: { modelName: "users" } }; const res = {}; const next = vi.fn();
+  crudReadPermissionGuard((req as unknown as Parameters<typeof crudReadPermissionGuard>[0]), ((res) as unknown as Parameters<typeof crudReadPermissionGuard>[1]), next);
+  expect(mocks.permission).toHaveBeenCalledWith("access:read", req, res, next);
+});
+it("has no generic mutation endpoint and authenticates every read", () => {
+  const routes = crudRouter.stack.filter((layer) => layer.route).map((layer) => layer.route);
+  expect(routes).toHaveLength(2);
+  for (const route of routes) {
+    expect(route.methods).toEqual({ get: true });
+    expect(route.stack[0].handle).toBe(mocks.auth);
+  }
 });

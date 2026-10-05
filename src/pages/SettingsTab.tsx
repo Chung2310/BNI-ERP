@@ -1,3 +1,4 @@
+import { parseDateValue } from "../utils/dateValue";
 import React, { useState, lazy, Suspense } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -5,7 +6,6 @@ import {
   Calendar,
   Image as ImageIcon,
   Sliders,
-  Building2,
   Shield,
   ChevronLeft,
   ChevronRight
@@ -24,7 +24,7 @@ export default function SettingsTab() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { userProfile, uploadAvatar } = useAuth();
   const isAdmin = userProfile?.role === "admin";
-  
+
   const [photoURL, setPhotoURL] = useState(userProfile?.photoURL || "");
   const [displayName, setDisplayName] = useState(userProfile?.displayName || "");
   const [uploading, setUploading] = useState(false);
@@ -39,14 +39,17 @@ export default function SettingsTab() {
   }, [userProfile, isAdmin, activeSubTab, setActiveSubTab]);
 
   // Synchronize display name and photo url from context if it updates
-  React.useEffect(() => {
+  const [previousInputs1, setPreviousInputs1] = useState<unknown[] | null>(null);
+  if (previousInputs1 === null || !Object.is(previousInputs1[0], userProfile)) {
+    setPreviousInputs1([userProfile]);
     if (userProfile?.displayName) {
       setDisplayName(userProfile.displayName);
     }
     if (userProfile?.photoURL) {
       setPhotoURL(userProfile.photoURL);
     }
-  }, [userProfile]);
+
+  }
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -80,15 +83,7 @@ export default function SettingsTab() {
   const getFormattedDate = () => {
     if (!userProfile?.createdAt) return "Chưa cập nhật";
 
-    let date: Date;
-    if (typeof userProfile.createdAt.toDate === "function") {
-      date = userProfile.createdAt.toDate();
-    } else if (userProfile.createdAt.seconds) {
-      date = new Date(userProfile.createdAt.seconds * 1000);
-    } else {
-      date = new Date(userProfile.createdAt);
-    }
-
+    const date = parseDateValue(userProfile.createdAt);
     if (isNaN(date.getTime())) {
       return "Chưa cập nhật";
     }
@@ -115,7 +110,6 @@ export default function SettingsTab() {
             <h1 className="text-xl md:text-2xl font-black text-cyan-700 dark:text-cyan-400 tracking-tight">
               {isAdmin ? "Cài đặt Hệ thống & Cá nhân" : "Hồ sơ cá nhân"}
             </h1>
-            <p className="text-xs text-slate-500 font-medium">{isAdmin ? "Tùy chỉnh thông tin tài khoản, bảo mật và kết nối ERP" : "Tùy chỉnh thông tin tài khoản và bảo mật"}</p>
           </div>
         </div>
         <div className="flex min-w-0 flex-1 items-center gap-1 select-none">
@@ -132,11 +126,10 @@ export default function SettingsTab() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveSubTab(tab.id as SettingsSubTabType)}
-                  className={`flex items-center gap-2 px-4 py-2.5 font-bold text-xs transition-all duration-200 cursor-pointer shrink-0 rounded-xl ${
-                    isActive
+                  className={`flex items-center gap-2 px-4 py-2.5 font-bold text-xs transition-all duration-200 cursor-pointer shrink-0 rounded-xl ${isActive
                       ? "bg-cyan-600 text-white font-bold shadow-sm"
                       : "text-slate-600 hover:text-cyan-600 hover:bg-cyan-50 font-semibold"
-                  }`}
+                    }`}
                 >
                   <Icon className={`h-4 w-4 ${isActive ? "text-white" : "text-slate-400"}`} />
                   <span>{tab.label}</span>
@@ -155,8 +148,8 @@ export default function SettingsTab() {
         <div className={`relative flex flex-col items-center gap-4 overflow-hidden rounded-2xl border border-gray-200/80 bg-white/80 p-4 text-center shadow-xs backdrop-blur-md sm:p-6 ${
           visibleSubTab === "profile" ? "hidden" : "flex"
         }`}>
-          <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-r from-blue-500 to-indigo-600">
-            {userProfile?.coverImage && <img src={userProfile.coverImage} alt="Ảnh bìa cá nhân" className="h-full w-full object-cover" />}
+          <div className="absolute top-0 inset-x-0 h-24 bg-primary">
+            {userProfile?.coverImage && <img key={userProfile.coverImage} onError={event => { event.currentTarget.style.display = "none"; }} src={userProfile.coverImage} alt="Ảnh bìa cá nhân" className="h-full w-full object-cover" />}
           </div>
 
           <div className="relative mt-10 cursor-pointer group" onClick={handleAvatarClick}>
@@ -191,8 +184,7 @@ export default function SettingsTab() {
             <h3 className="text-base font-bold text-gray-800">{displayName}</h3>
             <p className="text-xs text-gray-500">{userProfile?.email}</p>
             <div className="pt-2 flex justify-center">
-              <span className={`px-2.5 py-0.5 rounded-full font-mono font-bold text-[9px] uppercase border tracking-wider ${
-                userProfile?.role === "admin"
+              <span className={`px-2.5 py-0.5 rounded-full font-mono font-bold text-[9px] uppercase border tracking-wider ${userProfile?.role === "admin"
                   ? "bg-amber-50 border-amber-200 text-amber-600"
                   : "bg-slate-50 border-slate-200 text-slate-600"
                 }`}>

@@ -11,7 +11,6 @@ import { connectDB } from "./server/config/database";
 import { startCelebrationScheduler } from "./server/service/celebration-scheduler.service";
 import { startMeetingScheduler } from "./server/modules/meetings/meeting.scheduler";
 import { startResourceRetentionScheduler } from "./server/service/resource-retention.service";
-import { startDomainEventWorker } from "./server/integrations/shared/domain-event-worker";
 import { apiRouter } from "./server/router";
 import { swaggerRouter } from "./server/swagger";
 import { initSocketServer } from "./server/socket";
@@ -39,21 +38,6 @@ function redactSensitiveQuery(url: string): string {
     })
     .join("&");
   return `${path}?${redacted}`;
-}
-
-function shouldSkipRoutineApiLog(method: string, url: string) {
-  const normalizedMethod = String(method || "").toUpperCase();
-  const normalizedUrl = String(url || "");
-
-  if (normalizedMethod !== "GET" && normalizedMethod !== "POST") {
-    return false;
-  }
-
-  const noisyPrefixes = [
-    "/api/v1/timekeeping",
-  ];
-
-  return noisyPrefixes.some((prefix) => normalizedUrl.startsWith(prefix));
 }
 
 function injectSeoMeta(html: string, requestPath: string): string {
@@ -220,7 +204,6 @@ async function startServer() {
 
   // Kết nối cơ sở dữ liệu MongoDB
   await connectDB();
-  startDomainEventWorker();
   startCelebrationScheduler();
   startMeetingScheduler();
   startResourceRetentionScheduler();
@@ -288,9 +271,6 @@ async function startServer() {
   });
 
   app.use("/api", (req, res, next) => {
-    if (shouldSkipRoutineApiLog(req.method, req.originalUrl)) {
-      return next();
-    }
     const timestamp = new Date().toLocaleTimeString("vi-VN");
     console.log(`[Server ${timestamp}] ${req.method} ${redactSensitiveQuery(req.originalUrl)} - IP: ${req.ip}`);
     next();

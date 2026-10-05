@@ -30,21 +30,21 @@ test("body parser, route and unexpected errors use the API envelope", async () =
       method: "POST", headers: { "content-type": "application/json" }, body: "{bad",
     });
     assert.equal(malformed.status, 400);
-    assert.equal((await malformed.json() as any).error.code, "MALFORMED_JSON");
+    assert.equal((await malformed.json()).error.code, "MALFORMED_JSON");
 
     const oversized = await fetch(`${base}/api/v1/echo`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ value: "x".repeat(100) }),
     });
     assert.equal(oversized.status, 413);
-    assert.equal((await oversized.json() as any).error.code, "PAYLOAD_TOO_LARGE");
+    assert.equal((await oversized.json()).error.code, "PAYLOAD_TOO_LARGE");
 
     const missing = await fetch(`${base}/api/v1/missing`);
     assert.equal(missing.status, 404);
-    assert.equal((await missing.json() as any).error.code, "API_ROUTE_NOT_FOUND");
+    assert.equal((await missing.json()).error.code, "API_ROUTE_NOT_FOUND");
 
     const rejected = await fetch(`${base}/api/v1/rejected`);
     assert.equal(rejected.status, 500);
-    assert.equal((await rejected.json() as any).error.code, "INTERNAL_ERROR");
+    assert.equal((await rejected.json()).error.code, "INTERNAL_ERROR");
 
     const staticMissing = await fetch(`${base}/missing`);
     assert.equal(staticMissing.status, 404);

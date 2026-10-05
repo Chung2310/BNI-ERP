@@ -6,7 +6,7 @@ const checksumKey = process.env.PAYOS_CHECKSUM_KEY || "";
 
 export const isPayOSConfigured = !!(clientId && apiKey && checksumKey);
 
-let payOSClient: any = null;
+let payOSClient: InstanceType<typeof PayOS> | null = null;
 
 if (isPayOSConfigured) {
   try {

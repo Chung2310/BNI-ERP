@@ -19,7 +19,7 @@ export const DriveDocuments: React.FC = () => {
   const [connected, setConnected] = useState(false);
   const [driveLink, setDriveLink] = useState("");
   const [files, setFiles] = useState<DriveApiFile[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!companyCode);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DriveApiFile | null>(null);
@@ -28,15 +28,15 @@ export const DriveDocuments: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [requestInputs, setRequestInputs] = useState(() => [companyCode]);
+  if (!Object.is(requestInputs[0], companyCode)) {
+    setRequestInputs([companyCode]);
+    setLoading(!!companyCode); setError(null); setFiles([]); setConnected(false);
+  }
   const load = useCallback(async () => {
-    if (!companyCode) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const config = await authService.getCompanyDriveConfig(companyCode);
+    if (!companyCode) return;
+    return authService.getCompanyDriveConfig(companyCode).then(async (config) => {
+      setError(null);
       setConnected(config.driveConnected);
       setDriveLink(config.driveFolderLink || "");
       if (config.driveConnected) {
@@ -53,11 +53,12 @@ export const DriveDocuments: React.FC = () => {
           setFiles([]);
         }
       }
-    } catch (e) {
+    
+}).catch(e => {
       toast.error(e instanceof Error ? e.message : "Không tải được cấu hình Google Drive.");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [companyCode]);
 
   useEffect(() => {

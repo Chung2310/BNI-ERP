@@ -1,3 +1,4 @@
+import { normalizeLoginIdentifier } from "../../src/utils/loginIdentifier";
 import { ipKeyGenerator } from "express-rate-limit";
 import jwt from "jsonwebtoken";
 import type { Request } from "express";
@@ -56,15 +57,15 @@ export function resolveClientRateKey(req: Request): string {
   return identityKeyFromToken(extractAccessToken(req), realVerify) ?? ipKey(req);
 }
 
-/** Chuẩn hoá email để chống lách bằng biến thể hoa/thường/space. */
+/** Normalize email and phone variants to the same account rate-limit key. */
 export function normalizeLoginAccount(email: unknown): string | null {
   if (typeof email !== "string") return null;
-  const normalized = email.trim().toLowerCase();
+  const normalized = normalizeLoginIdentifier(email) ?? email.trim().toLowerCase();
   return normalized.length > 0 ? normalized : null;
 }
 
-/** Key throttle brute-force theo tài khoản đích của /login. Không có email → null (limiter sẽ skip). */
+/** Account throttle accepts both identifier and the legacy email request field. */
 export function resolveLoginAccountKey(req: Request): string | null {
-  const account = normalizeLoginAccount((req.body as { email?: unknown } | undefined)?.email);
+  const account = normalizeLoginAccount(req.body?.identifier ?? req.body?.email);
   return account ? `acct:${account}` : null;
 }

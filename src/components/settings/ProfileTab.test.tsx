@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import ProfileTab from "./ProfileTab";
 import { authService } from "../../services/authService";
 
-const auth = vi.hoisted(() => ({ userProfile: null as any, updateProfileInfo: vi.fn() }));
+const auth = vi.hoisted(() => ({ userProfile: null, updateProfileInfo: vi.fn() }));
 vi.mock("../../services/authService", () => ({ authService: { uploadManagedFile: vi.fn() } }));
 vi.mock("../../context/AuthContext", () => ({ useAuth: () => auth }));
 vi.mock("../../pages/Toast", () => ({ toast: { error: vi.fn() } }));

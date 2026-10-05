@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { internalChatService, LinkPreview } from "../../services/internalChatService";
 
+export const LinkPreviewCard: React.FC<{ url: string; onDark?: boolean }> = props => <LinkPreviewContent key={props.url} {...props} />;
+
 // Cache theo URL để không gọi lại API mỗi lần re-render / cuộn
 const previewCache = new Map<string, LinkPreview | null>();
 
-export const LinkPreviewCard: React.FC<{ url: string; onDark?: boolean }> = ({ url, onDark }) => {
+const LinkPreviewContent: React.FC<{ url: string; onDark?: boolean }> = ({ url, onDark }) => {
   const [data, setData] = useState<LinkPreview | null>(() => previewCache.get(url) ?? null);
   const [loaded, setLoaded] = useState(previewCache.has(url));
 
   useEffect(() => {
     if (previewCache.has(url)) {
-      setData(previewCache.get(url) || null);
-      setLoaded(true);
       return;
     }
     let active = true;

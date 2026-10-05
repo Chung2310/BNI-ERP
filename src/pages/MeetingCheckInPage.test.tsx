@@ -77,7 +77,7 @@ it("previews an optional guest avatar and sends it with the check-in fields", as
   fireEvent.click(screen.getByRole("button", { name: "Khách mời" }));
   fireEvent.change(screen.getByLabelText("Họ và tên *"), { target: { value: "Khách An" } });
   const file = new File(["image"], "avatar.png", { type: "image/png" });
-  fireEvent.change(screen.getByLabelText("Ảnh đại diện (không bắt buộc)"), { target: { files: [file] } });
+  fireEvent.change(screen.getByLabelText("Ảnh đại diện"), { target: { files: [file] } });
   expect(await screen.findByAltText("Xem trước ảnh đại diện")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
   await screen.findByText("Check-in thành công");
@@ -98,7 +98,7 @@ it("rejects oversized avatar and lets the guest remove a selected image", async 
   render(<MeetingCheckInPage />);
   await screen.findByLabelText("Email tài khoản");
   fireEvent.click(screen.getByRole("button", { name: "Khách mời" }));
-  const chooser = screen.getByLabelText("Ảnh đại diện (không bắt buộc)");
+  const chooser = screen.getByLabelText("Ảnh đại diện");
   fireEvent.change(chooser, { target: { files: [new File([new Uint8Array(5 * 1024 * 1024 + 1)], "big.png", { type: "image/png" })] } });
   expect(await screen.findByRole("alert")).toBeTruthy();
   expect(screen.queryByAltText("Xem trước ảnh đại diện")).toBeNull();
@@ -108,26 +108,56 @@ it("rejects oversized avatar and lets the guest remove a selected image", async 
   expect(screen.queryByAltText("Xem trước ảnh đại diện")).toBeNull();
 });
 
-it("submits industry, bio and a cover without an avatar", async () => {
-  vi.stubGlobal("URL", class extends URL {
-    static createObjectURL = vi.fn(() => "blob:guest-cover");
-    static revokeObjectURL = vi.fn();
-  });
+it("submits industry and phone without email, bio, or cover image, and omits optional text", async () => {
   fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: { name: "Khách An" } }) });
   render(<MeetingCheckInPage />);
   await screen.findByLabelText("Email tài khoản");
   fireEvent.click(screen.getByRole("button", { name: "Khách mời" }));
+  expect(screen.queryByLabelText("Email")).toBeNull();
+  expect(screen.queryByLabelText(/Bio/i)).toBeNull();
+  expect(screen.queryByLabelText(/Ảnh bìa/i)).toBeNull();
+  expect(screen.queryByText(/không bắt buộc/i)).toBeNull();
+  expect(screen.queryByText(/tùy chọn/i)).toBeNull();
+
   fireEvent.change(screen.getByLabelText("Họ và tên *"), { target: { value: "Khách An" } });
-  fireEvent.change(screen.getByLabelText("Lĩnh vực (không bắt buộc)"), { target: { value: " Thiết kế " } });
-  fireEvent.change(screen.getByLabelText("Bio ngắn (không bắt buộc)"), { target: { value: " Giới thiệu ngắn " } });
-  const file = new File(["image"], "cover.png", { type: "image/png" });
-  fireEvent.change(screen.getByLabelText("Ảnh bìa (không bắt buộc)"), { target: { files: [file] } });
-  expect(await screen.findByAltText("Xem trước ảnh bìa")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Số điện thoại"), { target: { value: "0901234567" } });
+  fireEvent.change(screen.getByLabelText("Lĩnh vực"), { target: { value: " Thiết kế " } });
   fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
   await screen.findByText("Check-in thành công");
-  const payload = fetchMock.mock.calls[1][1].body;
-  expect(payload.get("coverImage")).toBe(file);
-  expect(payload.has("avatar")).toBe(false);
-  expect(payload.get("industry")).toBe("Thiết kế");
-  expect(payload.get("bio")).toBe("Giới thiệu ngắn");
+  const payload = JSON.parse(fetchMock.mock.calls[1][1].body);
+  expect(payload.industry).toBe("Thiết kế");
+  expect(payload.phone).toBe("0901234567");
+  expect(payload).not.toHaveProperty("email");
+  expect(payload).not.toHaveProperty("bio");
+  expect(payload).not.toHaveProperty("coverImage");
 });
+
+
+it('accepts a permanent QR and identifies the actual recorded meeting on success', async () => {
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: { ...info, expiresAt: null } }) });
+  fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: { name: 'An', meetingTitle: 'Cuộc họp đang diễn ra' } }) });
+  render(<MeetingCheckInPage />);
+  fireEvent.change(await screen.findByLabelText('Email tài khoản'), { target: { value: 'an@example.com' } });
+  fireEvent.change(screen.getByLabelText('Mật khẩu'), { target: { value: 'password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Check-in' }));
+  await screen.findByText('Check-in thành công');
+  expect(screen.getByText(/cho cuộc họp “Cuộc họp đang diễn ra”/)).toBeTruthy();
+  expect(screen.queryByText(/Mã QR đã hết hạn/)).toBeNull();
+});
+
+it("member check-in submits phone number identifier and validates with qrMemberInput", async () => {
+  fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: { name: "Bình" } }) });
+  render(<MeetingCheckInPage />);
+  fireEvent.change(await screen.findByLabelText("Email tài khoản"), { target: { value: "0901234567" } });
+  fireEvent.change(screen.getByLabelText("Mật khẩu"), { target: { value: "secret123" } });
+  fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+  await screen.findByText("Check-in thành công");
+  const [url, options] = fetchMock.mock.calls[1];
+  const payload = JSON.parse(options.body);
+  expect(url).toBe("/api/v1/meeting-checkin/test-token/member");
+  expect(qrMemberInput.validate(payload).error).toBeUndefined();
+  expect(payload.email).toBe("0901234567");
+  expect(payload.password).toBe("secret123");
+});
+

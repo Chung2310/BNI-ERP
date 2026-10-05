@@ -1,12 +1,12 @@
+import { entityId } from "../utils/entityId";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
 import {
-  FolderOpen, Folder, CloudUpload, Trash2, Eye, Download, HardDrive, ArrowLeft,
+  FolderOpen, Folder, Trash2, Download, HardDrive, ArrowLeft,
   FileText, Image as ImageIcon, Video as VideoIcon, File as FileIcon,
-  Loader2, RefreshCw, AlertCircle, ArrowUpRight, FolderTree,
-  Share2, Shield, Lock, Globe, Search, X, ChevronDown, Check, Users, Plus,
-  Link as LinkIcon, FileSpreadsheet, Presentation, FolderPlus, Upload, MoreVertical,
-  Info, Pencil, ArrowRightLeft, Copy, BellOff, MessageSquare, Briefcase, ChevronRight, ChevronLeft,
+  Loader2, RefreshCw,
+  Share2, Lock, Globe, Search, X, ChevronDown, Check, Users, Plus,
+  Link as LinkIcon, FileSpreadsheet, Presentation, FolderPlus, Upload, MoreVertical, Pencil, ArrowRightLeft, ChevronRight, ChevronLeft,
   ExternalLink, Link, SlidersHorizontal, Calendar, List, LayoutGrid, Mic, Undo2, Redo2
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -127,7 +127,7 @@ const EmptyStateIllustration = () => (
   </svg>
 );
 
-const getMemberId = (u: any) => (u && typeof u === "object" ? (u._id || u.id) : u);
+const getMemberId = entityId;
 
 interface OpenedTab {
   id: string;
@@ -138,8 +138,8 @@ interface OpenedTab {
 }
 
 export default function ResourceTab() {
-  const { userProfile, refreshProfile } = useAuth();
-  const userProfileAny = userProfile as any;
+  const { userProfile } = useAuth();
+  const userProfileAny = userProfile;
   const userProfileId = userProfile?.uid || userProfileAny?.id || "";
 
   const [subTab, setSubTab] = useSubTabRouter<ResourceSubTabType>(RESOURCE_SUB_TAB_ROUTES, "TÀI LIỆU KHÁC");
@@ -166,17 +166,17 @@ export default function ResourceTab() {
     setLocalItemsCount({ count, total });
   }, []);
 
-  const isConnected = userProfileAny?.googleDriveIntegration?.isConnected;
-  const driveEmail = userProfileAny?.googleDriveIntegration?.driveEmail;
+  const isConnected = userProfileAny?.companyDrive?.isConnected;
+  
 
   // Space management
   const [selectedSpace, setSelectedSpace] = useState<string>("personal");
-  const [rooms, setRooms] = useState<any[]>([]);
+  const [rooms, setRooms] = useState<import("../services/internalChatService").ChatRoom[]>([]);
   const [showSpaceDropdown, setShowSpaceDropdown] = useState(false);
 
   // User/Owner scoping for Admins
   const [selectedOwnerId, setSelectedOwnerId] = useState<string>("");
-  const [allStaff, setAllStaff] = useState<any[]>([]);
+  const [allStaff, setAllStaff] = useState<import("../types").UserProfile[]>([]);
 
   useEffect(() => {
     if (userProfile) {
@@ -274,7 +274,7 @@ export default function ResourceTab() {
   // Note Modal States
   const [showAddNoteModal, setShowAddNoteModal] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
-  const [noteContent, setNoteContent] = useState("");
+  const [, setNoteContent] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteTool, setNoteTool] = useState<"draw" | "text" | "arrow" | "rect" | "line" | "image">("draw");
   const [noteColor, setNoteColor] = useState<string>("#ef4444");
@@ -314,7 +314,7 @@ export default function ResourceTab() {
   const [savingAudio, setSavingAudio] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<any>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Active menu id for three-dot menu on folder/file cards
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -344,7 +344,7 @@ export default function ResourceTab() {
 
   // Permissions & Sharing Modal States
   const [showShareModal, setShowShareModal] = useState(false);
-  const [roomMembers, setRoomMembers] = useState<any[]>([]);
+  const [roomMembers, setRoomMembers] = useState<import("../services/internalChatService").ChatRoomMember[]>([]);
   const [driveGeneralAccess, setDriveGeneralAccess] = useState<"restricted" | "company">("restricted");
   const [shareSearchQuery, setShareSearchQuery] = useState("");
   const [savingPermissions, setSavingPermissions] = useState(false);
@@ -370,81 +370,6 @@ export default function ResourceTab() {
   const [driveRenameValue, setDriveRenameValue] = useState("");
   const [driveRenaming, setDriveRenaming] = useState(false);
 
-  const [connectingGoogleDrive, setConnectingGoogleDrive] = useState(false);
-
-  useEffect(() => {
-    const handleGoogleDriveMessage = async (event: MessageEvent) => {
-      const isAllowedOrigin =
-        event.origin === window.location.origin ||
-        event.origin.includes("localhost:") ||
-        event.origin.includes("127.0.0.1:");
-      if (!isAllowedOrigin) return;
-
-      if (event.data?.type === "GOOGLE_DRIVE_CONNECTED") {
-        toast.success(`Đã kết nối Google Drive cá nhân thành công!`);
-        void refreshProfile();
-        window.location.reload();
-      } else if (event.data?.type === "GOOGLE_DRIVE_FAILED") {
-        toast.error(event.data.error || "Kết nối Google Drive cá nhân thất bại.");
-      }
-    };
-    window.addEventListener("message", handleGoogleDriveMessage);
-    return () => window.removeEventListener("message", handleGoogleDriveMessage);
-  }, [refreshProfile]);
-
-  const handleGoogleDriveOAuth = async () => {
-    setConnectingGoogleDrive(true);
-    try {
-      localStorage.removeItem("google_drive_oauth_result");
-      const res = await fetch("/api/v1/integrations/google-drive/auth-url", {
-        headers: { Authorization: `Bearer ${getAccessToken()}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Không thể lấy link xác thực Google.");
-
-      const authUrl = data.authUrl;
-      const width = 600;
-      const height = 650;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
-      const oauthWindow = window.open(
-        authUrl,
-        "GoogleDriveOAuthPopup",
-        `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
-      );
-
-      if (!oauthWindow) {
-        throw new Error("Trình duyệt đang chặn cửa sổ popup. Vui lòng cho phép popup để kết nối.");
-      }
-
-      const checkInterval = setInterval(() => {
-        if (oauthWindow.closed) {
-          clearInterval(checkInterval);
-          setConnectingGoogleDrive(false);
-          // Polling check to automatically reload if connection succeeded
-          setTimeout(async () => {
-            try {
-              const res = await fetch("/api/v1/auth/me", {
-                headers: { Authorization: `Bearer ${getAccessToken()}` },
-              });
-              const data = await res.json();
-              if (res.ok && data.user?.googleDriveIntegration?.isConnected) {
-                toast.success(`Đã kết nối Google Drive cá nhân thành công!`);
-                window.location.reload();
-              }
-            } catch (err) {
-              console.error("Lỗi khi kiểm tra kết nối Google Drive:", err);
-            }
-          }, 600);
-        }
-      }, 800);
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Không thể kết nối Google Drive.");
-      setConnectingGoogleDrive(false);
-    }
-  };
-
   const fetchMoveFolders = async (space: string, folderId: string) => {
     setLoadingMoveFolders(true);
     try {
@@ -461,7 +386,7 @@ export default function ResourceTab() {
       const data = await res.json();
       if (res.ok && data.status === "success") {
         const list = (data.data || []).filter(
-          (r: any) => r.mimeType === "application/vnd.google-apps.folder"
+          (r) => r.mimeType === "application/vnd.google-apps.folder"
         );
         setMoveFolders(list);
       } else {
@@ -495,7 +420,7 @@ export default function ResourceTab() {
       if (!res.ok) throw new Error(data.message || "Di chuyển thất bại.");
       toast.success(`Đã di chuyển "${resource.name}" thành công!`);
       void fetchResources();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err.message || "Lỗi di chuyển tài nguyên.");
     }
   };
@@ -530,7 +455,7 @@ export default function ResourceTab() {
       toast.success(`Đã đổi tên thành "${name}"!`);
       setDriveRenameTarget(null);
       void fetchResources();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err.message || "Lỗi đổi tên tài nguyên.");
     } finally {
       setDriveRenaming(false);
@@ -572,7 +497,7 @@ export default function ResourceTab() {
     if (moveTarget) {
       // Khi mở modal, browse từ thư mục gốc của space đích
       const rootId = moveSpace === "personal"
-        ? (userProfileAny?.googleDriveIntegration?.rootFolderId || "root")
+        ? (userProfileAny?.companyDrive?.rootFolderId || "root")
         : (rooms.find(r => r._id === moveSpace)?.driveFolderId || "root");
       void fetchMoveFolders(moveSpace, rootId);
     }
@@ -586,39 +511,7 @@ export default function ResourceTab() {
     return (words[0][0] + (words[1]?.[0] || "")).toUpperCase();
   };
 
-  const handleCopyToLocal = async (resource: Resource) => {
-    if (resource.mimeType === "application/vnd.google-apps.folder") {
-      toast.warning("Hệ thống chỉ hỗ trợ sao chép tệp tin/tài liệu (không sao chép thư mục).");
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/v1/resources/file", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-        body: JSON.stringify({
-          name: resource.name,
-          fileUrl: resource.webViewLink,
-          parentId: "google-documents",
-          mimeType: resource.mimeType,
-          size: resource.size || 0,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Sao chép thất bại.");
-      }
-
-      toast.success(`Đã sao chép "${resource.name}" vào thư mục "_GOOGLE DOCUMENTS" thành công!`);
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Có lỗi xảy ra khi sao chép tài nguyên.");
-    }
-  };
+  
 
   const handleOpenFile = (item: { _id: string; name: string; fileUrl?: string; mimeType?: string }) => {
     const existingTab = openedTabs.find(t => t.id === item._id);
@@ -689,17 +582,14 @@ export default function ResourceTab() {
   const fetchRooms = async () => {
     try {
       const data = await internalChatService.getRooms();
-      setRooms(data.filter((r: any) => r.isGroup));
+      setRooms(data.filter((r) => r.isGroup));
     } catch (err) {
       console.error("Lỗi lấy danh sách phòng chat:", err);
     }
   };
 
   const fetchResources = async () => {
-    const targetUser = allStaff.find(u => (u.uid || u.id) === selectedOwnerId);
-    const targetIsConnected = selectedOwnerId === userProfileId
-      ? isConnected
-      : targetUser?.googleDriveIntegration?.isConnected;
+    const targetIsConnected = isConnected;
 
     if (selectedSpace === "personal" && !targetIsConnected) {
       setResources([]);
@@ -727,7 +617,7 @@ export default function ResourceTab() {
         setDriveGeneralAccess(data.driveGeneralAccess || "restricted");
         setRoomMembers(data.members || []);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       toast.error(err.message || "Lỗi khi tải danh sách tài nguyên.");
       setResources([]);
@@ -798,7 +688,7 @@ export default function ResourceTab() {
     if (!room) return false;
 
     const memberInfo = room.members.find(
-      (m: any) => String(getMemberId(m.userId)) === String(userProfileId)
+      (m) => String(getMemberId(m.userId)) === String(userProfileId)
     );
     const isRoomAdmin = memberInfo?.role === "admin";
     const isCreator = String(room.creatorId) === String(userProfileId);
@@ -815,7 +705,7 @@ export default function ResourceTab() {
     if (!room) return false;
 
     const memberInfo = room.members.find(
-      (m: any) => String(getMemberId(m.userId)) === String(userProfileId)
+      (m) => String(getMemberId(m.userId)) === String(userProfileId)
     );
     const isRoomAdmin = memberInfo?.role === "admin";
     const isCreator = String(room.creatorId) === String(userProfileId);
@@ -828,7 +718,7 @@ export default function ResourceTab() {
     try {
       const payload = {
         driveGeneralAccess,
-        members: roomMembers.map((m: any) => ({
+        members: roomMembers.map((m) => ({
           userId: m.userId?._id || m.userId,
           canUploadDrive: !!m.canUploadDrive
         }))
@@ -850,7 +740,7 @@ export default function ResourceTab() {
       setShowShareModal(false);
       void fetchResources();
       void fetchRooms();
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       toast.error(err.message || "Lỗi lưu cấu hình phân quyền.");
     } finally {
@@ -910,7 +800,7 @@ export default function ResourceTab() {
       setCreateFileDialog(null);
       setNewFileName("");
       setNewFileLink("");
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       toast.error(err.message || "Có lỗi xảy ra khi tạo tài nguyên.");
     } finally {
@@ -1004,7 +894,7 @@ export default function ResourceTab() {
         else await uploadDriveFile(files[i]);
         ok += 1;
         setUploadQueue((q) => q.map((it, idx) => (idx === i ? { ...it, status: "done" } : it)));
-      } catch (err: any) {
+      } catch (err) {
         console.error(err);
         setUploadQueue((q) =>
           q.map((it, idx) => (idx === i ? { ...it, status: "error", error: err?.message || "Tải lên thất bại." } : it))
@@ -1026,16 +916,9 @@ export default function ResourceTab() {
     e.target.value = "";
   };
 
-  const onDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
+  
 
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      void uploadManyFiles(Array.from(e.dataTransfer.files));
-    }
-  };
+  
 
   // Advanced feature handlers (Link, Note, Audio)
   const handleSaveLink = async () => {
@@ -1082,7 +965,7 @@ export default function ResourceTab() {
       setLinkName("");
       setLinkUrl("");
       setRefreshTrigger(prev => prev + 1);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Lỗi thêm liên kết:", err);
       toast.error(err.message || "Không thêm được liên kết.");
     } finally {
@@ -1125,7 +1008,7 @@ export default function ResourceTab() {
       setNoteTitle("");
       setNoteContent("");
       setRefreshTrigger(prev => prev + 1);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Lỗi lưu ghi chú:", err);
       toast.error(err.message || "Lỗi lưu ghi chú.");
     } finally {
@@ -1505,7 +1388,7 @@ export default function ResourceTab() {
           setShowAddAudioModal(false);
           setRecordingSeconds(0);
           setRefreshTrigger(prev => prev + 1);
-        } catch (err: any) {
+        } catch (err) {
           console.error("Lỗi lưu file ghi âm:", err);
           toast.error(err.message || "Lỗi tải ghi âm lên.");
         } finally {
@@ -1527,7 +1410,7 @@ export default function ResourceTab() {
           return prev + 1;
         });
       }, 1000);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Lỗi truy cập Microphone:", err);
       toast.error("Không thể kết nối Microphone. Vui lòng cho phép quyền truy cập mic.");
     }
@@ -1574,7 +1457,7 @@ export default function ResourceTab() {
 
       toast.success("Đã xóa tài nguyên thành công.");
       void fetchResources();
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       toast.error(err.message || "Lỗi khi xóa tài nguyên.");
     }
@@ -1604,7 +1487,7 @@ export default function ResourceTab() {
     const isFolder = resource.mimeType === "application/vnd.google-apps.folder";
     const isCreatorOrAdmin = userProfile?.role === "admin";
     const room = selectedSpace !== "personal" ? rooms.find(r => r._id === selectedSpace) : null;
-    const isRoomAdmin = room && room.members.find((m: any) => String(getMemberId(m.userId)) === String(userProfileId))?.role === "admin";
+    const isRoomAdmin = room && room.members.find((m) => String(getMemberId(m.userId)) === String(userProfileId))?.role === "admin";
 
     // Check if the current user has edit permission for this space
     const canEdit = (() => {
@@ -1612,7 +1495,7 @@ export default function ResourceTab() {
       if (isCreatorOrAdmin) return true;
       if (!room) return false;
       const memberInfo = room.members.find(
-        (m: any) => String(getMemberId(m.userId)) === String(userProfileId)
+        (m) => String(getMemberId(m.userId)) === String(userProfileId)
       );
       const isRoomAdmin = memberInfo?.role === "admin";
       const isCreator = String(room.creatorId) === String(userProfileId);
@@ -1746,7 +1629,7 @@ export default function ResourceTab() {
                     setActiveMenuId(null);
                     // Mở modal, browse từ thư mục gốc của space hiện tại
                     const rootId = selectedSpace === "personal"
-                      ? (userProfileAny?.googleDriveIntegration?.rootFolderId || "root")
+                      ? (userProfileAny?.companyDrive?.rootFolderId || "root")
                       : (rooms.find(r => r._id === selectedSpace)?.driveFolderId || "root");
                     setMoveTarget(resource);
                     setMoveSpace(selectedSpace);
@@ -1835,7 +1718,7 @@ export default function ResourceTab() {
   return (
     <div
       className="flex flex-col h-full overflow-hidden bg-[#f8f9fa]"
-      onMouseDown={(e) => {
+      onMouseDown={(_e) => {
         // Close fixed dropdown when clicking outside it
         if (menuPosition && activeMenuId) {
           setActiveMenuId(null);
@@ -2617,25 +2500,9 @@ export default function ResourceTab() {
                             </div>
                             <h3 className="text-base font-bold text-gray-800">Chưa kết nối Google Drive</h3>
                             <p className="text-xs text-gray-500 max-w-sm text-center mt-2 leading-relaxed">
-                              Nhân viên cần liên kết với tài khoản Google cá nhân của mình để kích hoạt không gian lưu trữ tài nguyên riêng biệt.
+                              Quản trị viên cần kết nối Google Drive trong Cài đặt doanh nghiệp để sử dụng tài nguyên Drive.
                             </p>
-                            <button
-                              onClick={handleGoogleDriveOAuth}
-                              disabled={connectingGoogleDrive}
-                              className="mt-6 flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-lg transition-all duration-150 cursor-pointer disabled:opacity-60"
-                            >
-                              {connectingGoogleDrive ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 animate-spin text-white" />
-                                  <span>Đang kết nối...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span>Kết nối Google Drive cá nhân ngay</span>
-                                  <ArrowUpRight className="h-4 w-4" />
-                                </>
-                              )}
-                            </button>
+
                           </div>
                         ) : (
                           <div className="h-full flex flex-col">
@@ -2691,7 +2558,7 @@ export default function ResourceTab() {
                                         if (isCreatorOrAdmin) return true;
                                         if (!room) return false;
                                         const memberInfo = room.members.find(
-                                          (m: any) => String(getMemberId(m.userId)) === String(userProfileId)
+                                          (m) => String(getMemberId(m.userId)) === String(userProfileId)
                                         );
                                         const isRoomAdminLocal = memberInfo?.role === "admin";
                                         const isCreator = String(room.creatorId) === String(userProfileId);
@@ -2699,13 +2566,6 @@ export default function ResourceTab() {
                                         return isRoomAdminLocal || isCreator || isUploader;
                                       })();
 
-                                      const isMyFile = resource.uploadedBy && String(resource.uploadedBy) === String(userProfileId);
-                                      const isRoomCreator = room && String(room.creatorId) === String(userProfileId);
-                                      const memberInfo = room?.members.find(
-                                        (m: any) => String(getMemberId(m.userId)) === String(userProfileId)
-                                      );
-                                      const isRoomAdminCheck = memberInfo?.role === "admin";
-                                      const canDelete = selectedSpace === "personal" || isCreatorOrAdmin || isRoomAdminCheck || isRoomCreator || isMyFile;
 
                                       const isMenuOpen = activeMenuId === resource._id;
 
@@ -3489,11 +3349,11 @@ export default function ResourceTab() {
 
               <div className="space-y-2 max-h-[35vh] overflow-y-auto pr-1">
                 {roomMembers
-                  .filter((member: any) => {
+                  .filter((member) => {
                     const name = member.userId?.displayName || "";
                     return name.toLowerCase().includes(shareSearchQuery.toLowerCase());
                   })
-                  .map((member: any) => {
+                  .map((member) => {
                     const isOwner = String(rooms.find(r => r._id === selectedSpace)?.creatorId) === String(getMemberId(member.userId));
                     const isMe = String(getMemberId(member.userId)) === String(userProfileId);
 
@@ -3520,8 +3380,8 @@ export default function ResourceTab() {
                             value={member.canUploadDrive ? "uploader" : "viewer"}
                             onChange={(e) => {
                               const updatedVal = e.target.value === "uploader";
-                              setRoomMembers((prev: any[]) =>
-                                prev.map((m: any) =>
+                              setRoomMembers((prev) =>
+                                prev.map((m) =>
                                   String(getMemberId(m.userId)) === String(getMemberId(member.userId))
                                     ? { ...m, canUploadDrive: updatedVal }
                                     : m
@@ -3617,10 +3477,10 @@ export default function ResourceTab() {
 
                       {/* Filter Pills */}
                       <div className="flex gap-1 mb-2 border-b border-slate-100 pb-1.5">
-                        {["Thành viên", "Nhóm", "Lĩnh vực"].map((tab) => (
+                        {(["Thành viên", "Nhóm", "Lĩnh vực"] as const).map((tab) => (
                           <button
                             key={tab}
-                            onClick={() => setMoveFilterTab(tab as any)}
+                            onClick={() => setMoveFilterTab(tab)}
                             className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${moveFilterTab === tab
                                 ? "bg-cyan-600 text-white"
                                 : "bg-slate-50 hover:bg-slate-100 text-slate-600"
@@ -3636,7 +3496,7 @@ export default function ResourceTab() {
                           <button
                             onClick={() => {
                               setMoveSpace("personal");
-                              setMoveFolderId(userProfileAny?.googleDriveIntegration?.rootFolderId || "root");
+                              setMoveFolderId(userProfileAny?.companyDrive?.rootFolderId || "root");
                               setMoveBreadcrumbs([]);
                               setShowMoveSpaceDropdown(false);
                             }}
@@ -3702,7 +3562,7 @@ export default function ResourceTab() {
                       if (!res.ok) throw new Error("Không thể tạo thư mục.");
                       toast.success(`Đã tạo thư mục "${folderName}"!`);
                       void fetchMoveFolders(moveSpace, moveFolderId);
-                    } catch (err: any) {
+                    } catch (err) {
                       toast.error(err.message);
                     }
                   }}
@@ -3729,7 +3589,7 @@ export default function ResourceTab() {
                 <button
                   onClick={() => {
                     const rootId = moveSpace === "personal"
-                      ? (userProfileAny?.googleDriveIntegration?.rootFolderId || "root")
+                      ? (userProfileAny?.companyDrive?.rootFolderId || "root")
                       : (rooms.find(r => r._id === moveSpace)?.driveFolderId || "root");
                     setMoveFolderId(rootId);
                     setMoveBreadcrumbs([]);
@@ -3905,13 +3765,13 @@ export default function ResourceTab() {
         const canEdit = (() => {
           if (selectedSpace === "personal") return !!isConnected;
           if (isCreatorOrAdmin) return true;
-          const memberInfo = room?.members?.find((m: any) => getMemberId(m.userId) === userProfileId);
+          const memberInfo = room?.members?.find((m) => getMemberId(m.userId) === userProfileId);
           return memberInfo?.role === "admin" || room?.createdBy === userProfileId;
         })();
         const canDelete = canEdit;
         if (!canEdit) return null;
         const rootId = selectedSpace === "personal"
-          ? (userProfileAny?.googleDriveIntegration?.rootFolderId || "root")
+          ? (userProfileAny?.companyDrive?.rootFolderId || "root")
           : (rooms.find(r => r._id === selectedSpace)?.driveFolderId || "root");
         return ReactDOM.createPortal(
           <div

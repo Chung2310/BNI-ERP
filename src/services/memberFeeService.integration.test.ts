@@ -25,7 +25,7 @@ afterAll(async () => { await mongoose.disconnect(); if (database) await database
 afterEach(() => vi.unstubAllEnvs());
 beforeEach(async () => {
   vi.mocked(companyEmailService.send).mockReset().mockResolvedValue({ messageId: "test-message" });
-  vi.mocked(companyEmailService.getSmtp).mockReset().mockResolvedValue({ hasPassword: true } as any);
+  vi.mocked(companyEmailService.getSmtp).mockReset().mockResolvedValue({ host: "localhost", port: 587, secure: false, user: "test", fromEmail: "test@example.com", fromName: "Test", hasPassword: true });
   vi.stubEnv("SEPAY_ENABLED", "false");
   await Promise.all([MemberFeeModel.deleteMany({}), UserModel.deleteMany({}), SePayTransactionModel.deleteMany({}), NotificationModel.deleteMany({})]);
   const [member, foreign] = await UserModel.create([
@@ -48,27 +48,27 @@ describe("annual member fees persisted ledger", () => {
     await expect(createMemberFees("A","admin",{...assignment(),memberIds:[foreignId]})).rejects.toMatchObject({status:400});
     const id=await setupFee();
     await expect(getFee("B",id)).rejects.toMatchObject({status:404});
-    await expect(receiveFee("B",id,"other",receipt())).rejects.toMatchObject({status:404});
+    await expect(receiveFee("B",id,"other",(receipt() as unknown as Parameters<typeof receiveFee>[3]))).rejects.toMatchObject({status:404});
     expect(serializeFee(await getFee("A",id)).paid).toBe(0);
   });
   it("records partial payment and makes a retry idempotent", async () => {
     const id=await setupFee(), payment=receipt();
-    const first=await receiveFee("A",id,"admin",payment);
+    const first=await receiveFee("A",id,"admin",(payment as unknown as Parameters<typeof receiveFee>[3]));
     expect(first.paid).toBe(40); expect(first.remaining).toBe(60);
-    const repeated=await receiveFee("A",id,"admin",payment);
+    const repeated=await receiveFee("A",id,"admin",(payment as unknown as Parameters<typeof receiveFee>[3]));
     expect(repeated.payments).toHaveLength(1);
-    await expect(receiveFee("A",id,"admin",{...payment,amount:30})).rejects.toMatchObject({status:409});
+    await expect(receiveFee("A",id,"admin",({...payment,amount:30} as unknown as Parameters<typeof receiveFee>[3]))).rejects.toMatchObject({status:409});
   });
   it("rejects overpayment and prevents simultaneous receipts from exceeding the fee", async () => {
     const id=await setupFee();
-    await expect(receiveFee("A",id,"admin",receipt(101))).rejects.toMatchObject({status:400});
-    const outcomes=await Promise.allSettled([receiveFee("A",id,"one",receipt(60)),receiveFee("A",id,"two",receipt(60))]);
+    await expect(receiveFee("A",id,"admin",(receipt(101) as unknown as Parameters<typeof receiveFee>[3]))).rejects.toMatchObject({status:400});
+    const outcomes=await Promise.allSettled([receiveFee("A",id,"one",(receipt(60) as unknown as Parameters<typeof receiveFee>[3])),receiveFee("A",id,"two",(receipt(60) as unknown as Parameters<typeof receiveFee>[3]))]);
     expect(outcomes.filter(result=>result.status==="fulfilled")).toHaveLength(1);
     expect(serializeFee(await getFee("A",id)).remaining).toBe(40);
   });
   it("voiding a receipt restores the balance and preserves its audit history", async () => {
     const id=await setupFee(), payment=receipt(100);
-    expect((await receiveFee("A",id,"admin",payment)).status).toBe("paid");
+    expect((await receiveFee("A",id,"admin",(payment as unknown as Parameters<typeof receiveFee>[3]))).status).toBe("paid");
     const result=await voidFeePayment("A",id,payment.id,"manager","Ghi nhận nhầm");
     expect(result.paid).toBe(0); expect(result.remaining).toBe(100);
     expect(result.payments[0].voidReason).toBe("Ghi nhận nhầm");
@@ -149,10 +149,10 @@ describe("SePay annual fee collection", () => {
     const payload = bankTransfer(fee.paymentCode!);
     const original = SePayTransactionModel.updateOne.bind(SePayTransactionModel);
     const spy = vi.spyOn(SePayTransactionModel, "updateOne");
-    spy.mockImplementation(((filter: any, update: any, options: any) => {
-      if (update.$set?.status === "applied") throw new Error("simulated storage failure");
+    spy.mockImplementation(((filter, update, options) => {
+      if (!Array.isArray(update) && "$set" in update && update.$set?.status === "applied") throw new Error("simulated storage failure");
       return original(filter, update, options);
-    }) as any);
+    }));
     await expect(processSePay("A", payload)).rejects.toThrow("simulated storage failure");
     spy.mockRestore();
     expect((await getFee("A", id)).payments).toHaveLength(1);
@@ -192,13 +192,13 @@ describe("SePay annual fee collection", () => {
   });
 });
 
-const routeIdentity = vi.hoisted(() => ({ user: {} as any }));
+const routeIdentity = vi.hoisted(() => ({ user: { id: "", email: "", role: "", companyCode: undefined as string | undefined } }));
 vi.mock("../../server/middleware/auth", async importOriginal => {
-  const actual: any = await importOriginal();
-  return { ...actual, requireAuth: (req: any, _res: any, next: any) => { req.user = routeIdentity.user; next(); },
-    requirePermission: () => (_req: any, _res: any, next: any) => next() };
+  const actual = await importOriginal<typeof import("../../server/middleware/auth")>();
+  return { ...actual, requireAuth: (req: import("express").Request, _res: import("express").Response, next: import("express").NextFunction) => { req.user = routeIdentity.user; next(); },
+    requirePermission: () => (_req: import("express").Request, _res: import("express").Response, next: import("express").NextFunction) => next() };
 });
-vi.mock("../../server/middleware/require-module", () => ({ requireModule: () => (_req: any, _res: any, next: any) => next() }));
+vi.mock("../../server/middleware/require-module", () => ({ requireModule: () => (_req: import("express").Request, _res: import("express").Response, next: import("express").NextFunction) => next() }));
 import express from "express";
 import type { Server } from "node:http";
 import { memberFeeRouter } from "../../server/modules/member-fees/member-fee.router";
@@ -209,13 +209,15 @@ beforeAll(async () => {
   const app = express(); app.use(express.json());
   app.use("/fees", memberFeeRouter); app.use("/webhook", webhookRouter);
   await new Promise<void>(resolve => { httpServer = app.listen(0, "127.0.0.1", () => resolve()); });
-  baseUrl = "http://127.0.0.1:" + (httpServer.address() as any).port;
+  const address = httpServer.address();
+  if (!address || typeof address === "string") throw new Error("Expected an HTTP server address.");
+  baseUrl = "http://127.0.0.1:" + address.port;
 });
 afterAll(async () => { if (httpServer) await new Promise<void>((resolve, reject) => httpServer.close(e => e ? reject(e) : resolve())); });
 describe("fee HTTP authorization and SePay protocol", () => {
   it("restricts members to their own fee and reserves creation/settings/sending to admins", async () => {
     const { id } = await checkoutSetup();
-    routeIdentity.user = { id: memberId, role: "user", companyCode: "A" };
+    routeIdentity.user = { id: memberId, email: "an@fee.test", role: "user", companyCode: "A" };
     expect((await (await fetch(baseUrl + "/fees/?year=2026")).json()).data).toHaveLength(1);
     expect((await fetch(baseUrl + "/fees/" + id)).status).toBe(200);
     // Even an otherwise privileged non-admin cannot mutate fees.
@@ -223,12 +225,12 @@ describe("fee HTTP authorization and SePay protocol", () => {
       ["DELETE", "/" + id], ["GET", "/sepay/transactions"], ["POST", "/" + id + "/notify"], ["POST", "/" + id + "/payments"]]) {
       expect((await fetch(baseUrl + "/fees" + path, {method})).status).toBe(403);
     }
-    routeIdentity.user = { id: foreignId, role: "manager", companyCode: "A" };
+    routeIdentity.user = { id: foreignId, email: "binh@fee.test", role: "manager", companyCode: "A" };
     expect((await (await fetch(baseUrl + "/fees/?year=2026")).json()).data).toHaveLength(0);
     expect((await fetch(baseUrl + "/fees/" + id)).status).toBe(404);
-    routeIdentity.user = { id: foreignId, role: "admin", companyCode: "B" };
+    routeIdentity.user = { id: foreignId, email: "admin@fee.test", role: "admin", companyCode: "B" };
     expect((await fetch(baseUrl + "/fees/" + id)).status).toBe(404);
-    routeIdentity.user = { id: memberId, role: "admin", companyCode: "A" };
+    routeIdentity.user = { id: memberId, email: "admin@fee.test", role: "admin", companyCode: "A" };
     expect((await fetch(baseUrl + "/fees/sepay/config")).status).toBe(200);
   });
   it("rejects unauthenticated webhooks before any write and acknowledges valid/replayed bank callbacks", async () => {
@@ -255,7 +257,7 @@ it("fails closed for incomplete environment config and never exposes another org
 });
 it("does not allow admin HTTP requests to overwrite environment settings", async () => {
   configureSePay(settings);
-  routeIdentity.user = { id: memberId, role: "admin", companyCode: "A" };
+  routeIdentity.user = { id: memberId, email: "admin@fee.test", role: "admin", companyCode: "A" };
   const response = await fetch(baseUrl + "/fees/sepay/config", { method: "PUT", headers: {"Content-Type":"application/json"},
     body: JSON.stringify({...settings, accountNumber:"999999"}) });
   expect(response.status).toBe(405);
@@ -268,7 +270,7 @@ describe("Fee reminder email", () => {
     const id = await setupFee();
     configureSePay(settings);
     await UserModel.updateOne({ _id: memberId }, { $set: { email: "updated@fee.test", displayName: "<b>An</b>" } });
-    await receiveFee("A", id, "admin", receipt(40));
+    await receiveFee("A", id, "admin", (receipt(40) as unknown as Parameters<typeof receiveFee>[3]));
     await notifyFee("A", id);
     await Promise.all([notifyFee("A", id), notifyFee("A", id)]);
     expect(companyEmailService.send).toHaveBeenCalledTimes(1);
@@ -331,7 +333,7 @@ describe("Fee reminder email", () => {
     configureSePay(settings);
     await UserModel.updateOne({ _id: memberId }, { $set: { companyCode: "B" } });
     await expect(notifyFee("A", id)).rejects.toMatchObject({ status: 400 });
-    await receiveFee("A", id, "admin", receipt(100));
+    await receiveFee("A", id, "admin", (receipt(100) as unknown as Parameters<typeof receiveFee>[3]));
     await expect(notifyFee("A", id)).rejects.toMatchObject({ status: 400 });
     expect(companyEmailService.send).not.toHaveBeenCalled();
   });
@@ -363,7 +365,7 @@ describe("Collection rounds and fee deletion", () => {
     await MemberFeeModel.updateOne({ _id: id }, { $set: { emailClaimUntil: new Date(Date.now() + 60000) } });
     await expect(deleteMemberFee("A", id)).rejects.toMatchObject({ status: 409 });
     const payment = receipt();
-    await receiveFee("A", id, "admin", payment);
+    await receiveFee("A", id, "admin", (payment as unknown as Parameters<typeof receiveFee>[3]));
     await expect(deleteMemberFee("A", id)).rejects.toMatchObject({ status: 409 });
     await voidFeePayment("A", id, payment.id, "admin", "Thu nhầm");
     await MemberFeeModel.updateOne({ _id: id }, { $unset: { emailClaimUntil: 1 } });
@@ -379,12 +381,15 @@ describe("Collection rounds and fee deletion", () => {
   it("protects against a bank transfer arriving between lookup and deletion", async () => {
     const { id, fee } = await checkoutSetup();
     const original = MemberFeeModel.deleteOne.bind(MemberFeeModel);
-    const spy = vi.spyOn(MemberFeeModel, "deleteOne").mockImplementationOnce((...args: any[]) => ({
-      then: async (resolve: any, reject: any) => {
-        try { await processSePay("A", bankTransfer(fee.paymentCode!)); resolve(await original(...args as [any])); }
-        catch (e) { reject(e); }
+    const spy = vi.spyOn(MemberFeeModel, "deleteOne").mockImplementationOnce((...args: Parameters<typeof original>) => ({
+      then: async (
+        resolve: (value: Awaited<ReturnType<typeof original>>) => unknown,
+        reject: (reason: unknown) => unknown
+      ) => {
+        try { await processSePay("A", bankTransfer(fee.paymentCode!)); resolve(await original(...args)); }
+        catch (error) { reject(error); }
       }
-    }) as any);
+    } as unknown as ReturnType<typeof original>));
     try { await expect(deleteMemberFee("A", id)).rejects.toMatchObject({ status: 409 }); }
     finally { spy.mockRestore(); }
     expect((await getFee("A", id)).payments).toHaveLength(1);
@@ -392,9 +397,9 @@ describe("Collection rounds and fee deletion", () => {
 
   it("exposes deletion to admins only and isolates organizations", async () => {
     const id = await setupFee();
-    routeIdentity.user = { id: memberId, role: "admin", companyCode: "B" };
+    routeIdentity.user = { id: memberId, email: "admin@fee.test", role: "admin", companyCode: "B" };
     expect((await fetch(baseUrl + "/fees/" + id, { method: "DELETE" })).status).toBe(404);
-    routeIdentity.user = { id: memberId, role: "admin", companyCode: "A" };
+    routeIdentity.user = { id: memberId, email: "admin@fee.test", role: "admin", companyCode: "A" };
     expect((await fetch(baseUrl + "/fees/" + id, { method: "DELETE" })).status).toBe(200);
     expect((await fetch(baseUrl + "/fees/" + id)).status).toBe(404);
   });
@@ -418,12 +423,15 @@ it("credits only the matching round when two rounds have the same title", async 
 it("reviews a transfer if its fee disappears after lookup but before credit", async () => {
   const { id, fee } = await checkoutSetup();
   const original = MemberFeeModel.updateOne.bind(MemberFeeModel);
-  const spy = vi.spyOn(MemberFeeModel, "updateOne").mockImplementationOnce((...args: any[]) => ({
-    then: async (resolve: any, reject: any) => {
-      try { await deleteMemberFee("A", id); resolve(await original(...args as [any, any])); }
-      catch (e) { reject(e); }
+  const spy = vi.spyOn(MemberFeeModel, "updateOne").mockImplementationOnce((...args: Parameters<typeof original>) => ({
+    then: async (
+      resolve: (value: Awaited<ReturnType<typeof original>>) => unknown,
+      reject: (reason: unknown) => unknown
+    ) => {
+      try { await deleteMemberFee("A", id); resolve(await original(...args)); }
+      catch (error) { reject(error); }
     }
-  }) as any);
+  } as unknown as ReturnType<typeof original>));
   try { expect(await processSePay("A", bankTransfer(fee.paymentCode!))).toMatchObject({ status: "review" }); }
   finally { spy.mockRestore(); }
 });

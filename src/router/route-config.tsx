@@ -1,8 +1,9 @@
 import { lazy } from "react";
+import { MODULE_READ_PERMISSIONS } from "../config/modules";
 import type { ComponentType, LazyExoticComponent } from "react";
 import type { TabType, UserProfile } from "../types";
 
-export type LazyPageComponent = LazyExoticComponent<ComponentType<any>>;
+export type LazyPageComponent = LazyExoticComponent<ComponentType>;
 
 export type AppRoute = {
   tab: TabType;
@@ -14,6 +15,16 @@ export const APP_ROUTES: AppRoute[] = [
   {
     tab: "TỔNG QUAN",
     component: lazy(() => import("../pages/DashboardTab")),
+    canAccess: (userProfile) =>
+      userProfile.role === "admin" ||
+      Boolean(
+        userProfile.permissions?.includes("*") ||
+        MODULE_READ_PERMISSIONS["TỔNG QUAN"]?.some(permission => userProfile.permissions?.includes(permission))
+      ),
+  },
+  {
+    tab: "BẢNG XẾP HẠNG",
+    component: lazy(() => import("../pages/RankingsTab")),
     canAccess: (userProfile) =>
       userProfile.role === "admin" ||
       Boolean(

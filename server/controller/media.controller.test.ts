@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createMediaController } from "./media.controller";
 
 function response() {
-  const res: any = {
+  const res = {
     statusCode: 200,
     body: undefined,
     status(code: number) { this.statusCode = code; return this; },
@@ -36,7 +36,7 @@ describe("mediaController managed upload", () => {
       cloudinary: { uploadMedia: vi.fn() },
       managedUpload: { createPendingUpload },
     });
-    const req: any = {
+    const req = {
       user: { id: "user-1", email: "admin@acme.vn", companyCode: "ACME", branchId: "branch-a" },
       body: {
         file: "data:application/pdf;base64,QQ==",
@@ -49,7 +49,7 @@ describe("mediaController managed upload", () => {
     };
     const res = response();
 
-    await controller.upload(req, res);
+    await controller.upload((req as unknown as Parameters<typeof controller.upload>[0]), ((res) as unknown as Parameters<typeof controller.upload>[1]));
 
     expect(createPendingUpload).toHaveBeenCalledWith(
       { companyCode: "ACME", branchId: "branch-a", actorId: "user-1", actorName: "admin@acme.vn" },
@@ -75,10 +75,10 @@ describe("mediaController managed upload", () => {
       cloudinary: { uploadMedia },
       managedUpload: { createPendingUpload: vi.fn() },
     });
-    const req: any = { user: { id: "user-1", companyCode: "ACME" }, body: { file: "data:image/png;base64,QQ==", folder: "igen_erp/legacy" } };
+    const req = { user: { id: "user-1", companyCode: "ACME" }, body: { file: "data:image/png;base64,QQ==", folder: "igen_erp/legacy" } };
     const res = response();
 
-    await controller.upload(req, res);
+    await controller.upload((req as unknown as Parameters<typeof controller.upload>[0]), ((res) as unknown as Parameters<typeof controller.upload>[1]));
 
     expect(uploadMedia).toHaveBeenCalledWith(req.body.file, "igen_erp/legacy");
     expect(res.body).toEqual({ status: "success", url: "https://res.cloudinary.com/acme/legacy.png" });

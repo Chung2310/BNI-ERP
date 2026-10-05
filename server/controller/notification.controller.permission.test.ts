@@ -16,7 +16,7 @@ vi.mock("../service/notification.service", () => ({
 import { notificationController } from "./notification.controller";
 
 function response() {
-  const res: any = { status: vi.fn(), json: vi.fn() };
+  const res = { status: vi.fn(), json: vi.fn() };
   res.status.mockReturnValue(res);
   return res;
 }
@@ -29,16 +29,19 @@ describe("notificationController.create permission scope", () => {
   it("rejects delivery to a recipient outside the caller company", async () => {
     dependencies.findOne.mockReturnValue({
       select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({ _id: "recipient", companyCode: "OTHER" }),
+        lean: vi.fn().mockResolvedValue(null),
       }),
     });
     const res = response();
 
-    await notificationController.create({
+    await notificationController.create(({
       user: { id: "manager", role: "admin", email: "manager@example.test", companyCode: "ACME" },
       body: { recipientUid: "507f1f77bcf86cd799439011", companyCode: "OTHER", title: "Notice", body: "Body", type: "he-thong" },
-    } as any, res);
+    } as unknown as Parameters<typeof notificationController.create>[0]), ((res) as unknown as Parameters<typeof notificationController.create>[1]));
 
+    expect(dependencies.findOne).toHaveBeenCalledWith({
+      _id: "507f1f77bcf86cd799439011", companyCode: "ACME",
+    });
     expect(res.status).toHaveBeenCalledWith(403);
     expect(dependencies.createNotification).not.toHaveBeenCalled();
   });
@@ -52,11 +55,15 @@ describe("notificationController.create permission scope", () => {
     dependencies.createNotification.mockResolvedValue({ id: "notification" });
     const res = response();
 
-    await notificationController.create({
+    await notificationController.create(({
       user: { id: "manager", role: "admin", email: "manager@example.test", companyCode: "ACME" },
       body: { recipientUid: "507f1f77bcf86cd799439011", companyCode: "OTHER", title: "Notice", body: "Body", type: "he-thong" },
-    } as any, res);
+    } as unknown as Parameters<typeof notificationController.create>[0]), ((res) as unknown as Parameters<typeof notificationController.create>[1]));
 
+    expect(dependencies.findOne).toHaveBeenCalledWith({
+      _id: "507f1f77bcf86cd799439011", companyCode: "ACME",
+    });
+    expect(res.status).toHaveBeenCalledWith(201);
     expect(dependencies.createNotification).toHaveBeenCalledWith(expect.objectContaining({ companyCode: "ACME" }));
   });
 });

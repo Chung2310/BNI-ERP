@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { beforeEach } from "node:test";
 import express from "express";
 import { once } from "node:events";
 import { setRateLimitRedisClientForTesting } from "../../infrastructure/rate-limit-redis";
@@ -7,15 +7,17 @@ setRateLimitRedisClientForTesting({ eval: async () => [1, 1000], decr: async () 
 const { qrCheckInGuest } = await import("./meeting.service");
 const { meetingCheckInRouter } = await import("./meeting-checkin.router");
 import { guestAvatarError, MAX_GUEST_AVATAR_BYTES } from "./meeting-guest-avatar";
-import { MeetingModel } from "./meeting.model";
+import { MeetingModel, MeetingCheckInQrModel } from "./meeting.model";
 import { cloudinaryService } from "../../service/cloudinary.service";
 const { buildProfileSlide } = await import("./meeting-slides.service");
+
+beforeEach(t => { assert.ok("mock" in t); t.mock.method(MeetingCheckInQrModel, "findOne", async () => null); });
 
 const buffer = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1kAAAAASUVORK5CYII=", "base64");
 const avatar = { buffer, size: buffer.length, mimetype: "image/png" };
 const input = { name: "Khách An", email: "", phone: "0901234567", company: "ACME", latitude: 10, longitude: 106 };
 const asset = { publicId: "meetings/m/guests/avatar", secureUrl: "https://example.com/avatar.png", resourceType: "image", bytes: buffer.length };
-function meeting(): any {
+function meeting() {
   return { _id: "507f1f77bcf86cd799439011", companyCode: "ACME", __v: 0, status: "scheduled", checkInQrTokenHash: "hash",
     checkInQrExpiresAt: new Date(Date.now() + 60000), latitude: 10, longitude: 106, gpsRadiusMeters: 200,
     speakers: [], tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20, save: async () => {} };

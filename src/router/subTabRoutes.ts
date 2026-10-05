@@ -11,6 +11,7 @@ export type SettingsSubTabType =
   | "erp";
 
 export const HR_SUB_TAB_ROUTES: SubTabRouteMap<HRSubTabType> = [
+  { slug: "thanh-vien", value: "SƠ ĐỒ TỔ CHỨC" },
   { slug: "so-do", value: "SƠ ĐỒ TỔ CHỨC" },
   { slug: "phi-thuong-nien", value: "PHÍ THƯỜNG NIÊN" },
   { slug: "email-chuc-mung", value: "EMAIL CHÚC MỪNG" as HRSubTabType },

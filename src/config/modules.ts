@@ -35,9 +35,10 @@ export const MODULE_OPTIONS = [
  * Mã quyền tối thiểu để user được coi là có quyền truy cập tab
  */
 export const MODULE_READ_PERMISSIONS: Partial<Record<TabType, string[]>> = {
-  "TỔNG QUAN": ["dashboard:read"],
+  "TỔNG QUAN": ["dashboard:read", "meetings:read", "meetings:manage"],
+  "BẢNG XẾP HẠNG": ["dashboard:read"],
   "CUỘC HỌP": ["meetings:read", "meetings:manage"],
-  "NHÂN SỰ": ["hr:read", "access:read", "work:read", "timekeeping:read"],
+  "NHÂN SỰ": ["hr:read", "access:read", "work:read"],
   "QUẢN LÝ TÀI NGUYÊN": ["resource:read"],
   "TÀI NGUYÊN": ["resource:read"],
   "TRÒ CHUYỆN": ["chat:read"],

@@ -8,7 +8,7 @@ interface PersonalDriveAccessInput {
 
 export function canAccessPersonalDriveTarget({
   callerId,
-  callerRole,
+  callerRole: _callerRole,
   callerCompanyCode,
   targetUserId,
   targetCompanyCode,

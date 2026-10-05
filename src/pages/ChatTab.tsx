@@ -7,12 +7,10 @@ import {
   VolumeX,
   ChevronDown,
   Send,
-  Image as ImageIcon,
   File as FileIcon,
   X,
   Users,
   Settings,
-  MoreVertical,
   Ban,
   LogOut,
   Trash2,
@@ -25,7 +23,6 @@ import {
   ChevronLeft,
   Info,
   Camera,
-  Crown,
   ShieldCheck,
   Edit3,
   Save,
@@ -150,7 +147,7 @@ export default function ChatTab() {
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [soundMuted, setSoundMuted] = useState<boolean>(() => localStorage.getItem(CHAT_SOUND_MUTED_KEY) === "1");
   const [mention, setMention] = useState<{ query: string; start: number } | null>(null);
-  const draftsRef = useRef<Record<string, string>>({});
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   // Custom Confirmation Modal State & Helper
   const [confirmModal, setConfirmModal] = useState<{
@@ -184,11 +181,11 @@ export default function ChatTab() {
 
   // Ứng viên @mention (chỉ trong nhóm, loại trừ chính mình)
   const mentionCandidates = React.useMemo(() => {
-    if (!mention || !activeRoom || !activeRoom.isGroup) return [] as any[];
+    if (!mention || !activeRoom || !activeRoom.isGroup) return [];
     const q = mention.query.toLowerCase();
     const members = activeRoom.members
-      .map((m: any) => m.userId)
-      .filter((u: any) => u && String(u._id) !== currentUserId && u.uid !== currentUserId && (u.displayName || "").toLowerCase().includes(q));
+      .map((m) => m.userId)
+      .filter((u) => u && String(u._id) !== currentUserId && u.uid !== currentUserId && (u.displayName || "").toLowerCase().includes(q));
 
     const showAllOption = "all".includes(q) || "tất cả".includes(q) || "tat ca".includes(q) || q === "";
     if (showAllOption) {
@@ -204,79 +201,9 @@ export default function ChatTab() {
   }, [mention, activeRoom, currentUserId]);
 
   // Regex nhận diện "@Tên thành viên" để tô sáng trong tin nhắn
-  const mentionRegex = React.useMemo(() => {
-    if (!activeRoom) return null;
-    const names = activeRoom.members
-      .map((m: any) => m.userId?.displayName)
-      .filter(Boolean)
-      .map((n: string) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-
-    if (activeRoom.isGroup) {
-      names.push("all", "Tất cả", "tất cả");
-    }
-
-    names.sort((a: string, b: string) => b.length - a.length);
-    if (names.length === 0) return null;
-    return new RegExp("@(" + names.join("|") + ")", "gi");
-  }, [activeRoom]);
-
-  // Tô sáng các @mention thành viên trong một đoạn văn bản (không chứa URL)
-  const renderTextWithMentions = (text: string, onDark: boolean): React.ReactNode => {
-    if (!mentionRegex) return text;
-    const myName = userProfile?.displayName;
-    const nodes: React.ReactNode[] = [];
-    let last = 0;
-    let m: RegExpExecArray | null;
-    mentionRegex.lastIndex = 0;
-    while ((m = mentionRegex.exec(text)) !== null) {
-      if (m.index > last) nodes.push(text.slice(last, m.index));
-      const isMentionAll = ["all", "tất cả"].includes(m[1].toLowerCase());
-      const cls =
-        m[1] === myName || isMentionAll
-          ? "bg-amber-300/80 text-amber-950 font-bold"
-          : onDark
-            ? "bg-white/25 text-white"
-            : "bg-indigo-100 text-indigo-700";
-      nodes.push(
-        <span key={`mt-${m.index}`} className={`rounded px-1 font-semibold ${cls}`}>
-          {m[0]}
-        </span>
-      );
-      last = m.index + m[0].length;
-      if (m.index === mentionRegex.lastIndex) mentionRegex.lastIndex++;
-    }
-    if (last < text.length) nodes.push(text.slice(last));
-    return nodes;
-  };
 
   // Render nội dung tin nhắn: biến URL thành link bấm được + tô sáng @mention
-  const renderMessageContent = (content: string, onDark: boolean): React.ReactNode => {
-    const urlRe = /(https?:\/\/[^\s]+)/g;
-    const parts = content.split(urlRe);
-    return parts.map((part, idx) => {
-      if (/^https?:\/\//.test(part)) {
-        // Tách dấu câu bám cuối URL để không nuốt vào link
-        const match = part.match(/^(.*?)([.,;:!?)\]}"']*)$/);
-        const url = match ? match[1] : part;
-        const trailing = match ? match[2] : "";
-        return (
-          <React.Fragment key={`u-${idx}`}>
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className={`underline break-all hover:opacity-80 ${onDark ? "text-white font-medium" : "text-indigo-600"}`}
-            >
-              {url}
-            </a>
-            {trailing}
-          </React.Fragment>
-        );
-      }
-      return <React.Fragment key={`t-${idx}`}>{renderTextWithMentions(part, onDark)}</React.Fragment>;
-    });
-  };
+  
   const [currentPinnedIndex, setCurrentPinnedIndex] = useState(0);
 
   // Zalo-like Search States & Handlers
@@ -297,7 +224,7 @@ export default function ChatTab() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchMessageQuery, searchMessageType, activeRoom?._id, showSearchPanel]);
 
-  const performMessageSearch = async () => {
+  async function performMessageSearch() {
     if (!activeRoom) return;
     try {
       setSearchingMessages(true);
@@ -307,12 +234,12 @@ export default function ChatTab() {
         searchMessageType
       );
       setSearchMessageResults(results);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Lỗi tìm kiếm tin nhắn:", error);
     } finally {
       setSearchingMessages(false);
     }
-  };
+  }
 
   const scrollToMessage = (msgId: string) => {
     const el = document.getElementById(`msg-${msgId}`);
@@ -639,13 +566,13 @@ export default function ChatTab() {
   }, [activeRoom]);
 
   // Helper to scroll to bottom of chat
-  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+  function scrollToBottom(behavior: ScrollBehavior = "smooth") {
     requestAnimationFrame(() => {
       if (messageEndRef.current) {
         messageEndRef.current.scrollIntoView({ behavior });
       }
     });
-  };
+  }
 
   // Scroll to bottom when typing status changes
   useEffect(() => {
@@ -654,28 +581,23 @@ export default function ChatTab() {
     }
   }, [typingUsers, activeRoom?._id]);
 
+  const [previousRoom, setPreviousRoom] = useState(() => [activeRoom?._id]);
+  if (!Object.is(previousRoom[0], activeRoom?._id)) {
+    setPreviousRoom([activeRoom?._id]);
+    setCurrentPinnedIndex(0); setReplyingMessage(null); setShowSearchPanel(false);
+    setSearchMessageQuery(""); setSearchMessageResults([]); setEditingMessage(null); setMention(null);
+    setMessageInput(activeRoom ? drafts[activeRoom._id] || "" : "");
+    setNewMsgCount(0); setIsNearBottom(true); setLoadingMessages(!!activeRoom); setHasMoreMessages(true); setMessages([]);
+    if (activeRoom) setRooms(previous => previous.map(room => room._id === activeRoom._id ? { ...room, unreadCount: 0 } : room));
+  }
   // Join/leave socket room when active room changes
   useEffect(() => {
     if (activeRoom) {
-      setCurrentPinnedIndex(0);
-      setReplyingMessage(null);
-      // Reset search inputs & close search panel on switching room
-      setShowSearchPanel(false);
-      setSearchMessageQuery("");
-      setSearchMessageResults([]);
       // Fetch messages for active room
       fetchMessages(activeRoom._id);
       // Mark as read + xóa badge chưa đọc của phòng này
       internalChatService.markAsRead(activeRoom._id);
       markRoomRead(activeRoom._id);
-      setRooms((prev) => prev.map((r) => (r._id === activeRoom._id ? { ...r, unreadCount: 0 } : r)));
-      // Khôi phục bản nháp đang gõ dở của phòng này + reset trạng thái phụ
-      setEditingMessage(null);
-      setMention(null);
-      setMessageInput(draftsRef.current[activeRoom._id] || "");
-      // Reset trạng thái cuộn/tin mới khi đổi phòng
-      setNewMsgCount(0);
-      setIsNearBottom(true);
       isNearBottomRef.current = true;
       // Join socket room
       socketService.emit("join_chat_room", { roomId: activeRoom._id });
@@ -694,13 +616,13 @@ export default function ChatTab() {
   // Helper to check if a room is pinned by the current user
   const isRoomPinned = (room: ChatRoom) => {
     const member = room.members.find(
-      (m) => m.userId && (m.userId._id || (m.userId as any).uid || m.userId) === currentUserId
+      (m) => m.userId && (m.userId._id || (m.userId).uid || m.userId) === currentUserId
     );
     return !!member?.isPinned;
   };
 
   // Helper to sort rooms list: pinned first, then by updatedAt descending
-  const sortRoomsList = (roomsList: ChatRoom[]) => {
+  function sortRoomsList(roomsList: ChatRoom[]) {
     return [...roomsList].sort((a, b) => {
       const aPinned = isRoomPinned(a) ? 1 : 0;
       const bPinned = isRoomPinned(b) ? 1 : 0;
@@ -712,10 +634,10 @@ export default function ChatTab() {
       const bTime = new Date(b.updatedAt).getTime();
       return bTime - aTime;
     });
-  };
+  }
 
   // Fetch Rooms API
-  const fetchRooms = async () => {
+  async function fetchRooms() {
     try {
       setLoadingRooms(true);
       const data = await internalChatService.getRooms();
@@ -758,44 +680,42 @@ export default function ChatTab() {
           setActiveRoom(targetRoom);
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.message);
     } finally {
       setLoadingRooms(false);
     }
-  };
+  }
 
   // Fetch Company Users API
-  const fetchCompanyUsers = async () => {
+  async function fetchCompanyUsers() {
     try {
       if (companyCode) {
         const users = await authService.getColleagues();
         // Exclude current user from list for general member selection
         setCompanyUsers(users);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Lỗi khi tải danh sách nhân viên công ty:", error);
     }
-  };
+  }
 
   // Fetch Messages API
-  const fetchMessages = async (roomId: string) => {
-    try {
-      setLoadingMessages(true);
-      setHasMoreMessages(true);
-      const data = await internalChatService.getMessages(roomId, 30);
+  async function fetchMessages(roomId: string) {
+    return internalChatService.getMessages(roomId, 30).then(async (data) => {
       // Reverse messages because API returns latest first (createdAt -1)
       setMessages([...data].reverse());
       if (data.length < 30) {
         setHasMoreMessages(false);
       }
       scrollToBottom("auto");
-    } catch (error: any) {
+    
+}).catch(error => {
       toast.error(error.message);
-    } finally {
+    }).finally(() => {
       setLoadingMessages(false);
-    }
-  };
+    });
+  }
 
   // Load More Messages (Pagination)
   const loadMoreMessages = async () => {
@@ -834,7 +754,7 @@ export default function ChatTab() {
       } else {
         setHasMoreMessages(false);
       }
-    } catch (error: any) {
+    } catch (error) {
       toast.error(getApiErrorMessage(error, "Không thể tải thêm tin nhắn cũ."));
     } finally {
       setLoadingMore(false);
@@ -891,7 +811,7 @@ export default function ChatTab() {
       });
 
       setActiveRoom(room);
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.message);
     }
   };
@@ -929,7 +849,7 @@ export default function ChatTab() {
       setGroupName("");
       setSelectedMembers([]);
       setGroupAvatar("");
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.message);
     }
   };
@@ -944,7 +864,7 @@ export default function ChatTab() {
       setRooms((prev) => sortRoomsList(prev.map((r) => (r._id === updatedRoom._id ? updatedRoom : r))));
       setShowAddMemberModal(false);
       setMembersToAdd([]);
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.message);
     }
   };
@@ -963,7 +883,7 @@ export default function ChatTab() {
           toast.success("Đã xóa thành viên ra khỏi phòng chat thành công.");
           setActiveRoom(updatedRoom);
           setRooms((prev) => sortRoomsList(prev.map((r) => (r._id === updatedRoom._id ? updatedRoom : r))));
-        } catch (error: any) {
+        } catch (error) {
           toast.error(error.message);
         }
       },
@@ -986,7 +906,7 @@ export default function ChatTab() {
           setActiveRoom(null);
           setMessages([]);
           setShowRoomDetails(false);
-        } catch (error: any) {
+        } catch (error) {
           toast.error(error.message);
         }
       },
@@ -1009,7 +929,7 @@ export default function ChatTab() {
           setActiveRoom(null);
           setMessages([]);
           setShowRoomDetails(false);
-        } catch (error: any) {
+        } catch (error) {
           toast.error(error.message);
         }
       },
@@ -1034,7 +954,7 @@ export default function ChatTab() {
           setRooms((previous) => previous.map((item) => item._id === updated._id ? { ...item, ...updated } : item));
           setActiveRoom((current) => current?._id === updated._id ? updated : current);
           toast.success(blocked ? "Đã chặn cuộc trò chuyện." : "Đã bỏ chặn cuộc trò chuyện.");
-        } catch (error: any) {
+        } catch (error) {
           toast.error(error.message || "Không thể cập nhật trạng thái chặn.");
         } finally {
           setUpdatingBlock(false);
@@ -1055,7 +975,7 @@ export default function ChatTab() {
       }
       const isPinned = isRoomPinned(updatedRoom);
       toast.success(isPinned ? "Đã ghim cuộc trò chuyện lên đầu." : "Đã bỏ ghim cuộc trò chuyện.");
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.message || "Không thể thực hiện ghim phòng chat.");
     }
   };
@@ -1077,7 +997,7 @@ export default function ChatTab() {
       setActiveRoom(updatedRoom);
       setRooms((prev) => sortRoomsList(prev.map((r) => (r._id === updatedRoom._id ? updatedRoom : r))));
       setShowGroupSettings(false);
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.message);
     } finally {
       setSavingGroupSettings(false);
@@ -1097,7 +1017,7 @@ export default function ChatTab() {
       toast.success("Đã cập nhật ảnh đại diện của phòng chat thành công.");
       setActiveRoom(updatedRoom);
       setRooms((prev) => sortRoomsList(prev.map((r) => (r._id === updatedRoom._id ? updatedRoom : r))));
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.message);
     } finally {
       setSavingGroupSettings(false);
@@ -1129,7 +1049,7 @@ export default function ChatTab() {
           }
           setActiveRoom(updatedRoom);
           setRooms((prev) => sortRoomsList(prev.map((r) => (r._id === updatedRoom._id ? updatedRoom : r))));
-        } catch (error: any) {
+        } catch (error) {
           toast.error(error.message);
         }
       },
@@ -1144,7 +1064,7 @@ export default function ChatTab() {
       toast.success("Đã ghim tin nhắn.");
       setActiveRoom(updatedRoom);
       setRooms((prev) => sortRoomsList(prev.map((r) => (r._id === updatedRoom._id ? updatedRoom : r))));
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.message);
     }
   };
@@ -1158,7 +1078,7 @@ export default function ChatTab() {
       setActiveRoom(updatedRoom);
       setRooms((prev) => sortRoomsList(prev.map((r) => (r._id === updatedRoom._id ? updatedRoom : r))));
       setCurrentPinnedIndex(0);
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.message);
     }
   };
@@ -1176,7 +1096,7 @@ export default function ChatTab() {
           const deletedMessage = await internalChatService.deleteMessage(activeRoom._id, messageId);
           toast.success("Đã thu hồi tin nhắn.");
           setMessages((prev) => prev.map((m) => (m._id === messageId ? deletedMessage : m)));
-        } catch (error: any) {
+        } catch (error) {
           toast.error(error.message);
         }
       },
@@ -1204,7 +1124,7 @@ export default function ChatTab() {
     try {
       const updated = await internalChatService.reactToMessage(activeRoom._id, messageId, emoji);
       setMessages((prev) => prev.map((m) => (m._id === messageId ? { ...m, reactions: updated.reactions } : m)));
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.message || "Thả cảm xúc thất bại.");
     }
   };
@@ -1219,7 +1139,7 @@ export default function ChatTab() {
 
   const cancelEdit = () => {
     setEditingMessage(null);
-    setMessageInput(activeRoom ? draftsRef.current[activeRoom._id] || "" : "");
+    setMessageInput(activeRoom ? drafts[activeRoom._id] || "" : "");
   };
 
   // Handle Typing indicator event emission
@@ -1231,7 +1151,7 @@ export default function ChatTab() {
       const end = el.selectionEnd ?? start;
       const next = messageInput.slice(0, start) + emoji + messageInput.slice(end);
       setMessageInput(next);
-      if (activeRoom && !editingMessage) draftsRef.current[activeRoom._id] = next;
+      if (activeRoom && !editingMessage) setDrafts(previous => ({ ...previous, [activeRoom._id]: next }));
       // Đưa con trỏ ra sau emoji vừa chèn và giữ focus
       requestAnimationFrame(() => {
         el.focus();
@@ -1241,7 +1161,7 @@ export default function ChatTab() {
     } else {
       const next = messageInput + emoji;
       setMessageInput(next);
-      if (activeRoom && !editingMessage) draftsRef.current[activeRoom._id] = next;
+      if (activeRoom && !editingMessage) setDrafts(previous => ({ ...previous, [activeRoom._id]: next }));
     }
   };
 
@@ -1264,7 +1184,7 @@ export default function ChatTab() {
     const cursor = el?.selectionStart ?? messageInput.length;
     const next = messageInput.slice(0, mention.start) + "@" + displayName + " " + messageInput.slice(cursor);
     setMessageInput(next);
-    if (activeRoom && !editingMessage) draftsRef.current[activeRoom._id] = next;
+    if (activeRoom && !editingMessage) setDrafts(previous => ({ ...previous, [activeRoom._id]: next }));
     setMention(null);
     requestAnimationFrame(() => {
       el?.focus();
@@ -1275,7 +1195,7 @@ export default function ChatTab() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessageInput(e.target.value);
-    if (activeRoom && !editingMessage) draftsRef.current[activeRoom._id] = e.target.value;
+    if (activeRoom && !editingMessage) setDrafts(previous => ({ ...previous, [activeRoom._id]: e.target.value }));
 
     // Cập nhật gợi ý @mention (chỉ nhóm)
     if (activeRoom?.isGroup) {
@@ -1314,7 +1234,7 @@ export default function ChatTab() {
       const attachment = await internalChatService.uploadAttachment(file);
       setAttachments((prev) => [...prev, attachment]);
       toast.success(`Đã tải lên file: ${file.name}`);
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.message);
     } finally {
       setUploadingFile(false);
@@ -1324,16 +1244,7 @@ export default function ChatTab() {
   };
 
   // Send Sticker (emoji)
-  const handleSendSticker = async (emoji: string) => {
-    if (!activeRoom) return;
-    setShowStickerPicker(false);
-    try {
-      await internalChatService.sendMessage(activeRoom._id, emoji, [], replyingMessage?._id);
-      setReplyingMessage(null);
-    } catch (error: any) {
-      toast.error(error.message || "Không thể gửi sticker.");
-    }
-  };
+  
 
   // Kiểm tra quyền micro/camera trước khi ghi.
   // Nếu quyền đã bị chặn thì hướng dẫn mở lại; nếu chưa hỏi thì getUserMedia sẽ tự hiện hộp thoại xin quyền.
@@ -1369,7 +1280,7 @@ export default function ChatTab() {
     return true;
   };
 
-  const showMediaError = (error: any, device: "micro" | "camera") => {
+  const showMediaError = (error: { name?: string; message?: string }, device: "micro" | "camera") => {
     const name = error?.name || "";
     if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
       // Quyền có thể đã cấp cho trang nhưng bị chặn ở tầng khác: iframe thiếu allow="camera; microphone",
@@ -1449,7 +1360,7 @@ export default function ChatTab() {
         const attachment = await internalChatService.uploadAttachment(audioFile);
         await internalChatService.sendMessage(activeRoom._id, "", [attachment], replyingMessage?._id);
         setReplyingMessage(null);
-      } catch (error: any) {
+      } catch (error) {
         toast.error(error.message || "Không thể gửi tin nhắn thoại.");
       } finally {
         setUploadingAudio(false);
@@ -1551,7 +1462,7 @@ export default function ChatTab() {
         const attachment = await internalChatService.uploadAttachment(videoFile);
         await internalChatService.sendMessage(roomId, "", [attachment], replyId);
         setReplyingMessage(null);
-      } catch (error: any) {
+      } catch (error) {
         toast.error(error.message || "Không thể gửi tin nhắn video.");
       } finally {
         setUploadingVideo(false);
@@ -1607,7 +1518,7 @@ export default function ChatTab() {
       }
       setEditingMessage(null);
       // Khôi phục bản nháp đang gõ dở (nếu có) sau khi sửa xong
-      setMessageInput(draftsRef.current[activeRoom._id] || "");
+      setMessageInput(drafts[activeRoom._id] || "");
       if (newContent === target.content) return; // không thay đổi
       // Cập nhật lạc quan
       setMessages((prev) =>
@@ -1618,7 +1529,7 @@ export default function ChatTab() {
         setMessages((prev) =>
           prev.map((m) => (m._id === target._id ? { ...m, content: updated.content, editedAt: updated.editedAt } : m))
         );
-      } catch (error: any) {
+      } catch (error) {
         toast.error(error.message || "Sửa tin nhắn thất bại.");
         // Hoàn tác
         setMessages((prev) =>
@@ -1659,7 +1570,7 @@ export default function ChatTab() {
 
     setMessages((prev) => [...prev, optimisticMsg]);
     setMessageInput("");
-    draftsRef.current[activeRoom._id] = ""; // xóa nháp sau khi gửi
+    setDrafts(previous => ({ ...previous, [activeRoom._id]: "" })); // xóa nháp sau khi gửi
     setMention(null);
     setAttachments([]);
     setReplyingMessage(null);
@@ -1677,7 +1588,7 @@ export default function ChatTab() {
       setMessages((prev) =>
         prev.map((m) => (m._id === tempId ? realMessage : m))
       );
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.message);
       // Remove optimistic message on error
       setMessages((prev) => prev.filter((m) => m._id !== tempId));
@@ -1754,7 +1665,7 @@ export default function ChatTab() {
   // Check if I am admin or deputy of the current group
   const isGroupAdminOrDeputy = () => {
     if (!activeRoom || !activeRoom.isGroup) return false;
-    const member = activeRoom.members.find((m: any) => {
+    const member = activeRoom.members.find((m) => {
       const mId = m.userId._id || m.userId.uid || m.userId;
       return mId === currentUserId;
     });
@@ -1764,10 +1675,10 @@ export default function ChatTab() {
   const blockState = chatBlockState(activeRoom, currentUserId);
   const canUserMessage = !blockState.isBlocked && (!activeRoom || !activeRoom.isGroup || !activeRoom.onlyAdminsCanMessage || isGroupAdminOrDeputy());
 
-  const getMsgSenderRole = (msg: any) => {
+  const getMsgSenderRole = (msg: ChatMessage) => {
     if (!activeRoom || !activeRoom.isGroup) return "member";
     const senderId = typeof msg.senderId === "object" && msg.senderId !== null ? msg.senderId._id : msg.senderId;
-    const member = activeRoom.members.find((m: any) => {
+    const member = activeRoom.members.find((m) => {
       const mId = m.userId._id || m.userId.uid || m.userId;
       return mId === senderId;
     });
@@ -1775,7 +1686,7 @@ export default function ChatTab() {
   };
 
   // Hàm hiển thị nội dung tin nhắn dạng Thuần Text (tự động loại bỏ ký tự Markdown như **, *, #, `)
-  const formatMessageContent = (text: string, isMe: boolean) => {
+  const formatMessageContent = (text: string, _isMe: boolean) => {
     if (!text) return "";
     return text
       .replace(/```[\s\S]*?```/g, (m) => m.replace(/```[a-zA-Z]*\n?/g, "").replace(/```/g, ""))
@@ -2206,9 +2117,9 @@ export default function ChatTab() {
               if (!pinnedMsg) return null;
 
               const isObject = typeof pinnedMsg === "object" && pinnedMsg !== null;
-              const senderName = isObject ? (pinnedMsg as any).senderName : "Thành viên";
-              const contentText = isObject ? cleanMessagePreviewText((pinnedMsg as any).content, 80) || "[Đính kèm]" : "Nội dung tin nhắn";
-              const msgId = isObject ? (pinnedMsg as any)._id : pinnedMsg;
+              const senderName = isObject ? (pinnedMsg).senderName : "Thành viên";
+              const contentText = isObject ? cleanMessagePreviewText((pinnedMsg).content, 80) || "[Đính kèm]" : "Nội dung tin nhắn";
+              const msgId = typeof pinnedMsg === 'string' ? pinnedMsg : pinnedMsg._id;
 
               return (
                 <div className="flex items-center justify-between bg-amber-50 border-b-2 border-amber-300 px-6 py-2.5 text-xs transition-all shadow-2xs">
@@ -2844,7 +2755,7 @@ export default function ChatTab() {
                                   toast.success("Đã cập nhật quyền gửi tin nhắn.");
                                   setActiveRoom(updatedRoom);
                                   setRooms((prev) => prev.map((r) => (r._id === updatedRoom._id ? updatedRoom : r)));
-                                } catch (error: any) {
+                                } catch (error) {
                                   toast.error(error.message || "Lỗi cập nhật quyền.");
                                 } finally {
                                   setSavingGroupSettings(false);
@@ -2930,7 +2841,7 @@ export default function ChatTab() {
 
                             <div className="space-y-2">
                               {activeRoom.members.map((member) => {
-                                const userObj = typeof member.userId === "object" ? member.userId : {} as any;
+                                const userObj: Partial<import("../services/internalChatService").ChatRoomMember["userId"]> = typeof member.userId === "object" ? member.userId : {};
                                 const memId = (userObj._id || userObj.uid || member.userId) as string;
                                 const isMemMe = memId === currentUserId;
 
@@ -3055,16 +2966,16 @@ export default function ChatTab() {
 
                   {/* Filter Tabs */}
                   <div className="flex border-b-2 border-slate-300 bg-white text-[11px] font-semibold text-slate-500 overflow-x-auto shrink-0 scrollbar-none">
-                    {[
+                    {([
                       { id: "all", label: "Tất cả" },
                       { id: "text", label: "Tin nhắn" },
                       { id: "media", label: "Ảnh/Video" },
                       { id: "file", label: "File" },
                       { id: "link", label: "Link" },
-                    ].map((tab) => (
+                    ] as const).map((tab) => (
                       <button
                         key={tab.id}
-                        onClick={() => setSearchMessageType(tab.id as any)}
+                        onClick={() => setSearchMessageType(tab.id)}
                         className={`flex-1 py-3 text-center transition border-b-2 whitespace-nowrap px-1 ${searchMessageType === tab.id
                             ? "text-indigo-600 border-indigo-600 font-bold"
                             : "border-transparent hover:text-slate-800"
@@ -3191,7 +3102,7 @@ export default function ChatTab() {
                         Nhắc đến thành viên
                       </div>
                       <div className="max-h-48 overflow-y-auto">
-                        {mentionCandidates.map((u: any) => (
+                        {mentionCandidates.map((u) => (
                           <button
                             key={u._id}
                             type="button"
@@ -3203,7 +3114,7 @@ export default function ChatTab() {
                                 <img src={u.photoURL} alt={u.displayName} className="h-full w-full object-cover" />
                               ) : (
                                 <div className="flex h-full w-full items-center justify-center text-[11px] font-bold text-slate-500">
-                                  {u.isSpecialAll ? (
+                                  {('isSpecialAll' in u && u.isSpecialAll) ? (
                                     <Users className="h-4 w-4 text-indigo-600" />
                                   ) : (
                                     (u.displayName || "?").charAt(0).toUpperCase()
@@ -3212,7 +3123,7 @@ export default function ChatTab() {
                               )}
                             </div>
                             <span className="truncate text-sm font-medium text-slate-700">
-                              {u.isSpecialAll ? (
+                              {('isSpecialAll' in u && u.isSpecialAll) ? (
                                 <span className="font-bold text-indigo-600">@all (Nhắc cả nhóm)</span>
                               ) : (
                                 u.displayName
@@ -3819,7 +3730,7 @@ export default function ChatTab() {
                             );
                             toast.success(`Đã chia sẻ tin nhắn đến ${roomName}`);
                             setSharingMessage(null);
-                          } catch (err: any) {
+                          } catch (err) {
                             toast.error(`Chia sẻ thất bại: ${err.message}`);
                           }
                         }}

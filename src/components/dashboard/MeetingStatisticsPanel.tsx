@@ -1,33 +1,28 @@
+import { meetingElapsedLabel } from "../meetings/meetingElapsedLabel";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   CalendarDays,
   Users,
   Search,
   RotateCcw,
-  Calendar,
-  Building2,
-  Briefcase,
   ChevronRight,
-  ChevronDown,
   UserCheck,
   UserX,
   UserPlus,
   Phone,
   Gift,
-  Trophy,
   Award,
   Ticket,
-  Crown,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { authService } from "../../services/authService";
 import { meetingService, Meeting, Speaker } from "../../services/meetingService";
 import { socketService } from "../../services/socketService";
 import { UserProfile } from "../../types/common";
-import { VietnameseDatePicker } from "../common/VietnameseDatePicker";
+import { Pagination } from "../common/Pagination";
 
+import { SearchableSelect } from "../common/SearchableSelect";
 type QuickTimeFilter = "all" | "month" | "quarter" | "year";
-type StatusFilter = "all" | "ended" | "live" | "scheduled";
 
 export const drawSourceLabels = { wheel: "Vòng quay may mắn", bingo: "Lồng cầu bingo", draw: "Bốc thăm" };
 
@@ -56,13 +51,6 @@ interface ExtendedSpeaker extends Speaker {
   phone?: string;
   isMember: boolean;
 }
-
-const getLiveElapsedMinutes = (startsAt: string | Date): number => {
-  const startTime = new Date(startsAt).getTime();
-  const diffMs = Date.now() - startTime;
-  if (diffMs <= 0) return 1;
-  return Math.floor(diffMs / 60000);
-};
 
 export const extractLuckyWinners = (meeting: Meeting): LuckyDrawWinnerRecord[] => {
   const result: LuckyDrawWinnerRecord[] = [];
@@ -245,10 +233,10 @@ function LuckyWinnersTable({
   );
 }
 
-export function MeetingStatisticsPanel() {
+export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: React.ReactNode }) {
   const { userProfile } = useAuth();
 
-  const [, setTick] = useState(Date.now());
+  const [, setTick] = useState(Date.now);
   useEffect(() => {
     const timer = setInterval(() => setTick(Date.now()), 30000);
     return () => clearInterval(timer);
@@ -262,9 +250,17 @@ export function MeetingStatisticsPanel() {
   // Filters
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickTimeFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  const [meetingsPerPage, setMeetingsPerPage] = useState(10);
+  const [meetingPage, setMeetingPage] = useState(1);
+
+  const [previousInputs1, setPreviousInputs1] = useState<unknown[] | null>(null);
+  if (previousInputs1 === null || !Object.is(previousInputs1[0], searchQuery) || !Object.is(previousInputs1[1], quickFilter) || !Object.is(previousInputs1[2], selectedMeetingId) || !Object.is(previousInputs1[3], meetingsPerPage) || !Object.is(previousInputs1[4], userProfile?.companyCode)) {
+    setPreviousInputs1([searchQuery, quickFilter, selectedMeetingId, meetingsPerPage, userProfile?.companyCode]);
+    setMeetingPage(1);
+  
+  }
 
   // Tab switch in "all meetings" mode: "meetings" list or "winners" list
   const [allMeetingsTab, setAllMeetingsTab] = useState<"meetings" | "winners">("meetings");
@@ -279,12 +275,15 @@ export function MeetingStatisticsPanel() {
   const [hoveredBarId, setHoveredBarId] = useState<string | null>(null);
   const [hoveredSegment, setHoveredSegment] = useState<"present" | "guest" | "absent" | null>(null);
 
+  const [requestInputs, setRequestInputs] = useState(() => [userProfile?.companyCode]);
+  if (!Object.is(requestInputs[0], userProfile?.companyCode)) {
+    setRequestInputs([userProfile?.companyCode]);
+    setIsLoading(true); setError(null);
+  }
+  
   const fetchData = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // 1. Fetch meetings
-      const meetingsData = await meetingService.listMeetings();
+    return meetingService.listMeetings({ all: true }).then(async (meetingsData) => {
+      setError(null);
       setMeetings(meetingsData || []);
 
       // 2. Fetch chapter members
@@ -307,20 +306,22 @@ export function MeetingStatisticsPanel() {
         }
       }
       setChapterMembers(members || []);
-    } catch (err) {
+    
+}).catch(err => {
       console.error("Lỗi tải dữ liệu thống kê cuộc họp:", err);
       setError(err instanceof Error ? err.message : "Không thể tải dữ liệu.");
-    } finally {
+    }).finally(() => {
       setIsLoading(false);
-    }
+    });
   };
 
   useEffect(() => {
     fetchData();
-    const refreshWinners = () => { void meetingService.listMeetings().then(setMeetings).catch(console.error); };
+    const refreshWinners = () => { void meetingService.listMeetings({ all: true }).then(setMeetings).catch(console.error); };
     const off = socketService.on("lucky_draw_spun", refreshWinners);
+    const offMeeting = socketService.on("meeting_updated", refreshWinners);
     window.addEventListener("focus", refreshWinners);
-    return () => { off(); window.removeEventListener("focus", refreshWinners); };
+    return () => { off(); offMeeting(); window.removeEventListener("focus", refreshWinners); };
   }, [userProfile?.companyCode]);
 
   // Distinct member ids across system
@@ -348,10 +349,6 @@ export function MeetingStatisticsPanel() {
         const matchLocation = m.location?.toLowerCase().includes(q);
         if (!matchTitle && !matchLocation) return false;
       }
-      if (selectedDate) {
-        const mDate = new Date(m.startsAt).toISOString().slice(0, 10);
-        if (mDate !== selectedDate) return false;
-      }
       if (quickFilter !== "all") {
         const now = new Date();
         const mDate = new Date(m.startsAt);
@@ -365,17 +362,22 @@ export function MeetingStatisticsPanel() {
           if (mDate.getFullYear() !== now.getFullYear()) return false;
         }
       }
-      if (statusFilter !== "all") {
-        if (statusFilter === "ended" && m.status !== "ended") return false;
-        if (statusFilter === "live" && !["live", "paused"].includes(m.status)) return false;
-        if (statusFilter === "scheduled" && m.status !== "scheduled") return false;
-      }
       return true;
     });
-  }, [meetings, selectedMeetingId, searchQuery, selectedDate, quickFilter, statusFilter]);
+  }, [meetings, selectedMeetingId, searchQuery, quickFilter]);
 
-  useEffect(() => {
+  // Pagination only limits table rows; summaries and charts use all filtered meetings.
+  const meetingPageCount = Math.max(1, Math.ceil(filteredMeetings.length / meetingsPerPage));
+  const currentMeetingPage = Math.min(meetingPage, meetingPageCount);
+  const meetingPageStart = (currentMeetingPage - 1) * meetingsPerPage;
+  const paginatedMeetings = filteredMeetings.slice(meetingPageStart, meetingPageStart + meetingsPerPage);
+
+  const [animationInputs, setAnimationInputs] = useState(() => [filteredMeetings, selectedMeetingId]);
+  if (!Object.is(animationInputs[0], filteredMeetings) || !Object.is(animationInputs[1], selectedMeetingId)) {
+    setAnimationInputs([filteredMeetings, selectedMeetingId]);
     setIsAnimated(false);
+  }
+  useEffect(() => {
     const timer = setTimeout(() => setIsAnimated(true), 60);
     return () => clearTimeout(timer);
   }, [filteredMeetings, selectedMeetingId]);
@@ -465,25 +467,6 @@ export function MeetingStatisticsPanel() {
     });
   }, [allFilteredLuckyWinners, winnerSearch]);
 
-  const resetFilters = () => {
-    setSelectedMeetingId("all");
-    setSearchQuery("");
-    setSelectedDate("");
-    setQuickFilter("all");
-    setStatusFilter("all");
-    setAllMeetingsTab("meetings");
-    setWinnerSearch("");
-    setAttendeeRoleFilter("all");
-    setAttendeeSearch("");
-  };
-
-  const hasActiveFilters =
-    selectedMeetingId !== "all" ||
-    searchQuery.trim() !== "" ||
-    selectedDate !== "" ||
-    quickFilter !== "all" ||
-    statusFilter !== "all";
-
   // Selected single meeting object
   const activeSingleMeeting = useMemo(() => {
     if (selectedMeetingId !== "all") {
@@ -525,7 +508,7 @@ export function MeetingStatisticsPanel() {
     });
 
     return chapterMembers.filter((m) => {
-      const uid = String(m.uid || (m as any)._id || "");
+      const uid = String(m.uid || (m)._id || "");
       const name = (m.displayName || "").trim().toLowerCase();
       if (presentUserIds.has(uid)) return false;
       if (name && presentNames.has(name)) return false;
@@ -537,7 +520,7 @@ export function MeetingStatisticsPanel() {
   const singleMeetingAttendees = useMemo(() => {
     if (!activeSingleMeeting) return [];
 
-    const presentList: Array<ExtendedSpeaker & { isAbsent?: boolean }> = (activeSingleMeeting.speakers || []).map((s: any) => ({
+    const presentList: Array<ExtendedSpeaker & { isAbsent?: boolean }> = (activeSingleMeeting.speakers || []).map((s) => ({
       ...s,
       isMember: Boolean(s.userId),
       company: s.company || s.slideProfile?.company || "",
@@ -546,8 +529,8 @@ export function MeetingStatisticsPanel() {
       isAbsent: false,
     }));
 
-    const absentList: Array<ExtendedSpeaker & { isAbsent?: boolean }> = singleMeetingAbsentMembers.map((u) => ({
-      id: u.uid || `absent-${Math.random()}`,
+    const absentList: Array<ExtendedSpeaker & { isAbsent?: boolean }> = singleMeetingAbsentMembers.map((u, index) => ({
+      id: u.uid || u.email || `absent-${index}`,
       userId: u.uid,
       name: u.displayName || u.email?.split("@")[0] || "Thành viên",
       email: u.email,
@@ -615,114 +598,6 @@ export function MeetingStatisticsPanel() {
     5
   );
 
-  // Ranking calculation for active members
-  const memberRankings = useMemo(() => {
-    const memberMap = new Map<
-      string,
-      {
-        id: string;
-        name: string;
-        email?: string;
-        photoURL?: string;
-        companyName?: string;
-        industry?: string;
-        attendedCount: number;
-        earlyCount: number;
-        totalEarlyMinutes: number;
-      }
-    >();
-
-    // Seed from chapterMembers
-    chapterMembers.forEach((u: any) => {
-      const uid = String(u.uid || u._id || u.id || "");
-      if (!uid) return;
-      memberMap.set(uid, {
-        id: uid,
-        name: u.displayName || u.fullName || u.email?.split("@")[0] || "Thành viên",
-        email: u.email,
-        photoURL: u.photoURL,
-        companyName: u.companyName,
-        industry: u.industry,
-        attendedCount: 0,
-        earlyCount: 0,
-        totalEarlyMinutes: 0,
-      });
-    });
-
-    // Aggregate attendance and early arrival across filteredMeetings
-    filteredMeetings.forEach((m) => {
-      const startsAtTime = new Date(m.startsAt).getTime();
-      const speakers = m.speakers || [];
-      speakers.forEach((s) => {
-        if (!s.userId) return; // Skip guests
-        const uid = String(s.userId);
-        let entry = memberMap.get(uid);
-        if (!entry) {
-          entry = {
-            id: uid,
-            name: s.name || s.email || "Thành viên",
-            email: s.email,
-            photoURL: s.photoURL,
-            companyName: "",
-            industry: "",
-            attendedCount: 0,
-            earlyCount: 0,
-            totalEarlyMinutes: 0,
-          };
-          memberMap.set(uid, entry);
-        }
-
-        entry.attendedCount += 1;
-        if (s.checkedInAt) {
-          const checkedInTime = new Date(s.checkedInAt).getTime();
-          if (!isNaN(checkedInTime) && !isNaN(startsAtTime)) {
-            const diffMinutes = Math.round((startsAtTime - checkedInTime) / 60000);
-            const clamped = Math.max(-30, Math.min(90, diffMinutes));
-            entry.totalEarlyMinutes += clamped;
-            if (diffMinutes >= 5) {
-              entry.earlyCount += 1;
-            }
-          }
-        }
-      });
-    });
-
-    const totalEligibleMeetings = filteredMeetings.length || 1;
-
-    const list = Array.from(memberMap.values()).map((mem) => {
-      const avgEarlyMinutes =
-        mem.attendedCount > 0 ? Math.round(mem.totalEarlyMinutes / mem.attendedCount) : 0;
-      const attendanceRate = Math.round((mem.attendedCount / totalEligibleMeetings) * 100);
-
-      // Score: attendance (max 60) + punctuality (max 40)
-      const attendanceScore = attendanceRate * 0.6;
-      const punctualityScore = Math.min(
-        40,
-        Math.max(0, avgEarlyMinutes * 1.5) + mem.earlyCount * 2
-      );
-      const score = Math.round(attendanceScore + punctualityScore);
-
-      return {
-        ...mem,
-        avgEarlyMinutes,
-        attendanceRate,
-        score,
-      };
-    });
-
-    // Sort descending by: attendedCount -> avgEarlyMinutes -> score
-    list.sort((a, b) => {
-      if (b.attendedCount !== a.attendedCount) return b.attendedCount - a.attendedCount;
-      if (b.avgEarlyMinutes !== a.avgEarlyMinutes) return b.avgEarlyMinutes - a.avgEarlyMinutes;
-      return b.score - a.score;
-    });
-
-    return list;
-  }, [chapterMembers, filteredMeetings]);
-
-  const topFiveMembers = useMemo(() => memberRankings.slice(0, 5), [memberRankings]);
-  const nextFiveMembers = useMemo(() => memberRankings.slice(5, 10), [memberRankings]);
-
   return (
     <div className="space-y-4 pb-8 text-slate-700">
       {/* 1. THANH ĐIỀU KHIỂN & BỘ LỌC GỌN GÀNG (Inline Compact Toolbar) */}
@@ -735,7 +610,7 @@ export function MeetingStatisticsPanel() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm theo tên cuộc họp, địa điểm..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 pl-8 pr-7 text-xs font-normal text-slate-800 placeholder:text-slate-400 focus:border-red-500 focus:bg-white focus:outline-hidden"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 pl-8 pr-7 text-xs font-normal text-slate-800 placeholder:text-slate-400 focus:border-cyan-500 focus:bg-white focus:outline-hidden"
             />
             <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             {searchQuery && (
@@ -750,39 +625,22 @@ export function MeetingStatisticsPanel() {
 
           {/* Chọn buổi họp cụ thể */}
           <div className="relative min-w-[180px] max-w-xs flex-1">
-            <select
-              aria-label="Chọn buổi họp"
+            <SearchableSelect
+              ariaLabel="Chọn buổi họp"
+              compact
               value={selectedMeetingId}
-              onChange={(e) => setSelectedMeetingId(e.target.value)}
-              className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 pl-3 pr-8 text-xs font-normal text-slate-700 focus:border-red-500 focus:bg-white focus:outline-hidden"
-            >
-              <option value="all">Tất cả cuộc họp ({meetings.length})</option>
-              {meetings.map((m) => {
-                const dateLabel = new Date(m.startsAt).toLocaleDateString("vi-VN", {
-                  day: "2-digit",
-                  month: "2-digit",
-                });
-                return (
-                  <option key={m._id} value={m._id}>
-                    {dateLabel} - {m.title}
-                  </option>
-                );
-              })}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              onChange={setSelectedMeetingId}
+              searchPlaceholder="Tìm tên hoặc địa điểm cuộc họp..."
+              options={[
+                { value: "all", label: `Tất cả cuộc họp (${meetings.length})` },
+                ...meetings.map((m) => ({
+                  value: m._id,
+                  label: `${new Date(m.startsAt).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })} - ${m.title}`,
+                  searchText: m.location,
+                })),
+              ]}
+            />
           </div>
-
-          {/* Lọc ngày (Việt hóa) */}
-          <VietnameseDatePicker
-            ariaLabel="Lọc theo ngày"
-            value={selectedDate}
-            onChange={(val) => {
-              setSelectedDate(val);
-              if (val) setQuickFilter("all");
-            }}
-            placeholder="Lọc theo ngày..."
-            className="w-36 sm:w-40"
-          />
 
           {/* Nhóm nút thời gian */}
           <div className="flex rounded-xl bg-slate-100 p-0.5 text-xs">
@@ -798,10 +656,9 @@ export function MeetingStatisticsPanel() {
                 key={item.key}
                 onClick={() => {
                   setQuickFilter(item.key);
-                  setSelectedDate("");
                 }}
                 className={`rounded-lg px-2.5 py-1 text-xs transition-colors cursor-pointer ${
-                  quickFilter === item.key && !selectedDate
+                  quickFilter === item.key
                     ? "bg-white font-medium text-slate-800 shadow-2xs"
                     : "font-normal text-slate-500 hover:text-slate-800"
                 }`}
@@ -811,37 +668,13 @@ export function MeetingStatisticsPanel() {
             ))}
           </div>
 
-          {/* Trạng thái */}
-          <div className="relative">
-            <select
-              aria-label="Trạng thái"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="appearance-none rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 pl-3 pr-7 text-xs font-normal text-slate-700 focus:border-red-500 focus:bg-white focus:outline-hidden"
-            >
-              <option value="all">Mọi trạng thái</option>
-              <option value="ended">Đã kết thúc</option>
-              <option value="live">Đang diễn ra</option>
-              <option value="scheduled">Sắp tới</option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          </div>
-
-          {/* Reset & Refresh */}
+          {/* Refresh */}
           <div className="flex items-center gap-1.5">
-            {hasActiveFilters && (
-              <button
-                onClick={resetFilters}
-                title="Đặt lại bộ lọc"
-                className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-normal text-slate-600 hover:bg-slate-50 cursor-pointer"
-              >
-                Đặt lại
-              </button>
-            )}
             <button
               onClick={fetchData}
               disabled={isLoading}
               title="Làm mới"
+              aria-label="Làm mới"
               className="rounded-xl border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 active:scale-95 cursor-pointer"
             >
               <RotateCcw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
@@ -895,77 +728,77 @@ export function MeetingStatisticsPanel() {
           </div>
         </div>
 
-        {/* Thành viên có mặt (Màu Đỏ tươi BNI #ef4444) */}
-        <div className="rounded-2xl border border-rose-100 bg-rose-50/25 p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-          <div className="flex items-center justify-between text-rose-700 text-xs">
+        {/* Thành viên có mặt — xanh thương hiệu iGen Connect */}
+        <div className="rounded-2xl border border-cyan-100 bg-white p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+          <div className="flex items-center justify-between text-cyan-700 text-xs">
             <span>Thành viên có mặt</span>
-            <span className="h-2 w-2 rounded-full bg-rose-500" />
+            <span className="h-2 w-2 rounded-full bg-cyan-500" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold tracking-tight text-rose-600">{metrics.totalMembersPresent}</span>
-            <span className="text-xs text-rose-400">lượt</span>
-            <span className="ml-auto text-xs font-semibold text-rose-600">{metrics.memberPresentRate}%</span>
+            <span className="text-2xl font-bold tracking-tight text-cyan-700">{metrics.totalMembersPresent}</span>
+            <span className="text-xs text-cyan-700">lượt</span>
+            <span className="ml-auto text-xs font-semibold text-cyan-700">{metrics.memberPresentRate}%</span>
           </div>
-          <div className="mt-2 h-1.5 w-full rounded-full bg-rose-100 overflow-hidden">
+          <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-rose-500 to-rose-600 transition-all duration-1000 ease-out"
+              className="h-full rounded-full bg-cyan-500 transition-all duration-1000 ease-out"
               style={{ width: isAnimated ? `${metrics.memberPresentRate}%` : "0%" }}
             />
           </div>
         </div>
 
-        {/* Thành viên vắng mặt (Màu Cam cảnh báo #f97316) */}
-        <div className="rounded-2xl border border-orange-100 bg-orange-50/25 p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-          <div className="flex items-center justify-between text-orange-700 text-xs">
+        {/* Thành viên vắng mặt — xanh nhạt */}
+        <div className="rounded-2xl border border-cyan-100 bg-white p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+          <div className="flex items-center justify-between text-cyan-700 text-xs">
             <span>Thành viên vắng mặt</span>
-            <span className="h-2 w-2 rounded-full bg-orange-500" />
+            <span className="h-2 w-2 rounded-full bg-cyan-100 ring-1 ring-inset ring-cyan-200" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold tracking-tight text-orange-600">{metrics.totalMembersAbsent}</span>
-            <span className="text-xs text-orange-400">lượt</span>
-            <span className="ml-auto text-xs font-semibold text-orange-600">{metrics.absentRate}%</span>
+            <span className="text-2xl font-bold tracking-tight text-cyan-700">{metrics.totalMembersAbsent}</span>
+            <span className="text-xs text-cyan-700">lượt</span>
+            <span className="ml-auto text-xs font-semibold text-cyan-700">{metrics.absentRate}%</span>
           </div>
-          <div className="mt-2 h-1.5 w-full rounded-full bg-orange-100 overflow-hidden">
+          <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-500 transition-all duration-1000 ease-out"
+              className="h-full rounded-full bg-cyan-100 ring-1 ring-inset ring-cyan-200 transition-all duration-1000 ease-out"
               style={{ width: isAnimated ? `${metrics.absentRate}%` : "0%" }}
             />
           </div>
         </div>
 
-        {/* Khách mời (Màu Xanh da trời tươi sáng #0ea5e9 tương phản hoàn hảo) */}
-        <div className="rounded-2xl border border-sky-100 bg-sky-50/25 p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-          <div className="flex items-center justify-between text-sky-700 text-xs">
+        {/* Khách mời — xanh da trời tươi sáng */}
+        <div className="rounded-2xl border border-cyan-100 bg-white p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+          <div className="flex items-center justify-between text-cyan-700 text-xs">
             <span>Khách mời</span>
-            <span className="h-2 w-2 rounded-full bg-sky-500" />
+            <span className="h-2 w-2 rounded-full bg-cyan-400" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold tracking-tight text-sky-600">{metrics.totalGuests}</span>
-            <span className="text-xs text-sky-400">người</span>
-            <span className="ml-auto text-xs font-semibold text-sky-600">{metrics.guestRate}%</span>
+            <span className="text-2xl font-bold tracking-tight text-cyan-700">{metrics.totalGuests}</span>
+            <span className="text-xs text-cyan-700">người</span>
+            <span className="ml-auto text-xs font-semibold text-cyan-700">{metrics.guestRate}%</span>
           </div>
-          <div className="mt-2 h-1.5 w-full rounded-full bg-sky-100 overflow-hidden">
+          <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-sky-400 to-sky-500 transition-all duration-1000 ease-out"
+              className="h-full rounded-full bg-cyan-400 transition-all duration-1000 ease-out"
               style={{ width: isAnimated ? `${metrics.guestRate}%` : "0%" }}
             />
           </div>
         </div>
 
-        {/* Người trúng giải quay thưởng (Màu Vàng Amber sang trọng #f59e0b) */}
-        <div className="rounded-2xl border border-amber-200/80 bg-amber-50/30 p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-          <div className="flex items-center justify-between text-amber-700 text-xs">
+        {/* Người trúng giải quay thưởng */}
+        <div className="rounded-2xl border border-cyan-200/80 bg-white p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+          <div className="flex items-center justify-between text-cyan-700 text-xs">
             <span>Trúng giải quay</span>
-            <Gift className="h-4 w-4 text-amber-500" />
+            <Gift className="h-4 w-4 text-cyan-700" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold tracking-tight text-amber-600">{metrics.totalWinners}</span>
-            <span className="text-xs text-amber-500/80">lượt</span>
+            <span className="text-2xl font-bold tracking-tight text-cyan-700">{metrics.totalWinners}</span>
+            <span className="text-xs text-cyan-700/80">lượt</span>
           </div>
         </div>
       </div>
 
-      {/* 3. BIỂU ĐỒ (Màu sắc tươi sáng, tương phản cao, hoạt ảnh mọc cột & tương tác 2 chiều) */}
+      {/* 3. BIỂU ĐỒ — bảng màu iGen Connect đồng nhất với thẻ thống kê */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Biểu đồ cột: Lượt tham dự theo từng cuộc họp */}
         <div className="lg:col-span-2 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs flex flex-col justify-between">
@@ -976,15 +809,15 @@ export function MeetingStatisticsPanel() {
               </span>
               <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-xs bg-rose-500 inline-block" />
+                  <span className="h-2.5 w-2.5 rounded-xs bg-cyan-500 inline-block" />
                   Có mặt ({metrics.totalMembersPresent})
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-xs bg-sky-500 inline-block" />
+                  <span className="h-2.5 w-2.5 rounded-xs bg-cyan-400 inline-block" />
                   Khách mời ({metrics.totalGuests})
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-xs bg-orange-400 inline-block" />
+                  <span className="h-2.5 w-2.5 rounded-xs bg-cyan-100 ring-1 ring-inset ring-cyan-200 inline-block" />
                   Vắng mặt ({metrics.totalMembersAbsent})
                 </span>
               </div>
@@ -1033,20 +866,20 @@ export function MeetingStatisticsPanel() {
                           className={`flex items-center gap-1 text-[11px] font-medium transition-all duration-300 rounded-full px-1.5 py-0.5 ${
                             isHovered
                               ? "bg-slate-900 text-white shadow-md -translate-y-1 scale-110"
-                              : "text-slate-600 group-hover:text-rose-600"
+                              : "text-slate-600 group-hover:text-cyan-700"
                           }`}
                         >
                           <span className={isHovered ? "font-bold text-white" : "text-slate-800"}>
                             {item.totalCheckedIn}
                           </span>
                           {item.membersAbsent > 0 && (
-                            <span className={isHovered ? "text-orange-300 text-[10px]" : "text-[10px] text-orange-500 font-normal"}>
+                            <span className={isHovered ? "text-cyan-300 text-[10px]" : "text-[10px] text-cyan-700 font-normal"}>
                               (-{item.membersAbsent})
                             </span>
                           )}
                         </div>
 
-                        {/* Stacked Bar with 3 contrasting vibrant colors & smooth growth animation */}
+                        {/* Stacked bar using the same series colors as the donut and legends */}
                         <div
                           className="w-full max-w-10 rounded-t-md overflow-hidden flex flex-col-reverse shadow-xs transition-all duration-700 ease-out group-hover:shadow-md"
                           style={{
@@ -1054,21 +887,21 @@ export function MeetingStatisticsPanel() {
                             transitionDelay: `${idx * 60}ms`,
                           }}
                         >
-                          {/* Member Present: Vibrant Rose Gradient */}
+                          {/* Member Present: iGen Connect brand blue */}
                           <div
-                            className="bg-gradient-to-t from-rose-600 to-rose-400 transition-all duration-500"
+                            className="bg-cyan-500 transition-all duration-500"
                             style={{ height: `${presentShare}%` }}
                             title={`Có mặt: ${item.membersPresent}`}
                           />
-                          {/* Guest: Bright Sky Blue Gradient */}
+                          {/* Guest: bright sky blue */}
                           <div
-                            className="bg-gradient-to-t from-sky-600 to-sky-400 transition-all duration-500"
+                            className="bg-cyan-400 transition-all duration-500"
                             style={{ height: `${guestShare}%` }}
                             title={`Khách mời: ${item.guests}`}
                           />
-                          {/* Member Absent: Bright Coral/Amber Gradient */}
+                          {/* Member Absent: pale blue */}
                           <div
-                            className="bg-gradient-to-t from-orange-500 to-amber-400 transition-all duration-500"
+                            className="bg-cyan-100 shadow-[inset_1px_0_0_var(--color-cyan-200),inset_-1px_0_0_var(--color-cyan-200)] transition-all duration-500"
                             style={{ height: `${absentShare}%` }}
                             title={`Vắng mặt: ${item.membersAbsent}`}
                           />
@@ -1076,7 +909,7 @@ export function MeetingStatisticsPanel() {
 
                         <span
                           className={`text-[11px] font-normal transition-all duration-200 truncate max-w-full ${
-                            isHovered ? "font-bold text-rose-600 scale-105" : "text-slate-500 group-hover:text-rose-600"
+                            isHovered ? "font-bold text-cyan-700 scale-105" : "text-slate-500 group-hover:text-cyan-700"
                           }`}
                         >
                           {item.dateStr}
@@ -1110,13 +943,13 @@ export function MeetingStatisticsPanel() {
                   <circle cx="90" cy="90" r="66" fill="none" stroke="#f1f5f9" strokeWidth="20" />
                   {metrics.totalMembersPresent + metrics.totalGuests + metrics.totalMembersAbsent > 0 ? (
                     <>
-                      {/* Segment 1: Thành viên có mặt (Rose/Red) */}
+                      {/* Segment 1: Thành viên có mặt (xanh thương hiệu) */}
                       <circle
                         cx="90"
                         cy="90"
                         r="66"
                         fill="none"
-                        stroke="#f43f5e"
+                        stroke="var(--color-cyan-500)"
                         strokeWidth={hoveredSegment === "present" ? 25 : 20}
                         opacity={hoveredSegment && hoveredSegment !== "present" ? 0.4 : 1}
                         strokeDasharray={
@@ -1129,13 +962,13 @@ export function MeetingStatisticsPanel() {
                         onMouseEnter={() => setHoveredSegment("present")}
                         onMouseLeave={() => setHoveredSegment(null)}
                       />
-                      {/* Segment 2: Khách mời (Sky Blue) */}
+                      {/* Segment 2: Khách mời (xanh da trời) */}
                       <circle
                         cx="90"
                         cy="90"
                         r="66"
                         fill="none"
-                        stroke="#0ea5e9"
+                        stroke="var(--color-cyan-400)"
                         strokeWidth={hoveredSegment === "guest" ? 25 : 20}
                         opacity={hoveredSegment && hoveredSegment !== "guest" ? 0.4 : 1}
                         strokeDasharray={
@@ -1148,13 +981,13 @@ export function MeetingStatisticsPanel() {
                         onMouseEnter={() => setHoveredSegment("guest")}
                         onMouseLeave={() => setHoveredSegment(null)}
                       />
-                      {/* Segment 3: Thành viên vắng mặt (Orange) */}
+                      {/* Segment 3: Thành viên vắng mặt (xanh nhạt) */}
                       <circle
                         cx="90"
                         cy="90"
                         r="66"
                         fill="none"
-                        stroke="#f97316"
+                        stroke="var(--color-cyan-100)"
                         strokeWidth={hoveredSegment === "absent" ? 25 : 20}
                         opacity={hoveredSegment && hoveredSegment !== "absent" ? 0.4 : 1}
                         strokeDasharray={
@@ -1177,21 +1010,21 @@ export function MeetingStatisticsPanel() {
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none transition-all duration-300">
                   {hoveredSegment === "present" ? (
                     <div className="animate-fadeIn">
-                      <span className="text-[10px] text-rose-500 font-bold uppercase tracking-wide">Có mặt</span>
-                      <span className="text-2xl font-extrabold text-rose-600 block">{metrics.totalMembersPresent}</span>
-                      <span className="text-[10px] text-rose-500 font-medium">{metrics.memberPresentRate}% tổng lượt</span>
+                      <span className="text-[10px] text-cyan-700 font-bold uppercase tracking-wide">Có mặt</span>
+                      <span className="text-2xl font-extrabold text-cyan-700 block">{metrics.totalMembersPresent}</span>
+                      <span className="text-[10px] text-cyan-700 font-medium">{metrics.memberPresentRate}% tổng lượt</span>
                     </div>
                   ) : hoveredSegment === "guest" ? (
                     <div className="animate-fadeIn">
-                      <span className="text-[10px] text-sky-500 font-bold uppercase tracking-wide">Khách mời</span>
-                      <span className="text-2xl font-extrabold text-sky-600 block">{metrics.totalGuests}</span>
-                      <span className="text-[10px] text-sky-500 font-medium">{metrics.guestRate}% tổng lượt</span>
+                      <span className="text-[10px] text-cyan-700 font-bold uppercase tracking-wide">Khách mời</span>
+                      <span className="text-2xl font-extrabold text-cyan-700 block">{metrics.totalGuests}</span>
+                      <span className="text-[10px] text-cyan-700 font-medium">{metrics.guestRate}% tổng lượt</span>
                     </div>
                   ) : hoveredSegment === "absent" ? (
                     <div className="animate-fadeIn">
-                      <span className="text-[10px] text-orange-500 font-bold uppercase tracking-wide">Vắng mặt</span>
-                      <span className="text-2xl font-extrabold text-orange-600 block">{metrics.totalMembersAbsent}</span>
-                      <span className="text-[10px] text-orange-500 font-medium">{metrics.absentRate}% tổng lượt</span>
+                      <span className="text-[10px] text-cyan-700 font-bold uppercase tracking-wide">Vắng mặt</span>
+                      <span className="text-2xl font-extrabold text-cyan-700 block">{metrics.totalMembersAbsent}</span>
+                      <span className="text-[10px] text-cyan-700 font-medium">{metrics.absentRate}% tổng lượt</span>
                     </div>
                   ) : (
                     <div>
@@ -1211,14 +1044,14 @@ export function MeetingStatisticsPanel() {
                   onMouseEnter={() => setHoveredSegment("present")}
                   onMouseLeave={() => setHoveredSegment(null)}
                   className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${
-                    hoveredSegment === "present" ? "bg-rose-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
+                    hoveredSegment === "present" ? "bg-cyan-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
                   }`}
                 >
                   <span className="flex items-center gap-1.5 text-slate-600">
-                    <span className="h-2 w-2 rounded-full bg-rose-500" />
+                    <span className="h-2 w-2 rounded-full bg-cyan-500" />
                     Thành viên có mặt
                   </span>
-                  <span className={`font-semibold ${hoveredSegment === "present" ? "text-rose-600" : "text-slate-800"}`}>
+                  <span className={`font-semibold ${hoveredSegment === "present" ? "text-cyan-700" : "text-slate-800"}`}>
                     {metrics.totalMembersPresent} ({metrics.memberPresentRate}%)
                   </span>
                 </div>
@@ -1227,14 +1060,14 @@ export function MeetingStatisticsPanel() {
                   onMouseEnter={() => setHoveredSegment("guest")}
                   onMouseLeave={() => setHoveredSegment(null)}
                   className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${
-                    hoveredSegment === "guest" ? "bg-sky-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
+                    hoveredSegment === "guest" ? "bg-cyan-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
                   }`}
                 >
                   <span className="flex items-center gap-1.5 text-slate-600">
-                    <span className="h-2 w-2 rounded-full bg-sky-500" />
+                    <span className="h-2 w-2 rounded-full bg-cyan-400" />
                     Khách mời
                   </span>
-                  <span className={`font-semibold ${hoveredSegment === "guest" ? "text-sky-600" : "text-slate-800"}`}>
+                  <span className={`font-semibold ${hoveredSegment === "guest" ? "text-cyan-700" : "text-slate-800"}`}>
                     {metrics.totalGuests} ({metrics.guestRate}%)
                   </span>
                 </div>
@@ -1243,14 +1076,14 @@ export function MeetingStatisticsPanel() {
                   onMouseEnter={() => setHoveredSegment("absent")}
                   onMouseLeave={() => setHoveredSegment(null)}
                   className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${
-                    hoveredSegment === "absent" ? "bg-orange-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
+                    hoveredSegment === "absent" ? "bg-cyan-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
                   }`}
                 >
                   <span className="flex items-center gap-1.5 text-slate-600">
-                    <span className="h-2 w-2 rounded-full bg-orange-500" />
+                    <span className="h-2 w-2 rounded-full bg-cyan-100 ring-1 ring-inset ring-cyan-200" />
                     Thành viên vắng mặt
                   </span>
-                  <span className={`font-semibold ${hoveredSegment === "absent" ? "text-orange-600" : "text-slate-800"}`}>
+                  <span className={`font-semibold ${hoveredSegment === "absent" ? "text-cyan-700" : "text-slate-800"}`}>
                     {metrics.totalMembersAbsent} ({metrics.absentRate}%)
                   </span>
                 </div>
@@ -1266,267 +1099,7 @@ export function MeetingStatisticsPanel() {
         </div>
       </div>
 
-      {/* 4. BẢNG XẾP HẠNG THÀNH VIÊN TÍCH CỰC (Top 5 bục podium cao thấp, Top 1 ở giữa, Top 6-10 danh sách) */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-amber-500" />
-              <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">
-                Bảng xếp hạng thành viên tích cực
-              </h3>
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                Top {Math.min(10, memberRankings.length)}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Xếp hạng theo số buổi điểm danh tham gia và thói quen đến sớm chuẩn giờ
-            </p>
-          </div>
-        </div>
-
-        {memberRankings.length === 0 || topFiveMembers.every((m) => m.attendedCount === 0) ? (
-          <div className="py-10 text-center text-xs text-slate-400">
-            <Trophy className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-            <p>Chưa có dữ liệu điểm danh thành viên trong khoảng thời gian đã chọn.</p>
-          </div>
-        ) : (
-          <div className="pt-6">
-            {/* Top 5 - Bục Podium 5 cột cao thấp, Top 1 ở chính giữa (#4 - #2 - #1 - #3 - #5) */}
-            {(() => {
-              const PODIUM_SLOTS = [
-                {
-                  rankIndex: 3, // #4 (ngoài cùng bên trái)
-                  rankNum: 4,
-                  heightClass: "h-28 sm:h-36",
-                  bgColor: "bg-blue-500",
-                  textColor: "text-white",
-                  dividerColor: "border-white/20",
-                  borderColor: "border-blue-400/50",
-                  badgeColor: "bg-blue-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-blue-400",
-                },
-                {
-                  rankIndex: 1, // #2 (trái giữa)
-                  rankNum: 2,
-                  heightClass: "h-44 sm:h-52",
-                  bgColor: "bg-red-500",
-                  textColor: "text-white",
-                  dividerColor: "border-white/20",
-                  borderColor: "border-red-400/50",
-                  badgeColor: "bg-red-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-red-400",
-                },
-                {
-                  rankIndex: 0, // #1 (CHÍNH GIỮA - TOP 1 QUÁN QUÂN)
-                  rankNum: 1,
-                  heightClass: "h-56 sm:h-64",
-                  bgColor: "bg-yellow-400",
-                  textColor: "text-slate-900",
-                  dividerColor: "border-slate-900/15",
-                  borderColor: "border-yellow-400 shadow-sm",
-                  badgeColor: "bg-amber-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-yellow-400",
-                  isTop1: true,
-                },
-                {
-                  rankIndex: 2, // #3 (phải giữa)
-                  rankNum: 3,
-                  heightClass: "h-36 sm:h-44",
-                  bgColor: "bg-green-500",
-                  textColor: "text-white",
-                  dividerColor: "border-white/20",
-                  borderColor: "border-green-400/50",
-                  badgeColor: "bg-green-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-green-400",
-                },
-                {
-                  rankIndex: 4, // #5 (ngoài cùng bên phải)
-                  rankNum: 5,
-                  heightClass: "h-22 sm:h-28",
-                  bgColor: "bg-orange-500",
-                  textColor: "text-white",
-                  dividerColor: "border-white/20",
-                  borderColor: "border-orange-400/50",
-                  badgeColor: "bg-orange-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-orange-400",
-                },
-              ];
-
-              return (
-                <div className="grid grid-cols-5 gap-2 sm:gap-4 items-end min-h-[300px] sm:min-h-[340px] px-1 sm:px-4 pb-2 border-b border-slate-100">
-                  {PODIUM_SLOTS.map((slot) => {
-                    const m = topFiveMembers[slot.rankIndex];
-
-                    if (!m) {
-                      return (
-                        <div key={`empty-${slot.rankNum}`} className="flex flex-col items-center justify-end h-full opacity-40">
-                          <div className="flex flex-col items-center mb-2.5 w-full">
-                            <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-400 text-xs font-medium mb-1.5 bg-slate-50/50">
-                              #{slot.rankNum}
-                            </div>
-                            <p className="text-xs text-slate-400 text-center font-normal">Chờ thành viên</p>
-                            <p className="text-[10px] text-slate-300 text-center">-</p>
-                          </div>
-                          <div
-                            className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center py-2 px-1 text-slate-400 ${slot.heightClass}`}
-                          >
-                            <span className="text-xs font-normal text-slate-300">#{slot.rankNum}</span>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div key={m.id || `rank-${slot.rankNum}`} className="flex flex-col items-center justify-end h-full group">
-                        {/* Header info above column: Avatar & Name */}
-                        <div className="flex flex-col items-center mb-2.5 w-full">
-                          {slot.isTop1 && (
-                            <Crown className="h-4 w-4 text-amber-500 fill-amber-400 drop-shadow-xs -mb-0.5" />
-                          )}
-                          <div className="relative mb-1.5">
-                            {m.photoURL ? (
-                              <img
-                                src={m.photoURL}
-                                alt={m.name}
-                                className={`h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover shadow-2xs ${slot.ringColor}`}
-                                onError={(e) => {
-                                  (e.target as HTMLElement).style.display = "none";
-                                }}
-                              />
-                            ) : (
-                              <div
-                                className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-slate-100 font-semibold text-slate-600 text-xs sm:text-sm shadow-2xs ${slot.ringColor}`}
-                              >
-                                {(m.name || "?").trim().charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                            <span
-                              className={`absolute -bottom-1 -right-1 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full text-[10px] sm:text-xs ${slot.badgeColor}`}
-                            >
-                              #{slot.rankNum}
-                            </span>
-                          </div>
-
-                          <p
-                            className="text-xs font-medium text-slate-700 text-center truncate max-w-[70px] sm:max-w-[120px]"
-                            title={m.name}
-                          >
-                            {m.name}
-                          </p>
-                          {m.companyName && (
-                            <p
-                              className="text-[10px] text-slate-400 text-center truncate max-w-[70px] sm:max-w-[120px]"
-                              title={m.companyName}
-                            >
-                              {m.companyName}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* The Pillar / Column bar */}
-                        <div
-                          className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border flex flex-col items-center justify-between py-2.5 sm:py-3 px-1 transition-all duration-300 ease-out group-hover:scale-[1.02] ${slot.heightClass} ${slot.bgColor} ${slot.borderColor} ${slot.textColor}`}
-                        >
-                          <div className="text-center">
-                            <span className="block text-xs sm:text-sm font-semibold tracking-normal">
-                              {m.attendedCount} buổi
-                            </span>
-                            <span className="block text-[10px] font-normal opacity-90 mt-0.5">
-                              {m.attendanceRate}%
-                            </span>
-                          </div>
-
-                          <div className={`text-center border-t ${slot.dividerColor} pt-1.5 w-full`}>
-                            <span className="block text-[10px] font-medium opacity-90 truncate">
-                              {m.avgEarlyMinutes > 0
-                                ? `Sớm +${m.avgEarlyMinutes}p`
-                                : m.attendedCount > 0
-                                ? "Đúng giờ"
-                                : "Chưa họp"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-
-            {/* Top 6 to 10 - Danh sách dạng bảng gọn gàng */}
-            {nextFiveMembers.length > 0 && (
-              <div className="mt-5 pt-3">
-                <div className="flex items-center justify-between mb-2.5">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 text-slate-400" />
-                    Thành viên tiếp theo (Hạng 6 - 10)
-                  </p>
-                  <span className="text-[11px] text-slate-400">
-                    Hiển thị {nextFiveMembers.length} thành viên
-                  </span>
-                </div>
-                <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xs">
-                  {nextFiveMembers.map((m, idx) => (
-                    <div
-                      key={m.id}
-                      className="flex items-center justify-between p-2.5 sm:px-4 hover:bg-slate-50/80 transition-colors text-xs"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 font-mono font-medium text-slate-500 text-xs">
-                          #{idx + 6}
-                        </span>
-                        {m.photoURL ? (
-                          <img
-                            src={m.photoURL}
-                            alt={m.name}
-                            className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                            }}
-                          />
-                        ) : (
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 font-medium text-slate-600 text-xs shrink-0">
-                            {(m.name || "?").trim().charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-800 truncate">{m.name}</p>
-                          {m.companyName && (
-                            <p className="text-[10px] text-slate-400 truncate">{m.companyName}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 sm:gap-6 text-right shrink-0">
-                        <div>
-                          <span className="font-semibold text-slate-700">{m.attendedCount}</span>
-                          <span className="text-slate-400 ml-1">buổi ({m.attendanceRate}%)</span>
-                        </div>
-                        <span
-                          className={`text-[11px] font-normal px-2 py-0.5 rounded-full ${
-                            m.avgEarlyMinutes > 0
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : m.attendedCount > 0
-                              ? "bg-sky-50 text-sky-700 border border-sky-200"
-                              : "bg-slate-100 text-slate-500"
-                          }`}
-                        >
-                          {m.avgEarlyMinutes > 0
-                            ? `Sớm +${m.avgEarlyMinutes}p`
-                            : m.attendedCount > 0
-                            ? "Đúng giờ"
-                            : "Chưa họp"}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {beforeDetails}
 
       {/* 4. DANH SÁCH CHI TIẾT */}
       {activeSingleMeeting ? (
@@ -1536,7 +1109,7 @@ export function MeetingStatisticsPanel() {
               <div className="flex items-center gap-2 mb-1">
                 <button
                   onClick={() => setSelectedMeetingId("all")}
-                  className="text-xs text-rose-600 hover:underline cursor-pointer"
+                  className="text-xs text-cyan-600 hover:underline cursor-pointer"
                 >
                   ← Tất cả cuộc họp
                 </button>
@@ -1556,7 +1129,7 @@ export function MeetingStatisticsPanel() {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-80" />
                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
                     </span>
-                    <span className="animate-pulse">Đang diễn ra {getLiveElapsedMinutes(activeSingleMeeting.startsAt)} phút</span>
+                    <span className="animate-pulse">{meetingElapsedLabel(activeSingleMeeting)}</span>
                   </span>
                 ) : (
                   <span className="text-xs text-slate-500">
@@ -1581,7 +1154,7 @@ export function MeetingStatisticsPanel() {
                 <button
                   onClick={() => setAttendeeRoleFilter("present")}
                   className={`px-2.5 py-1 rounded-md transition-colors ${
-                    attendeeRoleFilter === "present" ? "bg-white text-rose-600 font-medium shadow-2xs" : "text-slate-500"
+                    attendeeRoleFilter === "present" ? "bg-white text-cyan-600 font-medium shadow-2xs" : "text-slate-500"
                   }`}
                 >
                   Có mặt ({(activeSingleMeeting.speakers || []).filter((s) => Boolean(s.userId)).length})
@@ -1589,7 +1162,7 @@ export function MeetingStatisticsPanel() {
                 <button
                   onClick={() => setAttendeeRoleFilter("guest")}
                   className={`px-2.5 py-1 rounded-md transition-colors ${
-                    attendeeRoleFilter === "guest" ? "bg-white text-sky-600 font-medium shadow-2xs" : "text-slate-500"
+                    attendeeRoleFilter === "guest" ? "bg-white text-cyan-600 font-medium shadow-2xs" : "text-slate-500"
                   }`}
                 >
                   Khách mời ({(activeSingleMeeting.speakers || []).filter((s) => !s.userId).length})
@@ -1597,7 +1170,7 @@ export function MeetingStatisticsPanel() {
                 <button
                   onClick={() => setAttendeeRoleFilter("absent")}
                   className={`px-2.5 py-1 rounded-md transition-colors ${
-                    attendeeRoleFilter === "absent" ? "bg-white text-orange-600 font-medium shadow-2xs" : "text-slate-500"
+                    attendeeRoleFilter === "absent" ? "bg-white text-cyan-600 font-medium shadow-2xs" : "text-slate-500"
                   }`}
                 >
                   Vắng mặt ({singleMeetingAbsentMembers.length})
@@ -1657,17 +1230,17 @@ export function MeetingStatisticsPanel() {
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap">
                         {att.isAbsent ? (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-orange-50 border border-orange-200 px-2 py-0.5 text-[11px] font-medium text-orange-700">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-cyan-50 border border-cyan-200 px-2 py-0.5 text-[11px] font-medium text-cyan-700">
                             <UserX className="h-3 w-3" />
                             Vắng mặt
                           </span>
                         ) : att.isMember ? (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 border border-rose-200 px-2 py-0.5 text-[11px] font-medium text-rose-700">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-cyan-50 border border-cyan-200 px-2 py-0.5 text-[11px] font-medium text-cyan-700">
                             <UserCheck className="h-3 w-3" />
                             Thành viên có mặt
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 border border-sky-200 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-cyan-50 border border-cyan-200 px-2 py-0.5 text-[11px] font-medium text-cyan-700">
                             <UserPlus className="h-3 w-3" />
                             Khách mời
                           </span>
@@ -1775,7 +1348,7 @@ export function MeetingStatisticsPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredMeetings.map((m) => {
+                  {paginatedMeetings.map((m) => {
                     const speakers = m.speakers || [];
                     const memberCount = speakers.filter((s) => Boolean(s.userId)).length;
                     const guestCount = speakers.length - memberCount;
@@ -1805,7 +1378,7 @@ export function MeetingStatisticsPanel() {
                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
                               </span>
                               <span className="animate-pulse">
-                                Đang diễn ra {getLiveElapsedMinutes(m.startsAt)} phút
+                                {meetingElapsedLabel(m)}
                               </span>
                             </span>
                           ) : (
@@ -1813,24 +1386,24 @@ export function MeetingStatisticsPanel() {
                               className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-medium ${
                                 m.status === "ended"
                                   ? "bg-slate-100 text-slate-600"
-                                  : "bg-sky-50 text-sky-600"
+                                  : "bg-cyan-50 text-cyan-600"
                               }`}
                             >
                               {m.status === "ended" ? "Đã kết thúc" : "Đã lên lịch"}
                             </span>
                           )}
                         </td>
-                        <td className="py-2.5 px-3 text-center text-rose-600 font-medium">
+                        <td className="py-2.5 px-3 text-center text-cyan-600 font-medium">
                           {memberCount}
                         </td>
                         <td className="py-2.5 px-3 text-center font-medium">
                           {absentCount > 0 ? (
-                            <span className="text-orange-600">{absentCount}</span>
+                            <span className="text-cyan-600">{absentCount}</span>
                           ) : (
                             <span className="text-slate-400">0</span>
                           )}
                         </td>
-                        <td className="py-2.5 px-3 text-center text-sky-600 font-medium">{guestCount}</td>
+                        <td className="py-2.5 px-3 text-center text-cyan-600 font-medium">{guestCount}</td>
                         <td className="py-2.5 px-3 text-center whitespace-nowrap">
                           {luckyCount > 0 ? (
                             <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
@@ -1849,7 +1422,7 @@ export function MeetingStatisticsPanel() {
                               e.stopPropagation();
                               setSelectedMeetingId(m._id);
                             }}
-                            className="inline-flex items-center gap-1 text-xs text-rose-600 hover:underline cursor-pointer"
+                            className="inline-flex items-center gap-1 text-xs text-cyan-600 hover:underline cursor-pointer"
                           >
                             <span>Xem</span>
                             <ChevronRight className="h-3.5 w-3.5" />
@@ -1860,6 +1433,31 @@ export function MeetingStatisticsPanel() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+          {allMeetingsTab === "meetings" && filteredMeetings.length > 0 && (
+            <div className="space-y-3 border-t border-slate-100 pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                <p aria-live="polite">
+                  Hiển thị {meetingPageStart + 1}–{Math.min(meetingPageStart + meetingsPerPage, filteredMeetings.length)} / {filteredMeetings.length} cuộc họp
+                </p>
+                <label className="flex items-center gap-2">
+                  Số cuộc họp mỗi trang
+                  <select
+                    value={meetingsPerPage}
+                    onChange={event => setMeetingsPerPage(Number(event.target.value))}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-slate-700 focus:border-red-500 focus:outline-hidden"
+                  >
+                    {[10, 20, 50].map(size => <option key={size} value={size}>{size}</option>)}
+                  </select>
+                </label>
+              </div>
+              <Pagination
+                key={currentMeetingPage}
+                currentPage={currentMeetingPage}
+                totalPages={meetingPageCount}
+                onPageChange={setMeetingPage}
+              />
             </div>
           )}
         </div>

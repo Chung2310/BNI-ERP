@@ -95,7 +95,7 @@ interface ManagedUploadDependencies {
   now?: () => Date;
 }
 
-function toRecord(value: any): PendingUploadRecord {
+function toRecord(value: Omit<PendingUploadRecord, "_id"> & { _id: unknown }): PendingUploadRecord {
   return { ...value, _id: String(value._id) };
 }
 

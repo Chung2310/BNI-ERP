@@ -4,25 +4,19 @@ const sockets = vi.hoisted(() => ({ disconnectUserSockets: vi.fn() }));
 vi.mock("../socket", () => sockets);
 import { authService } from "./auth.service";
 import { UserModel } from "../model/user.model";
-import { TelegramSessionModel } from "../model/telegram-session.model";
-import { TelegramLinkTokenModel } from "../model/telegram-link-token.model";
 import { PushSubscriptionModel } from "../model/push-subscription.model";
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); });
 it("deletes only the authenticated account after verification and revokes notifications and sockets", async () => {
-  vi.spyOn(UserModel, "findById").mockResolvedValue({ role: "user", companyCode: "BNI", password: bcrypt.hashSync("password", 4) } as any);
+  vi.spyOn(UserModel, "findById").mockResolvedValue({ role: "user", companyCode: "BNI", password: bcrypt.hashSync("password", 4) });
   const remove = vi.spyOn(authService, "deleteUser").mockResolvedValue();
-  const sessions = vi.spyOn(TelegramSessionModel, "deleteMany").mockResolvedValue({ deletedCount: 1 } as any);
-  const links = vi.spyOn(TelegramLinkTokenModel, "deleteMany").mockResolvedValue({ deletedCount: 1 } as any);
-  const push = vi.spyOn(PushSubscriptionModel, "deleteMany").mockResolvedValue({ deletedCount: 1 } as any);
+  const push = vi.spyOn(PushSubscriptionModel, "deleteMany").mockResolvedValue(({ deletedCount: 1 } as unknown as Parameters<((value: Awaited<ReturnType<typeof PushSubscriptionModel.deleteMany>>) => void)>[0]));
   await authService.deleteOwnAccount("me", "password", "XÓA TÀI KHOẢN");
   expect(remove).toHaveBeenCalledWith("me", "BNI", "user");
   expect(sockets.disconnectUserSockets).toHaveBeenCalledWith("me");
-  expect(sessions).toHaveBeenCalledWith({ userId: "me" });
-  expect(links).toHaveBeenCalledWith({ userId: "me" });
   expect(push).toHaveBeenCalledWith({ uid: "me" });
 });
 it("does not delete or disconnect when password verification fails", async () => {
-  vi.spyOn(UserModel, "findById").mockResolvedValue({ role: "user", companyCode: "BNI", password: bcrypt.hashSync("password", 4) } as any);
+  vi.spyOn(UserModel, "findById").mockResolvedValue({ role: "user", companyCode: "BNI", password: bcrypt.hashSync("password", 4) });
   const remove = vi.spyOn(authService, "deleteUser").mockResolvedValue();
   await expect(authService.deleteOwnAccount("me", "wrong", "XÓA TÀI KHOẢN")).rejects.toThrow();
   expect(remove).not.toHaveBeenCalled();

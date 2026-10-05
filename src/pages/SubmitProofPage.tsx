@@ -47,7 +47,7 @@ interface ISubmission {
 export default function SubmitProofPage() {
   const token = new URLSearchParams(window.location.search).get("token");
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!token);
   const [submitting, setSubmitting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -62,18 +62,18 @@ export default function SubmitProofPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [requestInputs, setRequestInputs] = useState(() => [token]);
+  if (!Object.is(requestInputs[0], token)) {
+    setRequestInputs([token]);
+    setLoading(!!token);
+  }
   useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    if (!token) return;
     fetchDetail();
   }, [token]);
 
-  const fetchDetail = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch(`/api/v1/assignments/public/detail?token=${encodeURIComponent(token || "")}`);
+  async function fetchDetail() {
+    return fetch(`/api/v1/assignments/public/detail?token=${encodeURIComponent(token || "")}`).then(async (res) => {
       const json = await res.json();
       if (!res.ok || !json.success) {
         throw new Error(json.error || "Không thể tải thông tin bài tập.");
@@ -87,12 +87,13 @@ export default function SubmitProofPage() {
         setStudentNotes(json.data.submission.studentNotes || "");
         setUploadedFiles(json.data.submission.attachments || []);
       }
-    } catch (error: any) {
+    
+}).catch(error => {
       toast.error(error.message || "Lỗi khi tải thông tin.");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
-  };
+    });
+  }
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -165,7 +166,7 @@ export default function SubmitProofPage() {
         ]);
         toast.success(`Đã tải lên "${file.name}" thành công.`);
       }
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err.message || "Có lỗi xảy ra khi tải lên.");
     } finally {
       setUploading(false);
@@ -203,7 +204,7 @@ export default function SubmitProofPage() {
 
       toast.success("Nộp minh chứng bài làm thành công!");
       fetchDetail();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err.message || "Gửi minh chứng thất bại.");
     } finally {
       setSubmitting(false);
@@ -230,7 +231,7 @@ export default function SubmitProofPage() {
       setUploadedFiles([]);
       setStudentNotes("");
       fetchDetail();
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err.message || "Hủy nộp thất bại.");
     } finally {
       setCancelling(false);

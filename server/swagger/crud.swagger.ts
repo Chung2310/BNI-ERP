@@ -12,15 +12,7 @@ export const crudSwagger = {
             required: true,
             schema: {
               type: "string",
-              enum: [
-                "products",
-                "categories",
-                "stock-logs",
-                "projects",
-                "kanban-tasks",
-                "training-courses",
-                "training-enrollments",
-              ]
+              enum: ["users"]
             },
             description: "Tên Model/Resource cần truy vấn"
           },
@@ -75,46 +67,6 @@ export const crudSwagger = {
           500: { description: "Lỗi máy chủ" }
         }
       },
-      post: {
-        summary: "Tạo mới một tài nguyên",
-        tags: ["Generic CRUD"],
-        security: [{ BearerAuth: [] }],
-        parameters: [
-          {
-            name: "modelName",
-            in: "path",
-            required: true,
-            schema: { type: "string" },
-            description: "Tên Model/Resource cần tạo"
-          }
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: { type: "object" }
-            }
-          }
-        },
-        responses: {
-          201: {
-            description: "Tạo mới thành công",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    status: { type: "string", example: "success" },
-                    data: { type: "object" }
-                  }
-                }
-              }
-            }
-          },
-          401: { description: "Chưa xác thực" },
-          500: { description: "Lỗi máy chủ" }
-        }
-      }
     },
     "/api/v1/crud/{modelName}/{id}": {
       get: {
@@ -157,95 +109,6 @@ export const crudSwagger = {
           500: { description: "Lỗi máy chủ" }
         }
       },
-      patch: {
-        summary: "Cập nhật một tài nguyên theo ID",
-        tags: ["Generic CRUD"],
-        security: [{ BearerAuth: [] }],
-        parameters: [
-          {
-            name: "modelName",
-            in: "path",
-            required: true,
-            schema: { type: "string" },
-            description: "Tên Model/Resource"
-          },
-          {
-            name: "id",
-            in: "path",
-            required: true,
-            schema: { type: "string" },
-            description: "ID của bản ghi (MongoDB ObjectId)"
-          }
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: { type: "object" }
-            }
-          }
-        },
-        responses: {
-          200: {
-            description: "Cập nhật thành công",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    status: { type: "string", example: "success" },
-                    data: { type: "object" }
-                  }
-                }
-              }
-            }
-          },
-          401: { description: "Chưa xác thực" },
-          404: { description: "Không tìm thấy hoặc không có quyền sửa" },
-          500: { description: "Lỗi máy chủ" }
-        }
-      },
-      delete: {
-        summary: "Xóa một tài nguyên theo ID",
-        tags: ["Generic CRUD"],
-        security: [{ BearerAuth: [] }],
-        parameters: [
-          {
-            name: "modelName",
-            in: "path",
-            required: true,
-            schema: { type: "string" },
-            description: "Tên Model/Resource"
-          },
-          {
-            name: "id",
-            in: "path",
-            required: true,
-            schema: { type: "string" },
-            description: "ID của bản ghi (MongoDB ObjectId)"
-          }
-        ],
-        responses: {
-          200: {
-            description: "Xóa thành công",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    status: { type: "string", example: "success" },
-                    message: { type: "string", example: "Xóa tài nguyên thành công" },
-                    data: { type: "object" }
-                  }
-                }
-              }
-            }
-          },
-          401: { description: "Chưa xác thực" },
-          404: { description: "Không tìm thấy hoặc không có quyền xóa" },
-          500: { description: "Lỗi máy chủ" }
-        }
-      }
     }
   }
 };

@@ -6,12 +6,12 @@ describe("analytics router", () => {
   const routeMiddlewareNames = (path: string, method = "get") => {
     const normalizedMethod = method.toLowerCase();
     return analyticsRouter.stack
-      .filter((entry: any) => entry.route?.path === path && entry.route.methods?.[normalizedMethod])
-      .flatMap((entry: any) => entry.route.stack.map((routeLayer: any) => routeLayer.handle.name));
+      .filter((entry) => entry.route?.path === path && entry.route.methods?.[normalizedMethod])
+      .flatMap((entry) => entry.route.stack.map((routeLayer) => routeLayer.handle.name));
   };
 
   it("keeps authentication at router level", () => {
-    const middleware = analyticsRouter.stack.filter((layer: any) => !layer.route).map((layer: any) => layer.handle);
+    const middleware = analyticsRouter.stack.filter((layer) => !layer.route).map((layer) => layer.handle);
     expect(middleware).toHaveLength(1);
     expect(middleware[0].name).toBe("requireAuth");
   });
@@ -38,8 +38,8 @@ describe("analytics router", () => {
 
   it("registers the reporting endpoints", () => {
     const paths = analyticsRouter.stack
-      .filter((layer: any) => layer.route)
-      .map((layer: any) => layer.route.path);
+      .filter((layer) => layer.route)
+      .map((layer) => layer.route.path);
     for (const path of ["/meta", "/revenue", "/receivables", "/expenses", "/pnl", "/export"]) {
       expect(paths, `missing analytics endpoint ${path}`).toContain(path);
     }

@@ -51,35 +51,35 @@ const rolePermissionParamsSchema = {
 // 1. Tạo mới hoặc cập nhật phân quyền cho Role (chỉ dành cho admin)
 rolePermissionRouter.post(
   "/",
-  requireAuth as any,
-  requirePermission("access:manage") as any,
+  requireAuth,
+  requirePermission("access:manage"),
   validateRequest(saveRolePermissionSchema),
-  rolePermissionController.save as any
+  rolePermissionController.save
 );
 
 // 2. Lấy danh sách cấu hình phân quyền vai trò (yêu cầu đăng nhập)
 rolePermissionRouter.get(
   "/",
-  requireAuth as any,
-  requirePermission("access:read") as any,
+  requireAuth,
+  requirePermission("access:read"),
   validateRequest(getRolePermissionsQuerySchema),
-  rolePermissionController.getList as any
+  rolePermissionController.getList
 );
 
 // 3. Lấy cấu hình phân quyền chi tiết của một Role (yêu cầu đăng nhập)
 rolePermissionRouter.get(
   "/:role",
-  requireAuth as any,
-  requirePermission("access:read") as any,
+  requireAuth,
+  requirePermission("access:read"),
   validateRequest(rolePermissionParamsSchema),
-  rolePermissionController.getDetail as any
+  rolePermissionController.getDetail
 );
 
 // 4. Xóa cấu hình phân quyền vai trò (chỉ dành cho admin)
 rolePermissionRouter.delete(
   "/:role",
-  requireAuth as any,
-  requirePermission("access:manage") as any,
+  requireAuth,
+  requirePermission("access:manage"),
   validateRequest(rolePermissionParamsSchema),
-  rolePermissionController.delete as any
+  rolePermissionController.delete
 );

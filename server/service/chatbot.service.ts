@@ -103,7 +103,7 @@ QUY TẮC PHẢN HỒI:
     // 6. Xóa chữ in đậm/nghiêng: ***text***, **text**, *text*, ___text___, __text__, _text_
     text = text.replace(/\*\*\*([^*]+)\*\*\*/g, "$1");
     text = text.replace(/\*\*([^*]+)\*\*/g, "$1");
-    text = text.replace(/(^|[^\*])\*([^*\n]+)\*([^\*]|$)/g, "$1$2$3");
+    text = text.replace(/(^|[^*])\*([^*\n]+)\*([^*]|$)/g, "$1$2$3");
     text = text.replace(/___([^_]+)___/g, "$1");
     text = text.replace(/__([^_]+)__/g, "$1");
     text = text.replace(/(^|[^_])_([^_\n]+)_([^_]|$)/g, "$1$2$3");

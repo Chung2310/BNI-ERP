@@ -16,7 +16,7 @@ export const pushController = {
         });
       }
       return res.status(200).json({ status: "success", data: { publicKey } });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[pushController.getPublicKey] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -37,7 +37,7 @@ export const pushController = {
 
       await pushService.saveSubscription(uid, companyCode, subscription, userAgent);
       return res.status(200).json({ status: "success", message: "Đã đăng ký nhận thông báo đẩy." });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[pushController.subscribe] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -57,7 +57,7 @@ export const pushController = {
 
       await pushService.removeSubscription(uid, endpoint);
       return res.status(200).json({ status: "success", message: "Đã hủy đăng ký thông báo đẩy." });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[pushController.unsubscribe] Error:", error);
       return res.status(500).json({
         status: "error",

@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
-const guards = vi.hoisted(() => new Map<any, string | string[]>());
+const guards = vi.hoisted(() => new Map<import("express").RequestHandler, string | string[]>());
 
 vi.mock("../middleware/auth", async (importOriginal) => {
-  const actual: any = await importOriginal();
+  const actual = await importOriginal<typeof import("../middleware/auth")>();
   return {
     ...actual,
     requirePermission: (permission: string | string[]) => {
-      const guard = (_req: any, _res: any, next: any) => next();
+      const guard = (_req: import("express").Request, _res: import("express").Response, next: import("express").NextFunction) => next();
       guards.set(guard, permission);
       return guard;
     },
@@ -17,12 +17,12 @@ vi.mock("../middleware/auth", async (importOriginal) => {
 import { googleDriveRouter } from "./google-drive.router";
 
 const permissionOf = (method: string, path: string) => {
-  const layer = (googleDriveRouter as any).stack.find((item: any) => (
+  const layer = (googleDriveRouter).stack.find((item) => (
     item.route?.path === path && item.route?.methods?.[method.toLowerCase()]
   ));
   if (!layer) return undefined;
   return layer.route.stack
-    .map((handler: any) => guards.get(handler.handle))
+    .map((handler) => guards.get(handler.handle))
     .find((permission: string | undefined) => permission !== undefined);
 };
 
@@ -35,8 +35,6 @@ describe("Google Drive route permissions", () => {
   });
 
   it.each([
-    ["GET", "/auth-url"],
-    ["POST", "/disconnect"],
     ["POST", "/upload"],
     ["POST", "/upload/group/:roomId"],
     ["POST", "/create-file"],
@@ -49,11 +47,17 @@ describe("Google Drive route permissions", () => {
   });
 
   it("does not expose a protected Drive route without a permission guard", () => {
-    const unguarded = (googleDriveRouter as any).stack
-      .filter((item: any) => item.route?.path !== "/callback")
-      .filter((item: any) => !item.route.stack.some((handler: any) => guards.has(handler.handle)))
-      .map((item: any) => item.route.path);
+    const unguarded = (googleDriveRouter).stack
+      .filter((item) => !item.route.stack.some((handler) => guards.has(handler.handle)))
+      .map((item) => item.route.path);
 
     expect(unguarded).toEqual([]);
   });
+});
+
+it("removes personal Drive OAuth endpoints", () => {
+  const paths = (googleDriveRouter).stack.map((item) => item.route?.path);
+  expect(paths).not.toContain("/auth-url");
+  expect(paths).not.toContain("/callback");
+  expect(paths).not.toContain("/disconnect");
 });

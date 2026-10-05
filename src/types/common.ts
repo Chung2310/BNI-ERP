@@ -3,6 +3,7 @@ export type TabType =
   | "TỔNG QUAN"
   | "NHÂN SỰ"
   | "CUỘC HỌP"
+  | "BẢNG XẾP HẠNG"
   | "QUẢN LÝ TÀI NGUYÊN"
   | "TRÒ CHUYỆN"
   | "TÀI NGUYÊN"
@@ -10,33 +11,36 @@ export type TabType =
   | "QUẢN TRỊ USER"
   | "CÀI ĐẶT";
 
-export interface GoogleDriveIntegration {
+export interface CompanyDriveStatus {
   isConnected: boolean;
   driveEmail: string;
-  connectedAt?: any | null;
+  rootFolderId?: string;
+  connectedAt?: import("../utils/dateValue").DateValue | null;
 }
 
 export interface UserProfile {
+  id?: string;
+  _id?: string;
+  companyDrive?: CompanyDriveStatus;
   uid: string;
   email: string;
   displayName: string;
   photoURL?: string;
   coverImage?: string;
+  galleryImages?: string[];
   industry?: string;
   role: "user" | "teacher" | "manager" | "branch_owner" | "admin";
   permissions?: string[];
-  createdAt: any;
-  updatedAt?: any;
+  createdAt: import("../utils/dateValue").DateValue;
+  updatedAt?: import("../utils/dateValue").DateValue;
   birthDate?: string;
-  jobTitle?: string;
-  qualification?: string;
-  department?: string;
+  gender?: "male" | "female" | "other";
+  address?: string;
+  targetMarket?: string;
   jobDescriptionLink?: string;
   phone?: string;
-  level?: number;
   parentId?: string;
   status?: "online" | "offline";
-  division?: string;
   companyCode?: string;
   companyName?: string;
   branchId?: string;
@@ -45,7 +49,6 @@ export interface UserProfile {
   enabledModules?: string[];
   businessType?: "education" | "labor" | "service" | "recruitment" | "general";
   monthlySalary?: number;
-  isLeader?: boolean;
   isActive?: boolean;
 }
 
@@ -53,19 +56,9 @@ export interface CompanyProfile {
   id: string;
   code: string;
   name: string;
-  createdAt: any;
+  createdAt: import("../utils/dateValue").DateValue;
   ownerEmail: string;
   enabledModules?: string[];
   businessType?: "education" | "labor" | "service" | "recruitment" | "general";
   monthlySalary?: number;
-}
-
-export interface TelegramLinkStatus {
-  linked: boolean;
-  telegramChatId: number | null;
-  telegramUserId: number | null;
-  linkedAt: any | null;
-  pendingCode: string | null;
-  pendingCodeExpiresAt: any | null;
-  botUsername: string;
 }

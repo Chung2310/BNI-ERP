@@ -1,3 +1,4 @@
+import { parseDateValue } from "../../utils/dateValue";
 import React, { useRef, useState } from "react";
 import {
   User,
@@ -9,10 +10,8 @@ import {
   ImagePlus,
   Trash2,
   Camera,
-  Calendar,
   Shield,
   BadgeCheck,
-  Sparkles,
   Clock,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -66,16 +65,9 @@ function getRoleInfo(role?: string) {
   }
 }
 
-function formatJoinDate(createdAt: any) {
+function formatJoinDate(createdAt: unknown) {
   if (!createdAt) return "Chưa cập nhật";
-  let date: Date;
-  if (typeof createdAt.toDate === "function") {
-    date = createdAt.toDate();
-  } else if (createdAt.seconds) {
-    date = new Date(createdAt.seconds * 1000);
-  } else {
-    date = new Date(createdAt);
-  }
+  const date = parseDateValue(createdAt);
   if (isNaN(date.getTime())) return "Chưa cập nhật";
   return date.toLocaleDateString("vi-VN", {
     year: "numeric",
@@ -216,26 +208,15 @@ function ProfileForm({
       {/* 1. HERO PROFILE BANNER CARD */}
       <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xs">
         {/* Cover Photo Area */}
-        <section aria-label="Ảnh bìa hồ sơ" className="relative aspect-[21/9] sm:aspect-[24/7] min-h-[160px] sm:min-h-[220px] w-full overflow-hidden bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-700">
-          {form.coverImage ? (
+        <section aria-label="Ảnh bìa hồ sơ" className="relative aspect-[21/9] sm:aspect-[24/7] min-h-[160px] sm:min-h-[220px] w-full overflow-hidden bg-primary">
+          {form.coverImage && (
             <img
+              key={form.coverImage}
               src={form.coverImage}
+              onError={event => { event.currentTarget.style.display = "none"; }}
               alt="Ảnh bìa hồ sơ"
               className="h-full w-full object-cover transition-transform duration-500 hover:scale-[1.02]"
             />
-          ) : (
-            <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
-              <div
-                className="absolute inset-0 opacity-15"
-                style={{
-                  backgroundImage: `radial-gradient(circle at 20% 50%, rgba(255,255,255,0.8) 0%, transparent 40%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.4) 0%, transparent 40%)`,
-                }}
-              />
-              <div className="relative z-10 flex flex-col items-center gap-1 text-white/90">
-                <Sparkles className="h-6 w-6 text-cyan-200" />
-                <span className="text-xs font-semibold tracking-wide uppercase text-cyan-100">Chưa có ảnh bìa cá nhân</span>
-              </div>
-            </div>
           )}
 
           {/* Floating Actions for Cover Photo */}
@@ -396,7 +377,6 @@ function ProfileForm({
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">Thông tin cá nhân</h3>
-                    <p className="text-xs text-slate-500">Họ tên đại diện và ngày sinh nhật thành viên</p>
                   </div>
                 </div>
 
@@ -464,7 +444,6 @@ function ProfileForm({
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">Doanh nghiệp & Nghề nghiệp</h3>
-                    <p className="text-xs text-slate-500">Thông tin công ty và ngành nghề đại diện trong Chapter</p>
                   </div>
                 </div>
 
@@ -537,7 +516,6 @@ function ProfileForm({
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-800">Tài khoản & Liên hệ</h3>
-                <p className="text-xs text-slate-500">Thông tin liên lạc và định danh đăng nhập an toàn</p>
               </div>
             </div>
 

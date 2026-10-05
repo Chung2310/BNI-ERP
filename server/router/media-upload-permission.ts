@@ -5,6 +5,7 @@ export function permissionForMediaUpload(sourceType: unknown): string {
   if (
     normalized === "profile.avatar" ||
     normalized === "profile.cover" ||
+    normalized === "profile.gallery" ||
     normalized === "settings.profile"
   ) {
     return "access:read";

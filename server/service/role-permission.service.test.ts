@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ findOne: vi.fn(), save: vi.fn() }));
 vi.mock("../model/role-permission.model", () => ({
-  RolePermissionModel: Object.assign(function RolePermissionModel(this: any, value: any) {
+  RolePermissionModel: Object.assign(function RolePermissionModel(this, value) {
     Object.assign(this, value);
     this.save = mocks.save;
   }, { findOne: mocks.findOne }),
@@ -15,18 +15,18 @@ describe("role permission persistence", () => {
 
   it("returns compact stored and expanded effective permissions", async () => {
     mocks.findOne.mockResolvedValue(null);
-    mocks.save.mockImplementation(async function (this: any) { return this; });
+    mocks.save.mockImplementation(async function (this) { return this; });
 
     const result = await rolePermissionService.saveRolePermission({
       companyCode: " acme ",
       role: "manager",
-      permissions: ["hr:read", "hr:manage", "payroll-payment:read"],
+      permissions: ["hr:read", "hr:manage", "resource:read"],
       level: 3,
       displayName: "Quản lý",
     });
 
-    expect(result.stored).toEqual(["hr:manage", "payroll-payment:read"]);
-    expect(result.effective).toEqual(["hr:manage", "hr:read", "payroll-payment:read"]);
+    expect(result.stored).toEqual(["hr:manage", "resource:read"]);
+    expect(result.effective).toEqual(["hr:manage", "hr:read", "resource:read"]);
     expect(result.rolePermission).toMatchObject({ companyCode: "ACME", role: "manager" });
   });
 
