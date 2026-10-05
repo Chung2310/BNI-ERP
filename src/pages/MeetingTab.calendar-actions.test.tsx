@@ -90,8 +90,8 @@ it("reschedules to the selected day after confirmation and switches the calendar
   expect(within(screen.getByRole("dialog", { name: "Lịch ngày 03/02/2030" })).getByText("07:00 · Họp tuần")).toBeTruthy();
 });
 
-it("keeps started meetings from being rescheduled and deletes with the trash icon only after confirmation", async () => {
-  const request = mockApi("paused");
+it.each(["live", "paused"])("blocks cancellation/rescheduling of %s meetings and confirms deletion", async (status) => {
+  const request = mockApi(status);
   const day = await openDay();
   expect((day.getByRole("button", { name: "Hủy" }) as HTMLButtonElement).disabled).toBe(true);
   expect((day.getByRole("button", { name: "Dời lịch" }) as HTMLButtonElement).disabled).toBe(true);
@@ -102,6 +102,40 @@ it("keeps started meetings from being rescheduled and deletes with the trash ico
   fireEvent.click(screen.getByRole("button", { name: "Xóa cuộc họp" }));
   await waitFor(() => expect(screen.queryByText("07:00 · Họp tuần")).toBeNull());
   expect(request.mock.calls.find(([, options]) => options?.method === "DELETE")?.[0]).toBe("/api/v1/meetings/calendar-one");
+});
+
+it.each([
+  ["Hủy", "Hủy buổi họp này?"],
+  ["Dời lịch", "Dời lịch cuộc họp"],
+  ["Xóa cuộc họp", "Xác nhận xóa cuộc họp"],
+])("opens %s directly from the list without opening meeting operations", async (action, title) => {
+  const request = mockApi();
+  await act(async () => { render(<MeetingTab />); });
+  await screen.findByText("07:00 · Họp tuần");
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+  fireEvent.click(screen.getByRole("button", { name: action }));
+  expect(screen.getByText(title, { exact: true })).toBeTruthy();
+  expect(screen.queryByTitle("Đóng popup")).toBeNull();
+  expect(request.mock.calls.some(([, options]) => options?.method && options.method !== "GET")).toBe(false);
+});
+
+it.each(["live", "paused"])("disables cancellation and rescheduling in the list for %s meetings", async (status) => {
+  mockApi(status);
+  await act(async () => { render(<MeetingTab />); });
+  await screen.findByText("07:00 · Họp tuần");
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+  expect((screen.getByRole("button", { name: "Hủy" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "Dời lịch" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("keeps scheduling actions outside the meeting operations modal", async () => {
+  mockApi();
+  const day = await openDay();
+  fireEvent.click(day.getByRole("button", { name: /07:00 · Họp tuần/ }));
+  expect(screen.getByTitle("Đóng popup")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Hủy" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Dời lịch" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Xóa cuộc họp" })).toBeNull();
 });
 
 it("makes ended meetings read-only in the calendar, list and detail views", async () => {

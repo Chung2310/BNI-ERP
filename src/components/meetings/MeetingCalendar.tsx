@@ -104,7 +104,7 @@ export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChang
             <span className="mt-1 flex items-center gap-1.5 text-xs text-slate-500"><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${statusDots[item.status] || "bg-slate-400"}`} />{labels[item.status] || item.status}{item.seriesId ? " · Định kỳ" : ""}</span>
           </button>
           {item.originalStartsAt && new Date(item.originalStartsAt).getTime() !== new Date(item.startsAt).getTime() && <p className="mt-1 text-[11px] text-slate-500">Dời từ {vietnamDateTime(item.originalStartsAt).replace("T", " ")}</p>}
-          {canManage && <div className="mt-2 border-t border-cyan-100 pt-2"><MeetingScheduleActions status={item.status} onCancel={() => { closeDay(); onCancel(item); }} onReschedule={() => { closeDay(); onReschedule(item); }} onDelete={() => { closeDay(); onDelete(item); }} /></div>}
+          {canManage && item.status !== "ended" && <div className="mt-2 border-t border-cyan-100 pt-2"><MeetingScheduleActions status={item.status} onCancel={() => { closeDay(); onCancel(item); }} onReschedule={() => { closeDay(); onReschedule(item); }} onDelete={() => { closeDay(); onDelete(item); }} /></div>}
         </article>)}</div>}
       </div>}
     </dialog>, document.body)}

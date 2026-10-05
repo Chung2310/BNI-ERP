@@ -31,7 +31,6 @@ import {
   X,
   Search,
   Pencil,
-  Trash2,
   ExternalLink,
   ChevronRight,
   Sparkles,
@@ -980,7 +979,7 @@ export default function MeetingTab() {
                     )}
                   </div>
 
-                  {/* Top Action Icons (Sửa, Xóa) */}
+                  {/* Edit meeting */}
                   {canManage && m.status !== "ended" && (
                     <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-90 transition-opacity group-hover:opacity-100">
                       <button
@@ -990,17 +989,6 @@ export default function MeetingTab() {
                         className="rounded-lg bg-white/90 backdrop-blur-md p-1.5 text-slate-700 hover:bg-white hover:text-cyan-700 shadow-sm border border-slate-200/60 transition cursor-pointer"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Xóa cuộc họp"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeletingMeeting(m);
-                        }}
-                        className="rounded-lg bg-white/90 backdrop-blur-md p-1.5 text-slate-700 hover:bg-rose-50 hover:text-rose-600 shadow-sm border border-slate-200/60 transition cursor-pointer"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   )}
@@ -1052,6 +1040,17 @@ export default function MeetingTab() {
                     </div>
                   </div>}
                 </div>
+
+                {canManage && m.status !== "ended" && (
+                  <div className="px-3 pb-3" onClick={(event) => event.stopPropagation()}>
+                    <MeetingScheduleActions
+                      status={m.status}
+                      onCancel={() => setCancellingMeeting(m)}
+                      onReschedule={() => setReschedulingMeeting(m)}
+                      onDelete={() => setDeletingMeeting(m)}
+                    />
+                  </div>
+                )}
 
                 {/* Card Footer: Action Button */}
                 <div className="px-3 pb-3 pt-0 flex items-center gap-2">
@@ -1162,7 +1161,6 @@ export default function MeetingTab() {
 
               {/* Actions */}
               <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
-                {canModifyActiveMeeting && <MeetingScheduleActions status={activeMeeting.status} onCancel={() => setCancellingMeeting(activeMeeting)} onReschedule={() => setReschedulingMeeting(activeMeeting)} onDelete={() => setDeletingMeeting(activeMeeting)} />}
                 {canModifyActiveMeeting && (
                   <button
                     type="button"
