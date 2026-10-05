@@ -210,6 +210,11 @@ const registerUserSchema = {
     industry: Joi.string().optional().allow(""),
     photoURL: Joi.string().optional().allow(""),
     coverImage: Joi.string().optional().allow(""),
+    galleryImages: Joi.array().items(Joi.string().uri()).max(5).optional(),
+    galleryUploadTokens: Joi.array().items(Joi.object({
+      index: Joi.number().integer().min(0).max(4).required(),
+      uploadToken: Joi.string().trim().required(),
+    }).unknown(false)).max(5).optional(),
     parentId: Joi.string().optional().allow(""),
     monthlySalary: Joi.number().min(0).optional(),
     birthDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow("", null),
@@ -328,6 +333,11 @@ const updateUserSchema = {
     industry: Joi.string().optional().allow(""),
     photoURL: Joi.string().optional().allow(""),
     coverImage: Joi.string().optional().allow(""),
+    galleryImages: Joi.array().items(Joi.string().uri()).max(5).optional(),
+    galleryUploadTokens: Joi.array().items(Joi.object({
+      index: Joi.number().integer().min(0).max(4).required(),
+      uploadToken: Joi.string().trim().required(),
+    }).unknown(false)).max(5).optional(),
     gender: Joi.string().valid("male", "female", "other").optional().allow(""),
     address: Joi.string().trim().max(300).optional().allow(""),
     targetMarket: Joi.string().trim().max(500).optional().allow(""),

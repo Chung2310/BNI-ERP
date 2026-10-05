@@ -22,6 +22,7 @@ const UserSchema = new Schema<IUser>({
   displayName: { type: String, required: true },
   photoURL: { type: String, default: "" },
   coverImage: { type: String, default: "" },
+  galleryImages: { type: [String], default: [] },
   industry: { type: String, default: "", trim: true },
   role: { type: String, default: "user" },
   createdAt: { type: Date, default: Date.now },

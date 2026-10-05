@@ -25,6 +25,7 @@ export interface UserProfile {
   displayName: string;
   photoURL?: string;
   coverImage?: string;
+  galleryImages?: string[];
   industry?: string;
   role: "user" | "teacher" | "manager" | "branch_owner" | "admin";
   permissions?: string[];

@@ -433,6 +433,7 @@ export const authService = {
       gender: data.gender || undefined,
       address: data.address?.trim() || "",
       targetMarket: data.targetMarket?.trim() || "",
+      galleryImages: Array.isArray(data.galleryImages) ? data.galleryImages.slice(0, 5) : [],
       createdAt: new Date(),
       updatedAt: new Date(),
       status: "offline",

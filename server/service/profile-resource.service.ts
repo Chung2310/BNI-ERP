@@ -21,6 +21,17 @@ export function createProfileResourceService(finalizer: SourceFinalizer) {
         uploads: [{ uploadToken, sourceField: "coverImage" }],
       });
     },
+    async finalizeGallery(actor: ManagedUploadActor, user: any, uploads: Array<{ index: number; uploadToken: string }>) {
+      const userId = String(user._id || user.id || user.uid);
+      return finalizer.finalize(actor, {
+        entityType: "user",
+        entityId: userId,
+        entityLabel: user.displayName || user.email || userId,
+        sourceRecordId: userId,
+        expectedSourceType: "profile.gallery",
+        uploads: uploads.map(({ index, uploadToken }) => ({ uploadToken, sourceField: `galleryImages.${index}` })),
+      });
+    },
     async finalizeAvatar(actor: ManagedUploadActor, user: any, uploadToken?: string) {
       const userId = String(user._id || user.id || user.uid);
       return finalizer.finalize(actor, {

@@ -22,6 +22,7 @@ export interface IUser extends Document {
   displayName: string;
   photoURL?: string;
   coverImage?: string;
+  galleryImages?: string[];
   industry?: string;
   role: string;
   createdAt: Date;

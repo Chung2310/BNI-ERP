@@ -18,6 +18,7 @@ export interface EmployeeNode {
   address?: string;
   targetMarket?: string;
   coverImage?: string;
+  galleryImages?: string[];
 }
 
 

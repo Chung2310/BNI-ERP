@@ -45,6 +45,7 @@ describe("resource source registry", () => {
       "chat.attachment",
       "workflow.attachment",
       "settings.profile",
+      "profile.gallery",
       "public.registration",
       "company.branding",
       "hr.celebration",

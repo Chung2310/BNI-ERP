@@ -79,6 +79,7 @@ export default function HRTab() {
     address: usr.address,
     targetMarket: usr.targetMarket,
     coverImage: usr.coverImage,
+    galleryImages: usr.galleryImages,
   }));
 
 

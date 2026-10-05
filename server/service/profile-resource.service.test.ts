@@ -31,3 +31,25 @@ it("indexes a cover under the member profile with the correct upload source", as
   await service.finalizeCover({ companyCode: "BNI", actorId: "member-1" }, { _id: "member-1", displayName: "Member" }, "cover-token");
   expect(finalize).toHaveBeenCalledWith(expect.objectContaining({ actorId: "member-1" }), expect.objectContaining({ entityType: "user", entityId: "member-1", expectedSourceType: "profile.cover", uploads: [{ uploadToken: "cover-token", sourceField: "coverImage" }] }));
 });
+
+it("indexes multiple product or activity images by gallery position", async () => {
+  const finalize = vi.fn(async () => []);
+  const service = createProfileResourceService({ finalize });
+  await service.finalizeGallery(
+    { companyCode: "BNI", actorId: "admin-1" },
+    { _id: "member-1", displayName: "Member" },
+    [{ index: 0, uploadToken: "image-token-1" }, { index: 2, uploadToken: "image-token-2" }],
+  );
+  expect(finalize).toHaveBeenCalledWith(
+    expect.objectContaining({ actorId: "admin-1" }),
+    expect.objectContaining({
+      entityType: "user",
+      entityId: "member-1",
+      expectedSourceType: "profile.gallery",
+      uploads: [
+        { uploadToken: "image-token-1", sourceField: "galleryImages.0" },
+        { uploadToken: "image-token-2", sourceField: "galleryImages.2" },
+      ],
+    }),
+  );
+});

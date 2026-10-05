@@ -56,6 +56,9 @@ const isUrl = (str?: string): boolean => {
   return str.startsWith("http://") || str.startsWith("https://") || str.startsWith("data:image/") || str.startsWith("/");
 };
 
+type MemberGalleryImage = { url: string; uploadToken?: string };
+const MAX_MEMBER_GALLERY_IMAGES = 5;
+
 const renderAvatar = (avatar: string, sizeClasses: string = "w-8 h-8", textClass: string = "text-base", nameFallback?: string) => {
   if (isUrl(avatar)) {
     return (
@@ -172,10 +175,13 @@ export default function OrgChartTab({
   const [addRole, setAddRole] = useState<"user" | "manager" | "branch_owner" | "admin">("user");
   const [addPhotoURL, setAddPhotoURL] = useState("");
   const [addCoverImage, setAddCoverImage] = useState("");
+  const [addGalleryImages, setAddGalleryImages] = useState<MemberGalleryImage[]>([]);
   const [uploadingAddAvatar, setUploadingAddAvatar] = useState(false);
   const [uploadingAddCover, setUploadingAddCover] = useState(false);
+  const [uploadingAddGallery, setUploadingAddGallery] = useState(false);
   const addAvatarFileInputRef = useRef<HTMLInputElement>(null);
   const addCoverFileInputRef = useRef<HTMLInputElement>(null);
+  const addGalleryInputRef = useRef<HTMLInputElement>(null);
 
   // Edit Member States
   const [isEditing, setIsEditing] = useState(false);
@@ -190,10 +196,13 @@ export default function OrgChartTab({
   const [editTargetMarket, setEditTargetMarket] = useState("");
   const [editPhotoURL, setEditPhotoURL] = useState("");
   const [editCoverImage, setEditCoverImage] = useState("");
+  const [editGalleryImages, setEditGalleryImages] = useState<MemberGalleryImage[]>([]);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingEditCover, setUploadingEditCover] = useState(false);
+  const [uploadingEditGallery, setUploadingEditGallery] = useState(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const editCoverFileInputRef = useRef<HTMLInputElement>(null);
+  const editGalleryInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Reset editing state when selected employee changes
@@ -214,6 +223,7 @@ export default function OrgChartTab({
     setEditPhone(raw?.phone && raw.phone !== "Chưa cập nhật" ? raw.phone : (selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : ""));
     setEditPhotoURL(raw?.photoURL || selectedEmp.avatar || "");
     setEditCoverImage(raw?.coverImage || selectedEmp.coverImage || "");
+    setEditGalleryImages((raw?.galleryImages || selectedEmp.galleryImages || []).slice(0, MAX_MEMBER_GALLERY_IMAGES).map(url => ({ url })));
     setEditBirthDate(
       raw?.birthDate
         ? (typeof raw.birthDate === "string" ? raw.birthDate.split("T")[0] : new Date(raw.birthDate).toISOString().split("T")[0])
@@ -264,6 +274,56 @@ export default function OrgChartTab({
     } finally {
       setUploadingEditCover(false);
     }
+  };
+
+  const uploadMemberGalleryFiles = async (
+    files: File[],
+    currentImages: MemberGalleryImage[],
+    setImages: React.Dispatch<React.SetStateAction<MemberGalleryImage[]>>,
+    setUploading: (uploading: boolean) => void,
+  ) => {
+    const remaining = MAX_MEMBER_GALLERY_IMAGES - currentImages.length;
+    if (remaining <= 0) {
+      toast.warning("Album chỉ chứa tối đa 5 ảnh.");
+      return;
+    }
+    if (files.length > remaining) {
+      toast.info(`Chỉ có thể thêm ${remaining} ảnh nữa.`);
+    }
+
+    setUploading(true);
+    const uploaded: MemberGalleryImage[] = [];
+    try {
+      const compCode = selectedCompanyCode || userProfile?.companyCode;
+      for (const file of files.slice(0, remaining)) {
+        try {
+          const result = await authService.uploadManagedFile(
+            file,
+            "profile.gallery",
+            compCode === "SYSTEM" ? undefined : compCode,
+          );
+          uploaded.push({ url: result.url, uploadToken: result.uploadToken });
+        } catch (err: any) {
+          toast.error(err?.message || `Không thể tải ảnh ${file.name}.`);
+          break;
+        }
+      }
+      if (uploaded.length > 0) setImages(previous => [...previous, ...uploaded].slice(0, MAX_MEMBER_GALLERY_IMAGES));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleAddGalleryFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (files.length) void uploadMemberGalleryFiles(files, addGalleryImages, setAddGalleryImages, setUploadingAddGallery);
+  };
+
+  const handleEditGalleryFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (files.length) void uploadMemberGalleryFiles(files, editGalleryImages, setEditGalleryImages, setUploadingEditGallery);
   };
 
   const handleAddAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -336,6 +396,8 @@ export default function OrgChartTab({
         phone: editPhone.trim() || "",
         photoURL: editPhotoURL.trim() || "",
         coverImage: editCoverImage.trim() || "",
+        galleryImages: editGalleryImages.map(image => image.url),
+        galleryUploadTokens: editGalleryImages.flatMap((image, index) => image.uploadToken ? [{ index, uploadToken: image.uploadToken }] : []),
         birthDate: editBirthDate || undefined,
         gender: editGender || undefined,
         address: editAddress.trim(),
@@ -357,6 +419,7 @@ export default function OrgChartTab({
         phone: updateData.phone || "Chưa cập nhật",
         avatar: updateData.photoURL || prev.avatar,
         coverImage: updateData.coverImage ?? prev.coverImage,
+        galleryImages: updateData.galleryImages,
         birthDate: updateData.birthDate,
         gender: updateData.gender,
         address: updateData.address,
@@ -607,6 +670,8 @@ export default function OrgChartTab({
           industry: addIndustry.trim() || undefined,
           photoURL: addPhotoURL.trim() || undefined,
           coverImage: addCoverImage.trim() || undefined,
+          galleryImages: addGalleryImages.map(image => image.url),
+          galleryUploadTokens: addGalleryImages.flatMap((image, index) => image.uploadToken ? [{ index, uploadToken: image.uploadToken }] : []),
         }
         });
 
@@ -630,6 +695,7 @@ export default function OrgChartTab({
       setAddTargetMarket("");
       setAddPhotoURL("");
       setAddCoverImage("");
+      setAddGalleryImages([]);
       setAddParentId("");
       setAddRole("user");
 
@@ -873,6 +939,7 @@ export default function OrgChartTab({
         const memberGender = rawUser?.gender || selectedEmp.gender;
         const memberAddress = rawUser?.address || selectedEmp.address || "Chưa cập nhật";
         const memberTargetMarket = rawUser?.targetMarket || selectedEmp.targetMarket || "Chưa cập nhật";
+        const memberGalleryImages = (rawUser?.galleryImages || selectedEmp.galleryImages || []).slice(0, MAX_MEMBER_GALLERY_IMAGES);
         const memberPhone = (rawUser?.phone && rawUser.phone !== "Chưa cập nhật") ? rawUser.phone : (selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : "Chưa cập nhật");
         const memberEmail = rawUser?.email || selectedEmp.email || "Chưa cập nhật";
         const memberBirthDate = rawUser?.birthDate || selectedEmp.birthDate;
@@ -1034,6 +1101,41 @@ export default function OrgChartTab({
                     </div>
                   </div>
 
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <label className="block font-bold text-gray-600">Ảnh sản phẩm hoặc hoạt động</label>
+                        <span className="text-[11px] text-slate-500">Tối đa 5 ảnh</span>
+                      </div>
+                      <input ref={editGalleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleEditGalleryFiles} />
+                      <button
+                        type="button"
+                        onClick={() => editGalleryInputRef.current?.click()}
+                        disabled={uploadingEditGallery || editGalleryImages.length >= MAX_MEMBER_GALLERY_IMAGES}
+                        className="shrink-0 rounded-xl border border-sky-200 bg-white px-3 py-2 text-[11px] font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50"
+                      >
+                        {uploadingEditGallery ? "Đang tải..." : "Thêm ảnh"}
+                      </button>
+                    </div>
+                    {editGalleryImages.length > 0 && (
+                      <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2">
+                        {editGalleryImages.map((image, index) => (
+                          <div key={`${image.url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-white">
+                            <img src={image.url} alt={`Ảnh sản phẩm hoặc hoạt động ${index + 1}`} className="h-full w-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => setEditGalleryImages(previous => previous.filter((_, imageIndex) => imageIndex !== index))}
+                              aria-label={`Xóa ảnh ${index + 1}`}
+                              className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-600 shadow hover:bg-rose-50 hover:text-rose-600"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block font-bold text-gray-500 mb-1">Giới tính</label>
@@ -1127,7 +1229,7 @@ export default function OrgChartTab({
                   </button>
                   <button
                     type="button"
-                    disabled={isSaving}
+                    disabled={isSaving || uploadingEditGallery}
                     onClick={handleEditEmployeeSave}
                     className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
                   >
@@ -1255,6 +1357,24 @@ export default function OrgChartTab({
                           </a>
                         </div>
                       </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-100 bg-white p-3.5">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ảnh sản phẩm hoặc hoạt động</span>
+                        <span className="text-[10px] text-slate-400">{memberGalleryImages.length}/5</span>
+                      </div>
+                      {memberGalleryImages.length > 0 ? (
+                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                          {memberGalleryImages.map((image, index) => (
+                            <a key={`${image}-${index}`} href={image} target="_blank" rel="noreferrer" className="block aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                              <img src={image} alt={`Ảnh sản phẩm hoặc hoạt động ${index + 1}`} className="h-full w-full object-cover transition-transform hover:scale-105" />
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400">Chưa có ảnh</p>
+                      )}
                     </div>
 
                     {/* Subordinates */}
@@ -1480,6 +1600,41 @@ export default function OrgChartTab({
                 </div>
               </div>
 
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <label className="block font-bold text-gray-600">Ảnh sản phẩm hoặc hoạt động</label>
+                    <span className="text-[11px] text-slate-500">Tối đa 5 ảnh</span>
+                  </div>
+                  <input ref={addGalleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddGalleryFiles} />
+                  <button
+                    type="button"
+                    onClick={() => addGalleryInputRef.current?.click()}
+                    disabled={uploadingAddGallery || addGalleryImages.length >= MAX_MEMBER_GALLERY_IMAGES}
+                    className="shrink-0 rounded-xl border border-sky-200 bg-white px-3 py-2 text-[11px] font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50"
+                  >
+                    {uploadingAddGallery ? "Đang tải..." : "Thêm ảnh"}
+                  </button>
+                </div>
+                {addGalleryImages.length > 0 && (
+                  <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2">
+                    {addGalleryImages.map((image, index) => (
+                      <div key={`${image.url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        <img src={image.url} alt={`Ảnh sản phẩm hoặc hoạt động ${index + 1}`} className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setAddGalleryImages(previous => previous.filter((_, imageIndex) => imageIndex !== index))}
+                          aria-label={`Xóa ảnh ${index + 1}`}
+                          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-600 shadow hover:bg-rose-50 hover:text-rose-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-gray-500 mb-1">Giới tính</label>
@@ -1585,7 +1740,7 @@ export default function OrgChartTab({
               </button>
               <button
                 type="submit"
-                disabled={isAddingEmployee}
+                disabled={isAddingEmployee || uploadingAddGallery}
                 className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
               >
                 {isAddingEmployee ? (
