@@ -6,6 +6,7 @@ import { drawSlideTimer, getSlideTimer, type SlideTimerMeeting } from "./slideTi
 import { SlideTransitionDelayInput } from "./SlideTransitionDelayInput";
 import { SpeechesCompleteMessage } from "./SpeechesCompleteDialog";
 import type { ProfileSlide, SlideDeck } from "./slideTypes";
+import { SpeakerAvatar } from "./SpeakerAvatar";
 
 type Props = {
   meeting: SlideTimerMeeting & { _id: string; __v: number };
@@ -65,17 +66,18 @@ function NextSpeakersOverlay({ speakers, large = false }: { speakers: ProfileSli
             >
               {i + 1}
             </span>
-            {s.photoURL ? (
-              <img
-                src={s.photoURL}
-                alt=""
-                className={`shrink-0 rounded-full border border-slate-200 object-cover ${
-                  large
-                    ? "h-[clamp(24px,2.2vw,38px)] w-[clamp(24px,2.2vw,38px)]"
-                    : "h-5 w-5 sm:h-6 sm:w-6"
-                }`}
-              />
-            ) : null}
+            <SpeakerAvatar
+              name={s.name}
+              photoURL={s.photoURL}
+              className={`shrink-0 rounded-full ${
+                large
+                  ? "h-[clamp(24px,2.2vw,38px)] w-[clamp(24px,2.2vw,38px)]"
+                  : "h-5 w-5 sm:h-6 sm:w-6"
+              }`}
+              textClassName={large ? "text-[clamp(11px,1vw,16px)] font-bold" : "text-[10px] font-bold"}
+              ringClassName="border border-slate-200"
+              alt=""
+            />
             <span
               className={`truncate font-bold text-slate-800 tracking-tight ${
                 large

@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import { validateSpeakingTimeSlots } from "../../../src/utils/meetingSpeakingTime";
+import { normalizeLoginIdentifier } from "../../../src/utils/loginIdentifier";
 export const presentationStateInput = Joi.object({
   version: Joi.number().integer().min(0).required(),
   view: Joi.string().valid("checkin", "speaker", "luckyDraw", "activeMembers", "waiting"),
@@ -49,7 +50,14 @@ export const checkinInput = Joi.object({ latitude: Joi.number().min(-90).max(90)
 export const controlInput = Joi.object({ action: Joi.string().valid('start', 'pause', 'resume', 'next', 'previous', 'finish', 'cancel', 'start_speaker', 'reset_speaker').required(), version: Joi.number().integer().min(0).required() });
 
 
-export const qrMemberInput = Joi.object({ email: Joi.string().email().max(254).required(), password: Joi.string().min(1).max(200).required(), latitude: Joi.number().min(-90).max(90).required(), longitude: Joi.number().min(-180).max(180).required() });
+const checkInIdentifierSchema = Joi.string().trim().max(254).custom((value, helpers) => normalizeLoginIdentifier(value) ? value : helpers.error("any.invalid"));
+export const qrMemberInput = Joi.object({
+  identifier: checkInIdentifierSchema,
+  email: checkInIdentifierSchema,
+  password: Joi.string().min(1).max(200).required(),
+  latitude: Joi.number().min(-90).max(90).required(),
+  longitude: Joi.number().min(-180).max(180).required()
+}).or("identifier", "email");
 export const qrGuestInput = Joi.object({ name: Joi.string().trim().min(2).max(150).required(), email: Joi.string().email().max(254).allow('').default(''), phone: Joi.string().trim().max(40).allow('').default(''), company: Joi.string().trim().max(150).allow('').default(''), industry: Joi.string().trim().max(150).allow('').default(''), bio: Joi.string().trim().max(1000).allow('').default(''), latitude: Joi.number().min(-90).max(90).required(), longitude: Joi.number().min(-180).max(180).required() });
 
 export const recurringMeetingInput = meetingInput.fork(["startsAt", "endsAt"], () => Joi.forbidden()).keys({

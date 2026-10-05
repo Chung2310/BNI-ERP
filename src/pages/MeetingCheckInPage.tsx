@@ -14,7 +14,7 @@ function MeetingCheckInContent({ token }: { token: string }) {
   const [meeting, setMeeting] = useState<MeetingInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<Mode>("member");
-  const [form, setForm] = useState({ email: "", password: "", name: "", phone: "", company: "", industry: "" });
+  const [form, setForm] = useState({ identifier: "", password: "", name: "", phone: "", company: "", industry: "" });
   const [avatar, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState("");
   function setAvatar(file: File | null) {
@@ -47,7 +47,7 @@ function MeetingCheckInContent({ token }: { token: string }) {
       const position = await locate();
       setPhase("submitting");
       const identity = mode === "member"
-        ? { email: form.email.trim(), password: form.password }
+        ? { email: form.identifier.trim(), password: form.password }
         : { name: form.name.trim(), phone: form.phone.trim(), company: form.company.trim(), industry: form.industry.trim() };
       let body: string | FormData = JSON.stringify({ ...identity, ...position });
       const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -107,7 +107,7 @@ function MeetingCheckInContent({ token }: { token: string }) {
                 <button type="button" aria-pressed={mode === "guest"} onClick={() => switchMode("guest")} className="rounded-xl px-4 py-3 text-sm font-semibold text-slate-500 transition aria-pressed:bg-white aria-pressed:text-cyan-700 aria-pressed:shadow-sm focus-visible:outline-cyan-500">Khách mời</button>
               </div>
               {mode === "member" ? <>
-                <label className="block text-sm font-medium text-slate-700">Email tài khoản<input required type="email" autoComplete="username" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={fieldClass} /></label>
+                <label className="block text-sm font-medium text-slate-700">Email hoặc số điện thoại<input required type="text" autoComplete="username" placeholder="Số điện thoại hoặc email" aria-label="Email tài khoản" value={form.identifier} onChange={e => setForm({ ...form, identifier: e.target.value })} className={fieldClass} /></label>
                 <label className="block text-sm font-medium text-slate-700">Mật khẩu<input required type="password" autoComplete="current-password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className={fieldClass} /></label>
               </> : <>
                 <label className="block text-sm font-medium text-slate-700">Họ và tên *<input required minLength={2} maxLength={150} autoComplete="name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={fieldClass} /></label>

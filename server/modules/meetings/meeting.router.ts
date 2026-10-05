@@ -84,6 +84,15 @@ meetingRouter.get('/:id', read, async (req, res) => {
 });
 
 // Both devices read the same snapshot, scoped to the organizer's company.
+meetingRouter.get('/:id/live/state', manage, async (req: import("express").Request, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
+    const serverReceivedAt = Date.now();
+    const meeting = await getMeeting(company(req), req.params.id);
+    res.set('Cache-Control', 'no-store');
+    res.json({ data: { meeting, serverReceivedAt, serverNow: Date.now() } });
+  } catch (error) { sendError(res, error); }
+});
 meetingRouter.get('/:id/live', manage, async (req: import("express").Request, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });

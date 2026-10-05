@@ -39,12 +39,16 @@ import {
   ArrowDownToLine,
   Maximize2,
   Minimize2,
+  ExternalLink,
+  SlidersHorizontal,
+  UserPlus,
 } from "lucide-react";
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
 import { LuckyDrawTab } from "../components/meetings/LuckyDrawTab";
 import { MeetingFlowStepper, loadMeetingFlowOrder, saveMeetingFlowOrder, type MeetingFlowStep } from "../components/meetings/MeetingFlowStepper";
 import { ActiveMembersPanel } from "../components/meetings/ActiveMembersPanel";
+import { SpeakerAvatar } from "../components/meetings/SpeakerAvatar";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { toast } from "./Toast";
 
@@ -1130,7 +1134,33 @@ function MeetingWorkspace() {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-between sm:justify-end gap-2">
+              <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
+                {canManage && (
+                  <div className="flex items-center gap-1.5 mr-1">
+                    <a
+                      href={meetingRoomUrl(activeMeeting._id, "control")}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-700 hover:bg-cyan-800 text-white text-xs font-semibold shadow-xs transition"
+                      title="Mở Bảng điều khiển cuộc họp"
+                    >
+                      <SlidersHorizontal className="h-3.5 w-3.5" />
+                      <span className="hidden md:inline">Bảng điều khiển cuộc họp</span>
+                      <span className="md:hidden">Điều khiển</span>
+                    </a>
+                    <a
+                      href={meetingRoomUrl(activeMeeting._id, "display")}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-cyan-200 bg-white hover:bg-cyan-50 text-cyan-800 text-xs font-semibold shadow-2xs transition"
+                      title="Mở Màn hình trình chiếu trong tab mới"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      <span className="hidden md:inline">Màn hình trình chiếu</span>
+                      <span className="md:hidden">Trình chiếu</span>
+                    </a>
+                  </div>
+                )}
 
                 {canManage && (
                   <button
@@ -1161,7 +1191,7 @@ function MeetingWorkspace() {
                     </button>
                     <button
                       type="button"
-                      title="Thoát toàn màn hình (Esc)"
+                      title="Đóng popup"
                       onClick={toggleModalFullscreen}
                       className="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0"
                     >
@@ -1191,11 +1221,6 @@ function MeetingWorkspace() {
                 )}
               </div>
             </div>
-
-            {canManage && <div className="flex flex-wrap gap-2 border-b bg-cyan-50/50 px-4 py-3">
-              <a href={meetingRoomUrl(activeMeeting._id, "control")} className="rounded-xl bg-cyan-700 px-4 py-2 text-sm font-semibold text-white">Bảng điều khiển cuộc họp</a>
-              <a href={meetingRoomUrl(activeMeeting._id, "display")} target="_blank" rel="noreferrer" className="rounded-xl border border-cyan-200 bg-white px-4 py-2 text-sm font-semibold text-cyan-800">Màn hình trình chiếu</a>
-            </div>}
             {/* Modal Body Content (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
               <MeetingFlowStepper
@@ -1208,11 +1233,105 @@ function MeetingWorkspace() {
                 onFinish={canManage && ["live", "paused"].includes(activeMeeting.status) ? () => setFinishRequested(true) : undefined}
               />
               {flowStep === "presentation" && (
-                <div role="group" aria-label="Chế độ xem thuyết trình" className="inline-flex rounded-xl bg-slate-100 p-1">
-                  <button type="button" aria-pressed={!slidesOpen} onClick={() => setSlidesOpen(false)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 transition aria-pressed:bg-white aria-pressed:font-semibold aria-pressed:text-cyan-700 aria-pressed:shadow-2xs cursor-pointer"><Users className="h-3.5 w-3.5" /> Bảng điều hành</button>
-                  <button type="button" aria-pressed={slidesOpen} onClick={() => setSlidesOpen(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 transition aria-pressed:bg-white aria-pressed:font-semibold aria-pressed:text-cyan-700 aria-pressed:shadow-2xs cursor-pointer"><Megaphone className="h-3.5 w-3.5" /> Slide trình chiếu</button>
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
+                  <div role="group" aria-label="Chế độ xem thuyết trình" className="inline-flex rounded-xl bg-slate-100 p-1 shrink-0">
+                    <button type="button" aria-pressed={!slidesOpen} onClick={() => setSlidesOpen(false)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 transition aria-pressed:bg-white aria-pressed:font-semibold aria-pressed:text-cyan-700 aria-pressed:shadow-2xs cursor-pointer"><Users className="h-3.5 w-3.5" /> Bảng điều hành</button>
+                    <button type="button" aria-pressed={slidesOpen} onClick={() => setSlidesOpen(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 transition aria-pressed:bg-white aria-pressed:font-semibold aria-pressed:text-cyan-700 aria-pressed:shadow-2xs cursor-pointer"><Megaphone className="h-3.5 w-3.5" /> Slide trình chiếu</button>
+                  </div>
+
+                  {!slidesOpen && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button type="button" disabled={saving || !activeMeeting.speakers.length}
+                        onClick={() => {
+                          const targetSpeakerId = (checkedSpeakerIds.length > 0 ? checkedSpeakerIds[checkedSpeakerIds.length - 1] : presentationSpeakerId) || "";
+                          if (targetSpeakerId) setPresentationSpeakerId(targetSpeakerId);
+                          setPresentationFullscreen(document.documentElement.requestFullscreen && !document.fullscreenElement
+                            ? document.documentElement.requestFullscreen().then(() => true).catch(() => false)
+                            : null);
+                          setStartPresentation(true); setFlowStep("presentation"); setSlidesOpen(true);
+                        }}
+                        className="flex items-center gap-1.5 rounded-xl bg-cyan-600 px-4 py-2 text-xs font-bold text-white shadow-sm shadow-cyan-600/20 disabled:opacity-40 hover:bg-cyan-700 transition cursor-pointer">
+                        <Play className="h-3.5 w-3.5" /> Bắt đầu thuyết trình
+                      </button>
+                      {canManage && activeMeeting.status === "scheduled" && (
+                        <button
+                          type="button"
+                          onClick={() => setStartingMeeting(activeMeeting)}
+                          disabled={saving}
+                          className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-medium shadow-sm shadow-emerald-600/20 transition cursor-pointer"
+                        >
+                          <Play className="h-3.5 w-3.5" fill="currentColor" />
+                          Bắt đầu cuộc họp
+                        </button>
+                      )}
+
+                      {canManage && activeMeeting.status === "live" && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => control("pause")}
+                            className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 px-3.5 py-2 text-xs font-medium transition cursor-pointer"
+                          >
+                            <Pause className="h-3.5 w-3.5" />
+                            Tạm dừng
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={saving || !current}
+                            onClick={() => control("next")}
+                            className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3.5 py-2 text-xs font-medium shadow-sm shadow-cyan-600/20 transition cursor-pointer"
+                          >
+                            {upcoming ? "Người tiếp theo ❯" : "Hoàn tất phát biểu"}
+                          </button>
+
+                          {autoAdvance && (
+                            <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-cyan-50 border border-cyan-200/80 text-[11px] font-medium text-cyan-700">
+                              <Sparkles className="h-3 w-3 text-cyan-600" />
+                              Hết giờ → chờ {autoAdvanceDelay}s → chuyển người & slide
+                            </span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setFinishRequested(true)}
+                            className="flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 text-xs font-medium transition cursor-pointer"
+                          >
+                            <Square className="h-3 w-3" fill="currentColor" />
+                            Kết thúc
+                          </button>
+                        </>
+                      )}
+
+                      {canManage && activeMeeting.status === "paused" && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => control("resume")}
+                            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 text-xs font-medium shadow-sm transition cursor-pointer"
+                          >
+                            <Play className="h-3.5 w-3.5" fill="currentColor" />
+                            Tiếp tục
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={saving || !current}
+                            onClick={() => control("next")}
+                            className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3.5 py-2 text-xs font-medium transition cursor-pointer"
+                          >
+                            {upcoming ? "Người tiếp theo ❯" : "Hoàn tất phát biểu"}
+                          </button>
+                          <button type="button" disabled={saving} onClick={() => setFinishRequested(true)} className="rounded-xl bg-slate-800 hover:bg-slate-900 px-4 py-2 text-xs font-medium text-white transition cursor-pointer">Kết thúc</button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
+
               {flowStep === "presentation" && slidesOpen && (
                 <MeetingSlides
                   key={activeMeeting._id}
@@ -1235,331 +1354,25 @@ function MeetingWorkspace() {
                   fullscreenRequest={presentationFullscreen}
                 />
               )}
-              {/* SUBTAB 1: DIỄN GIẢ & ĐIỀU PHỐI BUỔI HỌP */}
-              {(flowStep === "checkin" || (flowStep === "presentation" && !slidesOpen)) && (
+
+              {/* Status Notice Alerts */}
+              {activeMeeting.status === "scheduled" && flowStep === "presentation" && !slidesOpen && (
+                <div className="flex items-center gap-2.5 rounded-xl border border-cyan-200/70 bg-gradient-to-r from-cyan-50 to-sky-50 px-4 py-3 text-xs text-cyan-900 shadow-2xs">
+                  <span className="flex h-2 w-2 rounded-full bg-cyan-500 shrink-0" />
+                  <p>Kiểm tra danh sách và thứ tự bên dưới, sau đó bấm Bắt đầu cuộc họp. Có thể tiếp tục nhận check-in khi đang họp.</p>
+                </div>
+              )}
+              {["ended", "cancelled"].includes(activeMeeting.status) && flowStep === "presentation" && !slidesOpen && (
+                <div className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-xs text-slate-700">
+                  <p>Buổi họp đã đóng. Danh sách tham dự được giữ lại bên dưới.</p>
+                </div>
+              )}
+
+              {/* SUBTAB 1: CHECK-IN STEP */}
+              {flowStep === "checkin" && (
                 <div className="space-y-4">
-                  {flowStep === "presentation" && (<>
-                    {/* Meeting Hero Banner Card */}
-                    <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
-                      {activeMeeting.coverImage ? (
-                        <div className="relative h-36 md:h-44 w-full overflow-hidden bg-slate-100">
-                          <img src={activeMeeting.coverImage} alt="Cover" className="h-full w-full object-cover" />
-                          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/30 to-transparent" />
-                          <div className="absolute bottom-4 left-5 right-5 text-white">
-                            <div className="flex items-center gap-2 text-xs font-semibold text-cyan-200">
-                              <Clock3 className="h-3.5 w-3.5" />
-                              <span>{dateText(activeMeeting.startsAt)}</span>
-                              {activeMeeting.location && (
-                                <>
-                                  <span>•</span>
-                                  <span className="flex items-center gap-1">
-                                    <MapPin className="h-3.5 w-3.5" /> {activeMeeting.location}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                            <h2 className="mt-1 text-xl md:text-2xl font-semibold text-white">{activeMeeting.title}</h2>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-5 border-b border-slate-100 bg-slate-50/50">
-                          <div className="flex items-center gap-2 text-xs font-semibold text-cyan-700">
-                            <Clock3 className="h-3.5 w-3.5 text-cyan-600" />
-                            <span>{dateText(activeMeeting.startsAt)}</span>
-                            {activeMeeting.location && (
-                              <>
-                                <span>•</span>
-                                <span className="flex items-center gap-1 text-slate-500">
-                                  <MapPin className="h-3.5 w-3.5" /> {activeMeeting.location}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                          <h2 className="mt-1 text-xl font-semibold text-slate-800">{activeMeeting.title}</h2>
-                        </div>
-                      )}
+                  <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} onConfigure={() => openEditModal(activeMeeting)} />
 
-                      {/* Meeting Actions & Status Bar */}
-                      <div className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 bg-white">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-medium border ${statusMap[activeMeeting.status]?.badge || "bg-slate-100 text-slate-600"
-                              }`}
-                          >
-                            <span className={`h-2 w-2 rounded-full ${statusMap[activeMeeting.status]?.dot}`} />
-                            {statusMap[activeMeeting.status]?.label || activeMeeting.status}
-                          </span>
-
-                          <span className="text-xs text-slate-500 font-medium">
-                            • {activeMeeting.speakers.length} người tham gia ({activeMeeting.speakers.filter((s) => s.userId).length} thành viên, {activeMeeting.speakers.filter((s) => !s.userId).length} khách mời)
-                          </span>
-                        </div>
-
-                        {/* Operation Control Buttons */}
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button type="button" disabled={saving || !activeMeeting.speakers.length}
-                            onClick={() => {
-                              const targetSpeakerId = (checkedSpeakerIds.length > 0 ? checkedSpeakerIds[checkedSpeakerIds.length - 1] : presentationSpeakerId) || "";
-                              if (targetSpeakerId) setPresentationSpeakerId(targetSpeakerId);
-                              setPresentationFullscreen(document.documentElement.requestFullscreen && !document.fullscreenElement
-                                ? document.documentElement.requestFullscreen().then(() => true).catch(() => false)
-                                : null);
-                              setStartPresentation(true); setFlowStep("presentation"); setSlidesOpen(true);
-                            }}
-                            className="flex items-center gap-1.5 rounded-xl bg-cyan-600 px-4 py-2 text-xs font-bold text-white shadow-sm shadow-cyan-600/20 disabled:opacity-40 hover:bg-cyan-700 transition cursor-pointer">
-                            <Play className="h-3.5 w-3.5" /> Bắt đầu thuyết trình
-                          </button>
-                          {canManage && activeMeeting.status === "scheduled" && (
-                            <button
-                              type="button"
-                              onClick={() => setStartingMeeting(activeMeeting)}
-                              disabled={saving}
-                              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-medium shadow-sm shadow-emerald-600/20 transition cursor-pointer"
-                            >
-                              <Play className="h-3.5 w-3.5" fill="currentColor" />
-                              Bắt đầu cuộc họp
-                            </button>
-                          )}
-
-                          {canManage && activeMeeting.status === "live" && (
-                            <>
-                              <button
-                                type="button"
-                                disabled={saving}
-                                onClick={() => control("pause")}
-                                className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 px-3.5 py-2 text-xs font-medium transition cursor-pointer"
-                              >
-                                <Pause className="h-3.5 w-3.5" />
-                                Tạm dừng
-                              </button>
-
-                              <button
-                                type="button"
-                                disabled={saving || !current}
-                                onClick={() => control("next")}
-                                className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3.5 py-2 text-xs font-medium shadow-sm shadow-cyan-600/20 transition cursor-pointer"
-                              >
-                                {upcoming ? "Người tiếp theo ❯" : "Hoàn tất phát biểu"}
-                              </button>
-
-                              {autoAdvance && (
-                                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-cyan-50 border border-cyan-200/80 text-[11px] font-medium text-cyan-700">
-                                  <Sparkles className="h-3 w-3 text-cyan-600" />
-                                  Hết giờ → chờ {autoAdvanceDelay}s → chuyển người & slide
-                                </span>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => setFinishRequested(true)}
-                                className="flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 text-xs font-medium transition cursor-pointer"
-                              >
-                                <Square className="h-3 w-3" fill="currentColor" />
-                                Kết thúc
-                              </button>
-                            </>
-                          )}
-
-                          {canManage && activeMeeting.status === "paused" && (
-                            <>
-                              <button
-                                type="button"
-                                disabled={saving}
-                                onClick={() => control("resume")}
-                                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 text-xs font-medium shadow-sm transition cursor-pointer"
-                              >
-                                <Play className="h-3.5 w-3.5" fill="currentColor" />
-                                Tiếp tục
-                              </button>
-
-                              <button
-                                type="button"
-                                disabled={saving || !current}
-                                onClick={() => control("next")}
-                                className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3.5 py-2 text-xs font-medium transition cursor-pointer"
-                              >
-                                {upcoming ? "Người tiếp theo ❯" : "Hoàn tất phát biểu"}
-                              </button>
-                              <button type="button" disabled={saving} onClick={() => setFinishRequested(true)} className="rounded-xl bg-slate-800 hover:bg-slate-900 px-4 py-2 text-xs font-medium text-white transition cursor-pointer">Kết thúc</button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {activeMeeting.status === "scheduled" && <p className="rounded-xl bg-cyan-50 p-4 text-sm text-cyan-900">Kiểm tra danh sách và thứ tự bên dưới, sau đó bấm Bắt đầu cuộc họp. Có thể tiếp tục nhận check-in khi đang họp.</p>}
-                    {["ended", "cancelled"].includes(activeMeeting.status) && <p className="rounded-xl bg-slate-100 p-4 text-sm">Buổi họp đã đóng. Danh sách tham dự được giữ lại bên dưới.</p>}
-                    {/* Current & Upcoming Speakers side by side */}
-                    {!["ended", "cancelled"].includes(activeMeeting.status) && <div className="grid gap-4 sm:grid-cols-2">
-                      {/* Current Speaker Card */}
-                      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs flex flex-col justify-between">
-                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                          <span className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-slate-500">
-                            <Megaphone className="h-4 w-4 text-cyan-600" />
-                            Diễn giả hiện tại
-                          </span>
-                          {current && (
-                            <span className="text-[11px] font-mono text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded-md font-medium">
-                              {fmt(current.seconds)} mục tiêu
-                            </span>
-                          )}
-                        </div>
-
-                        {current ? (
-                          <div className="my-4 flex items-center gap-4">
-                            {current.photoURL ? (
-                              <img
-                                src={current.photoURL}
-                                alt={current.name}
-                                className="h-16 w-16 rounded-2xl object-cover ring-2 ring-cyan-500/30"
-                              />
-                            ) : (
-                              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-cyan-50 font-semibold text-cyan-700 text-xl">
-                                {current.name.slice(0, 1).toUpperCase()}
-                              </div>
-                            )}
-
-                            <div className="min-w-0 flex-1">
-                              <h3 className="truncate font-semibold text-base text-slate-800">{current.name}</h3>
-                              <p className="truncate text-xs text-slate-500">{current.email || "Khách mời"}</p>
-                              <span className="mt-1 inline-block text-[11px] font-medium text-cyan-600 bg-cyan-50/80 px-2 py-0.5 rounded-md">
-                                Lượt thứ {activeMeeting.currentIndex + 1} / {activeMeeting.speakers.length}
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="py-6 text-center text-xs text-slate-400">
-                            {activeMeeting.speechesCompletedAt ? "Phần phát biểu đã hoàn tất. Cuộc họp vẫn đang tiếp tục." : "Chưa có diễn giả nào đang phát biểu."}
-                          </div>
-                        )}
-
-                        {/* Timer Display */}
-                        <div className="space-y-2.5 mt-2">
-                          {current && <div className={`rounded-xl border p-3.5 flex items-center justify-between gap-3 ${remaining <= 0 ? "bg-rose-50 border-rose-200" : "bg-cyan-50/70 border-cyan-100"}`}>
-                            <div className="space-y-1">
-                              <span className="text-xs font-semibold text-slate-600">
-                                {remaining <= 0 ? "Thời lượng phát biểu" : !activeMeeting.speakerStartedAt && !activeMeeting.elapsedSeconds ? "Sẵn sàng" : activeMeeting.status === "paused" ? "Tạm dừng" : "Thời gian còn lại"}
-                              </span>
-                              {autoAdvance && remaining <= 0 && <p className="text-xs text-amber-800">
-                                {upcoming ? "Chuyển người tiếp theo" : "Hoàn tất phát biểu"} sau {Math.max(0, Math.ceil(autoAdvanceDelay - Math.abs(remaining)))}s
-                              </p>}
-                            </div>
-                            <span className={`font-mono text-2xl font-semibold ${remaining <= 0 ? "text-rose-600" : "text-slate-800"}`}>
-                              {remaining <= 0 ? "Hết giờ" : fmt(remaining)}
-                            </span>
-                          </div>}
-
-                          {/* Speaker Timer Actions */}
-                          {canManage && current && ["live", "paused"].includes(activeMeeting.status) && (
-                            <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100/80">
-                              <span className="text-[11px] text-slate-400">
-                                {!activeMeeting.speakerStartedAt && (activeMeeting.elapsedSeconds || 0) === 0
-                                  ? "Bấm để bắt đầu đếm ngược"
-                                  : `Mục tiêu: ${current.seconds} giây`}
-                              </span>
-
-                              <div className="flex items-center gap-2">
-                                {!activeMeeting.speakerStartedAt && (activeMeeting.elapsedSeconds || 0) === 0 ? (
-                                  <button
-                                    type="button"
-                                    disabled={saving}
-                                    onClick={() => control("start_speaker")}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium shadow-xs transition cursor-pointer"
-                                  >
-                                    <Play className="h-3.5 w-3.5" fill="currentColor" />
-                                    <span>Bắt đầu tính giờ ({current.seconds}s)</span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    disabled={saving}
-                                    onClick={() => control("start_speaker")}
-                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition cursor-pointer"
-                                    title="Bấm giờ lại từ đầu cho diễn giả này"
-                                  >
-                                    <RotateCcw className="h-3.5 w-3.5" />
-                                    <span>Bấm giờ lại ({current.seconds}s)</span>
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Auto-Advance Setting Box */}
-                          {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
-                            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50/90 border border-slate-200/80 text-xs">
-                              <label className="flex items-center gap-2 font-medium text-slate-700">Chế độ
-                                <select aria-label="Chế độ điều hành" value={autoAdvance ? "auto" : "manual"} disabled={saving} onChange={e => updateAutoAdvance(e.target.value === "auto")} className="rounded-lg border border-slate-300 bg-white p-2">
-                                  <option value="manual">Thủ công</option><option value="auto">Tự động</option>
-                                </select>
-                              </label>
-
-                              {autoAdvance && (
-                                <div className="flex items-center gap-1.5 ml-auto">
-                                  <span className="text-slate-500 font-medium">Thời gian chuyển slide:</span>
-                                  <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={updateAutoAdvanceDelay} />
-                                  <span className="text-slate-500 font-medium">giây</span>
-                                </div>
-                              )}
-                              {autoAdvance && <p className="w-full text-xs text-slate-500">Khi hết thời gian phát biểu, chờ {autoAdvanceDelay} giây rồi chuyển người và slide. Đây là thời gian chờ chuyển lượt, không phải thời lượng phát biểu.</p>}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Upcoming Speaker Card */}
-                      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs flex flex-col justify-between">
-                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                          <span className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-slate-500">
-                            <Clock3 className="h-4 w-4 text-slate-400" />
-                            Diễn giả tiếp theo
-                          </span>
-                          {upcoming && (
-                            <span className="text-[11px] font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md font-medium">
-                              {fmt(upcoming.seconds)}
-                            </span>
-                          )}
-                        </div>
-
-                        {upcoming ? (
-                          <div className="my-4 flex items-center gap-4">
-                            {upcoming.photoURL ? (
-                              <img
-                                src={upcoming.photoURL}
-                                alt={upcoming.name}
-                                className="h-16 w-16 rounded-2xl object-cover ring-1 ring-slate-200"
-                              />
-                            ) : (
-                              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-50 font-semibold text-slate-500 text-xl">
-                                {upcoming.name.slice(0, 1).toUpperCase()}
-                              </div>
-                            )}
-
-                            <div className="min-w-0 flex-1">
-                              <h3 className="truncate font-semibold text-base text-slate-800">{upcoming.name}</h3>
-                              <p className="truncate text-xs text-slate-500">{upcoming.email || "Khách mời"}</p>
-                              <span className="mt-1 inline-block text-[11px] font-medium text-slate-500">
-                                Hãy chuẩn bị tài liệu và micro!
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="py-6 text-center text-xs text-slate-400">
-                            {activeMeeting.speakers.length > 0
-                              ? "Đã là người phát biểu cuối cùng."
-                              : "Chưa có danh sách diễn giả."}
-                          </div>
-                        )}
-
-                        <div className="rounded-xl bg-slate-50 p-3.5 flex items-center justify-between text-xs text-slate-500">
-                          <span>Tổng số người check-in:</span>
-                          <span className="font-semibold text-slate-700">{activeMeeting.speakers.length} người</span>
-                        </div>
-                      </div>
-                    </div>}
-
-                  </>)}
-                  {flowStep === "checkin" && <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} onConfigure={() => openEditModal(activeMeeting)} />}
                   {/* Guest Checkin Form (MC / Admin) */}
                   {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
                     <form
@@ -1598,7 +1411,7 @@ function MeetingWorkspace() {
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-cyan-600" />
                         <h3 className="text-[11px] font-medium uppercase tracking-wider text-slate-600">
-                          {flowStep === "checkin" ? "Người đã check-in · thứ tự phát biểu" : "Danh sách thuyết trình"} ({filteredSpeakers.length}{filteredSpeakers.length !== activeMeeting.speakers.length ? `/${activeMeeting.speakers.length}` : ""})
+                          Người đã check-in · thứ tự phát biểu ({filteredSpeakers.length}{filteredSpeakers.length !== activeMeeting.speakers.length ? `/${activeMeeting.speakers.length}` : ""})
                         </h3>
                       </div>
 
@@ -1685,6 +1498,7 @@ function MeetingWorkspace() {
                         </button>
                       </div>
                     )}
+
                     <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
                       {filteredSpeakers.length === 0 ? (
                         <div className="py-8 text-center text-xs text-slate-400">
@@ -1740,17 +1554,13 @@ function MeetingWorkspace() {
                                 />
                               )}
 
-                              {p.photoURL ? (
-                                <img
-                                  src={p.photoURL}
-                                  alt={p.name}
-                                  className="h-9 w-9 rounded-full object-cover ring-1 ring-slate-200"
-                                />
-                              ) : (
-                                <span className="grid h-9 w-9 place-items-center rounded-full bg-cyan-50 font-medium text-xs text-cyan-600">
-                                  {p.name.slice(0, 1).toUpperCase()}
-                                </span>
-                              )}
+                              <SpeakerAvatar
+                                name={p.name}
+                                photoURL={p.photoURL}
+                                className="h-9 w-9 rounded-full"
+                                textClassName="font-medium text-xs"
+                                ringClassName="ring-1 ring-slate-200"
+                              />
 
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -1801,6 +1611,448 @@ function MeetingWorkspace() {
                           );
                         })
                       )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SUBTAB 1: PRESENTATION COORDINATION STUDIO (2-COLUMN MODERN DASHBOARD) */}
+              {flowStep === "presentation" && !slidesOpen && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                  {/* LEFT COLUMN: LIVE STAGE & CONTROLS (7/12) */}
+                  <div className="lg:col-span-7 space-y-4">
+                    {!["ended", "cancelled"].includes(activeMeeting.status) && (
+                      <div className="space-y-4">
+                        {/* Current Speaker Live Stage Card */}
+                        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs flex flex-col justify-between relative overflow-hidden">
+                          <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
+                            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
+                              <span className="relative flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-600" />
+                              </span>
+                              <Megaphone className="h-4 w-4 text-cyan-600" />
+                              Diễn giả hiện tại
+                            </span>
+                            {current && (
+                              <span className="text-[11px] font-mono text-cyan-700 bg-cyan-50/90 border border-cyan-100 px-2.5 py-1 rounded-lg font-bold">
+                                {fmt(current.seconds)} mục tiêu
+                              </span>
+                            )}
+                          </div>
+
+                          {current ? (
+                            <div className="my-4 flex items-center gap-4">
+                              <SpeakerAvatar
+                                name={current.name}
+                                photoURL={current.photoURL}
+                                className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl"
+                                textClassName="font-black text-2xl"
+                                ringClassName="ring-2 ring-cyan-500/30 shadow-xs"
+                              />
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h3 className="truncate font-bold text-lg text-slate-800">{current.name}</h3>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${current.userId ? "bg-cyan-50 text-cyan-700 border-cyan-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                                    {current.userId ? "Thành viên" : "Khách mời"}
+                                  </span>
+                                </div>
+                                <p className="truncate text-xs text-slate-500 mt-0.5">{current.email || "Khách mời"}</p>
+                                <span className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-700 bg-cyan-50/80 px-2.5 py-0.5 rounded-lg border border-cyan-100">
+                                  Lượt thứ {activeMeeting.currentIndex + 1} / {activeMeeting.speakers.length}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="py-8 text-center text-xs text-slate-400 bg-slate-50/50 rounded-xl my-3 border border-dashed border-slate-200">
+                              {activeMeeting.speechesCompletedAt ? "Phần phát biểu đã hoàn tất. Cuộc họp vẫn đang tiếp tục." : "Chưa có diễn giả nào đang phát biểu."}
+                            </div>
+                          )}
+
+                          {/* Timer Display & Micro Controls */}
+                          <div className="space-y-3 mt-1">
+                            {current && (
+                              <div className={`rounded-2xl border p-4 flex items-center justify-between gap-3 transition-colors ${remaining <= 0 ? "bg-rose-50 border-rose-200" : "bg-gradient-to-r from-cyan-50/80 to-sky-50/50 border-cyan-200/80"}`}>
+                                <div className="space-y-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <Clock3 className={`h-4 w-4 ${remaining <= 0 ? "text-rose-500" : "text-cyan-600"}`} />
+                                    <span className="text-xs font-bold text-slate-700">
+                                      {remaining <= 0 ? "Thời lượng phát biểu" : !activeMeeting.speakerStartedAt && !activeMeeting.elapsedSeconds ? "Sẵn sàng" : activeMeeting.status === "paused" ? "Tạm dừng" : "Thời gian còn lại"}
+                                    </span>
+                                  </div>
+                                  {autoAdvance && remaining <= 0 && (
+                                    <p className="text-xs font-medium text-amber-800">
+                                      {upcoming ? "Chuyển người tiếp theo" : "Hoàn tất phát biểu"} sau {Math.max(0, Math.ceil(autoAdvanceDelay - Math.abs(remaining)))}s
+                                    </p>
+                                  )}
+                                </div>
+                                <span className={`font-mono text-3xl sm:text-4xl font-black tracking-tight ${remaining <= 0 ? "text-rose-600 animate-pulse" : "text-slate-900"}`}>
+                                  {remaining <= 0 ? "Hết giờ" : fmt(remaining)}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Speaker Timer Actions */}
+                            {canManage && current && ["live", "paused"].includes(activeMeeting.status) && (
+                              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                                <span className="text-[11px] text-slate-400">
+                                  {!activeMeeting.speakerStartedAt && (activeMeeting.elapsedSeconds || 0) === 0
+                                    ? "Bấm để bắt đầu đếm ngược"
+                                    : `Mục tiêu: ${current.seconds} giây`}
+                                </span>
+
+                                <div className="flex items-center gap-2">
+                                  {!activeMeeting.speakerStartedAt && (activeMeeting.elapsedSeconds || 0) === 0 ? (
+                                    <button
+                                      type="button"
+                                      disabled={saving}
+                                      onClick={() => control("start_speaker")}
+                                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                                    >
+                                      <Play className="h-3.5 w-3.5" fill="currentColor" />
+                                      <span>Bắt đầu tính giờ ({current.seconds}s)</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      disabled={saving}
+                                      onClick={() => control("start_speaker")}
+                                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer"
+                                      title="Bấm giờ lại từ đầu cho diễn giả này"
+                                    >
+                                      <RotateCcw className="h-3.5 w-3.5" />
+                                      <span>Bấm giờ lại ({current.seconds}s)</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Auto-Advance Setting Box */}
+                            {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
+                              <div className="space-y-2 p-3 rounded-xl bg-slate-50/90 border border-slate-200/80 text-xs">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <label className="flex items-center gap-2 font-semibold text-slate-700">Chế độ
+                                    <select aria-label="Chế độ điều hành" value={autoAdvance ? "auto" : "manual"} disabled={saving} onChange={e => updateAutoAdvance(e.target.value === "auto")} className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium focus:border-cyan-500 focus:outline-none">
+                                      <option value="manual">Thủ công</option><option value="auto">Tự động</option>
+                                    </select>
+                                  </label>
+
+                                  {autoAdvance && (
+                                    <div className="flex items-center gap-1.5 ml-auto">
+                                      <span className="text-slate-600 font-medium">Thời gian chuyển slide:</span>
+                                      <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={updateAutoAdvanceDelay} />
+                                      <span className="text-slate-600 font-medium">giây</span>
+                                    </div>
+                                  )}
+                                </div>
+                                {autoAdvance && (
+                                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                                    Khi hết thời gian phát biểu, chờ {autoAdvanceDelay} giây rồi chuyển người và slide. Đây là thời gian chờ chuyển lượt, không phải thời lượng phát biểu.
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Upcoming Speaker Preview Card */}
+                        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col justify-between">
+                          <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                              <Clock3 className="h-3.5 w-3.5 text-slate-400" />
+                              Diễn giả tiếp theo
+                            </span>
+                            {upcoming && (
+                              <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md font-medium">
+                                {fmt(upcoming.seconds)}
+                              </span>
+                            )}
+                          </div>
+
+                          {upcoming ? (
+                            <div className="my-3 flex items-center gap-3.5">
+                              <SpeakerAvatar
+                                name={upcoming.name}
+                                photoURL={upcoming.photoURL}
+                                className="h-12 w-12 rounded-xl"
+                                textClassName="font-bold text-base"
+                                ringClassName="ring-1 ring-slate-200 shadow-2xs"
+                              />
+
+                              <div className="min-w-0 flex-1">
+                                <h3 className="truncate font-bold text-sm text-slate-800">{upcoming.name}</h3>
+                                <p className="truncate text-xs text-slate-500">{upcoming.email || "Khách mời"}</p>
+                                <span className="mt-0.5 inline-block text-[11px] font-medium text-cyan-600">
+                                  Hãy chuẩn bị tài liệu và micro!
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="py-4 text-center text-xs text-slate-400">
+                              {activeMeeting.speakers.length > 0
+                                ? "Đã là người phát biểu cuối cùng."
+                                : "Chưa có danh sách diễn giả."}
+                            </div>
+                          )}
+
+                          <div className="rounded-xl bg-slate-50 px-3 py-2 flex items-center justify-between text-xs text-slate-500">
+                            <span>Tổng số người check-in:</span>
+                            <span className="font-bold text-slate-700">{activeMeeting.speakers.length} người</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Guest Check-in Form (MC / Admin) */}
+                    {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
+                      <form
+                        onSubmit={addGuest}
+                        className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs flex flex-wrap items-center gap-3"
+                      >
+                        <span className="font-semibold text-xs text-slate-700 shrink-0 flex items-center gap-1.5">
+                          <UserPlus className="h-3.5 w-3.5 text-cyan-600" />
+                          MC ghi nhận khách tại chỗ:
+                        </span>
+                        <input
+                          required
+                          value={guestName}
+                          onChange={(e) => setGuestName(e.target.value)}
+                          placeholder="Họ tên khách mời..."
+                          className="min-w-36 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                        />
+                        <input
+                          type="email"
+                          value={guestEmail}
+                          onChange={(e) => setGuestEmail(e.target.value)}
+                          placeholder="Email khách mời..."
+                          className="min-w-44 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!canManage || saving}
+                          title={!canManage ? "Chỉ MC/Admin có quyền check-in khách mời" : ""}
+                          className="rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 text-xs font-bold transition cursor-pointer disabled:opacity-40 shadow-xs"
+                        >
+                          Check-in khách
+                        </button>
+                      </form>
+                    )}
+                  </div>
+
+                  {/* RIGHT COLUMN: SPEAKER QUEUE (5/12) */}
+                  <div className="lg:col-span-5">
+                    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs sticky top-0">
+                      <div className="mb-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-cyan-600" />
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Danh sách thuyết trình ({filteredSpeakers.length}{filteredSpeakers.length !== activeMeeting.speakers.length ? `/${activeMeeting.speakers.length}` : ""})
+                            </h3>
+                          </div>
+                        </div>
+
+                        {/* Search & Type Filters */}
+                        <div className="flex flex-col gap-2">
+                          <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                            <input
+                              type="text"
+                              placeholder="Tìm kiếm khách..."
+                              value={speakerSearch}
+                              onChange={(e) => setSpeakerSearch(e.target.value)}
+                              className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50/50 text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none transition shadow-2xs"
+                            />
+                            {speakerSearch && (
+                              <button
+                                type="button"
+                                onClick={() => setSpeakerSearch("")}
+                                className="absolute right-2 top-2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
+                                title="Xóa tìm kiếm"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="flex items-center rounded-xl bg-slate-100 p-1 text-xs font-medium text-slate-600">
+                            <button
+                              type="button"
+                              onClick={() => setSpeakerTypeFilter("all")}
+                              className={`flex-1 text-center py-1 rounded-lg transition cursor-pointer ${speakerTypeFilter === "all"
+                                ? "bg-white text-slate-800 font-bold shadow-2xs"
+                                : "hover:text-slate-900"
+                                }`}
+                            >
+                              Tất cả ({activeMeeting.speakers.length})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSpeakerTypeFilter("guest")}
+                              className={`flex-1 text-center py-1 rounded-lg transition cursor-pointer ${speakerTypeFilter === "guest"
+                                ? "bg-cyan-600 text-white font-bold shadow-2xs"
+                                : "hover:text-cyan-700 text-slate-600"
+                                }`}
+                            >
+                              Khách ({guestSpeakerCount})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSpeakerTypeFilter("member")}
+                              className={`flex-1 text-center py-1 rounded-lg transition cursor-pointer ${speakerTypeFilter === "member"
+                                ? "bg-cyan-600 text-white font-bold shadow-2xs"
+                                : "hover:text-cyan-700 text-slate-600"
+                                }`}
+                            >
+                              Thành viên ({memberSpeakerCount})
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && checkedSpeakerIds.length > 0 && (
+                        <div className="mb-3 flex items-center justify-between gap-2 text-xs py-1.5 px-3 bg-amber-50 rounded-xl border border-amber-200">
+                          <span className="font-semibold text-amber-900">Đã chọn {checkedSpeakerIds.length}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              title="Chuyển xuống cuối lượt"
+                              aria-label="Chuyển xuống cuối lượt"
+                              disabled={saving}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 text-xs font-bold disabled:opacity-40 transition cursor-pointer shadow-2xs"
+                              onClick={() => void deferSpeaker(checkedSpeakerIds).catch(error => toast.error(error.message || "Không hoãn được lượt."))}
+                            >
+                              <ArrowDownToLine className="h-3.5 w-3.5" />
+                              <span>({checkedSpeakerIds.length})</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="text-xs text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                              disabled={saving}
+                              onClick={() => setCheckedSpeakerIds([])}
+                            >
+                              Bỏ chọn
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                        {filteredSpeakers.length === 0 ? (
+                          <div className="py-8 text-center text-xs text-slate-400">
+                            <Search className="h-6 w-6 text-slate-300 mx-auto mb-2" />
+                            <p>
+                              {!activeMeeting.speakers.length
+                                ? "Chưa có ai check-in vào cuộc họp này."
+                                : "Không tìm thấy khách mời hoặc diễn giả nào phù hợp."}
+                            </p>
+                            {(speakerSearch || speakerTypeFilter !== "all") && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSpeakerSearch("");
+                                  setSpeakerTypeFilter("all");
+                                }}
+                                className="mt-2 text-cyan-600 hover:text-cyan-800 font-semibold cursor-pointer"
+                              >
+                                Xóa bộ lọc tìm kiếm
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          filteredSpeakers.map((p) => {
+                            const i = p.originalIndex;
+                            const isSpeaking = i === activeMeeting.currentIndex && ["live", "paused"].includes(activeMeeting.status);
+                            const isGuest = !p.userId;
+                            return (
+                              <div
+                                key={p.id}
+                                className={`flex items-center gap-2.5 rounded-xl p-2.5 transition-all ${isSpeaking
+                                  ? "border border-cyan-400 bg-cyan-50/80 shadow-xs ring-1 ring-cyan-400/30"
+                                  : "border border-slate-200/70 bg-white hover:bg-slate-50/80"
+                                  }`}
+                              >
+                                <span className="w-5 text-center font-mono text-xs font-semibold text-slate-400 shrink-0">
+                                  {i + 1}
+                                </span>
+                                {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
+                                  <input
+                                    type="checkbox"
+                                    aria-label={`Chọn ${p.name}`}
+                                    checked={checkedSpeakerIds.includes(p.id)}
+                                    disabled={saving || (activeMeeting.status !== "scheduled" && i < activeMeeting.currentIndex)}
+                                    className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 shrink-0"
+                                    onChange={e => {
+                                      if (e.target.checked) {
+                                        setCheckedSpeakerIds(ids => [...ids, p.id]);
+                                        setPresentationSpeakerId(p.id);
+                                      } else {
+                                        setCheckedSpeakerIds(ids => ids.filter(id => id !== p.id));
+                                      }
+                                    }}
+                                  />
+                                )}
+
+                                <SpeakerAvatar
+                                  name={p.name}
+                                  photoURL={p.photoURL}
+                                  className="h-9 w-9 rounded-xl"
+                                  textClassName="font-bold text-xs"
+                                  ringClassName="ring-1 ring-slate-200 shrink-0 shadow-2xs"
+                                />
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <button type="button" aria-label={`Bắt đầu từ ${p.name}`} aria-pressed={presentationSpeakerId === p.id} disabled={saving || !canManage || !["scheduled", "live", "paused"].includes(activeMeeting.status)} onClick={() => setPresentationSpeakerId(p.id)} className="block truncate text-left text-xs font-semibold text-slate-800 hover:text-cyan-700 aria-pressed:text-cyan-700 aria-pressed:underline transition cursor-pointer">{p.name}</button>
+                                    {isGuest ? (
+                                      <span className="shrink-0 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80">
+                                        Khách mời
+                                      </span>
+                                    ) : (
+                                      <span className="shrink-0 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200/80">
+                                        Thành viên
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[11px] text-slate-500 block truncate">
+                                    {p.email || (isGuest ? "Khách mời" : "")} • {p.seconds} giây
+                                  </span>
+                                </div>
+
+                                {isSpeaking && (
+                                  <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+                                    <Megaphone className="h-3 w-3 animate-bounce" /> Đang nói
+                                  </span>
+                                )}
+                                {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (activeMeeting.status === "scheduled" || i >= activeMeeting.currentIndex) ? (
+                                  <button
+                                    type="button"
+                                    title={i === activeMeeting.speakers.length - 1 ? (p.deferred ? "Đã chuyển cuối lượt" : "Người cuối danh sách") : "Chuyển xuống cuối lượt"}
+                                    aria-label={`Để cuối lượt: ${p.name}`}
+                                    disabled={saving || i === activeMeeting.speakers.length - 1}
+                                    onClick={() => void deferSpeaker(p.id).catch(error => toast.error(error.message || "Không hoãn được lượt."))}
+                                    className={`shrink-0 p-1.5 rounded-lg border transition cursor-pointer ${p.deferred
+                                      ? "border-amber-300 bg-amber-100/90 text-amber-800"
+                                      : "border-amber-200 bg-amber-50/80 text-amber-800 hover:bg-amber-100"
+                                      } disabled:opacity-40 disabled:cursor-not-allowed`}
+                                  >
+                                    <ArrowDownToLine className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : p.deferred ? (
+                                  <span
+                                    title="Đã chuyển cuối lượt"
+                                    className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-amber-50 text-amber-700 border border-amber-200/80 shrink-0"
+                                  >
+                                    <ArrowDownToLine className="h-3.5 w-3.5" />
+                                  </span>
+                                ) : null}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

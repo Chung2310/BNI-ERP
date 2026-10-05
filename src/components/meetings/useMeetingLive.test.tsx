@@ -17,7 +17,7 @@ vi.mock("../../services/socketService", () => ({ socketService: {
   reconnect: socket.reconnect,
 } }));
 let data: import('../../services/meetingLiveService').MeetingLiveSnapshot; let online: boolean; let stale: import('../../services/meetingLiveService').MeetingLiveSnapshot | null;
-const emit = () => socket.listeners.get("meeting_updated")?.forEach(callback => callback({ id: "meeting" }));
+const emit = () => socket.listeners.get("meeting_updated")?.forEach(callback => callback({ id: "meeting", version: data.meeting.__v, serverNow: data.serverNow, live: JSON.parse(JSON.stringify(data.meeting)) }));
 beforeEach(() => {
   online = true; stale = null;
   data = ({ serverNow: Date.parse("2030-01-01T01:00:10Z"), slides: [],
@@ -67,6 +67,15 @@ it("switches the shared display to speaker view after a remote next command", as
     expect(display.result.current.snapshot?.meeting.currentIndex).toBe(1);
     expect(display.result.current.snapshot?.meeting.presentation?.view).toBe("speaker");
   });
+});
+it("switches the display to lucky draw immediately from the phone without another read", async () => {
+  const display = renderHook(() => useMeetingLive("meeting", true));
+  const phone = renderHook(() => useMeetingLive("meeting", false));
+  await waitFor(() => expect(display.result.current.snapshot && phone.result.current.snapshot).toBeTruthy());
+  const readsBefore = vi.mocked(fetch).mock.calls.filter(([, options]) => options?.method === "GET").length;
+  await act(async () => { await phone.result.current.command("/presentation-state", { view: "luckyDraw" }, "PATCH"); });
+  expect(display.result.current.snapshot?.meeting.presentation?.view).toBe("luckyDraw");
+  expect(vi.mocked(fetch).mock.calls.filter(([, options]) => options?.method === "GET")).toHaveLength(readsBefore);
 });
 it("recovers missed updates on reconnect and ignores a stale snapshot", async () => {
   const display = renderHook(() => useMeetingLive("meeting", true));

@@ -4,6 +4,7 @@ import { UserX } from "lucide-react";
 import type { UserProfile } from "../../types/common";
 import type { Meeting } from "../../services/meetingService";
 import { buildMemberAbsenceRanking } from "./memberAbsenceRanking";
+import { UserAvatar } from "../meetings/SpeakerAvatar";
 
 export function MemberAbsenceLeaderboard({ members, meetings, loading }: { members: UserProfile[]; meetings: Meeting[]; loading: boolean }) {
   const now = useNow();
@@ -24,7 +25,7 @@ export function MemberAbsenceLeaderboard({ members, meetings, loading }: { membe
         <th className="px-2 py-3">Hạng</th><th className="px-2 py-3">Thành viên</th><th className="px-2 py-3 text-center">Số buổi xét</th><th className="px-2 py-3 text-center">Vắng mặt</th><th className="px-2 py-3 text-center">Có mặt</th><th className="px-2 py-3 text-center">Check-in muộn</th><th className="px-2 py-3 text-right">Tổng phút muộn</th>
       </tr></thead><tbody className="divide-y divide-slate-100">{matches.slice(0, limit).map(member => <tr key={member.id} className="hover:bg-orange-50/40">
         <td className="px-2 py-3 font-semibold text-orange-700">#{member.rank}</td>
-        <td className="px-2 py-3"><div className="flex items-center gap-2.5">{member.photoURL ? <img src={member.photoURL} alt="" className="h-8 w-8 rounded-full object-cover" /> : <span className="grid h-8 w-8 place-items-center rounded-full bg-orange-50 text-orange-700">{member.name.charAt(0).toUpperCase()}</span>}<div><p className="font-medium text-slate-800">{member.name}</p>{member.companyName && <p className="mt-0.5 text-[11px] text-slate-400">{member.companyName}</p>}</div></div></td>
+        <td className="px-2 py-3"><div className="flex items-center gap-2.5"><UserAvatar name={member.name} photoURL={member.photoURL} className="h-8 w-8 rounded-full" textClassName="text-xs font-semibold" alt="" /><div><p className="font-medium text-slate-800">{member.name}</p>{member.companyName && <p className="mt-0.5 text-[11px] text-slate-400">{member.companyName}</p>}</div></div></td>
         <td className="px-2 py-3 text-center">{member.eligibleCount}</td><td className="px-2 py-3 text-center font-semibold text-orange-700">{member.absentCount} <span className="font-normal text-slate-400">({member.absentRate}%)</span></td>
         <td className="px-2 py-3 text-center">{member.attendedCount}</td><td className="px-2 py-3 text-center text-amber-700">{member.lateCount}</td>
         <td className="px-2 py-3 text-right">{member.totalLateMinutes > 0 && member.totalLateMinutes < 0.1 ? "<0,1" : member.totalLateMinutes.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}</td>

@@ -145,3 +145,19 @@ it('accepts a permanent QR and identifies the actual recorded meeting on success
   expect(screen.getByText(/cho cuộc họp “Cuộc họp đang diễn ra”/)).toBeTruthy();
   expect(screen.queryByText(/Mã QR đã hết hạn/)).toBeNull();
 });
+
+it("member check-in submits phone number identifier and validates with qrMemberInput", async () => {
+  fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: { name: "Bình" } }) });
+  render(<MeetingCheckInPage />);
+  fireEvent.change(await screen.findByLabelText("Email tài khoản"), { target: { value: "0901234567" } });
+  fireEvent.change(screen.getByLabelText("Mật khẩu"), { target: { value: "secret123" } });
+  fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+  await screen.findByText("Check-in thành công");
+  const [url, options] = fetchMock.mock.calls[1];
+  const payload = JSON.parse(options.body);
+  expect(url).toBe("/api/v1/meeting-checkin/test-token/member");
+  expect(qrMemberInput.validate(payload).error).toBeUndefined();
+  expect(payload.email).toBe("0901234567");
+  expect(payload.password).toBe("secret123");
+});
+
