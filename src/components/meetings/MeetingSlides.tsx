@@ -6,6 +6,7 @@ import { getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
 import { SlideTransitionDelayInput } from "./SlideTransitionDelayInput";
 import { SpeechesCompleteMessage } from "./SpeechesCompleteDialog";
 import type { ProfileSlide, SlideDeck } from "./slideTypes";
+import { SpeakerAvatar } from "./SpeakerAvatar";
 
 type Props = {
   meeting: SlideTimerMeeting & { _id: string; __v: number };
@@ -28,6 +29,71 @@ type Props = {
 };
 const button = "inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition disabled:opacity-40 cursor-pointer";
 const fieldClass = "w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none transition";
+
+function NextSpeakersOverlay({ speakers, large = false }: { speakers: ProfileSlide[]; large?: boolean }) {
+  if (!speakers.length) return null;
+  return (
+    <div
+      aria-label="Người thuyết trình tiếp theo"
+      className={`pointer-events-none absolute z-10 flex items-center justify-end select-none ${
+        large
+          ? "right-[3.8%] top-[3.8%] h-[8%] max-w-[70%] gap-3.5"
+          : "right-[3.8%] top-[3.2%] h-[9%] max-w-[72%] gap-2"
+      }`}
+    >
+      <span
+        className={`font-black uppercase tracking-wider text-[#d70b2d] shrink-0 ${
+          large ? "text-[clamp(11px,1.1vw,18px)]" : "text-[9px] sm:text-[11px]"
+        }`}
+      >
+        Tiếp theo:
+      </span>
+
+      <div className={`flex items-center ${large ? "gap-3.5" : "gap-1.5 sm:gap-2.5"}`}>
+        {speakers.map((s, i) => (
+          <div key={s.id} className="flex items-center gap-1.5 min-w-0 shrink-0">
+            {i > 0 && (
+              <span className={`text-slate-300 font-light ${large ? "text-[clamp(11px,1.1vw,18px)] mx-0.5" : "text-[10px] mx-0.5"}`}>
+                •
+              </span>
+            )}
+            <span
+              className={`grid shrink-0 place-items-center rounded-full bg-[#d70b2d] text-white font-extrabold ${
+                large
+                  ? "h-[clamp(18px,1.5vw,26px)] w-[clamp(18px,1.5vw,26px)] text-[clamp(10px,0.85vw,14px)]"
+                  : "h-4 w-4 text-[9px]"
+              }`}
+            >
+              {i + 1}
+            </span>
+            <SpeakerAvatar
+              name={s.name}
+              photoURL={s.photoURL}
+              className={`shrink-0 rounded-full ${
+                large
+                  ? "h-[clamp(24px,2.2vw,38px)] w-[clamp(24px,2.2vw,38px)]"
+                  : "h-5 w-5 sm:h-6 sm:w-6"
+              }`}
+              textClassName={large ? "text-[clamp(11px,1vw,16px)] font-bold" : "text-[10px] font-bold"}
+              ringClassName="border border-slate-200"
+              alt=""
+            />
+            <span
+              className={`truncate font-bold text-slate-800 tracking-tight ${
+                large
+                  ? "text-[clamp(12px,1.15vw,20px)] max-w-[clamp(100px,13vw,240px)]"
+                  : "text-[10px] sm:text-[12px] max-w-[85px] sm:max-w-[130px]"
+              }`}
+              title={s.name}
+            >
+              {s.name}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker, onTogglePause }: Props) {
   const [now, setNow] = useState(Date.now);
@@ -85,13 +151,13 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     let cancelled = false;
     setLoading(true);
     api(`/${meeting._id}/slides`).then((data: SlideDeck) => {
-      if (!cancelled) { setDeck(data); setError(""); }
+      if (!cancelled) { setDeck({ slides: data?.slides || [], version: data?.version || 0 }); setError(""); }
     }).catch(e => { if (!cancelled) setError(e.message || "Không tải được slide."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [api, meeting._id, meeting.__v, revision]);
 
-  const queue = useMemo(() => deck.slides.filter(s => !excluded.has(s.id)), [deck.slides, excluded]);
+  const queue = useMemo(() => (deck.slides || []).filter(s => !excluded.has(s.id)), [deck.slides, excluded]);
   const currentSpeakerId = ["live", "paused"].includes(meeting.status) ? meeting.speakers[meeting.currentIndex]?.id : undefined;
   // Selection previews a profile; fullscreen follows the shared speaker after starting it.
   const followsSpeaker = ["live", "paused"].includes(meeting.status);

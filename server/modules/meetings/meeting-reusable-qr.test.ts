@@ -150,6 +150,33 @@ test('member authentication and repeat attendance use the resolved meeting and c
   await assert.rejects(qrCheckInMember(token, { ...credentials, password: 'wrong' }), { status: 401 });
 });
 
+test('member authentication with phone number check-in', async t => {
+  const { state } = setup(t);
+  const password = await bcrypt.hash('secret', 4);
+  const person = { _id: '0123456789abcdef01234567', displayName: 'Phone Member', phone: '0901234567', password };
+  t.mock.method(UserModel, 'find', (query) => {
+    assert.equal(query.companyCode, 'ACME');
+    return {
+      select: () => ({
+        limit: () => ({
+          lean: async () => [person],
+        }),
+      }),
+    };
+  });
+  t.mock.method(UserModel, 'findOne', (query) => {
+    assert.equal(query.companyCode, 'ACME');
+    return {
+      select: () => ({
+        lean: async () => person,
+      }),
+    };
+  });
+  const credentials = { email: '0901234567', password: 'secret', latitude: 10, longitude: 106 };
+  assert.equal((await qrCheckInMember(token, credentials)).meetingId, 'current');
+  assert.equal(state.matches[0].speakers[0].userId, '0123456789abcdef01234567');
+});
+
 test('revocation during guest image upload cleans up the image and creates no attendance', async t => {
   const { state } = setup(t);
   const buffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1kAAAAASUVORK5CYII=', 'base64');

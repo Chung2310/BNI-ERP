@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { Crown, Trophy, Users } from "lucide-react";
 import type { UserProfile } from "../../types/common";
 import type { Meeting } from "../../services/meetingService";
+import { UserAvatar } from "../meetings/SpeakerAvatar";
 
 export function ActiveMemberLeaderboard({ members: chapterMembers, meetings: filteredMeetings, loading }: {
   members: UserProfile[];
@@ -112,7 +113,7 @@ export function ActiveMemberLeaderboard({ members: chapterMembers, meetings: fil
           <div className="flex items-center gap-2">
             <Trophy className="h-4 w-4 text-sky-500" />
             <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-800">BẢNG XẾP HẠNG THÀNH VIÊN TÍCH CỰC</h3>
-            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">TOP 10</span>
+            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">Top {Math.min(10, memberRankings.length)}</span>
           </div>
           <p className="mt-0.5 text-xs text-slate-400">Xếp hạng theo số buổi điểm danh tham gia và thói quen đến sớm chuẩn giờ</p>
         </div>
