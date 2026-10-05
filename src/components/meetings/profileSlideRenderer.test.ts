@@ -22,6 +22,8 @@ it.each(["guest", "member"] as const)("fills the template with %s data and hides
   for (const value of ["NGUYỄN AN", "ACME", "THIẾT KẾ", "HOTLINE: 0901234567", "Bắc Ninh", "Doanh nghiệp", "SẢN PHẨM TIÊU BIỂU"]) expect(text).toContain(value);
   expect(ctx.arc).toHaveBeenCalledWith(338, 468, 180, 0, Math.PI * 2);
   expect(document.fonts.load).toHaveBeenCalledWith('700 32px "Be Vietnam Pro"', expect.any(String));
+  expect(document.fonts.load).toHaveBeenCalledWith('700 32px "Faustina"', expect.any(String));
+  expect(text).toContain(kind === "member" ? "THÔNG TIN THÀNH VIÊN" : "THÔNG TIN KHÁCH MỜI");
   expect(ctx.drawImage.mock.calls.filter(call => call.length === 5 && call[2] >= 504 && call[2] < 740)).toHaveLength(5);
   ctx.fillText.mockClear(); ctx.arc.mockClear(); ctx.drawImage.mockClear();
   await renderProfileSlide({ ...slide, company: " ", industry: "", phone: " ", address: "", targetMarket: " ", galleryImages: [], photoURL: "" });
@@ -45,8 +47,21 @@ it("shrinks long Vietnamese text within both width and height, with a bounded fa
   for (const line of drawn) {
     expect(ctx.measureText(line.text).width).toBeLessThanOrEqual(400);
     expect(line.y).toBeGreaterThanOrEqual(100);
-    expect(line.y + line.size * 1.35).toBeLessThanOrEqual(220);
+    expect(line.y + line.size * 0.2).toBeLessThanOrEqual(220);
   }
   expect(drawn.at(-1)?.text).toMatch(/…$/);
   expect(ctx.rect).toHaveBeenCalledWith(100, 100, 400, 120);
+});
+
+it("centers accented glyphs inside a title plaque without clipping accents", () => {
+  const ctx = {
+    font: "", textAlign: "center", textBaseline: "top",
+    save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), rect: vi.fn(), clip: vi.fn(),
+    measureText: () => ({ width: 200, actualBoundingBoxAscent: 29, actualBoundingBoxDescent: 5 }),
+    fillText: vi.fn(),
+  };
+  textBox(ctx as unknown as CanvasRenderingContext2D, "THỊ TRƯỜNG MỤC TIÊU", 300, 100, 470, 1, 27, 18, "#fff", 700, 54);
+  const baseline = ctx.fillText.mock.calls[0][2];
+  expect(ctx.textBaseline).toBe("alphabetic");
+  expect(baseline - 29 - 100).toBe(154 - (baseline + 5));
 });

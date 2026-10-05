@@ -2,6 +2,7 @@ import type { ProfileSlide } from "./slideTypes";
 import "@fontsource/be-vietnam-pro/400.css";
 import "@fontsource/be-vietnam-pro/700.css";
 import "@fontsource/be-vietnam-pro/800.css";
+import "./profileSlideFonts.css";
 
 export const SLIDE_WIDTH = 1920;
 export const SLIDE_HEIGHT = 1080;
@@ -31,8 +32,8 @@ export function loadSlideImage(url: string): Promise<HTMLImageElement | null> {
   return promise;
 }
 
-function font(ctx: CanvasRenderingContext2D, size: number, weight = 400) {
-  ctx.font = `${weight} ${size}px "Be Vietnam Pro", sans-serif`;
+function font(ctx: CanvasRenderingContext2D, size: number, weight = 400, family = "Be Vietnam Pro") {
+  ctx.font = `${weight} ${size}px "${family}", ${family === "Faustina" ? "serif" : "sans-serif"}`;
 }
 
 export function wrapSlideText(ctx: Pick<CanvasRenderingContext2D, "measureText">, value: string, width: number): string[] {
@@ -54,16 +55,16 @@ export function wrapSlideText(ctx: Pick<CanvasRenderingContext2D, "measureText">
   return lines;
 }
 
-export function textBox(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, width: number, maxLines: number, size: number, minSize: number, color: string, weight = 400, height = maxLines * size * 1.35) {
+export function textBox(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, width: number, maxLines: number, size: number, minSize: number, color: string, weight = 400, height = maxLines * size * 1.35, family = "Be Vietnam Pro") {
   let lines: string[] = [];
   let chosen = size;
   for (; chosen >= minSize; chosen -= 1) {
-    font(ctx, chosen, weight);
+    font(ctx, chosen, weight, family);
     lines = wrapSlideText(ctx, value, width);
     if (lines.length <= maxLines && lines.length * chosen * 1.35 <= height && lines.every(line => ctx.measureText(line).width <= width)) break;
   }
   chosen = Math.max(chosen, minSize);
-  font(ctx, chosen, weight);
+  font(ctx, chosen, weight, family);
   const visibleLines = Math.max(1, Math.min(maxLines, Math.floor(height / (chosen * 1.35))));
   if (lines.length > visibleLines) {
     lines = lines.slice(0, visibleLines);
@@ -75,8 +76,15 @@ export function textBox(ctx: CanvasRenderingContext2D, value: string, x: number,
   const left = ctx.textAlign === "center" ? x - width / 2 : ctx.textAlign === "right" ? x - width : x;
   ctx.beginPath(); ctx.rect(left, y, width, height); ctx.clip();
   ctx.fillStyle = color;
-  const top = y + Math.max(0, (height - lines.length * chosen * 1.35) / 2);
-  lines.forEach((line, i) => ctx.fillText(line, x, top + i * chosen * 1.35, width));
+  // Center actual glyph bounds, including Vietnamese accents, rather than the font's em box.
+  ctx.textBaseline = "alphabetic";
+  const metrics = lines.map(line => ctx.measureText(line));
+  const ascent = Math.max(...metrics.map(m => m.actualBoundingBoxAscent ?? chosen * 0.8));
+  const descent = Math.max(...metrics.map(m => m.actualBoundingBoxDescent ?? chosen * 0.2));
+  const lineHeight = chosen * 1.35;
+  const inkHeight = ascent + descent + (lines.length - 1) * lineHeight;
+  const top = y + (height - inkHeight) / 2;
+  lines.forEach((line, i) => ctx.fillText(line, x, top + ascent + i * lineHeight, width));
   ctx.restore();
   return lines.length * chosen * 1.35;
 }
@@ -103,7 +111,7 @@ function pill(ctx: CanvasRenderingContext2D, label: string, x: number, y: number
   ctx.fillStyle = "rgba(255,255,255,0.22)";
   ctx.beginPath(); ctx.roundRect(x + 12, y + 4, width - 24, 7, 4); ctx.fill();
   ctx.textAlign = "center";
-  textBox(ctx, label, x + width / 2, y + 8, width - 24, 1, 27, 18, "#fff", 700, 42);
+  textBox(ctx, label, x + width / 2, y, width - 24, 1, 27, 18, "#fff", 700, 54);
   ctx.restore();
 }
 
@@ -114,6 +122,7 @@ export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas:
     loadSlideImage(slide.photoURL),
     Promise.all(urls.map(loadSlideImage)),
     ...[400, 700, 800].map(weight => document.fonts.load(`${weight} 32px "Be Vietnam Pro"`, "Nguyễn Đặng Trần Quốc Việt")),
+    document.fonts.load('700 32px "Faustina"', "Địa chỉ Thị trường mục tiêu"),
   ]);
   const [background, frame, logo, footerWhite, footerRed, swoosh] = assets;
   const canvas = document.createElement("canvas");
@@ -130,7 +139,11 @@ export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas:
   if (footerRed) ctx.drawImage(footerRed, 1560, 873, 360, 207);
 
   // Chapter mark and the red title ribbon from the reference layout.
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.25)";
+  ctx.shadowBlur = 12; ctx.shadowOffsetY = 10;
   ctx.fillStyle = "#ffffff"; ctx.fillRect(55, 28, 288, 191);
+  ctx.restore();
   if (logo) ctx.drawImage(logo, 92, 36, 215, 105);
   else textBox(ctx, "BNI", 100, 35, 220, 1, 90, 90, RED, 800);
   ctx.textAlign = "center";
@@ -162,7 +175,7 @@ export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas:
     textBox(ctx, `HOTLINE: ${slide.phone.trim()}`, 347, 878, 600, 1, 28, 16, "#00528d", 700, 42);
   }
   if (slide.address?.trim()) {
-    textBox(ctx, slide.address.trim(), 347, 934, 610, 3, 29, 16, "#00528d", 700, 105);
+    textBox(ctx, slide.address.trim(), 347, 934, 610, 3, 29, 16, "#00528d", 700, 105, "Faustina");
   }
   ctx.textAlign = "left";
 
@@ -204,7 +217,7 @@ export async function renderProfileSlide(slide: ProfileSlide): Promise<{ canvas:
   }
   if (slide.targetMarket?.trim()) {
     pill(ctx, "THỊ TRƯỜNG MỤC TIÊU", 710, 777, 470);
-    textBox(ctx, slide.targetMarket.trim(), 735, 852, 1020, 5, 40, 17, "#003b67", 700, 170);
+    textBox(ctx, slide.targetMarket.trim(), 735, 852, 1020, 5, 40, 17, "#003b67", 700, 170, "Faustina");
   }
   const warnings: string[] = [];
   if (slide.photoURL && !avatar) warnings.push("Không tải được ảnh đại diện.");
