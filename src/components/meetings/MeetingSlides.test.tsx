@@ -43,9 +43,23 @@ it.each([0, 1])("previews selected attendee %s without changing the live turn un
   expect((await screen.findByRole("img")).getAttribute("aria-label")).toContain(slides[target].name);
   expect(start).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
-  await waitFor(() => expect(start).toHaveBeenCalledExactlyOnceWith(slides[target].id));
+  await waitFor(() => expect(start).toHaveBeenCalledExactlyOnceWith(slides[target].id, 1));
   view.rerender(<MeetingSlides meeting={{ ...meeting, currentIndex: target }} canManage api={api} onStartPresentation={start} />);
   expect((await within(screen.getByRole("dialog")).findByRole("img")).getAttribute("aria-label")).toContain(slides[target].name);
+});
+
+it("reloads both meeting data and slides after a presentation conflict", async () => {
+  const api = vi.fn().mockResolvedValue({ slides, version: 2 });
+  const reload = vi.fn().mockResolvedValue(undefined);
+  const start = vi.fn().mockRejectedValue(new Error("Cuộc họp đã thay đổi. Vui lòng tải lại trước khi thao tác."));
+  render(<MeetingSlides meeting={meeting} canManage api={api} onStartPresentation={start} onReloadData={reload} />);
+  await screen.findByText("Nguyễn An");
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
+  await screen.findByRole("alert");
+  fireEvent.click(screen.getByRole("button", { name: "Tải lại dữ liệu" }));
+  await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
 });
 
 it("defers a waiting speaker and disables deferral for the last attendee", async () => {
