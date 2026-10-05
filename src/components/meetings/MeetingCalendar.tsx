@@ -4,14 +4,15 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { vietnamDateTime } from "../../utils/meetingRecurrence";
 import { VietnameseMonthPicker } from "../common/VietnameseMonthPicker";
 import { MeetingScheduleActions } from "./MeetingScheduleActions";
+import { meetingElapsedLabel } from "./meetingElapsedLabel";
 
-type CalendarMeeting = { _id: string; title: string; startsAt: string; originalStartsAt?: string; seriesId?: string; status: string; __v: number };
+type CalendarMeeting = { _id: string; title: string; startsAt: string; startedAt?: string; originalStartsAt?: string; seriesId?: string; status: string; __v: number };
 const labels: Record<string, string> = { scheduled: "Sắp diễn ra", live: "Đang diễn ra", paused: "Tạm dừng", ended: "Đã kết thúc", cancelled: "Đã hủy" };
 const statusDots: Record<string, string> = { scheduled: "bg-sky-400", live: "bg-cyan-500", paused: "bg-amber-400", ended: "bg-slate-400", cancelled: "bg-rose-400" };
 const weekDays = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ nhật"];
 
-export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChange, revision, load, canManage, onOpen, onReschedule, onCancel, onDelete, filter }: {
-  month: string; onMonthChange: (value: string) => void; revision: number;
+export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChange, revision, tick = Date.now(), flowStepLabel = () => "Check-in", load, canManage, onOpen, onReschedule, onCancel, onDelete, filter }: {
+  month: string; onMonthChange: (value: string) => void; revision: number; tick?: number; flowStepLabel?: (meetingId: string) => string;
   load: (path: string) => Promise<T[]>; canManage: boolean; onOpen: (item: T) => void; onReschedule: (item: T) => void; onCancel: (item: T) => void; onDelete: (item: T) => void; filter: (item: T) => boolean;
 }) {
   const [items, setItems] = useState<T[]>([]);
@@ -98,14 +99,18 @@ export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChang
           <div><h2 id="calendar-day-title" className="text-sm font-medium">Lịch ngày {selectedDay ? dateLabel(selectedDay) : ""}</h2><p className="mt-0.5 text-xs text-slate-500">{selectedMeetings.length} buổi</p></div>
           <button type="button" autoFocus aria-label="Đóng lịch ngày" onClick={closeDay} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 cursor-pointer"><X className="h-4 w-4" /></button>
         </div>
-        {selectedMeetings.length === 0 ? <p className="py-5 text-center text-xs text-slate-500">Chưa có cuộc họp trong ngày này.</p> : <div className="space-y-2">{selectedMeetings.map(item => <article key={item._id} className="rounded-xl border border-cyan-100 bg-cyan-50/40 p-3">
+        {selectedMeetings.length === 0 ? <p className="py-5 text-center text-xs text-slate-500">Chưa có cuộc họp trong ngày này.</p> : <div className="space-y-2">{selectedMeetings.map(item => {
+          const live = item.status === "live";
+          const inProgress = live || item.status === "paused";
+          return <article key={item._id} className="rounded-xl border border-cyan-100 bg-cyan-50/40 p-3">
           <button type="button" onClick={() => { closeDay(); onOpen(item); }} className="w-full text-left cursor-pointer">
             <span className="block text-sm font-medium text-slate-800">{vietnamDateTime(item.startsAt).slice(11)} · {item.title}</span>
-            <span className="mt-1 flex items-center gap-1.5 text-xs text-slate-500"><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${statusDots[item.status] || "bg-slate-400"}`} />{labels[item.status] || item.status}{item.seriesId ? " · Định kỳ" : ""}</span>
+            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500"><span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${statusDots[item.status] || "bg-slate-400"}`} />{live ? meetingElapsedLabel(item, tick) : labels[item.status] || item.status}</span>{inProgress && <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-cyan-800">Đang {flowStepLabel(item._id)}</span>}{item.seriesId && <span>Định kỳ</span>}</span>
           </button>
           {item.originalStartsAt && new Date(item.originalStartsAt).getTime() !== new Date(item.startsAt).getTime() && <p className="mt-1 text-[11px] text-slate-500">Dời từ {vietnamDateTime(item.originalStartsAt).replace("T", " ")}</p>}
           {canManage && item.status !== "ended" && <div className="mt-2 border-t border-cyan-100 pt-2"><MeetingScheduleActions status={item.status} onCancel={() => { closeDay(); onCancel(item); }} onReschedule={() => { closeDay(); onReschedule(item); }} onDelete={() => { closeDay(); onDelete(item); }} /></div>}
-        </article>)}</div>}
+        </article>;
+        })}</div>}
       </div>}
     </dialog>, document.body)}
   </section>;

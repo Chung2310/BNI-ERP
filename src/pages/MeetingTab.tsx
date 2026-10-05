@@ -48,6 +48,7 @@ import { LuckyDrawTab } from "../components/meetings/LuckyDrawTab";
 import { MeetingFlowStepper, MEETING_FLOW_META, loadMeetingFlowOrder, saveMeetingFlowOrder, type MeetingFlowStep } from "../components/meetings/MeetingFlowStepper";
 import { ActiveMembersPanel } from "../components/meetings/ActiveMembersPanel";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
+import { SearchableSelect } from "../components/common/SearchableSelect";
 import { toast } from "./Toast";
 
 type Speaker = {
@@ -225,7 +226,6 @@ export default function MeetingTab() {
     setSlidesOpen(true);
   }, []);
   const [prioritySpeakerId, setPrioritySpeakerId] = useState("");
-  const [prioritySpeakerSearch, setPrioritySpeakerSearch] = useState("");
   const [priorityPosition, setPriorityPosition] = useState(1);
 
   // Fullscreen state for Meeting Detail Modal
@@ -495,7 +495,6 @@ export default function MeetingTab() {
     if (m.status === "ended") return;
     setEditingMeeting(m);
     setPrioritySpeakerId("");
-    setPrioritySpeakerSearch("");
     setPriorityPosition(1);
     setEditTitle(m.title);
     setEditLocation(m.location || "");
@@ -922,7 +921,7 @@ export default function MeetingTab() {
       </div>
       {canManage && showSharedQr && <CompanyCheckInQrDialog api={api} companyCode={userProfile?.companyCode} onClose={() => setShowSharedQr(false)} />}
       {/* Grid of Meeting Cards (Dạng danh sách / Thẻ hiển thị) */}
-      {view === "calendar" ? <MeetingCalendar<Meeting> month={calendarMonth} onMonthChange={setCalendarMonth} revision={calendarRevision} load={api} canManage={canManage} filter={matchesMeetingFilter}
+      {view === "calendar" ? <MeetingCalendar<Meeting> month={calendarMonth} onMonthChange={setCalendarMonth} revision={calendarRevision} tick={tick} flowStepLabel={meetingId => MEETING_FLOW_META[getMeetingFlowStep(meetingId)].label} load={api} canManage={canManage} filter={matchesMeetingFilter}
         onOpen={meeting => { setItems(previous => [...previous.filter(item => item._id !== meeting._id), meeting]); setDetailMeetingId(meeting._id); openMeetingFlow(meeting); }}
         onReschedule={setReschedulingMeeting}
         onCancel={setCancellingMeeting}
@@ -940,7 +939,6 @@ export default function MeetingTab() {
             const winnerCount = m.luckyDraw?.winners?.length || 0;
             const isLive = m.status === "live" || m.status === "paused";
             const currentMeetingStep = isLive ? MEETING_FLOW_META[detailMeetingId === m._id ? flowStep : getMeetingFlowStep(m._id)] : null;
-            const CurrentStepIcon = currentMeetingStep?.icon;
 
             return (
               <div
@@ -974,7 +972,7 @@ export default function MeetingTab() {
                   )}
 
                   {/* Status Badge */}
-                  <div className="absolute top-2 left-2 flex flex-col items-start gap-1">
+                  <div className="absolute top-2 left-2">
                     {m.status === "live" || m.status === "paused" ? (
                       <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-green-300 bg-green-50/95 text-green-700 shadow-xs backdrop-blur-xs">
                         <span className="relative flex h-2 w-2 shrink-0">
@@ -999,9 +997,6 @@ export default function MeetingTab() {
                         {s.label}
                       </span>
                     )}
-                    {currentMeetingStep && CurrentStepIcon && <span title={`Bước hiện tại: ${currentMeetingStep.label}`} className="inline-flex items-center gap-1 rounded-full border border-white/80 bg-white/95 px-2 py-0.5 text-[10px] font-bold text-cyan-800 shadow-xs backdrop-blur-xs">
-                      <CurrentStepIcon className="h-3 w-3" />Bước hiện tại: {currentMeetingStep.label}
-                    </span>}
                   </div>
 
                   {/* Edit meeting */}
@@ -1019,18 +1014,12 @@ export default function MeetingTab() {
                   )}
 
                   {/* Time preview on image bottom */}
-                  <div className="absolute bottom-2.5 left-3 right-3 flex items-center gap-1.5 text-xs">
-                    {m.coverImage ? (
-                      <div className="flex items-center gap-1.5 text-white/95 font-medium drop-shadow-sm">
-                        <Clock3 className="h-3.5 w-3.5 text-cyan-300 shrink-0" />
-                        <span className="truncate">{dateText(m.startsAt)}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-slate-600 font-semibold drop-shadow-xs">
-                        <Clock3 className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                        <span className="truncate">{dateText(m.startsAt)}</span>
-                      </div>
-                    )}
+                  <div className="absolute bottom-2.5 left-3 right-3 flex min-w-0 items-center justify-between gap-1.5 text-xs">
+                    <div className={`flex min-w-0 flex-1 items-center gap-1.5 font-medium ${m.coverImage ? "text-white/95 drop-shadow-sm" : "text-slate-600 drop-shadow-xs"}`}>
+                      <Clock3 className={`h-3.5 w-3.5 shrink-0 ${m.coverImage ? "text-cyan-300" : "text-slate-500"}`} />
+                      <span className="truncate">{dateText(m.startsAt)}</span>
+                    </div>
+                    {currentMeetingStep && <span title={`Đang ${currentMeetingStep.label}`} className="max-w-[48%] shrink-0 truncate rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-bold text-cyan-800 shadow-xs">Đang {currentMeetingStep.label}</span>}
                   </div>
                 </div>
 
@@ -1913,7 +1902,7 @@ export default function MeetingTab() {
               <div className={recurring ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 sm:grid-cols-2 gap-3"}>
                 {!recurring && <div>
                   <label className="block font-bold text-slate-700 mb-1">
-                    Thời gian diễn ra (giờ Việt Nam) <span className="text-rose-500">*</span>
+                    Thời gian bắt đầu <span className="text-rose-500">*</span>
                   </label>
                   <MeetingDateTimePicker
                     required
@@ -1933,7 +1922,7 @@ export default function MeetingTab() {
                 </div>
               </div>
 
-              {!recurring && <label className="block text-sm font-bold text-slate-700">Giờ kết thúc cuộc họp *<input aria-label="Giờ kết thúc cuộc họp" required type="datetime-local" value={endsAt} min={startsAt || undefined} onChange={event => setEndsAt(event.target.value)} className="mt-1 block w-full rounded-xl border border-slate-200 p-2.5" /><span className="mt-1 block text-xs font-normal text-slate-500">QR dùng chung nhận check-in từ giờ bắt đầu đến trước giờ kết thúc. Mặc định 2 giờ, có thể điều chỉnh.</span></label>}
+              {!recurring && <div className="text-sm font-bold text-slate-700"><label className="mb-1 block">Thời gian kết thúc cuộc họp <span className="text-rose-500">*</span></label><MeetingDateTimePicker ariaLabel="Giờ kết thúc cuộc họp" required value={endsAt} onChange={setEndsAt} /><span className="mt-1 block text-xs font-normal text-slate-500">QR dùng chung nhận check-in từ giờ bắt đầu đến trước giờ kết thúc. Mặc định 2 giờ, có thể điều chỉnh.</span></div>}
 
               <MeetingLocationFields value={gpsPoint} onChange={setGpsPoint} radius={gpsRadiusMeters} onRadiusChange={setGpsRadiusMeters} />
 
@@ -2014,7 +2003,7 @@ export default function MeetingTab() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
-                    Thời gian diễn ra (giờ Việt Nam) <span className="text-rose-500">*</span>
+                    Thời gian bắt đầu <span className="text-rose-500">*</span>
                   </label>
                   <MeetingDateTimePicker
                     required
@@ -2035,7 +2024,7 @@ export default function MeetingTab() {
                 </div>
               </div>
 
-              <label className="block text-sm font-bold text-slate-700">Giờ kết thúc cuộc họp *<input aria-label="Giờ kết thúc cuộc họp" required type="datetime-local" value={editEndsAt} min={editStartsAt || undefined} onChange={event => setEditEndsAt(event.target.value)} className="mt-1 block w-full rounded-xl border border-slate-200 p-2.5" /><span className="mt-1 block text-xs font-normal text-slate-500">QR dùng chung nhận check-in từ giờ bắt đầu đến trước giờ kết thúc. Mặc định 2 giờ, có thể điều chỉnh.</span></label>
+              <div className="text-sm font-bold text-slate-700"><label className="mb-1 block">Thời gian kết thúc cuộc họp <span className="text-rose-500">*</span></label><MeetingDateTimePicker ariaLabel="Giờ kết thúc cuộc họp" required value={editEndsAt} onChange={setEditEndsAt} /><span className="mt-1 block text-xs font-normal text-slate-500">QR dùng chung nhận check-in từ giờ bắt đầu đến trước giờ kết thúc. Mặc định 2 giờ, có thể điều chỉnh.</span></div>
 
               <MeetingLocationFields value={editGpsPoint} onChange={setEditGpsPoint} radius={editGpsRadiusMeters} onRadiusChange={setEditGpsRadiusMeters} />
 
@@ -2057,15 +2046,18 @@ export default function MeetingTab() {
               {canManage && orderingMeeting && ["scheduled", "live", "paused"].includes(orderingMeeting.status) && orderingMeeting.speakers.length > 0 && <div className="mb-4 space-y-2 rounded-xl border border-cyan-100 bg-cyan-50/40 p-3">
                 <h4 className="font-bold text-slate-800">Sắp xếp thứ tự thuyết trình</h4>
                 <div className="flex flex-wrap items-end gap-3">
-                  <label className="min-w-48 flex-1 text-xs font-semibold">Chọn người phát biểu
-                    <input aria-label="Tìm người phát biểu để sắp xếp" type="search" value={prioritySpeakerSearch} onChange={event => setPrioritySpeakerSearch(event.target.value)} placeholder="Tìm theo tên..." disabled={saving || pendingStart >= orderingMeeting.speakers.length} className="mt-1 mb-1 w-full rounded-lg border bg-white p-2 text-sm" />
-                    <select aria-label="Chọn người để sắp xếp" disabled={saving} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm"
+                  <label className="min-w-48 flex-1 text-xs font-normal">Chọn người phát biểu
+                    <SearchableSelect ariaLabel="Chọn người để sắp xếp" searchPlaceholder="Tìm khách hoặc thành viên..."
+                      placeholder={pendingStart >= orderingMeeting.speakers.length ? "Không còn người đang chờ phát biểu" : "Chọn khách hoặc thành viên"}
+                      className="mt-1" compact subtle disabled={saving}
                       value={orderingMeeting.speakers.slice(pendingStart).some(person => person.id === prioritySpeakerId) ? prioritySpeakerId : orderingMeeting.speakers[pendingStart]?.id || ""}
-                      onChange={event => setPrioritySpeakerId(event.target.value)}>
-                      {pendingStart >= orderingMeeting.speakers.length && <option value="">Không còn người đang chờ phát biểu</option>}
-                      {orderingMeeting.speakers.map((person, index) => ({ person, index })).filter(({ person }) => person.name.toLocaleLowerCase("vi").includes(prioritySpeakerSearch.trim().toLocaleLowerCase("vi"))).map(({ person, index }) => <option key={person.id} value={person.id} disabled={index < pendingStart}>{person.name}{index < pendingStart ? index === orderingMeeting.currentIndex ? " — Đang phát biểu" : " — Đã phát biểu" : ""}</option>)}
-                      {prioritySpeakerSearch && !orderingMeeting.speakers.some(person => person.name.toLocaleLowerCase("vi").includes(prioritySpeakerSearch.trim().toLocaleLowerCase("vi"))) && <option value="" disabled>Không tìm thấy người phát biểu</option>}
-                    </select>
+                      onChange={setPrioritySpeakerId}
+                      options={orderingMeeting.speakers.map((person, index) => ({
+                        value: person.id,
+                        label: `${person.name}${index < pendingStart ? index === orderingMeeting.currentIndex ? " — Đang phát biểu" : " — Đã phát biểu" : ""}`,
+                        searchText: person.name,
+                        disabled: index < pendingStart,
+                      }))} />
                   </label>
                   <label className="text-xs font-semibold">Thứ tự ưu tiên
                     <input aria-label="Thứ tự ưu tiên" type="number" inputMode="numeric" min={1} max={Math.max(1, orderingMeeting.speakers.length - pendingStart)} disabled={saving || pendingStart >= orderingMeeting.speakers.length}
