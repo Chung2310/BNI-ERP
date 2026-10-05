@@ -1,3 +1,4 @@
+import { MEMBER_RANKING_PODIUM } from "../../config/memberRankingPodium";
 import { useMemo } from "react";
 import { Crown, Trophy, Users } from "lucide-react";
 import type { UserProfile } from "../../types/common";
@@ -102,14 +103,14 @@ export function ActiveMemberLeaderboard({ members: chapterMembers, meetings: fil
   }, [chapterMembers, filteredMeetings]);
 
   const topFiveMembers = useMemo(() => memberRankings.slice(0, 5), [memberRankings]);
-  const nextFiveMembers = useMemo(() => memberRankings.slice(5, 10), [memberRankings]);
+  const topTenMembers = useMemo(() => memberRankings.slice(0, 10), [memberRankings]);
 
   return (
       <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
           <div>
             <div className="flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-amber-500" />
+              <Trophy className="h-4 w-4 text-sky-500" />
               <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">
                 Bảng xếp hạng thành viên tích cực
               </h3>
@@ -134,68 +135,10 @@ export function ActiveMemberLeaderboard({ members: chapterMembers, meetings: fil
           <div className="pt-6">
             {/* Top 5 - Bục Podium 5 cột cao thấp, Top 1 ở chính giữa (#4 - #2 - #1 - #3 - #5) */}
             {(() => {
-              const PODIUM_SLOTS = [
-                {
-                  rankIndex: 3, // #4 (ngoài cùng bên trái)
-                  rankNum: 4,
-                  heightClass: "h-28 sm:h-36",
-                  bgColor: "bg-blue-500",
-                  textColor: "text-white",
-                  dividerColor: "border-white/20",
-                  borderColor: "border-blue-400/50",
-                  badgeColor: "bg-blue-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-blue-400",
-                },
-                {
-                  rankIndex: 1, // #2 (trái giữa)
-                  rankNum: 2,
-                  heightClass: "h-44 sm:h-52",
-                  bgColor: "bg-red-500",
-                  textColor: "text-white",
-                  dividerColor: "border-white/20",
-                  borderColor: "border-red-400/50",
-                  badgeColor: "bg-red-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-red-400",
-                },
-                {
-                  rankIndex: 0, // #1 (CHÍNH GIỮA - TOP 1 QUÁN QUÂN)
-                  rankNum: 1,
-                  heightClass: "h-56 sm:h-64",
-                  bgColor: "bg-yellow-400",
-                  textColor: "text-slate-900",
-                  dividerColor: "border-slate-900/15",
-                  borderColor: "border-yellow-400 shadow-sm",
-                  badgeColor: "bg-amber-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-yellow-400",
-                  isTop1: true,
-                },
-                {
-                  rankIndex: 2, // #3 (phải giữa)
-                  rankNum: 3,
-                  heightClass: "h-36 sm:h-44",
-                  bgColor: "bg-green-500",
-                  textColor: "text-white",
-                  dividerColor: "border-white/20",
-                  borderColor: "border-green-400/50",
-                  badgeColor: "bg-green-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-green-400",
-                },
-                {
-                  rankIndex: 4, // #5 (ngoài cùng bên phải)
-                  rankNum: 5,
-                  heightClass: "h-22 sm:h-28",
-                  bgColor: "bg-orange-500",
-                  textColor: "text-white",
-                  dividerColor: "border-white/20",
-                  borderColor: "border-orange-400/50",
-                  badgeColor: "bg-orange-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                  ringColor: "ring-2 ring-orange-400",
-                },
-              ];
 
               return (
                 <div className="grid grid-cols-5 gap-2 sm:gap-4 items-end min-h-[300px] sm:min-h-[340px] px-1 sm:px-4 pb-2 border-b border-slate-100">
-                  {PODIUM_SLOTS.map((slot) => {
+                  {MEMBER_RANKING_PODIUM.map((slot) => {
                     const m = topFiveMembers[slot.rankIndex];
 
                     if (!m) {
@@ -222,7 +165,7 @@ export function ActiveMemberLeaderboard({ members: chapterMembers, meetings: fil
                         {/* Header info above column: Avatar & Name */}
                         <div className="flex flex-col items-center mb-2.5 w-full">
                           {slot.isTop1 && (
-                            <Crown className="h-4 w-4 text-amber-500 fill-amber-400 drop-shadow-xs -mb-0.5" />
+                            <Crown className="h-4 w-4 text-sky-500 fill-sky-300 drop-shadow-xs -mb-0.5" />
                           )}
                           <div className="relative mb-1.5">
                             {m.photoURL ? (
@@ -294,27 +237,27 @@ export function ActiveMemberLeaderboard({ members: chapterMembers, meetings: fil
               );
             })()}
 
-            {/* Top 6 to 10 - Danh sách dạng bảng gọn gàng */}
-            {nextFiveMembers.length > 0 && (
+            {/* Full top 10 list, including the five members shown above. */}
+            {topTenMembers.length > 0 && (
               <div className="mt-5 pt-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
                     <Users className="h-3.5 w-3.5 text-slate-400" />
-                    Thành viên tiếp theo (Hạng 6 - 10)
+                    TOP 10
                   </p>
                   <span className="text-[11px] text-slate-400">
-                    Hiển thị {nextFiveMembers.length} thành viên
+                    Hiển thị {topTenMembers.length} thành viên
                   </span>
                 </div>
                 <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xs">
-                  {nextFiveMembers.map((m, idx) => (
+                  {topTenMembers.map((m, idx) => (
                     <div
                       key={m.id}
                       className="flex items-center justify-between p-2.5 sm:px-4 hover:bg-slate-50/80 transition-colors text-xs"
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 font-mono font-medium text-slate-500 text-xs">
-                          #{idx + 6}
+                          #{idx + 1}
                         </span>
                         {m.photoURL ? (
                           <img

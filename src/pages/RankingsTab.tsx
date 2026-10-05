@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { RotateCcw, Trophy } from "lucide-react";
 import { ActiveMemberLeaderboard } from "../components/rankings/ActiveMemberLeaderboard";
 import { MemberAbsenceLeaderboard } from "../components/rankings/MemberAbsenceLeaderboard";
-import { VietnameseDatePicker } from "../components/common/VietnameseDatePicker";
+import { SearchableSelect } from "../components/common/SearchableSelect";
 import { useAuth } from "../context/AuthContext";
 import { authService } from "../services/authService";
 import { meetingService, type Meeting } from "../services/meetingService";
@@ -10,7 +10,6 @@ import { socketService } from "../services/socketService";
 import type { UserProfile } from "../types";
 
 type QuickTimeFilter = "all" | "month" | "quarter" | "year";
-type StatusFilter = "all" | "ended" | "live" | "scheduled";
 
 export default function RankingsTab() {
   const { userProfile } = useAuth();
@@ -21,9 +20,7 @@ export default function RankingsTab() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedMeetingId, setSelectedMeetingId] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickTimeFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const companyCode = userProfile?.companyCode;
 
   useEffect(() => {
@@ -69,28 +66,21 @@ export default function RankingsTab() {
       if (selectedMeetingId !== "all" && meeting._id !== selectedMeetingId) return false;
       if (query && ![meeting.title, meeting.location].some(value => value?.toLocaleLowerCase("vi").includes(query))) return false;
       const date = new Date(meeting.startsAt);
-      if (selectedDate) {
-        const localDate = [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
-        if (localDate !== selectedDate) return false;
-      }
       if (quickFilter !== "all") {
         if (date.getFullYear() !== now.getFullYear()) return false;
         if (quickFilter === "month" && date.getMonth() !== now.getMonth()) return false;
         if (quickFilter === "quarter" && Math.floor(date.getMonth() / 3) !== Math.floor(now.getMonth() / 3)) return false;
       }
-      if (statusFilter === "live") return ["live", "paused"].includes(meeting.status);
-      return statusFilter === "all" || meeting.status === statusFilter;
+      return true;
     });
-  }, [meetings, selectedMeetingId, searchQuery, selectedDate, quickFilter, statusFilter]);
+  }, [meetings, selectedMeetingId, searchQuery, quickFilter]);
 
   const resetFilters = () => {
     setSelectedMeetingId("all");
     setSearchQuery("");
-    setSelectedDate("");
     setQuickFilter("all");
-    setStatusFilter("all");
   };
-  const hasActiveFilters = selectedMeetingId !== "all" || searchQuery !== "" || selectedDate !== "" || quickFilter !== "all" || statusFilter !== "all";
+  const hasActiveFilters = selectedMeetingId !== "all" || searchQuery !== "" || quickFilter !== "all";
   const inputClassName = "rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-700 focus:border-red-500 focus:bg-white focus:outline-hidden";
 
   return (
@@ -111,18 +101,22 @@ export default function RankingsTab() {
           placeholder="Tìm theo tên cuộc họp, địa điểm..."
           className={inputClassName + " min-w-[200px] flex-1"}
         />
-        <select aria-label="Chọn buổi họp" value={selectedMeetingId} onChange={event => setSelectedMeetingId(event.target.value)} className={inputClassName + " w-full sm:w-64"}>
-          <option value="all">Tất cả cuộc họp ({meetings.length})</option>
-          {meetings.map(meeting => <option key={meeting._id} value={meeting._id}>
-            {new Date(meeting.startsAt).toLocaleDateString("vi-VN")} - {meeting.title}
-          </option>)}
-        </select>
-        <VietnameseDatePicker
-          ariaLabel="Lọc theo ngày"
-          value={selectedDate}
-          onChange={value => { setSelectedDate(value); if (value) setQuickFilter("all"); }}
-          placeholder="Lọc theo ngày..."
-          className="w-36 sm:w-40"
+        <SearchableSelect
+          ariaLabel="Chọn buổi họp"
+          value={selectedMeetingId}
+          onChange={setSelectedMeetingId}
+          placeholder={`Tất cả cuộc họp (${meetings.length})`}
+          searchPlaceholder="Tìm cuộc họp..."
+          compact
+          className="w-full sm:w-64"
+          options={[
+            { value: "all", label: `Tất cả cuộc họp (${meetings.length})` },
+            ...meetings.map((meeting) => ({
+              value: meeting._id,
+              label: `${new Date(meeting.startsAt).toLocaleDateString("vi-VN")} - ${meeting.title}`,
+              searchText: `${meeting.title} ${meeting.location || ""}`,
+            })),
+          ]}
         />
         <div className="flex rounded-xl bg-slate-100 p-0.5 text-xs">
           {([
@@ -133,20 +127,13 @@ export default function RankingsTab() {
           ] as const).map(item => <button
             key={item.key}
             type="button"
-            aria-pressed={quickFilter === item.key && !selectedDate}
-            onClick={() => { setQuickFilter(item.key); setSelectedDate(""); }}
-            className={"rounded-lg px-2.5 py-1 " + (quickFilter === item.key && !selectedDate ? "bg-white font-medium text-slate-800 shadow-2xs" : "text-slate-500 hover:text-slate-800")}
+            aria-pressed={quickFilter === item.key}
+            onClick={() => setQuickFilter(item.key)}
+            className={"rounded-lg px-2.5 py-1 " + (quickFilter === item.key ? "bg-white font-medium text-slate-800 shadow-2xs" : "text-slate-500 hover:text-slate-800")}
           >{item.label}</button>)}
         </div>
-        <select aria-label="Trạng thái" value={statusFilter} onChange={event => setStatusFilter(event.target.value as StatusFilter)} className={inputClassName}>
-          <option value="all">Mọi trạng thái</option>
-          <option value="ended">Đã kết thúc</option>
-          <option value="live">Đang diễn ra</option>
-          <option value="scheduled">Sắp tới</option>
-        </select>
-        {hasActiveFilters && <button type="button" onClick={resetFilters} className={inputClassName + " hover:bg-slate-100"}>Đặt lại</button>}
-        <button type="button" aria-label="Làm mới bảng xếp hạng" title="Làm mới" disabled={isLoading} onClick={() => setRefreshKey(value => value + 1)} className={inputClassName + " hover:bg-slate-100 disabled:opacity-50"}>
-          <RotateCcw className={"h-4 w-4" + (isLoading ? " animate-spin" : "")} />
+        <button type="button" onClick={resetFilters} disabled={!hasActiveFilters} className={inputClassName + " flex size-9 items-center justify-center p-0 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"} aria-label="Đặt lại bộ lọc" title="Đặt lại bộ lọc">
+          <RotateCcw className="h-4 w-4" />
         </button>
       </section>
 

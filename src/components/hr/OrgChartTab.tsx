@@ -342,7 +342,7 @@ export default function OrgChartTab({
         industry: updateData.industry,
         phone: updateData.phone || "Chưa cập nhật",
         avatar: updateData.photoURL || prev.avatar,
-        coverImage: updateData.coverImage || prev.coverImage,
+        coverImage: updateData.coverImage ?? prev.coverImage,
         birthDate: updateData.birthDate,
       } : null);
     } catch (err) {
@@ -842,7 +842,7 @@ export default function OrgChartTab({
       {isDetailModalOpen && selectedEmp && (() => {
         const rawUser = usersList.find(u => u.uid === selectedEmp.id);
         const memberAvatar = rawUser?.photoURL || selectedEmp.avatar;
-        const memberCover = rawUser?.coverImage || selectedEmp.coverImage;
+        const memberCover = (rawUser ? rawUser.coverImage : selectedEmp.coverImage)?.trim();
         const memberName = rawUser?.displayName || selectedEmp.name;
         const memberRole = selectedEmp.role || "Thành viên";
         const memberCompany = rawUser?.companyName || selectedEmp.companyName || "Chưa cập nhật";
@@ -869,6 +869,7 @@ export default function OrgChartTab({
                     <div className="relative h-28 sm:h-32 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 overflow-hidden">
                       {editCoverImage ? (
                         <img
+                          key={editCoverImage}
                           src={editCoverImage}
                           alt="Ảnh bìa"
                           className="w-full h-full object-cover"
@@ -1078,9 +1079,9 @@ export default function OrgChartTab({
             ) : (
               <div className="bg-white border border-slate-100 rounded-3xl shadow-2xl w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto relative text-left animate-in fade-in zoom-in-95 duration-200">
                 {/* Header Cover Banner */}
-                <div className="relative h-28 w-full overflow-hidden rounded-t-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500">
+                <div className="relative h-28 w-full overflow-hidden rounded-t-3xl bg-primary">
                   {memberCover && (
-                    <img src={memberCover} alt="Cover" className="w-full h-full object-cover opacity-90" />
+                    <img key={memberCover} src={memberCover} alt="" className="w-full h-full object-cover" onError={event => { event.currentTarget.style.display = "none"; }} />
                   )}
                   <button
                     type="button"
@@ -1247,6 +1248,7 @@ export default function OrgChartTab({
                 <div className="relative h-28 sm:h-32 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 overflow-hidden">
                   {addCoverImage ? (
                     <img
+                      key={addCoverImage}
                       src={addCoverImage}
                       alt="Ảnh bìa"
                       className="w-full h-full object-cover"

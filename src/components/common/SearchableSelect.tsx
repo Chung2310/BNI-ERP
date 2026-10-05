@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useId } from "react";
 import { ChevronDown, Search, Check, X } from "lucide-react";
 
 export interface SelectOption {
   value: string;
   label: string;
+  searchText?: string;
 }
 
 interface SearchableSelectProps {
@@ -14,7 +15,11 @@ interface SearchableSelectProps {
   searchPlaceholder?: string;
   disabled?: boolean;
   className?: string;
+  compact?: boolean;
+  ariaLabel?: string;
 }
+
+const normalizeSearch = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[đĐ]/g, "d").toLowerCase().trim();
 
 export function SearchableSelect({
   options,
@@ -24,11 +29,15 @@ export function SearchableSelect({
   searchPlaceholder = "Tìm kiếm...",
   disabled = false,
   className = "",
+  compact = false,
+  ariaLabel,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -44,9 +53,7 @@ export function SearchableSelect({
   // Focus search input when dropdown opens
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 50);
+      searchInputRef.current.focus();
     } else {
       setSearchQuery("");
     }
@@ -55,26 +62,42 @@ export function SearchableSelect({
   const selectedOption = options.find((opt) => opt.value === value);
 
   const filteredOptions = options.filter((opt) =>
-    opt.label.toLowerCase().includes(searchQuery.toLowerCase())
+    normalizeSearch(`${opt.label} ${opt.searchText || ""}`).includes(normalizeSearch(searchQuery))
   );
 
   const handleSelect = (val: string) => {
     onChange(val);
     setIsOpen(false);
+    triggerRef.current?.focus();
   };
 
   return (
-    <div ref={containerRef} className={`relative w-full ${className}`}>
+    <div
+      ref={containerRef}
+      className={`relative w-full ${className}`}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && isOpen) {
+          event.preventDefault();
+          event.stopPropagation();
+          setIsOpen(false);
+          triggerRef.current?.focus();
+        }
+      }}
+    >
       {/* Trigger Button */}
       <button
         type="button"
+        ref={triggerRef}
+        aria-label={ariaLabel}
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? panelId : undefined}
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex w-full min-w-0 items-center justify-between rounded-lg border border-slate-200 bg-white p-2.5 text-left text-sm transition-all duration-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60 ${
+        className={`flex w-full min-w-0 items-center justify-between border border-slate-200 text-left transition-all duration-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60 ${compact ? "rounded-xl bg-slate-50/50 px-3 py-1.5 text-xs" : "rounded-lg bg-white p-2.5 text-sm"} ${
           isOpen ? "border-blue-500 ring-4 ring-blue-500/10" : ""
         }`}
       >
-        <span className={`truncate mr-2 flex-1 ${selectedOption ? "text-slate-800 font-medium" : "text-slate-400 font-normal"}`}>
+        <span className={`truncate mr-2 flex-1 ${selectedOption ? `text-slate-700 ${compact ? "font-normal" : "font-medium"}` : "text-slate-400 font-normal"}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <ChevronDown className={`h-4 w-4 text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
@@ -82,7 +105,7 @@ export function SearchableSelect({
 
       {/* Dropdown Panel */}
       {isOpen && (
-        <div className="absolute left-0 right-0 z-[100] mt-1.5 max-h-72 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl animate-fade-in flex flex-col">
+        <div id={panelId} className="absolute left-0 right-0 z-[100] mt-1.5 max-h-72 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl animate-fade-in flex flex-col">
           {/* Search Input Area */}
           <div className="relative flex items-center border-b border-slate-100 p-2 bg-slate-50/50">
             <Search className="absolute left-4 h-4 w-4 text-slate-400" />
@@ -90,6 +113,7 @@ export function SearchableSelect({
               ref={searchInputRef}
               type="text"
               placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-md border border-slate-200 bg-white py-1.5 pl-8 pr-8 text-xs transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 placeholder:text-slate-400/70"
@@ -97,7 +121,11 @@ export function SearchableSelect({
             {searchQuery && (
               <button
                 type="button"
-                onClick={() => setSearchQuery("")}
+                aria-label="Xóa tìm kiếm"
+                onClick={() => {
+                  setSearchQuery("");
+                  searchInputRef.current?.focus();
+                }}
                 className="absolute right-4 rounded-full p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
                 <X className="h-3 w-3" />
@@ -121,7 +149,7 @@ export function SearchableSelect({
                     onClick={() => handleSelect(opt.value)}
                     className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition-colors ${
                       isSelected
-                        ? "bg-blue-50 text-blue-750 font-bold"
+                        ? "bg-cyan-50 text-cyan-700 font-medium"
                         : "text-slate-700 hover:bg-slate-50"
                     }`}
                   >

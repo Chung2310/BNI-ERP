@@ -183,7 +183,24 @@ export default function MeetingTab() {
     setFlowStep(step);
     setSlidesOpen(false);
   }, []);
-  const openMeetingFlow = (status: string) => goToFlowStep(status === "scheduled" ? flowOrder[0] : "presentation");
+  const meetingFlowSteps = useRef(new Map<string, MeetingFlowStep>());
+  const openMeetingFlow = (meeting: Meeting) => {
+    let step = meetingFlowSteps.current.get(meeting._id);
+    if (!step) {
+      try {
+        const saved = localStorage.getItem("bni_meeting_flow_step:" + meeting._id);
+        if (flowOrder.includes(saved as MeetingFlowStep)) step = saved as MeetingFlowStep;
+      } catch { /* Keep navigation available when browser storage is unavailable. */ }
+    }
+    goToFlowStep(step || "checkin");
+  };
+  useEffect(() => {
+    if (!detailMeetingId || !canManage) return;
+    meetingFlowSteps.current.set(detailMeetingId, flowStep);
+    try {
+      localStorage.setItem("bni_meeting_flow_step:" + detailMeetingId, flowStep);
+    } catch { /* The in-memory state still remembers the step during this visit. */ }
+  }, [detailMeetingId, flowStep, canManage]);
   const [attendedOnly, setAttendedOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -454,7 +471,7 @@ export default function MeetingTab() {
         setView("calendar"); setDetailMeetingId(null);
         toast.success("Đã tạo " + result.length + " buổi họp định kỳ.");
       } else { detailMeetingIdRef.current = result._id; setDetailMeetingId(result._id); }
-      openMeetingFlow("scheduled");
+      if (!recurring) openMeetingFlow(result);
     });
   };
 
@@ -753,7 +770,7 @@ export default function MeetingTab() {
                   className="flex items-center gap-2 rounded-xl border border-cyan-200 bg-white px-4 py-2.5 text-xs font-bold text-cyan-700 hover:bg-cyan-50"
                 >
                   <QrCode className="h-4 w-4" />
-                  <span>QR check-in chung</span>
+                  <span>Check-in</span>
                 </button>
                 <button
                   type="button"
@@ -873,7 +890,7 @@ export default function MeetingTab() {
       {canManage && showSharedQr && <CompanyCheckInQrDialog api={api} companyCode={userProfile?.companyCode} onClose={() => setShowSharedQr(false)} />}
       {/* Grid of Meeting Cards (Dạng danh sách / Thẻ hiển thị) */}
       {view === "calendar" ? <MeetingCalendar<Meeting> month={calendarMonth} onMonthChange={setCalendarMonth} revision={calendarRevision} load={api} canManage={canManage} filter={matchesMeetingFilter}
-        onOpen={meeting => { setItems(previous => [...previous.filter(item => item._id !== meeting._id), meeting]); setDetailMeetingId(meeting._id); openMeetingFlow(meeting.status); }}
+        onOpen={meeting => { setItems(previous => [...previous.filter(item => item._id !== meeting._id), meeting]); setDetailMeetingId(meeting._id); openMeetingFlow(meeting); }}
         onEdit={meeting => openEditModal(meeting)}
         onCancel={async meeting => { try { await api("/" + meeting._id + "/control", "POST", { action: "cancel", version: meeting.__v }); await refresh(); toast.success("Đã hủy buổi họp."); } catch (error: any) { toast.error(error.message); throw error; } }}
       /> : loading ? <p role="status" className="p-8 text-center text-sm text-slate-500">Đang tải cuộc họp...</p> : loadError ? <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{loadError}<button type="button" onClick={() => { setLoading(true); void refresh(); }} className="ml-3 font-bold">Thử lại</button></div> : filteredItems.length > 0 ? (
@@ -894,7 +911,7 @@ export default function MeetingTab() {
                 key={m._id}
                 onClick={() => {
                   setDetailMeetingId(m._id);
-                  openMeetingFlow(m.status);
+                  openMeetingFlow(m);
                 }}
                 className={`group relative flex flex-col justify-between overflow-hidden rounded-lg border bg-white shadow-2xs transition-all duration-200 hover:shadow-md cursor-pointer ${s.border}`}
               >
@@ -1026,7 +1043,7 @@ export default function MeetingTab() {
                   <button
                     type="button"
                     aria-label={!canManage ? "Xem chi tiết cuộc họp" : isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}
-                    onClick={(event) => { event.stopPropagation(); setDetailMeetingId(m._id); openMeetingFlow(m.status); }}
+                    onClick={(event) => { event.stopPropagation(); setDetailMeetingId(m._id); openMeetingFlow(m); }}
                     className="flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-lg bg-slate-50 group-hover:bg-cyan-600 text-slate-700 group-hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap"
                   >
                     <span className="truncate">{!canManage ? "Xem chi tiết" : isLive ? "Điều hành" : m.status === "scheduled" ? "Check-in" : "Xem cuộc họp"}</span>

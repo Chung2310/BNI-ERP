@@ -24,7 +24,7 @@ it("excludes admins and inactive accounts from the meeting flow ranking and its 
     ],
   };
   render(<ActiveMembersPanel meeting={meeting} meetings={[meeting]} />);
-  await screen.findByText("Active Member");
+  expect(await screen.findAllByText("Active Member")).toHaveLength(2);
   expect(screen.queryByText(/Admin|Inactive|Unlisted/)).toBeNull();
   await waitFor(() => expect(authService.getUsersByCompany).toHaveBeenCalledWith("ACME"));
 });
