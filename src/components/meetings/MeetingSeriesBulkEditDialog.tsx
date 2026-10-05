@@ -41,7 +41,7 @@ type MeetingSeriesBulkEditDialogProps = {
   meeting: MeetingForBulkEdit;
   meetings: MeetingForBulkEdit[];
   seed: MeetingSeriesBulkEditSeed;
-  initiallySelected: MeetingSeriesBulkEditField[];
+  initiallySelected?: MeetingSeriesBulkEditField[];
   loading: boolean;
   saving: boolean;
   onClose: () => void;
@@ -60,16 +60,9 @@ const changeLabels: Record<keyof MeetingSeriesChanges, string> = {
 const monthOf = (startsAt: string) => vietnamDateTime(startsAt).slice(0, 7);
 const monthLabel = (month: string) => `Th\u00e1ng ${Number(month.slice(5, 7))}/${month.slice(0, 4)}`;
 
-export function MeetingSeriesBulkEditDialog({ meeting, meetings, seed, initiallySelected, loading, saving, onClose, onApply }: MeetingSeriesBulkEditDialogProps) {
+export function MeetingSeriesBulkEditDialog({ meeting, meetings, seed, loading, saving, onClose, onApply }: MeetingSeriesBulkEditDialogProps) {
   const [step, setStep] = useState<"edit" | "select">("edit");
   const [values, setValues] = useState(seed);
-  const [enabled, setEnabled] = useState<Record<MeetingSeriesBulkEditField, boolean>>(() => ({
-    location: initiallySelected.includes("location"),
-    coverImage: initiallySelected.includes("coverImage"),
-    startsTime: initiallySelected.includes("startsTime"),
-    durationMinutes: initiallySelected.includes("durationMinutes"),
-    speakingTime: initiallySelected.includes("speakingTime"),
-  }));
   const [changes, setChanges] = useState<MeetingSeriesChanges | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [pendingIds, setPendingIds] = useState<string[] | null>(null);
@@ -78,7 +71,6 @@ export function MeetingSeriesBulkEditDialog({ meeting, meetings, seed, initially
   const allSelected = meetings.length > 0 && selectedIds.length === meetings.length;
   const changedLabels = changes ? [...new Set(Object.keys(changes).map(key => changeLabels[key as keyof MeetingSeriesChanges]))] : [];
 
-  const toggleField = (field: MeetingSeriesBulkEditField) => setEnabled(current => ({ ...current, [field]: !current[field] }));
   const updateValue = <K extends keyof MeetingSeriesBulkEditSeed>(key: K, value: MeetingSeriesBulkEditSeed[K]) => setValues(current => ({ ...current, [key]: value }));
   const toggleMeeting = (id: string) => setSelectedIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
   const toggleMonth = (month: string) => {
@@ -90,24 +82,25 @@ export function MeetingSeriesBulkEditDialog({ meeting, meetings, seed, initially
   const continueToSelection = () => {
     setError("");
     const next: MeetingSeriesChanges = {};
-    if (enabled.location) next.location = values.location;
-    if (enabled.coverImage) next.coverImage = values.coverImage;
-    if (enabled.startsTime) {
-      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(values.startsTime)) { setError("Vui l\u00f2ng nh\u1eadp gi\u1edd b\u1eaft \u0111\u1ea7u h\u1ee3p l\u1ec7."); return; }
-      next.startsTime = values.startsTime;
-    }
-    if (enabled.durationMinutes) {
-      if (!Number.isInteger(values.durationMinutes) || values.durationMinutes < 1 || values.durationMinutes > 1440) { setError("Th\u1eddi l\u01b0\u1ee3ng ph\u1ea3i t\u1eeb 1 ph\u00fat \u0111\u1ebfn 1440 ph\u00fat."); return; }
-      next.durationMinutes = values.durationMinutes;
-    }
-    if (enabled.speakingTime) {
-      const slotError = validateSpeakingTimeSlots(values.tiers);
-      if (slotError) { setError(slotError); return; }
-      if (!Number.isInteger(values.fallbackSeconds) || values.fallbackSeconds < 1 || values.fallbackSeconds > 3600) { setError("Th\u1eddi l\u01b0\u1ee3ng ph\u00e1t bi\u1ec3u ngo\u00e0i khung ph\u1ea3i t\u1eeb 1 \u0111\u1ebfn 3600 gi\u00e2y."); return; }
-      next.tiers = values.tiers;
-      next.fallbackSeconds = values.fallbackSeconds;
-    }
-    if (!Object.keys(next).length) { setError("H\u00e3y ch\u1ecdn ít nh\u1ea5t m\u1ed9t th\u00f4ng tin c\u1ea7n c\u1eadp nh\u1eadt."); return; }
+    const originalStart = vietnamDateTime(meeting.startsAt);
+    const originalDuration = meeting.endsAt
+      ? Math.max(1, Math.round((new Date(meeting.endsAt).getTime() - new Date(meeting.startsAt).getTime()) / 60000))
+      : 120;
+    const originalTiers = speakingTimeSlotsForEdit(meeting.tiers);
+
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(values.startsTime)) { setError("Vui l\u00f2ng nh\u1eadp gi\u1edd b\u1eaft \u0111\u1ea7u h\u1ee3p l\u1ec7."); return; }
+    if (!Number.isInteger(values.durationMinutes) || values.durationMinutes < 1 || values.durationMinutes > 1440) { setError("Th\u1eddi l\u01b0\u1ee3ng ph\u1ea3i t\u1eeb 1 ph\u00fat \u0111\u1ebfn 1440 ph\u00fat."); return; }
+    const slotError = validateSpeakingTimeSlots(values.tiers);
+    if (slotError) { setError(slotError); return; }
+    if (!Number.isInteger(values.fallbackSeconds) || values.fallbackSeconds < 1 || values.fallbackSeconds > 3600) { setError("Th\u1eddi l\u01b0\u1ee3ng ph\u00e1t bi\u1ec3u ngo\u00e0i khung ph\u1ea3i t\u1eeb 1 \u0111\u1ebfn 3600 gi\u00e2y."); return; }
+
+    if (values.location !== (meeting.location || "")) next.location = values.location;
+    if (values.coverImage !== (meeting.coverImage || "")) next.coverImage = values.coverImage;
+    if (values.startsTime !== originalStart.slice(11, 16)) next.startsTime = values.startsTime;
+    if (values.durationMinutes !== originalDuration) next.durationMinutes = values.durationMinutes;
+    if (JSON.stringify(values.tiers) !== JSON.stringify(originalTiers)) next.tiers = values.tiers;
+    if (values.fallbackSeconds !== (meeting.fallbackSeconds || 20)) next.fallbackSeconds = values.fallbackSeconds;
+    if (!Object.keys(next).length) { setError("H\u00e3y thay \u0111\u1ed5i \u00edt nh\u1ea5t m\u1ed9t th\u00f4ng tin c\u1ea7n c\u1eadp nh\u1eadt."); return; }
     setChanges(next);
     setStep("select");
   };
@@ -122,14 +115,6 @@ export function MeetingSeriesBulkEditDialog({ meeting, meetings, seed, initially
     }
   };
 
-  const field = (key: MeetingSeriesBulkEditField, label: string, input: React.ReactNode) => <fieldset className="rounded-xl border border-slate-200 p-3">
-    <label className="mb-2 flex cursor-pointer items-center gap-2 text-xs font-bold text-slate-800">
-      <input type="checkbox" checked={enabled[key]} disabled={saving} onChange={() => toggleField(key)} />
-      {label}
-    </label>
-    {input}
-  </fieldset>;
-
   return <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-slate-900/60 p-3 backdrop-blur-xs sm:p-5" onClick={event => { if (event.target === event.currentTarget && !saving) onClose(); }}>
     <section role="dialog" aria-modal="true" aria-labelledby="series-bulk-title" className="my-auto max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-xl sm:p-6">
       <header className="mb-4 flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
@@ -142,12 +127,22 @@ export function MeetingSeriesBulkEditDialog({ meeting, meetings, seed, initially
 
       {step === "edit" ? <>
         <div className="grid gap-3 sm:grid-cols-2">
-          {field("location", "\u0110\u1ecba \u0111i\u1ec3m / Link h\u1ecdp", <input value={values.location} disabled={!enabled.location || saving} onChange={event => updateValue("location", event.target.value)} maxLength={500} className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs disabled:bg-slate-50 disabled:text-slate-400" />)}
-          {field("coverImage", "\u1ea2nh b\u00eca", <div className={!enabled.coverImage || saving ? "pointer-events-none opacity-50" : ""}><MeetingCoverImageField value={values.coverImage} disabled={!enabled.coverImage || saving} onChange={value => updateValue("coverImage", value)} /></div>)}
-          {field("startsTime", "Gi\u1edd b\u1eaft \u0111\u1ea7u", <input type="time" value={values.startsTime} disabled={!enabled.startsTime || saving} onChange={event => updateValue("startsTime", event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs disabled:bg-slate-50 disabled:text-slate-400" />)}
-          {field("durationMinutes", "Th\u1eddi l\u01b0\u1ee3ng bu\u1ed5i h\u1ecdp (ph\u00fat)", <input type="number" min={1} max={1440} value={values.durationMinutes} disabled={!enabled.durationMinutes || saving} onChange={event => updateValue("durationMinutes", Number(event.target.value))} className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs disabled:bg-slate-50 disabled:text-slate-400" />)}
+          <label className="rounded-xl border border-slate-200 p-3 text-xs font-bold text-slate-800">
+            &#272;&#7883;a &#273;i&#7875;m / Link h&#7885;p
+            <input value={values.location} disabled={saving} onChange={event => updateValue("location", event.target.value)} maxLength={500} className="mt-2 w-full rounded-lg border border-slate-200 bg-white p-2 font-normal disabled:bg-slate-50 disabled:text-slate-400" />
+          </label>
+          <div className="rounded-xl border border-slate-200 p-3"><MeetingCoverImageField value={values.coverImage} disabled={saving} onChange={value => updateValue("coverImage", value)} /></div>
+          <label className="rounded-xl border border-slate-200 p-3 text-xs font-bold text-slate-800">
+            Gi&#7901; b&#7855;t &#273;&#7847;u
+            <input type="time" value={values.startsTime} disabled={saving} onChange={event => updateValue("startsTime", event.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 bg-white p-2 font-normal disabled:bg-slate-50 disabled:text-slate-400" />
+          </label>
+          <label className="rounded-xl border border-slate-200 p-3 text-xs font-bold text-slate-800">
+            Th&#7901;i l&#432;&#7907;ng bu&#7893;i h&#7885;p (ph&#250;t)
+            <input type="number" min={1} max={1440} value={values.durationMinutes} disabled={saving} onChange={event => updateValue("durationMinutes", Number(event.target.value))} className="mt-2 w-full rounded-lg border border-slate-200 bg-white p-2 font-normal disabled:bg-slate-50 disabled:text-slate-400" />
+          </label>
           <div className="sm:col-span-2">
-            {field("speakingTime", "Th&#7901;i l&#432;&#7907;ng ph&#225;t bi&#7875;u theo gi&#7901; check-in", enabled.speakingTime ? <MeetingSpeakingTimeFields value={values.tiers} onChange={value => updateValue("tiers", value)} fallbackSeconds={values.fallbackSeconds} onFallbackChange={value => updateValue("fallbackSeconds", value)} hideTitle /> : <p className="text-xs text-slate-400">B&#7853;t ch&#7885;n &#273;&#7875; s&#7917;a c&#225;c khung gi&#7901;.</p>)}
+            <h3 className="mb-2 text-sm font-bold text-slate-800">Th&#7901;i l&#432;&#7907;ng ph&#225;t bi&#7875;u theo gi&#7901; check-in</h3>
+            <MeetingSpeakingTimeFields value={values.tiers} onChange={value => updateValue("tiers", value)} fallbackSeconds={values.fallbackSeconds} onFallbackChange={value => updateValue("fallbackSeconds", value)} hideTitle />
           </div>
         </div>
         {error && <p role="alert" className="mt-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{error}</p>}
