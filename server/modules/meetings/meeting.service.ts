@@ -161,23 +161,16 @@ export async function updateMeeting(companyCode: string, id: string, input: any)
 export async function bulkUpdateMeetingSeries(companyCode: string, id: string, input: any) {
   const anchor = await getMeeting(companyCode, id);
   if (!anchor.seriesId) throw new MeetingError(400, 'Cuộc họp này không thuộc chu kỳ định kỳ.');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(input.dateTo)) {
-    throw new MeetingError(400, 'Khoảng ngày không hợp lệ.');
-  }
-  const fromDay = new Date(input.dateFrom + 'T00:00:00Z');
-  const toDay = new Date(input.dateTo + 'T00:00:00Z');
-  if (fromDay.toISOString().slice(0, 10) !== input.dateFrom || toDay.toISOString().slice(0, 10) !== input.dateTo || toDay < fromDay) {
-    throw new MeetingError(400, 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.');
-  }
-  const from = new Date(input.dateFrom + 'T00:00:00+07:00');
-  const until = new Date(toDay.getTime() + 86400000 - 7 * 3600000);
-  const selected = await MeetingModel.find({ companyCode, seriesId: anchor.seriesId, status: 'scheduled', startsAt: { $gte: from, $lt: until, $gt: new Date() } }).lean();
-  if (!selected.length) throw new MeetingError(404, 'Không có buổi họp định kỳ nào trong khoảng ngày đã chọn.');
+  const meetingIds: string[] = input.meetingIds;
+  if (!meetingIds.length) throw new MeetingError(400, 'Vui l\u00f2ng ch\u1ecdn \u00edt nh\u1ea5t m\u1ed9t bu\u1ed5i h\u1ecdp.');
+  const selected = await MeetingModel.find({ companyCode, seriesId: anchor.seriesId, _id: { $in: meetingIds }, status: 'scheduled', startsAt: { $gt: new Date() } }).lean();
+  if (!selected.length) throw new MeetingError(404, 'Kh\u00f4ng c\u00f3 bu\u1ed5i h\u1ecdp n\u00e0o trong danh s\u00e1ch c\u00f3 th\u1ec3 c\u1eadp nh\u1eadt.');
+  if (selected.length !== meetingIds.length) throw new MeetingError(409, 'Danh s\u00e1ch bu\u1ed5i h\u1ecdp \u0111\u00e3 thay \u0111\u1ed5i. H\u00e3y t\u1ea3i l\u1ea1i l\u1ecbch r\u1ed3i th\u1eed l\u1ea1i.');
 
   const changes = input.changes;
   const updates = selected.map((item: any) => {
     const set: Record<string, unknown> = {};
-    for (const key of ['title', 'description', 'location', 'latitude', 'longitude', 'gpsRadiusMeters', 'coverImage', 'reminderDays', 'tiers', 'fallbackSeconds'] as const) {
+    for (const key of ['location', 'coverImage', 'tiers', 'fallbackSeconds'] as const) {
       if (changes[key] !== undefined) set[key] = changes[key];
     }
     if (item.status === 'scheduled' && (changes.tiers !== undefined || changes.fallbackSeconds !== undefined)) {
@@ -189,24 +182,22 @@ export async function bulkUpdateMeetingSeries(companyCode: string, id: string, i
     }
     if (changes.startsTime !== undefined) {
       const date = new Date(new Date(item.startsAt).getTime() + 7 * 3600000).toISOString().slice(0, 10);
-      const startsAt = new Date(`${date}T${changes.startsTime}:00+07:00`);
-      if (startsAt <= new Date()) throw new MeetingError(400, 'Giờ mới khiến một hoặc nhiều buổi họp không còn ở tương lai.');
-      const duration = item.endsAt ? new Date(item.endsAt).getTime() - new Date(item.startsAt).getTime() : DEFAULT_MEETING_DURATION_MS;
+      const startsAt = new Date(date + 'T' + changes.startsTime + ':00+07:00');
+      if (startsAt <= new Date()) throw new MeetingError(400, 'Gi\u1edd m\u1edbi khi\u1ebfn m\u1ed9t ho\u1eb7c nhi\u1ec1u bu\u1ed5i h\u1ecdp kh\u00f4ng c\u00f2n \u1edf t\u01b0\u01a1ng lai.');
+      const duration = changes.durationMinutes !== undefined ? changes.durationMinutes * 60000 : item.endsAt ? new Date(item.endsAt).getTime() - new Date(item.startsAt).getTime() : DEFAULT_MEETING_DURATION_MS;
       set.startsAt = startsAt;
       set.endsAt = new Date(startsAt.getTime() + duration);
-      set.reminderAt = reminderDueAt(startsAt, changes.reminderDays ?? item.reminderDays ?? 1);
-    } else if (changes.reminderDays !== undefined) {
-      set.reminderAt = reminderDueAt(item.startsAt, changes.reminderDays);
+    } else {
+      if (changes.durationMinutes !== undefined) set.endsAt = new Date(new Date(item.startsAt).getTime() + changes.durationMinutes * 60000);
     }
 
-    const qrChanged = changes.startsTime !== undefined
-      || changes.latitude !== undefined || changes.longitude !== undefined || changes.gpsRadiusMeters !== undefined;
+    const qrChanged = changes.startsTime !== undefined || changes.durationMinutes !== undefined;
     return {
       updateOne: {
         filter: { _id: item._id, companyCode, seriesId: anchor.seriesId, status: 'scheduled', __v: item.__v },
         update: {
           ...(Object.keys(set).length ? { $set: set } : {}),
-          $inc: { __v: 1, ...(changes.startsTime !== undefined || changes.reminderDays !== undefined ? { revision: 1 } : {}) },
+          $inc: { __v: 1, ...(changes.startsTime !== undefined || changes.durationMinutes !== undefined ? { revision: 1 } : {}) },
           ...(qrChanged ? { $unset: { checkInQrTokenHash: 1, checkInQrTokenEncrypted: 1, checkInQrExpiresAt: 1 } } : {}),
         },
       },

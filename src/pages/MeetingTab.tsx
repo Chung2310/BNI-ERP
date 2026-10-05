@@ -295,6 +295,9 @@ export default function MeetingTab() {
   // Edit Meeting Modal state
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [bulkEditingMeeting, setBulkEditingMeeting] = useState<Meeting | null>(null);
+  const [bulkMeetingCandidates, setBulkMeetingCandidates] = useState<Meeting[]>([]);
+  const [bulkEditingChanges, setBulkEditingChanges] = useState<MeetingSeriesChanges | null>(null);
+  const [bulkEditingLoading, setBulkEditingLoading] = useState(false);
   const [bulkEditingSaving, setBulkEditingSaving] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editStartsAt, setEditStartsAt] = useState("");
@@ -540,12 +543,72 @@ export default function MeetingTab() {
     });
   };
 
-  const applyBulkMeetingChanges = async (dateFrom: string, dateTo: string, changes: MeetingSeriesChanges) => {
-    if (!bulkEditingMeeting) return;
+  const openBulkEditSelection = async () => {
+    if (!editingMeeting?.seriesId || editingMeeting.status !== "scheduled") return;
+    const timeSlotError = validateSpeakingTimeSlots(editTiers);
+    if (timeSlotError) { toast.error(timeSlotError); return; }
+
+    const changes: MeetingSeriesChanges = {};
+    const originalStart = vietnamDateTime(editingMeeting.startsAt);
+    const originalStartMs = new Date(editingMeeting.startsAt).getTime();
+    const originalEndMs = editingMeeting.endsAt ? new Date(editingMeeting.endsAt).getTime() : originalStartMs + 120 * 60000;
+    const nextStartMs = new Date(editStartsAt + ":00+07:00").getTime();
+    const nextEndMs = new Date(editEndsAt + ":00+07:00").getTime();
+    const nextDurationMs = nextEndMs - nextStartMs;
+    if (!Number.isFinite(nextDurationMs) || nextDurationMs <= 0 || nextDurationMs > 24 * 60 * 60000) {
+      toast.error("Thời lượng cuộc họp phải từ 1 phút đến 24 giờ.");
+      return;
+    }
+
+    if (editLocation !== (editingMeeting.location || "")) changes.location = editLocation;
+    if (editStartsAt.slice(11, 16) !== originalStart.slice(11, 16)) changes.startsTime = editStartsAt.slice(11, 16);
+    if (Math.round(nextDurationMs / 60000) !== Math.round((originalEndMs - originalStartMs) / 60000)) {
+      changes.durationMinutes = Math.round(nextDurationMs / 60000);
+    }
+
+    if (editCoverImage !== (editingMeeting.coverImage || "")) changes.coverImage = editCoverImage;
+
+    const originalTiers = speakingTimeSlotsForEdit(editingMeeting.tiers);
+    if (JSON.stringify(editTiers) !== JSON.stringify(originalTiers)) changes.tiers = editTiers;
+    if (editFallbackSeconds !== (editingMeeting.fallbackSeconds || 20)) changes.fallbackSeconds = editFallbackSeconds;
+
+    if (!Object.keys(changes).length) {
+      toast.error("Hãy chỉnh ít nhất một thông tin trước khi áp dụng hàng loạt.");
+      return;
+    }
+
+    setBulkMeetingCandidates([]);
+    setBulkEditingChanges(changes);
+    setBulkEditingMeeting(editingMeeting);
+    setBulkEditingLoading(true);
+    try {
+      const allMeetings: Meeting[] = await api("?history=all");
+      const now = Date.now();
+      setBulkMeetingCandidates(allMeetings
+        .filter(item => item.seriesId === editingMeeting.seriesId && item.status === "scheduled" && new Date(item.startsAt).getTime() > now)
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
+    } catch (error) {
+      setBulkEditingMeeting(null);
+      setBulkEditingChanges(null);
+      toast.error(error instanceof Error ? error.message : "Không thể tải các buổi họp định kỳ.");
+    } finally {
+      setBulkEditingLoading(false);
+    }
+  };
+
+  const closeBulkEditSelection = () => {
+    setBulkEditingMeeting(null);
+    setBulkEditingChanges(null);
+    setBulkMeetingCandidates([]);
+  };
+
+  const applyBulkMeetingChanges = async (meetingIds: string[]) => {
+    if (!bulkEditingMeeting || !bulkEditingChanges) return;
     setBulkEditingSaving(true);
     try {
-      const result: { updatedCount: number } = await api(`/${bulkEditingMeeting._id}/series`, "PUT", { dateFrom, dateTo, changes });
-      setBulkEditingMeeting(null);
+      const result: { updatedCount: number } = await api(`/${bulkEditingMeeting._id}/series`, "PUT", { meetingIds, changes: bulkEditingChanges });
+      closeBulkEditSelection();
+      setEditingMeeting(null);
       await refresh();
       toast.success(`Đã cập nhật ${result.updatedCount} buổi họp.`);
     } finally {
@@ -1990,10 +2053,6 @@ export default function MeetingTab() {
             </div>
 
             <form onSubmit={update} className="space-y-4 pt-4 text-xs">
-              {editingMeeting.seriesId && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-cyan-50 p-3">
-                <p>Chỉnh riêng buổi này hoặc áp dụng các trường đã chọn cho nhiều buổi trong chu kỳ.</p>
-                <button type="button" onClick={() => { setBulkEditingMeeting(editingMeeting); setEditingMeeting(null); }} className="shrink-0 rounded-lg border border-cyan-200 bg-white px-3 py-2 text-xs font-bold text-cyan-800 hover:bg-cyan-100">Chỉnh sửa hàng loạt</button>
-              </div>}
 
 
               <div>
@@ -2095,6 +2154,12 @@ export default function MeetingTab() {
                 >
                   Hủy
                 </button>
+                {editingMeeting.seriesId && editingMeeting.status === "scheduled" && (
+                  <button type="button" disabled={saving || bulkEditingLoading} onClick={() => void openBulkEditSelection()} className="rounded-xl border border-cyan-200 bg-white px-4 py-2 font-bold text-cyan-800 hover:bg-cyan-50 disabled:opacity-50">
+                    {bulkEditingLoading ? <>&#272;ang t&#7843;i...</> : <>&#193;p d&#7909;ng h&#224;ng lo&#7841;t</>}
+                  </button>
+                )}
+
                 <button
                   type="submit"
                   disabled={saving}
@@ -2109,7 +2174,7 @@ export default function MeetingTab() {
       )}
 
       {canManage && completionKey && dismissedCompletion !== completionKey && <SpeechesCompleteDialog onClose={dismissCompletion} />}
-      {bulkEditingMeeting && <MeetingSeriesBulkEditDialog key={bulkEditingMeeting._id} meeting={bulkEditingMeeting} saving={bulkEditingSaving} onClose={() => setBulkEditingMeeting(null)} onApply={applyBulkMeetingChanges} />}
+      {bulkEditingMeeting && bulkEditingChanges && <MeetingSeriesBulkEditDialog key={bulkEditingMeeting._id} meeting={bulkEditingMeeting} meetings={bulkMeetingCandidates} changes={bulkEditingChanges} loading={bulkEditingLoading} saving={bulkEditingSaving} onClose={closeBulkEditSelection} onApply={applyBulkMeetingChanges} />}
       <ConfirmDialog isOpen={finishRequested} title="Kết thúc buổi họp?" description="Sau khi kết thúc, buổi họp ngừng nhận check-in và điều hành phát biểu." confirmLabel="Kết thúc buổi họp" isSubmitting={saving} onClose={() => setFinishRequested(false)} onConfirm={async () => { await control("finish"); setFinishRequested(false); }} />
       {/* POPUP XÁC NHẬN BẮT ĐẦU CUỘC HỌP */}
       <ConfirmDialog
