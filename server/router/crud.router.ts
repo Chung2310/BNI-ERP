@@ -7,7 +7,7 @@ import { requireAuth, requirePermission } from "../middleware/auth";
 export const crudRouter = Router();
 export const SUPPORTED_CRUD_MODELS = ["users"] as const;
 export const CRUD_MODEL_PERMISSION_POLICY = { users: { read: "access:read" } };
-export const crudReadPermissionGuard = (req: any, res: any, next: any) => {
+export const crudReadPermissionGuard = (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
   if (req.params.modelName !== "users") return res.status(404).json({ status: "error", message: "Tài nguyên không còn được hỗ trợ." });
   return requirePermission("access:read")(req, res, next);
 };
@@ -17,5 +17,5 @@ const listSchema = {
   query: Joi.object({ page: Joi.number().integer().min(1), limit: Joi.number().integer().min(1), sort: Joi.string(), search: Joi.string().allow("") }).unknown(true),
 };
 const detailSchema = { params: Joi.object({ modelName, id: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).required() }) };
-crudRouter.get("/:modelName", requireAuth as any, crudReadPermissionGuard, validateRequest(listSchema), crudController.getList as any);
-crudRouter.get("/:modelName/:id", requireAuth as any, crudReadPermissionGuard, validateRequest(detailSchema), crudController.getById as any);
+crudRouter.get("/:modelName", requireAuth, crudReadPermissionGuard, validateRequest(listSchema), crudController.getList);
+crudRouter.get("/:modelName/:id", requireAuth, crudReadPermissionGuard, validateRequest(detailSchema), crudController.getById);

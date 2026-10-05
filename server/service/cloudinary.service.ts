@@ -64,7 +64,7 @@ export const cloudinaryService = {
         resourceType: response.resource_type,
         bytes: response.bytes,
       };
-    } catch (error: any) {
+    } catch (error) {
       console.error("[cloudinaryService.uploadMedia] Error:", error);
       throw new Error(`Tải lên Cloudinary thất bại: ${error.message || error}`);
     }

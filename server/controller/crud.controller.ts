@@ -20,7 +20,7 @@ export const crudController = {
 
       // Trích xuất các tham số còn lại làm bộ lọc động (filters)
       const { page: _p, limit: _l, sort: _s, search: _sh, filters: queryFilters, ...otherParams } = req.query;
-      const filters: any = {
+      const filters = {
         ...(typeof queryFilters === "object" && queryFilters !== null ? queryFilters : {}),
         ...otherParams,
       };
@@ -40,7 +40,7 @@ export const crudController = {
         page: result.page,
         limit: result.limit,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[crudController.getList] Error:", error);
       return res.status(error.statusCode || 500).json({
         status: "error",
@@ -65,7 +65,7 @@ export const crudController = {
         status: "success",
         data: item,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[crudController.getById] Error:", error);
       return res.status(error.statusCode || 500).json({
         status: "error",

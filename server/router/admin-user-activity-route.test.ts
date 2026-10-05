@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-test("company admin activity route is role-guarded and tenant-scoped", () => {
+test("retired company admin activity route remains role-guarded and returns no history", () => {
   const source = fs.readFileSync("server/router/auth.router.ts", "utf8");
-  assert.match(source, /users\/:id\/activity[\s\S]*requireRole\(\["admin"\]\)[\s\S]*companyCode:\s*req\.user\.companyCode/);
+  const route = source.slice(source.indexOf('authRouter.get("/users/:id/activity"')).split("\n});")[0];
+  assert.match(route, /requireAuth[\s\S]*requireRole\(\["admin"\]\)/);
+  assert.match(route, /res\.json\(\{ items: \[\], total: 0 \}\)/);
+  assert.doesNotMatch(route, /UserActivityEventModel/);
 });

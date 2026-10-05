@@ -198,12 +198,12 @@ describe("ManagedUploadService", () => {
       fileName: "contract.pdf", fileUrl: "https://example.com/contract.pdf", storageProvider: "cloudinary",
       status: "finalized", finalizedResourceId: "resource-1", createdAt: new Date("2026-08-01"), expiresAt: new Date("2026-08-09"),
     });
-    const trashResourceById = vi.fn(async () => ({ _id: "resource-1" } as any));
-    const service = createManagedUploadService({
+    const trashResourceById = vi.fn(async () => ({ _id: "resource-1" }));
+    const service = createManagedUploadService(({
       repository,
       storage: { upload: vi.fn(), delete: vi.fn() },
       indexer: { registerUploadedResource: vi.fn(), trashResourceById },
-    });
+    } as unknown as Parameters<typeof createManagedUploadService>[0]));
 
     await service.trashFinalizedUpload("token-1", { companyCode: "ACME", actorId: "admin-1", trusted: true });
 

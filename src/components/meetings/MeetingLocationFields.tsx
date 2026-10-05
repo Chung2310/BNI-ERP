@@ -19,7 +19,7 @@ export function MeetingLocationFields({ value, onChange, radius, onRadiusChange 
       setDraft({ latitude: p.coords.latitude.toString(), longitude: p.coords.longitude.toString() });
       onChange({ latitude: p.coords.latitude, longitude: p.coords.longitude }); setBusy(false);
     }, () => { setError("Không lấy được vị trí. Hãy cấp quyền vị trí hoặc nhập tọa độ địa điểm bên dưới."); setBusy(false); },
-    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
   };
   return <fieldset className="space-y-3 rounded-xl border border-cyan-100 bg-cyan-50/50 p-4">
     <legend className="px-1 font-bold text-slate-800">Vị trí check-in</legend>

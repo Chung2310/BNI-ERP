@@ -31,13 +31,13 @@ export async function authenticateSePay(companyCode: string, authorization: stri
     throw new MemberFeeError(401, "Webhook không được xác thực.");
   }
 }
-export async function feeCheckout(companyCode: string, fee: any) {
+export async function feeCheckout(companyCode: string, fee: import('./member-fee.service').MemberFeeDocument) {
   const balance = serializeFee(fee);
   const config = readSePayEnvironment(companyCode);
   if (balance.remaining <= 0 || !fee.paymentCode || !fee.bankAccount || !config?.enabled) return null;
   const params = new URLSearchParams({ bank: fee.bankAccount.bank, acc: fee.bankAccount.accountNumber,
     amount: String(balance.remaining), des: fee.paymentCode });
-  return { ...(fee.bankAccount.toObject?.() || fee.bankAccount), paymentCode: fee.paymentCode,
+  return { ...fee.toObject().bankAccount, paymentCode: fee.paymentCode,
     amount: balance.remaining, qrUrl: "https://vietqr.app/img?" + params.toString() };
 }
 export async function notifyFee(companyCode: string, id: string) {
@@ -61,7 +61,7 @@ export async function notifyFee(companyCode: string, id: string) {
       body: fee.title + " năm " + fee.year + ": còn " + serializeFee(fee).remaining.toLocaleString("vi-VN") +
         " VND, hạn " + fee.dueDate + ". Mở thông báo để xem mã QR chuyển khoản và trạng thái thanh toán.",
       type: "he-thong", read: false, action: { tab: "NHÂN SỰ", subTab: "PHÍ THƯỜNG NIÊN", feeId: id } });
-  } catch (error: any) {
+  } catch (error) {
     if (error.code !== 11000) throw error;
   }
   const notification = await NotificationModel.findOne({ companyCode, recipientUid: fee.memberId, idempotencyKey: key });
@@ -96,7 +96,7 @@ export async function processSePay(companyCode: string, raw: unknown) {
   const fingerprint = hash(JSON.stringify(payload));
   const filter = { companyCode, transactionId: id };
   try { await SePayTransactionModel.updateOne(filter, { $setOnInsert: { ...filter, fingerprint, payload, status: "pending" } }, { upsert: true }); }
-  catch (e: any) { if (e.code !== 11000) throw e; }
+  catch (e) { if (e.code !== 11000) throw e; }
   const entry = (await SePayTransactionModel.findOne(filter))!;
   if (entry.fingerprint !== fingerprint) throw new MemberFeeError(409, "Mã giao dịch đã tồn tại với dữ liệu khác.");
   if (entry.status !== "pending") return { success: true, status: entry.status };

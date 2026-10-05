@@ -1,21 +1,23 @@
 import React, { useEffect, useRef, useState } from "react";
 import { memberFeeService, type MemberFee } from "../../services/memberFeeService";
 
-export default function FeePaymentPanel({ id, canManage, onUpdate }: { id: string; canManage: boolean; onUpdate: (fee: MemberFee) => void }) {
+export default function FeePaymentPanel(props: { id: string; canManage: boolean; onUpdate: (fee: MemberFee) => void }) {
+  return <FeePaymentContent key={props.id} {...props} />;
+}
+function FeePaymentContent({ id, canManage, onUpdate }: { id: string; canManage: boolean; onUpdate: (fee: MemberFee) => void }) {
   const [fee, setFee] = useState<MemberFee | null>(null);
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
-  const update = useRef(onUpdate); update.current = onUpdate;
+  const update = useRef(onUpdate); useEffect(() => { update.current = onUpdate; }, [onUpdate]);
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
-    setFee(null); setError("");
     const poll = async () => {
       try {
         const result = await memberFeeService.get(id);
         if (!cancelled) { setFee(result); update.current(result); setError(""); }
-      } catch (e: any) { if (!cancelled) setError(e.message); }
+      } catch (e) { if (!cancelled) setError(e.message); }
       finally { if (!cancelled) timer = setTimeout(poll, 8000); }
     };
     void poll();
@@ -28,7 +30,7 @@ export default function FeePaymentPanel({ id, canManage, onUpdate }: { id: strin
       const result = await memberFeeService.get(id);
       setFee(result); update.current(result);
       setMessage("Đã gửi thông báo trong ứng dụng và email kèm mã QR. Khoản đã gửi email hôm nay sẽ không gửi lại.");
-    } catch (e: any) { setError(e.message); } finally { setSending(false); }
+    } catch (e) { setError(e.message); } finally { setSending(false); }
   };
   return (
     <section className="mb-4 rounded-xl border border-cyan-200 bg-cyan-50/50 p-4 text-sm">

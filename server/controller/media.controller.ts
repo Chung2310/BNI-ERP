@@ -13,7 +13,7 @@ export function createMediaController(dependencies: MediaControllerDependencies)
     /** POST /api/v1/media/upload */
     async upload(req: AuthenticatedRequest, res: Response) {
       try {
-        const { file, folder, sourceType, name, fileName, mimeType, size, companyCode } = req.body;
+        const { file, folder, sourceType, name, fileName, mimeType, size } = req.body;
         if (sourceType) {
           if (!req.user?.id || !req.user.companyCode) {
             return res.status(401).json({ status: "error", message: "Người dùng chưa xác thực." });
@@ -43,7 +43,7 @@ export function createMediaController(dependencies: MediaControllerDependencies)
 
         const secureUrl = await dependencies.cloudinary.uploadMedia(file, folder);
         return res.status(200).json({ status: "success", url: secureUrl });
-      } catch (error: any) {
+      } catch (error) {
         console.error("[mediaController.upload] Error:", error);
         return res.status(500).json({
           status: "error",

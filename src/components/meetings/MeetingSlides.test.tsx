@@ -14,7 +14,7 @@ const slides = [
   { id: "b", kind: "guest", name: "Trần Bình", company: "Guest Co", photoURL: "", coverImage: "", phone: "", industry: "", bio: "" },
 ];
 const meeting = { _id: "m", __v: 1, currentIndex: 1, status: "live", speakers: slides };
-beforeEach(() => vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn() } as any));
+beforeEach(() => vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(({ drawImage: vi.fn() } as unknown as Parameters<((value: ReturnType<typeof HTMLCanvasElement.prototype.getContext>) => void)>[0])));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 it("checks multiple attendees and submits one batch while preserving the selection on failure", async () => {
@@ -233,8 +233,8 @@ it("StrictMode does not exit an incoming fullscreen request; real unmount still 
     await waitFor(() => expect(exitFullscreen).toHaveBeenCalledTimes(1));
   } finally {
     view.unmount();
-    delete (document as any).fullscreenElement;
-    delete (document as any).exitFullscreen;
+    Reflect.deleteProperty(document, "fullscreenElement");
+    Reflect.deleteProperty(document, "exitFullscreen");
   }
 });
 

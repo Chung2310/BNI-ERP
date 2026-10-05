@@ -1,8 +1,11 @@
-import { CompanyCheckInQrPanel, type CheckInQrApi } from "./CompanyCheckInQrPanel";
+import { CompanyCheckInQrPanel } from "./CompanyCheckInQrPanel";
 
 type Meeting = { title: string; status: string; latitude?: number; longitude?: number; gpsRadiusMeters?: number; speakers: { userId?: string }[] };
 export function MeetingCheckInPanel({ meeting, canManage, api, companyCode, onConfigure }: {
-  meeting: Meeting; canManage: boolean; api: CheckInQrApi; companyCode?: string;
+  meeting: Meeting;
+  canManage: boolean;
+  api: (path: string, method?: string, body?: unknown) => Promise<{ checkInUrl?: string } | null>;
+  companyCode?: string;
   onConfigure: () => void;
 }) {
   const open = ["scheduled", "live", "paused"].includes(meeting.status);

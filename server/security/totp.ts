@@ -3,9 +3,9 @@ import { authenticator } from "otplib";
 
 export const createTotpSecret = (): string => authenticator.generateSecret();
 
-export function verifyTotp(secret: string, token: string, options: { window?: number } = {}): boolean {
+export function verifyTotp(secret: string, token: string, _options: { window?: number } = {}): boolean {
   if (!/^\d{6}$/.test(token)) return false;
-  try { return authenticator.verify({ secret, token } as any); } catch { return false; }
+  try { return authenticator.verify({ secret, token }); } catch { return false; }
 }
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";

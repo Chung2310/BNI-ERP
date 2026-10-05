@@ -22,175 +22,175 @@ import {
 } from "../validation/chat.validation";
 
 export const chatRouter = Router();
-chatRouter.use(requireAuth as any, requirePermission("chat:read") as any);
+chatRouter.use(requireAuth, requirePermission("chat:read"));
 
 // Xem trước liên kết (OG metadata)
 chatRouter.get(
   "/link-preview",
-  requireAuth as any,
+  requireAuth,
   validateRequest(linkPreviewSchema),
-  chatController.getLinkPreview as any
+  chatController.getLinkPreview
 );
 
 // Lấy danh sách phòng chat
 chatRouter.get(
   "/rooms",
-  requireAuth as any,
-  chatController.getRooms as any
+  requireAuth,
+  chatController.getRooms
 );
 
 // Ghim/bỏ ghim cuộc trò chuyện
 chatRouter.post(
   "/rooms/:roomId/toggle-pin",
-  requireAuth as any,
+  requireAuth,
   validateRequest(roomIdParamsSchema),
-  chatController.togglePinRoom as any
+  chatController.togglePinRoom
 );
 
 // Tạo phòng chat mới (1-1 hoặc Nhóm)
 chatRouter.post(
   "/rooms",
-  requireAuth as any,
+  requireAuth,
   validateRequest(createRoomSchema),
-  chatController.createRoom as any
+  chatController.createRoom
 );
 
 // Lấy chi tiết phòng chat
 chatRouter.get(
   "/rooms/:roomId",
-  requireAuth as any,
+  requireAuth,
   validateRequest(roomIdParamsSchema),
-  chatController.getRoomById as any
+  chatController.getRoomById
 );
 
 // Cập nhật thông tin phòng chat nhóm
 chatRouter.patch(
   "/rooms/:roomId",
-  requireAuth as any,
+  requireAuth,
   validateRequest(updateRoomSchema),
-  chatController.updateRoom as any
+  chatController.updateRoom
 );
 
 // Giải tán nhóm chat
 chatRouter.delete(
   "/rooms/:roomId",
-  requireAuth as any,
+  requireAuth,
   validateRequest(roomIdParamsSchema),
-  chatController.deleteRoom as any
+  chatController.deleteRoom
 );
 
 // Rời khỏi nhóm chat
 chatRouter.delete(
   "/rooms/:roomId/leave",
-  requireAuth as any,
+  requireAuth,
   validateRequest(roomIdParamsSchema),
-  chatController.leaveRoom as any
+  chatController.leaveRoom
 );
 
 // Thêm thành viên vào nhóm chat
 chatRouter.post(
   "/rooms/:roomId/members",
-  requireAuth as any,
+  requireAuth,
   validateRequest(addMembersSchema),
-  chatController.addMembers as any
+  chatController.addMembers
 );
 
 // Xóa thành viên khỏi nhóm chat
 chatRouter.delete(
   "/rooms/:roomId/members/:userId",
-  requireAuth as any,
+  requireAuth,
   validateRequest(removeMemberSchema),
-  chatController.removeMember as any
+  chatController.removeMember
 );
 
 // Lấy lịch sử tin nhắn trong phòng chat
 chatRouter.get(
   "/rooms/:roomId/messages",
-  requireAuth as any,
+  requireAuth,
   validateRequest(getMessagesSchema),
-  chatController.getMessages as any
+  chatController.getMessages
 );
 
 // Tìm kiếm tin nhắn, liên kết, tệp tin, hình ảnh/video trong phòng chat
 chatRouter.get(
   "/rooms/:roomId/search",
-  requireAuth as any,
+  requireAuth,
   validateRequest(searchMessagesSchema),
-  chatController.searchMessages as any
+  chatController.searchMessages
 );
 
 // Gửi tin nhắn mới vào phòng chat
 chatRouter.post(
   "/rooms/:roomId/messages",
-  requireAuth as any,
+  requireAuth,
   validateRequest(sendMessageSchema),
-  chatController.sendMessage as any
+  chatController.sendMessage
 );
 
 // Đánh dấu đã đọc toàn bộ tin nhắn trong phòng chat
 chatRouter.post(
   "/rooms/:roomId/read",
-  requireAuth as any,
+  requireAuth,
   validateRequest(roomIdParamsSchema),
-  chatController.markAsRead as any
+  chatController.markAsRead
 );
 
 // Chuyển quyền Trưởng nhóm (Admin only)
 chatRouter.post(
   "/rooms/:roomId/transfer-admin",
-  requireAuth as any,
+  requireAuth,
   validateRequest(roomIdParamsSchema),
-  chatController.transferAdmin as any
+  chatController.transferAdmin
 );
 
 // Cập nhật vai trò thành viên nhóm (Admin only)
 chatRouter.post(
   "/rooms/:roomId/members/:userId/role",
-  requireAuth as any,
+  requireAuth,
   validateRequest(updateMemberRoleSchema),
-  chatController.updateMemberRole as any
+  chatController.updateMemberRole
 );
 
 // Ghim tin nhắn
 chatRouter.post(
   "/rooms/:roomId/pin",
-  requireAuth as any,
+  requireAuth,
   validateRequest(pinMessageSchema),
-  chatController.pinMessage as any
+  chatController.pinMessage
 );
 
 // Bỏ ghim tin nhắn
 chatRouter.post(
   "/rooms/:roomId/unpin",
-  requireAuth as any,
+  requireAuth,
   validateRequest(unpinMessageSchema),
-  chatController.unpinMessage as any
+  chatController.unpinMessage
 );
 
 // Thả / gỡ cảm xúc (reaction) trên tin nhắn
 chatRouter.post(
   "/rooms/:roomId/messages/:messageId/react",
-  requireAuth as any,
+  requireAuth,
   validateRequest(reactMessageSchema),
-  chatController.reactToMessage as any
+  chatController.reactToMessage
 );
 
 // Sửa nội dung tin nhắn (chỉ người gửi)
 chatRouter.patch(
   "/rooms/:roomId/messages/:messageId",
-  requireAuth as any,
+  requireAuth,
   validateRequest(editMessageSchema),
-  chatController.editMessage as any
+  chatController.editMessage
 );
 
 // Thu hồi tin nhắn (Soft Delete)
 chatRouter.delete(
   "/rooms/:roomId/messages/:messageId",
-  requireAuth as any,
+  requireAuth,
   validateRequest(deleteMessageSchema),
-  chatController.deleteMessage as any
+  chatController.deleteMessage
 );
 
 
 
-chatRouter.patch("/rooms/:roomId/block", validateRequest(setRoomBlockedSchema), chatController.setRoomBlocked as any);
+chatRouter.patch("/rooms/:roomId/block", validateRequest(setRoomBlockedSchema), chatController.setRoomBlocked);

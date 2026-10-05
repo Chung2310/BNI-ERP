@@ -5,6 +5,7 @@ export interface SelectOption {
   value: string;
   label: string;
   searchText?: string;
+  disabled?: boolean;
 }
 
 interface SearchableSelectProps {
@@ -17,6 +18,7 @@ interface SearchableSelectProps {
   className?: string;
   compact?: boolean;
   ariaLabel?: string;
+  subtle?: boolean;
 }
 
 const normalizeSearch = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[đĐ]/g, "d").toLowerCase().trim();
@@ -31,6 +33,7 @@ export function SearchableSelect({
   className = "",
   compact = false,
   ariaLabel,
+  subtle = false,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -94,10 +97,10 @@ export function SearchableSelect({
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
         className={`flex w-full min-w-0 items-center justify-between border border-slate-200 text-left transition-all duration-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60 ${compact ? "rounded-xl bg-slate-50/50 px-3 py-1.5 text-xs" : "rounded-lg bg-white p-2.5 text-sm"} ${
-          isOpen ? "border-blue-500 ring-4 ring-blue-500/10" : ""
+          isOpen ? subtle ? "border-cyan-300 ring-2 ring-cyan-500/10" : "border-blue-500 ring-4 ring-blue-500/10" : ""
         }`}
       >
-        <span className={`truncate mr-2 flex-1 ${selectedOption ? `text-slate-700 ${compact ? "font-normal" : "font-medium"}` : "text-slate-400 font-normal"}`}>
+        <span className={`truncate mr-2 flex-1 ${selectedOption ? `text-slate-700 ${compact || subtle ? "font-normal" : "font-medium"}` : "text-slate-400 font-normal"}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <ChevronDown className={`h-4 w-4 text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
@@ -116,7 +119,7 @@ export function SearchableSelect({
               aria-label={searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-md border border-slate-200 bg-white py-1.5 pl-8 pr-8 text-xs transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 placeholder:text-slate-400/70"
+              className={`w-full rounded-md border border-slate-200 bg-white py-1.5 pl-8 pr-8 text-xs transition-all focus:outline-none focus:ring-2 placeholder:text-slate-400/70 ${subtle ? "focus:border-cyan-500 focus:ring-cyan-500/10" : "focus:border-blue-500 focus:ring-blue-500/10"}`}
             />
             {searchQuery && (
               <button
@@ -146,10 +149,11 @@ export function SearchableSelect({
                   <button
                     key={opt.value}
                     type="button"
+                    disabled={opt.disabled}
                     onClick={() => handleSelect(opt.value)}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition-colors ${
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                       isSelected
-                        ? "bg-cyan-50 text-cyan-700 font-medium"
+                        ? `bg-cyan-50 text-cyan-700 ${subtle ? "font-normal" : "font-medium"}`
                         : "text-slate-700 hover:bg-slate-50"
                     }`}
                   >

@@ -13,7 +13,7 @@ test("slides include guest contact details and use current member profile fields
   assert.equal(guest.phone, "0901234567");
   assert.equal(guest.bio, "Guest bio");
   const member = buildProfileSlide({ id: "m", userId: "u", email: "old@example.com", phone: "old", bio: "old" },
-    { displayName: "Current", email: "member@example.com", phone: "", bio: "Current bio", industry: "" });
+    ({ displayName: "Current", email: "member@example.com", phone: "", bio: "Current bio", industry: "" } as unknown as Parameters<typeof buildProfileSlide>[1]));
   assert.equal(member.email, "member@example.com");
   assert.equal(member.phone, "");
   assert.equal(member.industry, "");
@@ -62,10 +62,10 @@ test("slide input rejects oversized phone numbers, script URLs, oversized bio an
 
 test("slide reads scope both meeting and profile queries to the requesting company", async t => {
   const meeting = new MeetingModel({ companyCode: "ACME", title: "Meeting", speakers: [{ id: "s", userId: "507f1f77bcf86cd799439011", name: "Stored", seconds: 30, checkedInAt: new Date() }], __v: 2 });
-  t.mock.method(MeetingModel, "findOne", async (query: any) => {
+  t.mock.method(MeetingModel, "findOne", async (query) => {
     assert.deepEqual(query, { _id: "meeting-1", companyCode: "ACME" }); return meeting;
   });
-  t.mock.method(UserModel, "find", (query: any) => {
+  t.mock.method(UserModel, "find", (query) => {
     assert.equal(query.companyCode, "ACME");
     assert.deepEqual(query.isActive, { $ne: false });
     return { select: (fields: string) => {

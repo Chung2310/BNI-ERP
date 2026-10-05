@@ -34,7 +34,7 @@ export default function MemberMeetingDetail({ meeting, userId, onClose, onCheckI
   const checkIn = async () => {
     if (pending.current) return;
     pending.current = true; setBusy(true); setError("");
-    try { const location = await locate(); await onCheckIn(location); } catch (error: any) { setError(error.message || "Không thể điểm danh. Vui lòng thử lại."); }
+    try { const location = await locate(); await onCheckIn(location); } catch (error) { setError(error.message || "Không thể điểm danh. Vui lòng thử lại."); }
     finally { pending.current = false; setBusy(false); }
   };
   const dialogRef = useRef<HTMLElement>(null);

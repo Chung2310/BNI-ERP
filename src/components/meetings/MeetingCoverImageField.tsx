@@ -30,7 +30,7 @@ export function MeetingCoverImageField({ value, onChange, disabled }: MeetingCov
       const url = await authService.uploadFile(file, "igen_erp/meetings");
       onChange(url);
       toast.success("Đã tải ảnh bìa lên thành công!");
-    } catch (error: any) {
+    } catch (error) {
       console.error("[MeetingCoverImageField] Upload error:", error);
       toast.error(error?.message || "Tải ảnh bìa thất bại.");
     } finally {

@@ -7,26 +7,27 @@ type Mode = "member" | "guest";
 const fieldClass = "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 disabled:bg-slate-50";
 export default function MeetingCheckInPage() {
   const token = window.location.pathname.split("/").filter(Boolean).pop() || "";
+  return <MeetingCheckInContent key={token} token={token} />;
+}
+function MeetingCheckInContent({ token }: { token: string }) {
   const [meeting, setMeeting] = useState<MeetingInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<Mode>("member");
   const [form, setForm] = useState({ email: "", password: "", name: "", phone: "", company: "", industry: "" });
-  const [avatar, setAvatar] = useState<File | null>(null);
+  const [avatar, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState("");
-  useEffect(() => {
-    if (!avatar) { setAvatarPreview(""); return; }
-    const url = URL.createObjectURL(avatar);
-    setAvatarPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [avatar]);
+  function setAvatar(file: File | null) {
+    setAvatarFile(file);
+    setAvatarPreview(file ? URL.createObjectURL(file) : "");
+  }
+  useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); }, [avatarPreview]);
   const [success, setSuccess] = useState("");
   const [checkedInMeeting, setCheckedInMeeting] = useState("");
   const [error, setError] = useState("");
   const [phase, setPhase] = useState<"idle" | "locating" | "submitting">("idle");
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
     fetch("/api/v1/meeting-checkin/" + encodeURIComponent(token), { signal: controller.signal })
       .then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.message || "Không mở được buổi họp."); setMeeting(d.data); })
       .catch(e => { if (e.name !== "AbortError") setError(e.message); })
@@ -65,7 +66,7 @@ export default function MeetingCheckInPage() {
       setCheckedInMeeting(data.data?.meetingTitle || meeting?.title || "");
       setSuccess(data.data?.name || (mode === "guest" ? form.name : "Bạn"));
       setForm(old => ({ ...old, password: "" }));
-    } catch (e: any) { setError(e.message); } finally { setPhase("idle"); }
+    } catch (e) { setError(e.message); } finally { setPhase("idle"); }
   };
   return <main className="min-h-dvh overflow-y-auto bg-[#f4f8fb] px-4 py-6 text-slate-900 sm:py-12">
     <section className="mx-auto max-w-xl overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-[0_16px_60px_-24px_rgba(15,60,80,0.22)]">

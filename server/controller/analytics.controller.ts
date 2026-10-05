@@ -1,4 +1,4 @@
-﻿import { Response } from "express";
+import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { analyticsService, RevenueGranularity } from "../service/analytics.service";
 import { OperatingExpenseModel } from "../model/operating-expense.model";
@@ -91,7 +91,7 @@ export const analyticsController = {
       });
 
       return res.status(200).json({ status: "success", data });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[analyticsController.getMeta] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -128,7 +128,7 @@ export const analyticsController = {
       );
 
       return res.status(200).json({ status: "success", data });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[analyticsController.getRevenue] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -145,7 +145,7 @@ export const analyticsController = {
       if (isNaN(asOf.getTime())) return res.status(400).json({ status: "error", message: "asOf phải đúng định dạng YYYY-MM-DD." });
       const data = await withAnalyticsCache(req.user.companyCode, req.originalUrl, () => analyticsService.getReceivables(resolveScope(req), asOf));
       return res.status(200).json({ status: "success", data });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[analyticsController.getReceivables] Error:", error);
       return res.status(500).json({ status: "error", message: "Lỗi hệ thống khi tổng hợp công nợ.", details: error.message });
     }
@@ -158,7 +158,7 @@ export const analyticsController = {
       if (!range) return res.status(400).json({ status: "error", message: "Khoảng thời gian không hợp lệ." });
       const data = await withAnalyticsCache(req.user.companyCode, req.originalUrl, () => analyticsService.getExpenses(resolveScope(req), range));
       return res.status(200).json({ status: "success", data });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[analyticsController.getExpenses] Error:", error);
       return res.status(500).json({ status: "error", message: "Lỗi hệ thống khi tổng hợp chi phí.", details: error.message });
     }
@@ -171,7 +171,7 @@ export const analyticsController = {
       if (!range) return res.status(400).json({ status: "error", message: "Khoảng thời gian không hợp lệ." });
       const data = await withAnalyticsCache(req.user.companyCode, req.originalUrl, () => analyticsService.getProfitAndLoss(resolveScope(req), range));
       return res.status(200).json({ status: "success", data });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[analyticsController.getProfitAndLoss] Error:", error);
       return res.status(500).json({ status: "error", message: "Lỗi hệ thống khi tổng hợp P&L.", details: error.message });
     }
@@ -185,7 +185,7 @@ export const analyticsController = {
       const range = resolveRange(String(req.query.from), String(req.query.to), (req.query.granularity as RevenueGranularity) || "day");
       if (!range) return res.status(400).json({ status: "error", message: "Khoảng thời gian không hợp lệ." });
       const scope = resolveScope(req);
-      const data: Record<string, any> = {};
+      const data: import("../service/analytics-export.service").ExportData = {};
 
       if (report === "overview") {
         [data.revenue, data.receivables, data.expenses] = await Promise.all([
@@ -217,7 +217,7 @@ export const analyticsController = {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename=${baseName}.xlsx`);
       return res.send(buffer);
-    } catch (error: any) {
+    } catch (error) {
       console.error("[analyticsController.exportReport] Error:", error);
       return res.status(500).json({ status: "error", message: "Lỗi hệ thống khi xuất báo cáo.", details: error.message });
     }

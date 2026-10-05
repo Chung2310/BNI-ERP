@@ -5,5 +5,5 @@ export interface ICRUDQueryOptions {
   limit?: number;
   sort?: string;
   search?: string;
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
 }

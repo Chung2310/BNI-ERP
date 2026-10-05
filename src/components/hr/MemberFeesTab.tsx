@@ -5,7 +5,6 @@ import {
   X,
   Download,
   Wallet,
-  Bell,
   RefreshCw,
   TrendingUp,
   CheckCircle2,
@@ -18,7 +17,6 @@ import {
   Send,
   UserCheck,
   UserX,
-  Check,
   Calendar,
   Trash2,
 } from "lucide-react";
@@ -178,11 +176,13 @@ export default function MemberFeesTab() {
   // Notification sending state for single member
   const [sendingMemberId, setSendingMemberId] = useState<string | null>(null);
 
+  const [requestInputs, setRequestInputs] = useState(() => [year, reload, canManage, userProfile?.uid]);
+  if (!Object.is(requestInputs[0], year) || !Object.is(requestInputs[1], reload) || !Object.is(requestInputs[2], canManage) || !Object.is(requestInputs[3], userProfile?.uid)) {
+    setRequestInputs([year, reload, canManage, userProfile?.uid]);
+    setLoading(true); setError(""); setItems([]);
+  }
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError("");
-    setItems([]);
     Promise.all([
       memberFeeService.list(year, controller.signal),
       canManage
@@ -428,7 +428,7 @@ export default function MemberFeesTab() {
           if (canManage) setSelectedCampaignKey(campaignKey);
           openDetail(fee);
         }
-      } catch (e: any) {
+      } catch (e) {
         if (alive) setError(e.message);
       }
     };
@@ -463,7 +463,7 @@ export default function MemberFeesTab() {
       try {
         await memberFeeService.notify(fee._id);
         sent++;
-      } catch (e: any) {
+      } catch (e) {
         failed++;
         failure = e.message;
       }
@@ -483,7 +483,7 @@ export default function MemberFeesTab() {
       await memberFeeService.notify(feeId);
       toast.success("Đã gửi thông báo và email kèm mã QR cho thành viên.");
       setReload((v) => v + 1);
-    } catch (e: any) {
+    } catch (e) {
       toast.error(e.message || "Gửi thông báo thất bại.");
     } finally {
       setSendingMemberId(null);
@@ -524,7 +524,7 @@ export default function MemberFeesTab() {
       }
       setCreating(false);
       setReload((value) => value + 1);
-    } catch (e: any) {
+    } catch (e) {
       setFormError(e.message);
     } finally {
       setBusy(false);
@@ -543,7 +543,7 @@ export default function MemberFeesTab() {
     let failure = "";
     for (const item of deleteTargets) {
       try { await memberFeeService.delete(item._id); removed.add(item._id); }
-      catch (error: any) { failed.push(item); failure = error.message; }
+      catch (error) { failed.push(item); failure = error.message; }
     }
     setItems(previous => previous.filter(item => !removed.has(item._id)));
     if (active && removed.has(active._id)) closeDetail();
@@ -565,7 +565,7 @@ export default function MemberFeesTab() {
       setItems((old) =>
         old.map((item) => (item._id === updated._id ? updated : item)),
       );
-    } catch (e: any) {
+    } catch (e) {
       setFormError(e.message);
     } finally {
       setBusy(false);
@@ -585,7 +585,7 @@ export default function MemberFeesTab() {
         old.map((item) => (item._id === updated._id ? updated : item)),
       );
       toast.success("Đã ghi nhận phiếu thu.");
-    } catch (e: any) {
+    } catch (e) {
       setFormError(e.message);
     } finally {
       setBusy(false);
@@ -611,7 +611,7 @@ export default function MemberFeesTab() {
         old.map((item) => (item._id === updated._id ? updated : item)),
       );
       toast.success("Đã hủy phiếu thu và cập nhật số còn phải đóng.");
-    } catch (e: any) {
+    } catch (e) {
       setFormError(e.message);
     } finally {
       setBusy(false);

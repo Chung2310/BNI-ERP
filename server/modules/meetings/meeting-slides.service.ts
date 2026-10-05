@@ -1,9 +1,12 @@
+import type { IUser } from '../../interface/user.interface';
+import type { MeetingDocument } from './meeting.service';
+type SlideSpeaker = { id: string; userId?: string; galleryImages?: string[]; slideProfile?: Partial<Record<(typeof fields)[number], string>> & { galleryImages?: string[] } } & Partial<Record<(typeof fields)[number], string>>;
 import { UserModel } from '../../model/user.model';
 import { assertMeetingEditable, assertVersion, getMeeting, MeetingError, saveMeeting } from './meeting.service';
 
 const fields = ['name', 'company', 'photoURL', 'coverImage', 'phone', 'email', 'industry', 'bio', 'address', 'targetMarket'] as const;
 
-export function buildProfileSlide(speaker: any, profile?: any) {
+export function buildProfileSlide(speaker: SlideSpeaker, profile?: Partial<IUser> & { bio?: string }) {
   const result: Record<string, string | string[]> = {
     id: speaker.id,
     kind: speaker.userId ? 'member' : 'guest',
@@ -29,7 +32,11 @@ export function buildProfileSlide(speaker: any, profile?: any) {
 }
 
 export async function getMeetingSlides(companyCode: string, meetingId: string) {
-  const meeting = await getMeeting(companyCode, meetingId);
+  return buildMeetingSlides(await getMeeting(companyCode, meetingId));
+}
+
+export async function buildMeetingSlides(meeting: Pick<MeetingDocument, 'companyCode' | '__v' | 'speakers'>) {
+  const companyCode = meeting.companyCode;
   const userIds = meeting.speakers.map(s => s.userId).filter(Boolean);
   const profiles = userIds.length ? await UserModel.find({
     _id: { $in: userIds }, companyCode, isActive: { $ne: false },
@@ -41,7 +48,7 @@ export async function getMeetingSlides(companyCode: string, meetingId: string) {
   };
 }
 
-export async function updateMeetingSlide(companyCode: string, meetingId: string, speakerId: string, input: any) {
+export async function updateMeetingSlide(companyCode: string, meetingId: string, speakerId: string, input: { version: number; profile: SlideSpeaker['slideProfile'] | null }) {
   const meeting = await getMeeting(companyCode, meetingId);
   assertMeetingEditable(meeting);
   assertVersion(meeting, input.version);

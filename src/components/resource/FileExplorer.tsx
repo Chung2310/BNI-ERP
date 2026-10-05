@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ChevronRight,
   ChevronLeft,
@@ -16,9 +16,7 @@ import {
   Info,
   ArrowRightLeft,
   Copy,
-  BellOff,
   MessageSquare,
-  Briefcase,
   Share2,
   X,
   Plus,
@@ -37,6 +35,7 @@ const FilePreviewModal = React.lazy(() => import("./FilePreviewModal").then((m) 
 import { formatBytes, formatDate, getFileIcon } from "./resourceHelpers";
 import UploadProgressPanel, { type UploadQueueItem } from "./UploadProgressPanel";
 import { useAuth } from "../../context/AuthContext";
+import { useNow } from "../../hooks/useNow";
 import {
   SystemManagedResourceBadge,
   canMutateResourceItem,
@@ -93,8 +92,8 @@ interface FileExplorerProps {
   ownerId?: string;
   roomId?: string;
   showTrash?: boolean;
-  users?: any[];
-  rooms?: any[];
+  users?: import("../../types").UserProfile[];
+  rooms?: import("../../services/internalChatService").ChatRoom[];
   showSharedOnly?: boolean; // Nếu true: chỉ hiển item được chia sẻ (tab "Được chia sẻ")
   filterStartDate?: string;
   filterEndDate?: string;
@@ -120,14 +119,14 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
   viewMode = "grid",
 }) => {
   const { userProfile } = useAuth();
-  const userProfileAny = userProfile as any;
+  const userProfileAny = userProfile;
   const userProfileId = userProfile?.uid || userProfileAny?.id || userProfileAny?._id || "";
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbEntry[]>([]);
   const isInsideFixedFolder = breadcrumb.some((b) => b.isFixed);
   const [items, setItems] = useState<ResourceItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const [, setUploading] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [infoItem, setInfoItem] = useState<ResourceItem | null>(null);
@@ -505,7 +504,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     }
   };
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  
 
   const load = useCallback(async (folderId: string | null) => {
     setLoading(true);
@@ -623,26 +622,34 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
           break;
         case "document":
           // Tài liệu Word, Epub, Txt (Loại trừ PDF vì có tab PDF riêng)
-          if (item.type !== "file") return false;
+          {
+if (item.type !== "file") return false;
           const isDoc = mime.startsWith("text/") || mime.includes("document") || mime.includes("word") || mime.includes("epub") || name.match(/\.(docx|doc|txt|odt)/);
           const isPdf = mime === "application/pdf" || name.endsWith(".pdf");
           if (!isDoc || isPdf) return false;
           break;
+}
         case "spreadsheet":
-          if (item.type !== "file") return false;
+          {
+if (item.type !== "file") return false;
           const isSheet = mime.includes("sheet") || mime.includes("excel") || mime.includes("csv") || name.match(/\.(xlsx|xls|csv)/);
           if (!isSheet) return false;
           break;
+}
         case "presentation":
-          if (item.type !== "file") return false;
+          {
+if (item.type !== "file") return false;
           const isPresentation = mime.includes("presentation") || mime.includes("powerpoint") || name.match(/\.(pptx|ppt)/);
           if (!isPresentation) return false;
           break;
+}
         case "link":
-          if (item.type !== "file") return false;
-          const isLink = mime.includes("shortcut") || mime.includes("link") || (item.fileUrl && !(item as any).driveFileId && !item.mimeType) || mime.includes("html") || name.match(/\.(html|htm)/);
+          {
+if (item.type !== "file") return false;
+          const isLink = mime.includes("shortcut") || mime.includes("link") || (item.fileUrl && !(item).driveFileId && !item.mimeType) || mime.includes("html") || name.match(/\.(html|htm)/);
           if (!isLink) return false;
           break;
+}
         default:
           break;
       }
@@ -730,10 +737,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     [currentFolder, load, isInsideFixedFolder, ownerId, roomId, showTrash]
   );
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) uploadFiles(e.target.files);
-    e.target.value = "";
-  };
+  
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -796,8 +800,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
   const files = showSharedOnly
     ? sharedItems.filter((i) => i.type === "file")
     : ownItems.filter((i) => i.type === "file");
-  const sharedFolders = sharedItems.filter((i) => i.type === "folder");
-  const sharedFiles = sharedItems.filter((i) => i.type === "file");
+  
+  
 
   // Pagination logic for list view
   const allListItems = [...folders, ...files];
@@ -2381,6 +2385,7 @@ const ResourceCard: React.FC<{
   onShare,
   onSendToChat,
 }) => {
+  const now = useNow();
   const isFolder = item.type === "folder";
   const canMutate = canMutateResourceItem(item);
   const { Icon, color } = isFolder ? { Icon: Folder, color: "text-[#5bc0be]" } : getFileIcon(item.mimeType, item.name);
@@ -2394,7 +2399,7 @@ const ResourceCard: React.FC<{
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      className={`group relative flex flex-col items-center justify-between border rounded-3xl p-5 transition-all duration-300 ease-out select-none cursor-pointer text-center w-40 h-44 bg-white shadow-xs hover:shadow-lg hover:border-slate-200 hover:-translate-y-1 ${
+      className={`group relative flex flex-col items-center justify-between border rounded-3xl p-3.5 sm:p-4 transition-all duration-300 ease-out select-none cursor-pointer text-center w-40 min-h-[12rem] h-auto bg-white shadow-xs hover:shadow-lg hover:border-slate-200 hover:-translate-y-1 ${
         isDraggedOver
           ? "bg-slate-50 border-[#10b981] border-dashed scale-105 shadow-md"
           : "border-slate-100 hover:bg-slate-50/30"
@@ -2494,7 +2499,7 @@ const ResourceCard: React.FC<{
                   onClick={(e) => {
                     e.stopPropagation();
                     onToggleMenu(e); // Close menu
-                    const itemId = item._id || (item as any).id;
+                    const itemId = item._id || (item).id;
                     if (itemId) {
                       const url = `${window.location.origin}${window.location.pathname}?id=${itemId}`;
                       navigator.clipboard.writeText(url);
@@ -2577,22 +2582,22 @@ const ResourceCard: React.FC<{
       </div>
 
       {/* Center Icon */}
-      <div className="flex-1 flex items-center justify-center mt-4 w-full" onClick={onOpen}>
+      <div className="flex-1 flex items-center justify-center mt-2 w-full min-h-0" onClick={onOpen}>
         {isFolder && item.name.toUpperCase().includes("GOOGLE") ? (
-          <div className="relative p-3.5 bg-[#5bc0be]/5 rounded-2xl group-hover:bg-[#5bc0be]/10 transition duration-300">
-            <FolderOpen className="h-11 w-11 text-[#5bc0be]" strokeWidth={1.5} />
+          <div className="relative p-2.5 bg-[#5bc0be]/5 rounded-2xl group-hover:bg-[#5bc0be]/10 transition duration-300">
+            <FolderOpen className="h-9 w-9 text-[#5bc0be]" strokeWidth={1.5} />
             <div className="absolute bottom-1 right-1 flex items-center justify-center">
-              <GoogleDriveLogo className="h-4 w-4 bg-white rounded-full p-0.5 shadow-xs" />
+              <GoogleDriveLogo className="h-3.5 w-3.5 bg-white rounded-full p-0.5 shadow-xs" />
             </div>
           </div>
         ) : item.mimeType === "application/vnd.google-apps.spreadsheet" ? (
-          <GoogleSheetsLogo className="w-16 h-16" />
+          <GoogleSheetsLogo className="w-12 h-12" />
         ) : item.mimeType === "application/vnd.google-apps.document" ? (
-          <GoogleDocsLogo className="w-16 h-16" />
+          <GoogleDocsLogo className="w-12 h-12" />
         ) : item.mimeType === "application/vnd.google-apps.presentation" ? (
-          <GoogleSlidesLogo className="w-16 h-16" />
+          <GoogleSlidesLogo className="w-12 h-12" />
         ) : !isFolder && item.mimeType?.startsWith("image/") && item.fileUrl ? (
-          <div className="relative w-32 h-20 flex items-center justify-center rounded-xl overflow-hidden bg-slate-50 border border-slate-100 shadow-inner group-hover:scale-105 transition-transform duration-300">
+          <div className="relative w-28 h-16 flex items-center justify-center rounded-xl overflow-hidden bg-slate-50 border border-slate-100 shadow-inner group-hover:scale-105 transition-transform duration-300">
             <img src={item.fileUrl} alt={item.name} className="h-full w-full object-cover" />
             <div className="absolute bottom-1 left-1 bg-[#ff7b00] text-white p-0.5 rounded-xs shadow-xs">
               <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -2602,33 +2607,30 @@ const ResourceCard: React.FC<{
             </div>
           </div>
         ) : (
-          <div className={`p-3.5 rounded-2xl transition duration-300 ${
+          <div className={`p-2.5 rounded-2xl transition duration-300 ${
             isFolder 
               ? "bg-amber-50 group-hover:bg-amber-100/70" 
               : item.mimeType === "text/html" 
                 ? "bg-teal-50 group-hover:bg-teal-100/70"
                 : "bg-slate-50 group-hover:bg-slate-100/70"
           }`}>
-            <Icon className={`w-11 h-11 ${color}`} strokeWidth={1.5} />
+            <Icon className={`w-9 h-9 ${color}`} strokeWidth={1.5} />
           </div>
         )}
       </div>
 
       {/* Info */}
-      <div className="mt-auto w-full pt-3" onClick={onOpen}>
+      <div className="mt-auto w-full pt-2 min-w-0" onClick={onOpen}>
         <p className="truncate text-xs font-bold text-slate-800 px-0.5" title={item.name}>
           {item.name}
         </p>
-        <div className="mt-1">
-          <SystemManagedResourceBadge item={item} compact />
-        </div>
         <p className="truncate text-[10px] text-slate-400 font-semibold mt-1">
           {showTrash ? (
             (() => {
               if (!item.deletedAt) return "Còn 15 ngày";
               const delDate = new Date(item.deletedAt);
               const expiry = delDate.getTime() + 15 * 24 * 60 * 60 * 1000;
-              const diff = expiry - Date.now();
+              const diff = expiry - now;
               const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
               return days > 0 ? `Còn ${days} ngày` : "Sắp xóa";
             })()

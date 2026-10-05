@@ -14,33 +14,33 @@ process.env.APP_ENCRYPTION_KEY = '11'.repeat(32);
 const now = new Date('2030-01-31T02:00:00Z');
 const token = 'A'.repeat(43);
 const input = { name: 'Guest', email: '', latitude: 10, longitude: 106 };
-function meeting(id = 'current'): any {
+function meeting(id = 'current') {
   return { _id: id, title: id, companyCode: 'ACME', startsAt: new Date('2030-01-31T01:00:00Z'), endsAt: new Date('2030-01-31T03:00:00Z'),
     status: 'scheduled', reminderDays: 1, revision: 1, __v: 0, latitude: 10, longitude: 106, gpsRadiusMeters: 200, speakers: [],
     tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20, save: async () => {} };
 }
-function setup(t: any) {
+function setup(t: import("node:test").TestContext) {
   t.mock.timers.enable({ apis: ['Date'], now });
   const source = { ...meeting('source'), status: 'ended' };
-  const state: { qr: any; matches: any[]; queries: any[] } = { qr: { companyCode: 'ACME', tokenHash: createHash('sha256').update(token).digest('hex'), tokenEncrypted: encryptSecret(token), expiresAt: null }, matches: [meeting()], queries: [] };
-  t.mock.method(MeetingModel, 'findOne', (query: any) => {
+  const state: { qr: { companyCode: string; tokenHash?: string; tokenEncrypted?: string; expiresAt?: Date | null; revokedAt?: Date }; matches: ReturnType<typeof meeting>[]; queries: Record<string, unknown>[] } = { qr: { companyCode: 'ACME', tokenHash: createHash('sha256').update(token).digest('hex'), tokenEncrypted: encryptSecret(token), expiresAt: null }, matches: [meeting()], queries: [] };
+  t.mock.method(MeetingModel, 'findOne', (query) => {
     const result = query._id === 'source' && query.companyCode === 'ACME' ? source : null;
     return Object.assign(Promise.resolve(result), { select: async () => result });
   });
-  t.mock.method(MeetingModel, 'updateOne', async (query: any, update: any) => {
+  t.mock.method(MeetingModel, 'updateOne', async (query, update) => {
     assert.equal(query.companyCode, 'ACME');
     assert.equal(query._id, 'source');
-    for (const key of Object.keys(update.$unset)) delete (source as any)[key];
+    for (const key of Object.keys(update.$unset)) delete (source)[key];
   });
-  t.mock.method(MeetingModel, 'find', (query: any) => {
+  t.mock.method(MeetingModel, 'find', (query) => {
     state.queries.push(query);
     return { sort: () => ({ limit: async () => state.matches }) };
   });
-  t.mock.method(MeetingCheckInQrModel, 'findOne', (query: any) => {
+  t.mock.method(MeetingCheckInQrModel, 'findOne', (query) => {
     const result = state.qr && (query.companyCode === state.qr.companyCode || query.tokenHash === state.qr.tokenHash) ? state.qr : null;
     return Object.assign(Promise.resolve(result), { select: async () => result });
   });
-  t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', (query: any, update: any) => {
+  t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', (query, update) => {
     const run = async () => {
       if (state.qr?.tokenHash) throw Object.assign(new Error('Duplicate company'), { code: 11000 });
       state.qr = { companyCode: query.companyCode, ...update.$set };
@@ -48,7 +48,7 @@ function setup(t: any) {
     };
     return { select: run };
   });
-  t.mock.method(MeetingCheckInQrModel, 'updateOne', async (query: any, update: any) => {
+  t.mock.method(MeetingCheckInQrModel, 'updateOne', async (query, update) => {
     assert.equal(query.companyCode, 'ACME');
     Object.assign(state.qr, update.$set);
     for (const key of Object.keys(update.$unset || {})) delete state.qr[key];
@@ -90,10 +90,10 @@ test('existing shared QR becomes permanent without changing a printed token', as
 test('one reusable QR records consecutive meetings instead of its source meeting', async t => {
   const { state, source } = setup(t);
   assert.equal((await getPublicQrMeeting(token)).id, 'current');
-  const query = state.queries[0];
+  const query = state.queries[0] as { companyCode: string; status: { $in: string[] }; startsAt: { $lte: Date }; $or: [{ endsAt: { $gt: Date } }, { endsAt: null; startsAt: { $gt: Date } }] };
   assert.equal(query.companyCode, 'ACME');
   assert.deepEqual(query.status.$in, ['scheduled', 'live', 'paused']);
-  assert.equal(query.startsAt.$lte.getTime(), now.getTime());
+  assert.equal(query.startsAt.$lte.getTime(), now.getTime() + 2 * 60 * 60 * 1000);
   assert.equal(query.$or[0].endsAt.$gt.getTime(), now.getTime());
   assert.equal(query.$or[1].endsAt, null);
   assert.equal(query.$or[1].startsAt.$gt.getTime(), now.getTime() - 2 * 60 * 60 * 1000);
@@ -137,7 +137,7 @@ test('member authentication and repeat attendance use the resolved meeting and c
   const { state } = setup(t);
   const password = await bcrypt.hash('secret', 4);
   const person = { _id: 'member', displayName: 'Member', email: 'member@example.com', password };
-  const lookup = t.mock.method(UserModel, 'findOne', (query: any) => {
+  const lookup = t.mock.method(UserModel, 'findOne', (query) => {
     assert.equal(query.companyCode, 'ACME');
     return { select: () => ({ lean: async () => person }) };
   });

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from "react";
 import {
   Bell, LogOut, Search, Settings, Wallet, Info, X, Image, Video, Volume2, FileText,
@@ -265,7 +265,7 @@ export default function Header({ currentTab, onSearchSelect, onMenuClick }: Head
                           onClick={() => {
                             markRead(notif._id);
                             if (notif.action) {
-                              onSearchSelect(notif.action.tab as any, notif.action.subTab);
+                              onSearchSelect(notif.action.tab, notif.action.subTab);
                               setShowNotifications(false);
                             }
                           }}

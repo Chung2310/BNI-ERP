@@ -1,3 +1,4 @@
+import type { MeetingPresentationState } from "../utils/meetingPresentation";
 import type { SpeakingTimeSlot } from "../utils/meetingSpeakingTime";
 import { getAccessToken } from "./authService";
 
@@ -10,6 +11,10 @@ function getAuthHeaders() {
 }
 
 export interface Speaker {
+  company?: string;
+  industry?: string;
+  phone?: string;
+  slideProfile?: { company?: string; industry?: string; phone?: string };
   id: string;
   userId?: string;
   name: string;
@@ -76,6 +81,8 @@ export interface Meeting {
   revision: number;
   status: "scheduled" | "live" | "paused" | "ended" | "cancelled";
   speakers: Speaker[];
+  presentation?: MeetingPresentationState;
+  speechesCompletedAt?: string;
   currentIndex: number;
   speakerStartedAt?: string;
   elapsedSeconds?: number;

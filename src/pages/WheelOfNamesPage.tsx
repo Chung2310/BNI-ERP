@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Sparkles,
   Trophy,
-  Gift,
   Volume2,
   VolumeX,
   Maximize2,
@@ -11,17 +10,12 @@ import {
   UserPlus,
   Trash2,
   Shuffle,
-  RotateCcw,
   Search,
   X,
   Download,
   Check,
-  Play,
   UserMinus,
-  Settings2,
-  Award,
   ChevronRight,
-  ChevronLeft,
   ArrowLeft,
   RefreshCw,
   Clock,
@@ -35,6 +29,14 @@ import { UserProfile } from "../types";
 import { playTickSound, playWinFanfare, playSuspenseSound } from "../utils/soundEffects";
 import { launchConfetti } from "../utils/confetti";
 import { BRAND_NAME, BRAND_LOGO_PATH } from "../config/brand";
+
+async function loadChapterUsers(companyCode?: string): Promise<UserProfile[]> {
+  if (companyCode) {
+    try { return await authService.getUsersByCompany(companyCode); }
+    catch { return authService.getColleagues(); }
+  }
+  try { return await authService.getColleagues(); } catch { return []; }
+}
 
 export type ParticipantType = "member_present" | "member_absent" | "guest";
 export type ParticipantFilterCategory = "all" | "all_members" | "present_members" | "guests";
@@ -129,7 +131,7 @@ export const initBingoBalls = (active: Participant[], cageRadius: number): Bingo
     const y = Math.sin(phi) * dist;
 
     return {
-      participant: p,
+      participant: { ...p },
       ballNumber: i + 1,
       x,
       y,
@@ -151,8 +153,8 @@ export const drawCanvasRoundRect = (
   r: number
 ) => {
   ctx.beginPath();
-  if (typeof (ctx as any).roundRect === "function") {
-    (ctx as any).roundRect(x, y, w, h, r);
+  if (typeof (ctx).roundRect === "function") {
+    (ctx).roundRect(x, y, w, h, r);
   } else {
     ctx.moveTo(x + r, y);
     ctx.lineTo(x + w - r, y);
@@ -233,7 +235,7 @@ export default function WheelOfNamesPage() {
     setUnsavedResults(previous => [...previous, entry]);
     void saveResult(entry);
   };
-  const [meetingTitle, setMeetingTitle] = useState<string>("");
+  const [, setMeetingTitle] = useState<string>("");
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [winners, setWinners] = useState<WinnerRecord[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -277,10 +279,10 @@ export default function WheelOfNamesPage() {
   } | null>(null);
 
   // Filtered by Category
-  const categoryParticipants = participants.filter((p) => matchesFilterCategory(p, filterCategory));
+  const categoryParticipants = useMemo(() => participants.filter((p) => matchesFilterCategory(p, filterCategory)), [participants, filterCategory]);
 
   // Active selected participants on the wheel
-  const activeParticipants = categoryParticipants.filter((p) => p.selected);
+  const activeParticipants = useMemo(() => categoryParticipants.filter((p) => p.selected), [categoryParticipants]);
 
   // Participant counts by category
   const countAll = participants.length;
@@ -291,23 +293,13 @@ export default function WheelOfNamesPage() {
   const countGuests = participants.filter((p) => p.type === "guest").length;
 
   // 1. Fetch Users & Today's Meeting Check-in status directly from system
-  const loadSystemUsers = useCallback(async () => {
+  const [requestInputs, setRequestInputs] = useState(() => [authLoading, userProfile]);
+  if (!Object.is(requestInputs[0], authLoading) || !Object.is(requestInputs[1], userProfile)) {
+    setRequestInputs([authLoading, userProfile]);
     setLoadingUsers(true);
-    try {
-      let users: UserProfile[] = [];
-      if (userProfile?.companyCode) {
-        try {
-          users = await authService.getUsersByCompany(userProfile.companyCode);
-        } catch {
-          users = await authService.getColleagues();
-        }
-      } else {
-        try {
-          users = await authService.getColleagues();
-        } catch {
-          users = [];
-        }
-      }
+  }
+  const loadSystemUsers = useCallback(async () => {
+    return loadChapterUsers(userProfile?.companyCode).then(async (users) => {
 
       // Fetch meetings to get check-in attendees (speakers & guests)
       let meetings: Meeting[] = [];
@@ -377,7 +369,7 @@ export default function WheelOfNamesPage() {
       }
 
       // Collect speakers from target meeting, or fallback merge all speakers from recent meetings if target has none
-      let speakers: Speaker[] = targetMeeting?.speakers || [];
+      const speakers: Speaker[] = [...(targetMeeting?.speakers || [])];
       if (speakers.length === 0) {
         const seenSpeakerIds = new Set<string>();
         for (const m of meetings) {
@@ -395,7 +387,7 @@ export default function WheelOfNamesPage() {
 
       // Add DB users
       for (const u of users) {
-        const uid = String(u.uid || (u as any).id || (u as any)._id || u.email || "").trim();
+        const uid = String(u.uid || (u).id || (u)._id || u.email || "").trim();
         const uName = (u.displayName || u.email?.split("@")[0] || "Thành viên").trim();
         userMap.set(uName.toLowerCase(), {
           id: uid || `user-${Math.random()}`,
@@ -450,7 +442,7 @@ export default function WheelOfNamesPage() {
           id: `guest-speaker-${s.id}`,
           name: s.name.trim(),
           avatar: s.photoURL || s.coverImage,
-          companyName: (s as any).company || (s as any).slideProfile?.company || "Khách tham dự",
+          companyName: (s).company || (s).slideProfile?.company || "Khách tham dự",
           role: "Khách mời",
           selected: true,
           type: "guest" as const,
@@ -458,12 +450,13 @@ export default function WheelOfNamesPage() {
         }));
 
       setParticipants([...loadedMembers, ...guestSpeakers]);
-    } catch (err) {
+    
+}).catch(err => {
       console.error("Lỗi khi tải danh sách người dùng cho vòng quay:", err);
       setParticipants([]);
-    } finally {
+    }).finally(() => {
       setLoadingUsers(false);
-    }
+    });
   }, [userProfile]);
 
   useEffect(() => {
@@ -473,13 +466,13 @@ export default function WheelOfNamesPage() {
   }, [authLoading, loadSystemUsers]);
 
   // 2. Fullscreen Toggle
-  const toggleFullscreen = () => {
+  function toggleFullscreen() {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
     } else {
       document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
     }
-  };
+  }
 
   useEffect(() => {
     const handleFsChange = () => {
@@ -1375,7 +1368,7 @@ export default function WheelOfNamesPage() {
   }, [isDrawerOpen, drawWheel]);
 
   // 4A. Wheel Spin Mechanics
-  const handleStartSpinWheel = () => {
+  function handleStartSpinWheel() {
     if (isSpinning || activeParticipants.length === 0) return;
 
     setIsSpinning(true);
@@ -1466,10 +1459,10 @@ export default function WheelOfNamesPage() {
     };
 
     animationFrameIdRef.current = requestAnimationFrame(animateSpin);
-  };
+  }
 
   // 4B. Bingo Cage Spin Mechanics with 3D Tumbling & Dropping Ball
-  const handleStartSpinBingo = () => {
+  function handleStartSpinBingo() {
     if (isSpinning || activeParticipants.length === 0) return;
     setIsSpinning(true);
     winningBallDropRef.current = null;
@@ -1630,17 +1623,17 @@ export default function WheelOfNamesPage() {
     };
 
     animationFrameIdRef.current = requestAnimationFrame(animateBingo);
-  };
+  }
 
   // Unified start spin action
-  const handleStartSpin = () => {
+  function handleStartSpin() {
     if (isSpinning || activeParticipants.length === 0) return;
     if (selectedGame === "wheel") {
       handleStartSpinWheel();
     } else {
       handleStartSpinBingo();
     }
-  };
+  }
 
   // Remove winner from wheel (action in modal)
   const handleRemoveWinnerFromWheel = (winnerId: string) => {

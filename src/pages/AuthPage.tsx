@@ -59,7 +59,7 @@ export default function AuthPage() {
     setLoading(true);
     try {
       await loginWithIdentifier(identifier.trim(), password, rememberMe);
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       const msg = parseFirebaseError(err, "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
       setError(msg);

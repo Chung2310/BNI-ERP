@@ -1,3 +1,4 @@
+import { useNow } from "../../hooks/useNow";
 import { useMemo, useState } from "react";
 import { UserX } from "lucide-react";
 import type { UserProfile } from "../../types/common";
@@ -5,11 +6,12 @@ import type { Meeting } from "../../services/meetingService";
 import { buildMemberAbsenceRanking } from "./memberAbsenceRanking";
 
 export function MemberAbsenceLeaderboard({ members, meetings, loading }: { members: UserProfile[]; meetings: Meeting[]; loading: boolean }) {
-  const rankings = useMemo(() => buildMemberAbsenceRanking(members, meetings).slice(0, 10), [members, meetings]);
+  const now = useNow();
+  const rankings = useMemo(() => buildMemberAbsenceRanking(members, meetings, now).slice(0, 10), [members, meetings, now]);
   const [search, setSearch] = useState("");
   const query = search.trim().toLocaleLowerCase("vi");
   const matches = rankings.filter(member => !query || [member.name, member.email, member.companyName].some(value => value?.toLocaleLowerCase("vi").includes(query)));
-  const completedCount = meetings.filter(meeting => meeting.status === "ended" && new Date(meeting.startsAt).getTime() <= Date.now()).length;
+  const completedCount = meetings.filter(meeting => meeting.status === "ended" && new Date(meeting.startsAt).getTime() <= now).length;
   return <section aria-label="BXH thành viên lười nhất" className="rounded-2xl border border-orange-200/80 bg-white p-4 sm:p-5 shadow-2xs">
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3.5">
       <div><h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><UserX aria-hidden="true" className="h-4 w-4 text-orange-600" />BXH thành viên “lười” nhất<span className="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">Top 10</span></h3>

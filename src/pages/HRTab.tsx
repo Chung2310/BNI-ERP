@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { Users, Mail, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
 import { HRSubTabType, EmployeeNode, UserProfile } from "../types";
 import { useAuth } from "../context/AuthContext";
@@ -27,33 +27,25 @@ export default function HRTab() {
   const canManageCelebration = userProfile?.role === "admin" || hasPermission("settings:manage");
 
   const [subTab, setSubTab] = useSubTabRouter<HRSubTabType>(HR_SUB_TAB_ROUTES, "SƠ ĐỒ TỔ CHỨC");
-  const [usersList, setUsersList] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fetchedUsers, setUsersList] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(!!userProfile?.companyCode);
 
   const companyCode = userProfile?.companyCode || "";
 
-  // Fetch users list from API
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      let data: UserProfile[] = [];
-      if (companyCode) {
-        data = await authService.getUsersByCompany(companyCode);
-      } else if (userProfile) {
-        data = [userProfile];
-      }
-      setUsersList(data);
-    } catch (error) {
+  const usersList = companyCode ? fetchedUsers : userProfile ? [userProfile] : [];
+  const [requestInputs, setRequestInputs] = useState(() => [companyCode, userProfile?.uid]);
+  if (!Object.is(requestInputs[0], companyCode) || !Object.is(requestInputs[1], userProfile?.uid)) {
+    setRequestInputs([companyCode, userProfile?.uid]);
+    setLoading(!!companyCode); setUsersList([]);
+  }
+  const fetchUsers = useCallback(() => {
+    if (!companyCode) return;
+    return authService.getUsersByCompany(companyCode).then(setUsersList).catch(error => {
       console.error("Lỗi khi tải danh sách thành viên:", error);
       toast.error(getApiErrorMessage(error, "Không thể tải danh sách thành viên."));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, [companyCode, userProfile?.uid]);
+    }).finally(() => setLoading(false));
+  }, [companyCode]);
+  useEffect(() => { void fetchUsers(); }, [fetchUsers, userProfile?.uid]);
 
   // Map user profile to EmployeeNode tree model (excluding admin)
   const employees: EmployeeNode[] = usersList

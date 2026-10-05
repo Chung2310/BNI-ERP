@@ -92,22 +92,22 @@ const sharesSchema = {
 };
 
 // Google Drive dùng chung — đặt trước các route "/:id" để tránh trùng khớp
-resourceRouter.get("/drive/files", requireAuth as any, requirePermission("resource:read") as any, resourceController.driveList as any);
-resourceRouter.post("/drive/upload", expensiveApiRateLimiter, requireAuth as any, requirePermission("resource:manage") as any, validateRequest(driveUploadSchema), resourceController.driveUpload as any);
-resourceRouter.delete("/drive/files/:fileId", requireAuth as any, requirePermission("resource:manage") as any, resourceController.driveDelete as any);
+resourceRouter.get("/drive/files", requireAuth, requirePermission("resource:read"), resourceController.driveList);
+resourceRouter.post("/drive/upload", expensiveApiRateLimiter, requireAuth, requirePermission("resource:manage"), validateRequest(driveUploadSchema), resourceController.driveUpload);
+resourceRouter.delete("/drive/files/:fileId", requireAuth, requirePermission("resource:manage"), resourceController.driveDelete);
 
-resourceRouter.get("/", requireAuth as any, requirePermission("resource:read") as any, validateRequest(listSchema), resourceController.list as any);
-resourceRouter.get("/trash", requireAuth as any, requirePermission("resource:read") as any, resourceController.trashList as any);
-resourceRouter.get("/breadcrumb/:id", requireAuth as any, requirePermission("resource:read") as any, resourceController.breadcrumb as any);
-resourceRouter.get("/:id", requireAuth as any, requirePermission("resource:read") as any, validateRequest(idParamSchema), resourceController.getDetail as any);
-resourceRouter.post("/folder", requireAuth as any, requirePermission("resource:manage") as any, validateRequest(folderSchema), resourceController.createFolder as any);
-resourceRouter.post("/file", requireAuth as any, requirePermission("resource:manage") as any, validateRequest(fileSchema), resourceController.createFile as any);
-resourceRouter.post("/drive", requireAuth as any, requirePermission("resource:manage") as any, validateRequest(driveSchema), resourceController.addDriveLink as any);
-resourceRouter.get("/:id/shares", requireAuth as any, requirePermission("resource:read") as any, validateRequest(idParamSchema), resourceController.getShares as any);
-resourceRouter.put("/:id/shares", requireAuth as any, requirePermission("resource:manage") as any, validateRequest(idParamSchema), validateRequest(sharesSchema), resourceController.updateShares as any);
-resourceRouter.patch("/:id/rename", requireAuth as any, requirePermission("resource:manage") as any, validateRequest(renameSchema), resourceController.rename as any);
-resourceRouter.patch("/:id/move", requireAuth as any, requirePermission("resource:manage") as any, validateRequest(moveSchema), resourceController.move as any);
-resourceRouter.post("/:id/restore", requireAuth as any, requirePermission("resource:manage") as any, validateRequest(idParamSchema), resourceController.restore as any);
-resourceRouter.delete("/:id", requireAuth as any, requirePermission("resource:manage") as any, validateRequest(idParamSchema), resourceController.remove as any);
-resourceRouter.get("/:id/download-zip", requireAuth as any, requirePermission("resource:read") as any, resourceController.downloadZip as any);
+resourceRouter.get("/", requireAuth, requirePermission("resource:read"), validateRequest(listSchema), resourceController.list);
+resourceRouter.get("/trash", requireAuth, requirePermission("resource:read"), resourceController.trashList);
+resourceRouter.get("/breadcrumb/:id", requireAuth, requirePermission("resource:read"), resourceController.breadcrumb);
+resourceRouter.get("/:id", requireAuth, requirePermission("resource:read"), validateRequest(idParamSchema), resourceController.getDetail);
+resourceRouter.post("/folder", requireAuth, requirePermission("resource:manage"), validateRequest(folderSchema), resourceController.createFolder);
+resourceRouter.post("/file", requireAuth, requirePermission("resource:manage"), validateRequest(fileSchema), resourceController.createFile);
+resourceRouter.post("/drive", requireAuth, requirePermission("resource:manage"), validateRequest(driveSchema), resourceController.addDriveLink);
+resourceRouter.get("/:id/shares", requireAuth, requirePermission("resource:read"), validateRequest(idParamSchema), resourceController.getShares);
+resourceRouter.put("/:id/shares", requireAuth, requirePermission("resource:manage"), validateRequest(idParamSchema), validateRequest(sharesSchema), resourceController.updateShares);
+resourceRouter.patch("/:id/rename", requireAuth, requirePermission("resource:manage"), validateRequest(renameSchema), resourceController.rename);
+resourceRouter.patch("/:id/move", requireAuth, requirePermission("resource:manage"), validateRequest(moveSchema), resourceController.move);
+resourceRouter.post("/:id/restore", requireAuth, requirePermission("resource:manage"), validateRequest(idParamSchema), resourceController.restore);
+resourceRouter.delete("/:id", requireAuth, requirePermission("resource:manage"), validateRequest(idParamSchema), resourceController.remove);
+resourceRouter.get("/:id/download-zip", requireAuth, requirePermission("resource:read"), resourceController.downloadZip);
 

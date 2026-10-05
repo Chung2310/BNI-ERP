@@ -9,8 +9,8 @@ import { TEMPLATE_VARIABLE_MIME } from "../template-editor/TemplateVariablePalet
 
 afterEach(() => {
   cleanup();
-  delete (document as any).caretRangeFromPoint;
-  delete (document as any).caretPositionFromPoint;
+  delete (document).caretRangeFromPoint;
+  delete (document).caretPositionFromPoint;
   window.getSelection()?.removeAllRanges();
 });
 
@@ -57,7 +57,7 @@ it("drops a palette chip at the pointer rather than the previous selection", () 
   const data = transfer("employeeName");
   fireEvent.dragStart(screen.getByRole("button", { name: "Tên thành viên" }), { dataTransfer: data });
   expect(data.setData).toHaveBeenCalledWith(TEMPLATE_VARIABLE_MIME, "employeeName");
-  (document as any).caretPositionFromPoint = vi.fn(() => ({ offsetNode: editor.querySelector("p")!.firstChild!, offset: 6 }));
+  Object.defineProperty(document, "caretPositionFromPoint", { configurable: true, value: vi.fn((_x: number, _y: number) => ({ offsetNode: editor.querySelector("p")!.firstChild!, offset: 6 })) });
   fireEvent.drop(editor, { dataTransfer: data, clientX: 20, clientY: 30 });
   expect(changed).toHaveBeenLastCalledWith("<p>Hello {{employeeName}}world</p>");
   expect(changed.mock.lastCall?.[0]).not.toContain("data-celebration-variable");
@@ -68,7 +68,7 @@ it("moves a chip already in the body without duplicating its variable", () => {
   const chip = editor.querySelector<HTMLElement>(CHIP_SELECTOR)!;
   const data = transfer("employeeName");
   fireEvent.dragStart(chip, { dataTransfer: data });
-  (document as any).caretRangeFromPoint = () => caret(editor.querySelector("p")!.lastChild!, 12);
+  (document).caretRangeFromPoint = () => caret(editor.querySelector("p")!.lastChild!, 12);
   fireEvent.drop(editor, { dataTransfer: data, clientX: 20, clientY: 30 });
   expect(changed).toHaveBeenLastCalledWith("<p> hello world{{employeeName}}</p>");
   expect(editor.querySelectorAll(CHIP_SELECTOR)).toHaveLength(1);

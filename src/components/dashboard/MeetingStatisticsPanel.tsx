@@ -5,9 +5,6 @@ import {
   Users,
   Search,
   RotateCcw,
-  Calendar,
-  Building2,
-  Briefcase,
   ChevronRight,
   UserCheck,
   UserX,
@@ -239,7 +236,7 @@ function LuckyWinnersTable({
 export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: React.ReactNode }) {
   const { userProfile } = useAuth();
 
-  const [, setTick] = useState(Date.now());
+  const [, setTick] = useState(Date.now);
   useEffect(() => {
     const timer = setInterval(() => setTick(Date.now()), 30000);
     return () => clearInterval(timer);
@@ -258,9 +255,12 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
   const [meetingsPerPage, setMeetingsPerPage] = useState(10);
   const [meetingPage, setMeetingPage] = useState(1);
 
-  useEffect(() => {
+  const [previousInputs1, setPreviousInputs1] = useState<unknown[] | null>(null);
+  if (previousInputs1 === null || !Object.is(previousInputs1[0], searchQuery) || !Object.is(previousInputs1[1], quickFilter) || !Object.is(previousInputs1[2], selectedMeetingId) || !Object.is(previousInputs1[3], meetingsPerPage) || !Object.is(previousInputs1[4], userProfile?.companyCode)) {
+    setPreviousInputs1([searchQuery, quickFilter, selectedMeetingId, meetingsPerPage, userProfile?.companyCode]);
     setMeetingPage(1);
-  }, [searchQuery, quickFilter, selectedMeetingId, meetingsPerPage, userProfile?.companyCode]);
+  
+  }
 
   // Tab switch in "all meetings" mode: "meetings" list or "winners" list
   const [allMeetingsTab, setAllMeetingsTab] = useState<"meetings" | "winners">("meetings");
@@ -275,12 +275,15 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
   const [hoveredBarId, setHoveredBarId] = useState<string | null>(null);
   const [hoveredSegment, setHoveredSegment] = useState<"present" | "guest" | "absent" | null>(null);
 
+  const [requestInputs, setRequestInputs] = useState(() => [userProfile?.companyCode]);
+  if (!Object.is(requestInputs[0], userProfile?.companyCode)) {
+    setRequestInputs([userProfile?.companyCode]);
+    setIsLoading(true); setError(null);
+  }
+  
   const fetchData = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // 1. Fetch meetings
-      const meetingsData = await meetingService.listMeetings({ all: true });
+    return meetingService.listMeetings({ all: true }).then(async (meetingsData) => {
+      setError(null);
       setMeetings(meetingsData || []);
 
       // 2. Fetch chapter members
@@ -303,12 +306,13 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
         }
       }
       setChapterMembers(members || []);
-    } catch (err) {
+    
+}).catch(err => {
       console.error("Lỗi tải dữ liệu thống kê cuộc họp:", err);
       setError(err instanceof Error ? err.message : "Không thể tải dữ liệu.");
-    } finally {
+    }).finally(() => {
       setIsLoading(false);
-    }
+    });
   };
 
   useEffect(() => {
@@ -368,8 +372,12 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
   const meetingPageStart = (currentMeetingPage - 1) * meetingsPerPage;
   const paginatedMeetings = filteredMeetings.slice(meetingPageStart, meetingPageStart + meetingsPerPage);
 
-  useEffect(() => {
+  const [animationInputs, setAnimationInputs] = useState(() => [filteredMeetings, selectedMeetingId]);
+  if (!Object.is(animationInputs[0], filteredMeetings) || !Object.is(animationInputs[1], selectedMeetingId)) {
+    setAnimationInputs([filteredMeetings, selectedMeetingId]);
     setIsAnimated(false);
+  }
+  useEffect(() => {
     const timer = setTimeout(() => setIsAnimated(true), 60);
     return () => clearTimeout(timer);
   }, [filteredMeetings, selectedMeetingId]);
@@ -500,7 +508,7 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
     });
 
     return chapterMembers.filter((m) => {
-      const uid = String(m.uid || (m as any)._id || "");
+      const uid = String(m.uid || (m)._id || "");
       const name = (m.displayName || "").trim().toLowerCase();
       if (presentUserIds.has(uid)) return false;
       if (name && presentNames.has(name)) return false;
@@ -512,7 +520,7 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
   const singleMeetingAttendees = useMemo(() => {
     if (!activeSingleMeeting) return [];
 
-    const presentList: Array<ExtendedSpeaker & { isAbsent?: boolean }> = (activeSingleMeeting.speakers || []).map((s: any) => ({
+    const presentList: Array<ExtendedSpeaker & { isAbsent?: boolean }> = (activeSingleMeeting.speakers || []).map((s) => ({
       ...s,
       isMember: Boolean(s.userId),
       company: s.company || s.slideProfile?.company || "",
@@ -521,8 +529,8 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
       isAbsent: false,
     }));
 
-    const absentList: Array<ExtendedSpeaker & { isAbsent?: boolean }> = singleMeetingAbsentMembers.map((u) => ({
-      id: u.uid || `absent-${Math.random()}`,
+    const absentList: Array<ExtendedSpeaker & { isAbsent?: boolean }> = singleMeetingAbsentMembers.map((u, index) => ({
+      id: u.uid || u.email || `absent-${index}`,
       userId: u.uid,
       name: u.displayName || u.email?.split("@")[0] || "Thành viên",
       email: u.email,

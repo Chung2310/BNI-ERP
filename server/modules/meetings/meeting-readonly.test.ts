@@ -19,7 +19,7 @@ it.each([
   ["prize", (m: any) => service.addOrUpdatePrize(m, { name: "New" })],
   ["delete prize", (m: any) => service.deletePrize(m, "prize")],
   ["spin", (m: any) => service.spinLuckyDraw(m, "prize", "actor")],
-  ["result", (m: any) => service.recordGameWinner(m, { id: "result" }, "actor")],
+  ["result", (m: any) => service.recordGameWinner(m, { id: "result", winnerId: "speaker", source: "wheel", name: "Winner", prizeName: "Prize", wonAt: new Date() }, "actor")],
   ["redraw", (m: any) => service.redrawPrizeWinner(m, "prize", "winner")],
   ["reset", (m: any) => service.resetLuckyDrawWinners(m)],
 ] as const)("rejects %s without changing ended meetings", async (_name, action) => {

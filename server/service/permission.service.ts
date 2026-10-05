@@ -5,7 +5,7 @@ export const permissionService = {
   /**
    * Tạo mới một mã quyền
    */
-  async createPermission(data: any): Promise<IPermission> {
+  async createPermission(data: Partial<IPermission>): Promise<IPermission> {
     const existing = await PermissionModel.findOne({ code: data.code });
     if (existing) {
       throw new Error(`Mã quyền "${data.code}" đã tồn tại trên hệ thống.`);
@@ -18,7 +18,7 @@ export const permissionService = {
    * Lấy danh sách mã quyền có hỗ trợ bộ lọc và phân trang
    */
   async getPermissions(
-    filter: any = {},
+    filter: Record<string, unknown> = {},
     pagination: { page?: number; limit?: number } = {}
   ): Promise<{ data: IPermission[]; total: number; page: number; limit: number }> {
     const page = Math.max(1, pagination.page || 1);
@@ -44,7 +44,7 @@ export const permissionService = {
   /**
    * Cập nhật thông tin mã quyền
    */
-  async updatePermission(code: string, data: any): Promise<IPermission | null> {
+  async updatePermission(code: string, data: Partial<import('../interface/permission.interface').IPermission>): Promise<IPermission | null> {
     return await PermissionModel.findOneAndUpdate(
       { code },
       { $set: data },

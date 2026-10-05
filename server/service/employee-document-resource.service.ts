@@ -7,7 +7,7 @@ interface SourceFinalizer {
 
 export function createEmployeeDocumentResourceService(finalizer: SourceFinalizer) {
   return {
-    async finalizeJobDescription(actor: ManagedUploadActor, user: any, uploadToken?: string) {
+    async finalizeJobDescription(actor: ManagedUploadActor, user: { _id?: unknown; id?: string; uid?: string; displayName?: string; email?: string }, uploadToken?: string) {
       const userId = String(user._id || user.id || user.uid);
       return finalizer.finalize(actor, {
         entityType: "employee",

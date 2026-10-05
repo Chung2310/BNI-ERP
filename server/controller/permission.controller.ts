@@ -13,7 +13,7 @@ export const permissionController = {
         message: "Tạo mới mã quyền thành công.",
         data: permission,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[permissionController.create] Error:", error);
       return res.status(400).json({
         status: "error",
@@ -27,9 +27,9 @@ export const permissionController = {
    */
   async getList(req: Request, res: Response) {
     try {
-      const { page, limit, module, search } = req.query as any;
+      const { page, limit, module, search } = req.query;
 
-      const filter: any = {};
+      const filter: Record<string, unknown> = {};
       if (module) {
         filter.module = module;
       }
@@ -41,15 +41,15 @@ export const permissionController = {
       }
 
       const result = await permissionService.getPermissions(filter, {
-        page: page ? parseInt(page, 10) : undefined,
-        limit: limit ? parseInt(limit, 10) : undefined,
+        page: page ? parseInt(String(page), 10) : undefined,
+        limit: limit ? parseInt(String(limit), 10) : undefined,
       });
 
       return res.status(200).json({
         status: "success",
         ...result,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[permissionController.getList] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -76,7 +76,7 @@ export const permissionController = {
         status: "success",
         data: permission,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[permissionController.getDetail] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -104,7 +104,7 @@ export const permissionController = {
         message: "Cập nhật thông tin mã quyền thành công.",
         data: updated,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[permissionController.update] Error:", error);
       return res.status(400).json({
         status: "error",
@@ -124,7 +124,7 @@ export const permissionController = {
         status: "success",
         message: "Xóa mã quyền thành công.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[permissionController.delete] Error:", error);
       return res.status(400).json({
         status: "error",

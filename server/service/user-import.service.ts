@@ -22,7 +22,7 @@ const rowSchema = Joi.object({
   }),
 });
 export type ImportResultRow = { rowNumber: number; email: string; status: "valid" | "created" | "skipped" | "error"; message: string };
-export async function importUsers(input: unknown, actor: { companyCode: string; role: string; branchId?: string }) {
+export async function importUsers(input: unknown, actor: { companyCode?: string; role: string; branchId?: string }) {
   if (actor.role !== "admin") throw new UserImportError(403, "Chỉ Admin được nhập tài khoản.");
   const { error, value } = Joi.object({
     dryRun: Joi.boolean().strict().required(),

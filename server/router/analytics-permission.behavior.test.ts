@@ -3,20 +3,20 @@ import http from "node:http";
 import express from "express";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../middleware/auth", () => ({
-  requireAuth: (req: any, _res: any, next: any) => {
-    req.user = { id: "user-1", role: "user", companyCode: "ACME" };
+vi.mock("../middleware/auth", (() => ({
+  requireAuth: (req: import("express").Request, _res: import("express").Response, next: import("express").NextFunction) => {
+    req.user = { id: "user-1", email: "user@example.com", role: "user", companyCode: "ACME" };
     next();
   },
-  requirePermission: (required: string) => (req: any, res: any, next: any) => {
+  requirePermission: (required: string) => (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
     const granted = String(req.headers["x-permissions"] || "").split(",").filter(Boolean);
     return granted.includes(required) || granted.includes("*")
       ? next()
       : res.status(403).json({ message: "Forbidden" });
   },
-}));
+}) as unknown as Parameters<typeof vi.mock>[1]));
 vi.mock("../controller/analytics.controller", () => ({
-  analyticsController: new Proxy({}, { get: () => (_req: any, res: any) => res.status(200).json({ ok: true }) }),
+  analyticsController: new Proxy({}, { get: () => (_req, res) => res.status(200).json({ ok: true }) }),
 }));
 
 const { analyticsRouter } = await import("./analytics.router");

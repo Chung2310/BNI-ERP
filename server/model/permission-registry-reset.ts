@@ -21,7 +21,7 @@ export async function resetPermissionsForRegistryVersion(collections: {
 }) {
   try {
     await collections.markers.insertOne({ _id: PERMISSION_REGISTRY_RESET_VERSION, appliedAt: new Date() });
-  } catch (error: any) {
+  } catch (error) {
     if (error?.code === 11000) return { applied: false, rolesReset: 0, usersReset: 0 };
     throw error;
   }

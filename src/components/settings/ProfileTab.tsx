@@ -1,3 +1,4 @@
+import { parseDateValue } from "../../utils/dateValue";
 import React, { useRef, useState } from "react";
 import {
   User,
@@ -9,7 +10,6 @@ import {
   ImagePlus,
   Trash2,
   Camera,
-  Calendar,
   Shield,
   BadgeCheck,
   Clock,
@@ -65,16 +65,9 @@ function getRoleInfo(role?: string) {
   }
 }
 
-function formatJoinDate(createdAt: any) {
+function formatJoinDate(createdAt: unknown) {
   if (!createdAt) return "Chưa cập nhật";
-  let date: Date;
-  if (typeof createdAt.toDate === "function") {
-    date = createdAt.toDate();
-  } else if (createdAt.seconds) {
-    date = new Date(createdAt.seconds * 1000);
-  } else {
-    date = new Date(createdAt);
-  }
+  const date = parseDateValue(createdAt);
   if (isNaN(date.getTime())) return "Chưa cập nhật";
   return date.toLocaleDateString("vi-VN", {
     year: "numeric",
@@ -384,7 +377,6 @@ function ProfileForm({
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">Thông tin cá nhân</h3>
-                    <p className="text-xs text-slate-500">Họ tên đại diện và ngày sinh nhật thành viên</p>
                   </div>
                 </div>
 
@@ -452,7 +444,6 @@ function ProfileForm({
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">Doanh nghiệp & Nghề nghiệp</h3>
-                    <p className="text-xs text-slate-500">Thông tin công ty và ngành nghề đại diện trong Chapter</p>
                   </div>
                 </div>
 
@@ -525,7 +516,6 @@ function ProfileForm({
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-800">Tài khoản & Liên hệ</h3>
-                <p className="text-xs text-slate-500">Thông tin liên lạc và định danh đăng nhập an toàn</p>
               </div>
             </div>
 

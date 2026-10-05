@@ -36,7 +36,7 @@ export const resourceService = {
 
     if (section === "local" && !normalizedParent) {
       const fixedFolderName = "_GOOGLE DOCUMENTS";
-      let fixedFolder = await ResourceItemModel.findOne({
+      const fixedFolder = await ResourceItemModel.findOne({
         companyCode,
         section: "local",
         parentId: null,
@@ -98,7 +98,7 @@ export const resourceService = {
           });
 
           const files = response.data.files || [];
-          return files.map((file: any) => {
+          return files.map((file) => {
             const isFolder = file.mimeType === "application/vnd.google-apps.folder";
             return {
               _id: file.id,
@@ -114,14 +114,14 @@ export const resourceService = {
               updatedAt: file.createdTime || new Date(),
             };
           });
-        } catch (err: any) {
+        } catch (err) {
           console.error("[resourceService.list] Failed to fetch Google Drive files:", err.message);
           return [];
         }
       }
     }
 
-    const baseQuery: any = {
+    const baseQuery: Record<string, unknown> = {
       companyCode,
       section,
       parentId: normalizedParent,
@@ -158,17 +158,17 @@ export const resourceService = {
 
     // Đánh dấu item nào là được chia sẻ (không phải do user tạo)
     const effectiveRequesterId = requesterId || userId;
-    const mappedItems: any[] = rawItems.map(item => {
+    const mappedItems = rawItems.map(item => {
       const isShared = item.creatorUid !== effectiveRequesterId &&
         Array.isArray(item.shares) &&
-        item.shares.some((s: any) => s.targetId === effectiveRequesterId && s.targetType === "user");
+        item.shares.some((s) => s.targetId === effectiveRequesterId && s.targetType === "user");
       return isShared ? { ...item, isShared: true } : item;
     });
     const items = accessContext
       ? filterReadableResourceItems(mappedItems, accessContext)
       : mappedItems;
 
-    console.log('[DEBUG resourceService.list] RESULT length:', items.length, 'names:', items.map((i: any) => i.name));
+    console.log('[DEBUG resourceService.list] RESULT length:', items.length, 'names:', items.map((i) => i.name));
 
     if (section === "local" && !normalizedParent && roomId) {
       const { ChatMessageModel } = await import("../model/chat-message.model");
@@ -176,7 +176,7 @@ export const resourceService = {
         .sort({ createdAt: -1 })
         .lean();
       
-      const virtualItems: any[] = [];
+      const virtualItems: Array<{ _id: string; companyCode: string; section: string; type: string; name: string; parentId: null; fileUrl: string; mimeType: string; size: number; creatorUid: string; creatorName: string; isFixed: boolean; createdAt: Date; updatedAt: Date }> = [];
       let uniqueIndex = 1;
       
       for (const msg of messages) {
@@ -413,7 +413,7 @@ export const resourceService = {
   async rename(companyCode: string, id: string, name: string, userId?: string, userRole?: string) {
     if (!isValidObjectId(id)) throw new Error("Mã tài nguyên không hợp lệ.");
     
-    const query: any = { _id: id, companyCode };
+    const query: Record<string, unknown> = { _id: id, companyCode };
     const isAdmin = userRole === "admin";
     if (!isAdmin && userId) {
       query.creatorUid = userId;
@@ -441,7 +441,7 @@ export const resourceService = {
   async remove(companyCode: string, id: string, userId?: string, userRole?: string) {
     if (!isValidObjectId(id)) throw new Error("Mã tài nguyên không hợp lệ.");
     
-    const query: any = { _id: id, companyCode, isDeleted: { $ne: true } };
+    const query: Record<string, unknown> = { _id: id, companyCode, isDeleted: { $ne: true } };
     const isAdmin = userRole === "admin";
     if (!isAdmin && userId) {
       query.creatorUid = userId;
@@ -491,7 +491,7 @@ export const resourceService = {
    * Liệt kê các mục bị xóa trong Thùng rác.
    */
   async listTrash(companyCode: string, userId?: string, userRole?: string, roomId?: string | null, accessContext?: ResourceAccessContext) {
-    const query: any = {
+    const query: Record<string, unknown> = {
       companyCode,
       section: "local",
       isDeleted: true
@@ -534,7 +534,7 @@ export const resourceService = {
   async restore(companyCode: string, id: string, userId?: string, userRole?: string) {
     if (!isValidObjectId(id)) throw new Error("Mã tài nguyên không hợp lệ.");
 
-    const query: any = { _id: id, companyCode, isDeleted: true };
+    const query: Record<string, unknown> = { _id: id, companyCode, isDeleted: true };
     const isAdmin = userRole === "admin";
     if (!isAdmin && userId) {
       query.creatorUid = userId;
@@ -573,7 +573,7 @@ export const resourceService = {
   async removePermanently(companyCode: string, id: string, userId?: string, userRole?: string) {
     if (!isValidObjectId(id)) throw new Error("Mã tài nguyên không hợp lệ.");
 
-    const query: any = { _id: id, companyCode, isDeleted: true };
+    const query: Record<string, unknown> = { _id: id, companyCode, isDeleted: true };
     const isAdmin = userRole === "admin";
     if (!isAdmin && userId) {
       query.creatorUid = userId;
@@ -664,7 +664,7 @@ export const resourceService = {
     }
 
     // 4. Chuẩn hóa không gian đích (Target Space)
-    const updateFields: any = { parentId: normalizedParent };
+    const updateFields: Record<string, unknown> = { parentId: normalizedParent };
     
     if (targetRoomId) {
       // Di chuyển vào nhóm
@@ -693,7 +693,7 @@ export const resourceService = {
     // 6. Nếu là thư mục, chúng ta cần di chuyển tất cả các mục con bên trong nó
     // sang cùng không gian đích (roomId, creatorUid)!
     if (item.type === "folder") {
-      const childUpdateFields: any = {};
+      const childUpdateFields: Record<string, unknown> = {};
       if (targetRoomId) {
         childUpdateFields.roomId = targetRoomId;
       } else if (targetOwnerId) {

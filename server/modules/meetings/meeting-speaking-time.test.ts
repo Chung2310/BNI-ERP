@@ -86,7 +86,7 @@ it.each(["manual", "automatic", "presentation"])("recalculates checked-in people
   const now = new Date("2030-01-02T02:00:00Z");
   if (mode === "manual") await controlMeeting(item, "start", now);
   else if (mode === "automatic") {
-    vi.spyOn(MeetingModel, "find").mockResolvedValue([item] as any);
+    vi.spyOn(MeetingModel, "find").mockResolvedValue([item]);
     await autoStartDueMeetings(now);
   } else await startMeetingPresentation(item, "early", now);
   expect(item.speakers.map(person => person.id)).toEqual(["late", "early"]);
@@ -107,13 +107,13 @@ it("uses the same server timestamp for guests and members, regardless of attende
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2030-01-02T00:30:00Z"));
   const item = meeting();
-  item.speakers = [] as any;
+  item.set("speakers", []);
   for (let index = 0; index < 12; index++) {
-    await checkIn(item, { name: "Guest " + index, checkedInAt: "2030-01-02T01:30:00Z" }, "admin", true);
+    await checkIn(item, (({ name: "Guest " + index, checkedInAt: "2030-01-02T01:30:00Z" }) as unknown as Parameters<typeof checkIn>[1]), "admin", true);
   }
   expect(item.speakers.map(person => person.seconds)).toEqual(Array(12).fill(30));
   expect(item.speakers.every(person => person.checkedInAt?.toISOString() === "2030-01-02T00:30:00.000Z")).toBe(true);
-  vi.spyOn(UserModel, "findOne").mockReturnValue({ select: () => ({ lean: async () => ({ displayName: "Member", email: "member@test.com" }) }) } as any);
+  vi.spyOn(UserModel, "findOne").mockReturnValue({ select: () => ({ lean: async () => ({ displayName: "Member", email: "member@test.com" }) }) } as unknown as ReturnType<typeof UserModel.findOne>);
   await checkInFromModule(item, { latitude: 10, longitude: 106 }, "member", false);
   vi.setSystemTime(new Date("2030-01-02T01:00:00Z"));
   await checkInFromModule(item, { latitude: 10, longitude: 106 }, "member", false);

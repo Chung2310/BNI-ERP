@@ -37,7 +37,7 @@ export function useVariantMatrix(baseSku: string, options: Option[]) {
     if (validOptions.length === 0) return [];
 
     // Cartesian product algorithm
-    const cartesian = (...a: any[][]) => a.reduce((a, b) => a.flatMap(d => b.map(e => [d, e].flat())));
+    const cartesian = <T,>(...options: T[][]): T[][] => options.reduce<T[][]>((combinations, values) => combinations.flatMap(combination => values.map(value => [...combination, value])), [[]]);
 
     const optionValuesLists = validOptions.map(opt => 
       opt.values.map(val => ({ code: opt.code, value: val }))
@@ -50,7 +50,7 @@ export function useVariantMatrix(baseSku: string, options: Option[]) {
     return matrix.map(combination => {
       // Generate automatic SKU suffix based on option values
       const skuSuffix = combination
-        .map((c: any) => c.value.toUpperCase().replace(/\s+/g, '-').substring(0, 5))
+        .map((c) => c.value.toUpperCase().replace(/\s+/g, '-').substring(0, 5))
         .join('-');
 
       return {

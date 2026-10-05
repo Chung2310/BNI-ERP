@@ -37,22 +37,22 @@ const unsubscribeSchema = {
 };
 
 // Lấy VAPID public key để frontend đăng ký push
-pushRouter.get("/public-key", requireAuth as any, pushController.getPublicKey as any);
+pushRouter.get("/public-key", requireAuth, pushController.getPublicKey);
 
 // Đăng ký nhận thông báo đẩy cho thiết bị hiện tại
 pushRouter.post(
   "/subscribe",
-  requireAuth as any,
-  requirePermission("people:manage") as any,
+  requireAuth,
+  requirePermission("people:manage"),
   validateRequest(subscribeSchema),
-  pushController.subscribe as any
+  pushController.subscribe
 );
 
 // Hủy đăng ký thông báo đẩy
 pushRouter.post(
   "/unsubscribe",
-  requireAuth as any,
-  requirePermission("people:manage") as any,
+  requireAuth,
+  requirePermission("people:manage"),
   validateRequest(unsubscribeSchema),
-  pushController.unsubscribe as any
+  pushController.unsubscribe
 );

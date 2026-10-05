@@ -7,14 +7,13 @@ export default function FeeSePaySettings({ onClose }: { onClose: () => void }) {
   const [transactions, setTransactions] = useState<FeeSePayTransaction[]>([]);
   const [error, setError] = useState("");
   const load = async () => {
-    setError("");
-    try {
-      const [c, t] = await Promise.all([memberFeeService.sepayConfig(), memberFeeService.transactions()]);
-      setConfig(c);
+    return Promise.all([memberFeeService.sepayConfig(), memberFeeService.transactions()]).then(async ([c, t]) => {
+      setError(''); setConfig(c);
       setTransactions(t);
-    } catch (e: any) {
+    
+}).catch(e => {
       setError(e.message);
-    }
+    });
   };
   useEffect(() => { void load(); }, []);
   return (

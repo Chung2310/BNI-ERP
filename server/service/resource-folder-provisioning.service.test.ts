@@ -21,14 +21,14 @@ describe("automatic resource folders", () => {
   it("refreshes changed member names using the same folder identity", async () => {
     const folders = new Map<string, string>();
     let name = "Tên cũ";
-    const service = createResourceFolderProvisioning({
+    const service = createResourceFolderProvisioning(({
       company: async () => ({ enabledModules: ["hr", "resource"] }),
       members: async () => [{ _id: "member", displayName: name }],
       ensure: async input => {
         folders.set(input.companyCode + ":" + input.sourceType + ":" + (input.entityId || ""), input.entityLabel || "");
-        return { _id: "folder" } as any;
+        return { _id: "folder" };
       },
-    });
+    } as unknown as Parameters<typeof createResourceFolderProvisioning>[0]));
     await service.ensure("A"); const count = folders.size;
     name = "Tên mới"; await service.ensure("A");
     expect(folders.size).toBe(count);
