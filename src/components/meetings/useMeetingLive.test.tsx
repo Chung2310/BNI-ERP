@@ -16,14 +16,14 @@ vi.mock("../../services/socketService", () => ({ socketService: {
   onStatusChange: (callback: (connected: boolean) => void) => { socket.statuses.add(callback); callback(true); return () => socket.statuses.delete(callback); },
   reconnect: socket.reconnect,
 } }));
-let data: any; let online: boolean; let stale: any;
+let data: import('../../services/meetingLiveService').MeetingLiveSnapshot; let online: boolean; let stale: import('../../services/meetingLiveService').MeetingLiveSnapshot | null;
 const emit = () => socket.listeners.get("meeting_updated")?.forEach(callback => callback({ id: "meeting" }));
 beforeEach(() => {
   online = true; stale = null;
-  data = { serverNow: Date.parse("2030-01-01T01:00:10Z"), slides: [],
+  data = ({ serverNow: Date.parse("2030-01-01T01:00:10Z"), slides: [],
     meeting: { _id: "meeting", __v: 0, status: "live", currentIndex: 0, speakerStartedAt: "2030-01-01T01:00:00Z", elapsedSeconds: 0,
       presentation: { view: "speaker", autoAdvance: false, autoAdvanceDelay: 3 },
-      speakers: [{ id: "first", seconds: 30 }, { id: "second", seconds: 20 }] } };
+      speakers: [{ id: "first", seconds: 30 }, { id: "second", seconds: 20 }] } } as unknown as import("../../services/meetingLiveService").MeetingLiveSnapshot);
   vi.stubGlobal("fetch", vi.fn(async (_url, options) => {
     if (!online) throw new Error("offline");
     if (options.method === "GET") return { ok: true, json: async () => JSON.parse(JSON.stringify({ data: stale || data })) };

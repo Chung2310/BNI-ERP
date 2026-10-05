@@ -16,7 +16,6 @@ export function MemberAbsenceLeaderboard({ members, meetings, loading }: { membe
   return <section aria-label="BXH thành viên lười nhất" className="rounded-2xl border border-orange-200/80 bg-white p-4 sm:p-5 shadow-2xs">
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3.5">
       <div><h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><UserX aria-hidden="true" className="h-4 w-4 text-orange-600" />BXH thành viên “lười” nhất</h3>
-        <p className="mt-1 text-xs text-slate-500">Vắng nhiều nhất → nhiều lần check-in muộn nhất → tổng số phút muộn nhiều nhất.</p>
       </div>
       <input aria-label="Tìm thành viên trong BXH lười" value={search} onChange={event => { setSearch(event.target.value); setLimit(10); }} placeholder="Tìm tên, email, công ty…" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs sm:w-60" />
     </div>

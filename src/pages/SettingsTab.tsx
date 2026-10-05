@@ -24,7 +24,7 @@ export default function SettingsTab() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { userProfile, uploadAvatar } = useAuth();
   const isAdmin = userProfile?.role === "admin";
-  
+
   const [photoURL, setPhotoURL] = useState(userProfile?.photoURL || "");
   const [displayName, setDisplayName] = useState(userProfile?.displayName || "");
   const [uploading, setUploading] = useState(false);
@@ -48,7 +48,7 @@ export default function SettingsTab() {
     if (userProfile?.photoURL) {
       setPhotoURL(userProfile.photoURL);
     }
-  
+
   }
 
   const handleAvatarClick = () => {
@@ -110,7 +110,6 @@ export default function SettingsTab() {
             <h1 className="text-xl md:text-2xl font-black text-cyan-700 dark:text-cyan-400 tracking-tight">
               {isAdmin ? "Cài đặt Hệ thống & Cá nhân" : "Hồ sơ cá nhân"}
             </h1>
-            <p className="text-xs text-slate-500 font-medium">{isAdmin ? "Tùy chỉnh thông tin tài khoản, bảo mật và kết nối ERP" : "Tùy chỉnh thông tin tài khoản và bảo mật"}</p>
           </div>
         </div>
         <div className="flex min-w-0 flex-1 items-center gap-1 select-none">
@@ -127,11 +126,10 @@ export default function SettingsTab() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveSubTab(tab.id as SettingsSubTabType)}
-                  className={`flex items-center gap-2 px-4 py-2.5 font-bold text-xs transition-all duration-200 cursor-pointer shrink-0 rounded-xl ${
-                    isActive
+                  className={`flex items-center gap-2 px-4 py-2.5 font-bold text-xs transition-all duration-200 cursor-pointer shrink-0 rounded-xl ${isActive
                       ? "bg-cyan-600 text-white font-bold shadow-sm"
                       : "text-slate-600 hover:text-cyan-600 hover:bg-cyan-50 font-semibold"
-                  }`}
+                    }`}
                 >
                   <Icon className={`h-4 w-4 ${isActive ? "text-white" : "text-slate-400"}`} />
                   <span>{tab.label}</span>
@@ -147,9 +145,8 @@ export default function SettingsTab() {
       <div className={visibleSubTab === "profile" ? "w-full" : "grid grid-cols-1 lg:grid-cols-3 gap-6 items-start"}>
 
         {/* Left Column: Quick Profile Card */}
-        <div className={`relative flex flex-col items-center gap-4 overflow-hidden rounded-2xl border border-gray-200/80 bg-white/80 p-4 text-center shadow-xs backdrop-blur-md sm:p-6 ${
-          visibleSubTab === "profile" ? "hidden" : "flex"
-        }`}>
+        <div className={`relative flex flex-col items-center gap-4 overflow-hidden rounded-2xl border border-gray-200/80 bg-white/80 p-4 text-center shadow-xs backdrop-blur-md sm:p-6 ${visibleSubTab === "profile" ? "hidden" : "flex"
+          }`}>
           <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-r from-blue-500 to-indigo-600">
             {userProfile?.coverImage && <img src={userProfile.coverImage} alt="Ảnh bìa cá nhân" className="h-full w-full object-cover" />}
           </div>
@@ -186,8 +183,7 @@ export default function SettingsTab() {
             <h3 className="text-base font-bold text-gray-800">{displayName}</h3>
             <p className="text-xs text-gray-500">{userProfile?.email}</p>
             <div className="pt-2 flex justify-center">
-              <span className={`px-2.5 py-0.5 rounded-full font-mono font-bold text-[9px] uppercase border tracking-wider ${
-                userProfile?.role === "admin"
+              <span className={`px-2.5 py-0.5 rounded-full font-mono font-bold text-[9px] uppercase border tracking-wider ${userProfile?.role === "admin"
                   ? "bg-amber-50 border-amber-200 text-amber-600"
                   : "bg-slate-50 border-slate-200 text-slate-600"
                 }`}>

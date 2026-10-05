@@ -2566,13 +2566,6 @@ export default function ResourceTab() {
                                         return isRoomAdminLocal || isCreator || isUploader;
                                       })();
 
-                                      const isMyFile = resource.uploadedBy && String(resource.uploadedBy) === String(userProfileId);
-                                      const isRoomCreator = room && String(room.creatorId) === String(userProfileId);
-                                      const memberInfo = room?.members.find(
-                                        (m) => String(getMemberId(m.userId)) === String(userProfileId)
-                                      );
-                                      const isRoomAdminCheck = memberInfo?.role === "admin";
-                                      
 
                                       const isMenuOpen = activeMenuId === resource._id;
 

@@ -7,17 +7,17 @@ const mocks = vi.hoisted(() => ({ manage: true }));
 vi.mock("../../context/AuthContext", () => ({ useAuth: () => ({ hasPermission: () => mocks.manage }) }));
 vi.mock("../../services/socketService", () => ({ socketService: { on: () => () => {}, onStatusChange: (cb: (value: boolean) => void) => { cb(true); return () => {}; }, reconnect: () => {} } }));
 vi.mock("./MeetingStage", () => ({
-  MeetingStage: ({ snapshot }: any) => <div>Đang chiếu: {snapshot.meeting.presentation.view}</div>,
-  SpeakerStage: ({ slide }: any) => <div>Xem trước: {slide?.name}</div>,
+  MeetingStage: ({ snapshot }: { snapshot: import('../../services/meetingLiveService').MeetingLiveSnapshot }) => <div>Đang chiếu: {snapshot.meeting.presentation.view}</div>,
+  SpeakerStage: ({ slide }: { slide: import('../../services/meetingLiveService').MeetingLiveSnapshot['slides'][number] }) => <div>Xem trước: {slide?.name}</div>,
 }));
 vi.mock("qrcode", () => ({ default: { toDataURL: vi.fn().mockResolvedValue("data:image/png;base64,qr") } }));
-let snapshot: any;
+let snapshot: import('../../services/meetingLiveService').MeetingLiveSnapshot;
 beforeEach(() => {
   mocks.manage = true;
   snapshot = { serverNow: Date.now(), slides: [{ id: "a", name: "An" }, { id: "b", name: "Binh" }],
     meeting: { _id: "m", title: "Meeting", status: "live", __v: 0, currentIndex: 0, elapsedSeconds: 0,
       presentation: { view: "speaker", autoAdvance: false, autoAdvanceDelay: 3 },
-      speakers: [{ id: "a", name: "An", seconds: 30 }, { id: "b", name: "Binh", seconds: 20 }], luckyDraw: { prizes: [] } } };
+      speakers: [{ id: "a", name: "An", seconds: 30 }, { id: "b", name: "Binh", seconds: 20 }], luckyDraw: { prizes: [] } } } as unknown as import("../../services/meetingLiveService").MeetingLiveSnapshot;
   vi.stubGlobal("fetch", vi.fn(async (url, options) => {
     if (options.method !== "GET") {
       const body = JSON.parse(options.body);

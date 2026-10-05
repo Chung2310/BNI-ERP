@@ -1,5 +1,5 @@
 import MemberMessageButton from "./MemberMessageButton";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import {
   Users,
   Search,

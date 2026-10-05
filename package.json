@@ -10,7 +10,7 @@
     "start": "node dist-server/server.cjs",
     "clean": "rm -rf dist dist-server server.js",
     "typecheck": "node --max-old-space-size=4096 node_modules/typescript/lib/tsc.js --noEmit",
-    "lint": "eslint src/App.tsx src/pages/DashboardTab.tsx src/pages/Header.tsx src/pages/Sidebar.tsx",
+    "lint": "eslint src server server.ts",
     "lint:all": "eslint src server server.ts",
     "test": "npm run test:vitest && npm run test:node",
     "test:vitest": "vitest run --maxWorkers=4",

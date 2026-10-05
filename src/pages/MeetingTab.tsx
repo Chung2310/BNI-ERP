@@ -322,7 +322,7 @@ function MeetingWorkspace() {
     setCheckedSpeakerIds([]);
     setSpeakerSearch("");
     setSpeakerTypeFilter("all");
-  
+
   }
 
   const speakersWithIndex = useMemo(() => {
@@ -689,7 +689,6 @@ function MeetingWorkspace() {
                 {canManage ? "Quản lý buổi họp" : "Cuộc họp"}
               </h1>
               <p className="text-xs text-slate-500 font-medium mt-0.5">
-                {canManage ? "Lên lịch → Đón tiếp & check-in → Điều hành phát biểu → Quay thưởng" : "Theo dõi lịch họp và thông tin tham dự của bạn"}
               </p>
             </div>
           </div>

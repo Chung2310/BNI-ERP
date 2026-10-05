@@ -9,7 +9,7 @@ const { encryptSecret } = await import('../../security/crypto');
 process.env.APP_ENCRYPTION_KEY = '11'.repeat(32);
 
 test('concurrent first requests converge on the persisted company token', async t => {
-  let stored: any = null;
+  let stored: { companyCode: string; tokenHash?: string; tokenEncrypted?: string; expiresAt?: Date | null; revokedAt?: Date } | null = null;
   let writes = 0;
   t.mock.method(MeetingCheckInQrModel, 'findOne', () => {
     const snapshot = stored;
@@ -36,7 +36,7 @@ test('concurrent first requests converge on the persisted company token', async 
 });
 
 test('different companies receive independent permanent tokens', async t => {
-  const records = new Map<string, any>();
+  const records = new Map<string, { companyCode: string; tokenHash?: string; tokenEncrypted?: string; expiresAt?: Date | null; revokedAt?: Date }>();
   t.mock.method(MeetingCheckInQrModel, 'findOne', (query) => ({ select: async () => records.get(query.companyCode) || null }));
   t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', (query, update) => ({ select: async () => {
     const record = { companyCode: query.companyCode, ...update.$set };

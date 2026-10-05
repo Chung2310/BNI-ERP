@@ -389,7 +389,6 @@ function ProfileForm({
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">Thông tin cá nhân</h3>
-                    <p className="text-xs text-slate-500">Họ tên đại diện và ngày sinh nhật thành viên</p>
                   </div>
                 </div>
 
@@ -457,7 +456,6 @@ function ProfileForm({
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-800">Doanh nghiệp & Nghề nghiệp</h3>
-                    <p className="text-xs text-slate-500">Thông tin công ty và ngành nghề đại diện trong Chapter</p>
                   </div>
                 </div>
 
@@ -530,7 +528,6 @@ function ProfileForm({
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-800">Tài khoản & Liên hệ</h3>
-                <p className="text-xs text-slate-500">Thông tin liên lạc và định danh đăng nhập an toàn</p>
               </div>
             </div>
 

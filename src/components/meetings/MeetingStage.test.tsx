@@ -8,10 +8,10 @@ vi.mock("./ActiveMembersPanel", () => ({ ActiveMembersPanel: () => <div>Ranking<
 afterEach(cleanup);
 it("reveals the same persisted winner at server time and does not replay a completed draw on reload", () => {
   const start = Date.parse("2030-01-01T01:00:00Z");
-  const snapshot: any = { serverNow: start, slides: [], meeting: {
+  const snapshot = { serverNow: start, slides: [], meeting: {
     title: "Demo", status: "live", presentation: { view: "luckyDraw", drawWinnerId: "winner", drawStartedAt: new Date(start).toISOString(), drawRevealsAt: new Date(start + 5000).toISOString() },
     speakers: [{ id: "a", name: "Rolling" }], luckyDraw: { prizes: [{ winners: [{ id: "winner", name: "Chosen Winner", prizeName: "Gift" }] }] },
-  }};
+  }} as unknown as import("../../services/meetingLiveService").MeetingLiveSnapshot;
   const view = render(<MeetingStage snapshot={snapshot} now={start + 4999} />);
   expect(screen.getByText("Đang quay thưởng")).toBeTruthy();
   expect(screen.queryByText("Chosen Winner")).toBeNull();

@@ -1,5 +1,5 @@
 import { Plus, Users, Upload } from "lucide-react";
-import {  UserProfile } from "../../types";
+import { UserProfile } from "../../types";
 
 interface Props {
   userProfile?: UserProfile | null;
@@ -26,7 +26,6 @@ export function UserAdminHeader({
           <h1 className="font-extrabold text-cyan-700 text-xl lg:text-2xl tracking-tight">
             Quản trị Tài khoản & Phân quyền
           </h1>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">Quản lý danh sách thành viên & phân quyền vai trò</p>
         </div>
       </div>
       <div className="flex items-center gap-2">

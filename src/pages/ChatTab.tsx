@@ -201,50 +201,6 @@ export default function ChatTab() {
   }, [mention, activeRoom, currentUserId]);
 
   // Regex nhận diện "@Tên thành viên" để tô sáng trong tin nhắn
-  const mentionRegex = React.useMemo(() => {
-    if (!activeRoom) return null;
-    const names = activeRoom.members
-      .map((m) => m.userId?.displayName)
-      .filter(Boolean)
-      .map((n: string) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-
-    if (activeRoom.isGroup) {
-      names.push("all", "Tất cả", "tất cả");
-    }
-
-    names.sort((a: string, b: string) => b.length - a.length);
-    if (names.length === 0) return null;
-    return new RegExp("@(" + names.join("|") + ")", "gi");
-  }, [activeRoom]);
-
-  // Tô sáng các @mention thành viên trong một đoạn văn bản (không chứa URL)
-  const renderTextWithMentions = (text: string, onDark: boolean): React.ReactNode => {
-    if (!mentionRegex) return text;
-    const myName = userProfile?.displayName;
-    const nodes: React.ReactNode[] = [];
-    let last = 0;
-    let m: RegExpExecArray | null;
-    mentionRegex.lastIndex = 0;
-    while ((m = mentionRegex.exec(text)) !== null) {
-      if (m.index > last) nodes.push(text.slice(last, m.index));
-      const isMentionAll = ["all", "tất cả"].includes(m[1].toLowerCase());
-      const cls =
-        m[1] === myName || isMentionAll
-          ? "bg-amber-300/80 text-amber-950 font-bold"
-          : onDark
-            ? "bg-white/25 text-white"
-            : "bg-indigo-100 text-indigo-700";
-      nodes.push(
-        <span key={`mt-${m.index}`} className={`rounded px-1 font-semibold ${cls}`}>
-          {m[0]}
-        </span>
-      );
-      last = m.index + m[0].length;
-      if (m.index === mentionRegex.lastIndex) mentionRegex.lastIndex++;
-    }
-    if (last < text.length) nodes.push(text.slice(last));
-    return nodes;
-  };
 
   // Render nội dung tin nhắn: biến URL thành link bấm được + tô sáng @mention
   
