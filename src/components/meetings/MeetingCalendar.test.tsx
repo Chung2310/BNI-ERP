@@ -41,7 +41,7 @@ it("keeps all 31 days in a six-week month and exposes every meeting through the 
  await screen.findByText("07:00 · Buổi 1");
  expect(screen.getAllByRole("button",{name:/^Xem lịch ngày/})).toHaveLength(31);
  expect(screen.queryByRole("button",{name:"11:00 · Buổi 5"})).toBeNull();
- fireEvent.click(screen.getByRole("button",{name:"Xem 5 buổi họp ngày 31/08/2026"}));
+ fireEvent.click(document.querySelector('[data-calendar-day="2026-08-31"]')!);
  const dialog=screen.getByRole("dialog",{name:"Lịch ngày 31/08/2026"});
  expect(within(dialog).getAllByRole("button",{name:/Buổi \d/})).toHaveLength(5);
  fireEvent.click(within(dialog).getByRole("button",{name:/11:00 · Buổi 5/}));
