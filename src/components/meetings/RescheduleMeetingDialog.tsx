@@ -11,20 +11,21 @@ export function RescheduleMeetingDialog({ meeting, onClose, onConfirm }: {
 }) {
   const original = vietnamDateTime(meeting.startsAt);
   const [date, setDate] = useState(original.slice(0, 10));
+  const originalTime = original.slice(11);
+  const [time, setTime] = useState(originalTime);
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const time = original.slice(11);
   const dateLabel = (value: string) => value.split("-").reverse().join("/");
   const newStart = () => new Date(`${date}T${time}:00+07:00`);
   const validate = () => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(newStart().getTime())) return "Vui lòng chọn ngày mới.";
-    if (date === original.slice(0, 10)) return "Vui lòng chọn ngày khác ngày hiện tại của cuộc họp.";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time) || !Number.isFinite(newStart().getTime())) return "Vui lòng chọn ngày mới.";
+    if (date === original.slice(0, 10) && time === originalTime) return "Vui l\u00f2ng ch\u1ecdn th\u1eddi gian kh\u00e1c v\u1edbi l\u1ecbch hi\u1ec7n t\u1ea1i.";
     if (newStart().getTime() <= Date.now()) return "Vui lòng chọn thời gian trong tương lai.";
     return "";
   };
 
-  if (confirming) return <ConfirmDialog isOpen title="Xác nhận dời lịch" description={`Dời cuộc họp “${meeting.title}” từ ${time} ngày ${dateLabel(original.slice(0, 10))} sang ${time} ngày ${dateLabel(date)}? Giữ nguyên thời lượng và các buổi khác trong lịch định kỳ.`} tone="warning" confirmLabel="Xác nhận dời lịch" cancelLabel="Quay lại" isSubmitting={saving} onClose={() => setConfirming(false)} onConfirm={async () => {
+  if (confirming) return <ConfirmDialog isOpen title="Xác nhận dời lịch" description={`Dời cuộc họp “${meeting.title}” từ ${originalTime} ngày ${dateLabel(original.slice(0, 10))} sang ${time} ngày ${dateLabel(date)}? Giữ nguyên thời lượng và các buổi khác trong lịch định kỳ.`} tone="warning" confirmLabel="Xác nhận dời lịch" cancelLabel="Quay lại" isSubmitting={saving} onClose={() => setConfirming(false)} onConfirm={async () => {
     if (saving) return;
     const validation = validate();
     if (validation) { setError(validation); setConfirming(false); return; }
@@ -45,7 +46,8 @@ export function RescheduleMeetingDialog({ meeting, onClose, onConfirm }: {
       <div className="space-y-2">
         <span className="block text-xs text-slate-600">Ngày mới</span>
         <VietnameseDatePicker value={date} onChange={value => { setDate(value); setError(""); }} ariaLabel="Ngày dời cuộc họp" align="left" buttonClassName="rounded-xl border border-cyan-200 bg-white px-3 py-2 text-sm" />
-        <p className="text-xs text-slate-500">Giữ giờ bắt đầu {time} và thời lượng cuộc họp.</p>
+        <label htmlFor="reschedule-start-time" className="block pt-1 text-xs text-slate-600">Gi&#7901; b&#7855;t &#273;&#7847;u</label>
+        <input id="reschedule-start-time" type="time" value={time} onChange={event => { setTime(event.target.value); setError(""); }} className="w-full rounded-xl border border-cyan-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20" />
         {error && <p role="alert" className="text-xs text-rose-600">{error}</p>}
       </div>
       <div className="mt-5 flex justify-end gap-2">
