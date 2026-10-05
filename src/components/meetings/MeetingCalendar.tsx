@@ -3,9 +3,9 @@ import { vietnamDateTime } from "../../utils/meetingRecurrence";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 type CalendarMeeting = { _id: string; title: string; startsAt: string; originalStartsAt?: string; seriesId?: string; status: string; __v: number };
 const labels: Record<string, string> = { scheduled: "Sắp diễn ra", live: "Đang diễn ra", paused: "Tạm dừng", ended: "Đã kết thúc", cancelled: "Đã hủy" };
-export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChange, revision, load, canManage, onOpen, onEdit, onCancel, filter }: {
+export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChange, revision, load, canManage, onOpen, onEdit, onReschedule, onCancel, filter }: {
   month: string; onMonthChange: (value: string) => void; revision: number;
-  load: (path: string) => Promise<T[]>; canManage: boolean; onOpen: (item: T) => void; onEdit: (item: T) => void; onCancel: (item: T) => Promise<void>; filter: (item: T) => boolean;
+  load: (path: string) => Promise<T[]>; canManage: boolean; onOpen: (item: T) => void; onEdit: (item: T) => void; onReschedule: (item: T) => void; onCancel: (item: T) => Promise<void>; filter: (item: T) => boolean;
 }) {
   const [items, setItems] = useState<T[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
   const [retry, setRetry] = useState(0); const [cancelling, setCancelling] = useState<T | null>(null); const [saving, setSaving] = useState(false);
@@ -42,7 +42,7 @@ export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChang
           {visible.filter(item => vietnamDateTime(item.startsAt).slice(0,10) === key).map(item => <article key={item._id} className={"mt-2 rounded-xl border p-2 text-xs transition " + (item.status === "cancelled" ? "border-rose-200 bg-rose-50/80" : "border-cyan-200/80 bg-cyan-50/70 hover:border-cyan-400 hover:bg-cyan-50")}>
             <button type="button" onClick={() => onOpen(item)} className="w-full text-left cursor-pointer"><strong className="block font-bold text-slate-900 leading-snug">{vietnamDateTime(item.startsAt).slice(11)} · {item.title}</strong><span className="text-[11px] text-cyan-800 font-medium">{labels[item.status] || item.status}{item.seriesId ? " · Định kỳ" : ""}</span></button>
             {item.originalStartsAt && new Date(item.originalStartsAt).getTime() !== new Date(item.startsAt).getTime() && <p className="mt-1 text-slate-500 text-[11px]">Dời từ {vietnamDateTime(item.originalStartsAt).replace("T", " ")}</p>}
-            {canManage && item.status === "scheduled" && <div className="mt-2 flex flex-wrap gap-2 pt-1 border-t border-cyan-100"><button type="button" className="font-bold text-cyan-700 hover:text-cyan-800 cursor-pointer" onClick={() => onEdit(item)}>Sửa / Dời lịch</button><button type="button" className="text-rose-600 hover:text-rose-700 font-medium cursor-pointer" onClick={() => setCancelling(item)}>Hủy buổi</button></div>}
+            {canManage && item.status === "scheduled" && <div className="mt-2 flex flex-wrap gap-2 pt-1 border-t border-cyan-100"><button type="button" className="font-bold text-cyan-700 hover:text-cyan-800 cursor-pointer" onClick={() => onEdit(item)}>Sửa cuộc họp</button><button type="button" className="font-bold text-cyan-700 hover:text-cyan-800 cursor-pointer" onClick={() => onReschedule(item)}>Dời lịch</button><button type="button" className="text-rose-600 hover:text-rose-700 font-medium cursor-pointer" onClick={() => setCancelling(item)}>Hủy buổi</button></div>}
           </article>)}
         </div>;
       })}
