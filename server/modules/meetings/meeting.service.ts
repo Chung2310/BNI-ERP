@@ -756,8 +756,9 @@ async function resolveQrMeeting(token: string) {
   }
   const qr = await MeetingCheckInQrModel.findOne({ tokenHash: hash, revokedAt: null });
   if (!qr?.tokenHash || qr.revokedAt) throw new MeetingError(410, 'Mã QR không hợp lệ. Hãy sử dụng QR check-in dùng chung của đơn vị.');
+  const checkInStartsAt = new Date(now.getTime() + DEFAULT_MEETING_DURATION_MS);
   const matches = await MeetingModel.find({ companyCode: qr!.companyCode,
-    status: { $in: ['scheduled', 'live', 'paused'] }, startsAt: { $lte: now },
+    status: { $in: ['scheduled', 'live', 'paused'] }, startsAt: { $lte: checkInStartsAt },
     $or: [
       { endsAt: { $gt: now } },
       { endsAt: null, startsAt: { $gt: new Date(now.getTime() - DEFAULT_MEETING_DURATION_MS) } },

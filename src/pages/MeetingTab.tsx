@@ -264,6 +264,8 @@ function MeetingWorkspace() {
   const [editReminderDays, setEditReminderDays] = useState(1);
   const [editTiers, setEditTiers] = useState<SpeakingTimeSlot[]>([]);
   const [editFallbackSeconds, setEditFallbackSeconds] = useState(20);
+  const [reschedulingMeeting, setReschedulingMeeting] = useState<Meeting | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
 
   // Delete Meeting Confirmation Dialog state
   const [deletingMeeting, setDeletingMeeting] = useState<Meeting | null>(null);
@@ -434,6 +436,7 @@ function MeetingWorkspace() {
 
   const openEditModal = (m: Meeting, e?: React.MouseEvent) => {
     e?.stopPropagation();
+    setReschedulingMeeting(null);
     setEditingMeeting(m);
     setPrioritySpeakerId("");
     setPriorityPosition(1);
@@ -454,6 +457,35 @@ function MeetingWorkspace() {
       setEditStartsAt("");
       setEditEndsAt("");
     }
+  };
+
+  const openRescheduleModal = (m: Meeting, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (m.status !== "scheduled") return;
+    setEditingMeeting(null);
+    setRescheduleDate(vietnamDateTime(m.startsAt).slice(0, 10));
+    setReschedulingMeeting(m);
+  };
+
+  const reschedule = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reschedulingMeeting || !rescheduleDate) return;
+    const currentLocalDateTime = vietnamDateTime(reschedulingMeeting.startsAt);
+    const startTime = currentLocalDateTime.slice(11, 16);
+    const startsAt = new Date(rescheduleDate + "T" + startTime + ":00+07:00");
+    if (!Number.isFinite(startsAt.getTime())) {
+      toast.error("Ngày dời lịch không hợp lệ.");
+      return;
+    }
+
+    void run(async () => {
+      await api("/" + reschedulingMeeting._id, "PUT", {
+        version: reschedulingMeeting.__v,
+        startsAt: startsAt.toISOString(),
+      });
+      setReschedulingMeeting(null);
+      toast.success("Đã dời lịch cuộc họp.");
+    });
   };
 
   const update = (e: React.FormEvent) => {
@@ -824,7 +856,7 @@ function MeetingWorkspace() {
       {/* Grid of Meeting Cards (Dạng danh sách / Thẻ hiển thị) */}
       {view === "calendar" ? <MeetingCalendar<Meeting> month={calendarMonth} onMonthChange={setCalendarMonth} revision={calendarRevision} load={api} canManage={canManage} filter={matchesMeetingFilter}
         onOpen={meeting => { setItems(previous => [...previous.filter(item => item._id !== meeting._id), meeting]); setDetailMeetingId(meeting._id); openMeetingFlow(meeting.status); }}
-        onEdit={meeting => openEditModal(meeting)}
+        onEdit={meeting => openEditModal(meeting)} onReschedule={meeting => openRescheduleModal(meeting)}
         onCancel={async meeting => { try { await api("/" + meeting._id + "/control", "POST", { action: "cancel", version: meeting.__v }); await refresh(); toast.success("Đã hủy buổi họp."); } catch (error) { toast.error(error.message); throw error; } }}
       /> : loading ? <p role="status" className="p-8 text-center text-sm text-slate-500">Đang tải cuộc họp...</p> : loadError ? <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{loadError}<button type="button" onClick={() => { setLoading(true); void refresh(); }} className="ml-3 font-bold">Thử lại</button></div> : filteredItems.length > 0 ? (
         <div className="grid grid-cols-1 @min-[32rem]:grid-cols-2 @min-[48rem]:grid-cols-3 @min-[64rem]:grid-cols-4 gap-3">
@@ -909,6 +941,14 @@ function MeetingWorkspace() {
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
+                      {m.status === "scheduled" && <button
+                        type="button"
+                        title="Dời lịch"
+                        onClick={(e) => openRescheduleModal(m, e)}
+                        className="rounded-lg bg-white/90 backdrop-blur-md p-1.5 text-slate-700 hover:bg-white hover:text-cyan-700 shadow-sm border border-slate-200/60 transition cursor-pointer"
+                      >
+                        <CalendarDays className="h-3.5 w-3.5" />
+                      </button>}
                       <button
                         type="button"
                         title="Xóa cuộc họp"
@@ -1100,6 +1140,11 @@ function MeetingWorkspace() {
                     className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer shrink-0"
                   >
                     <Pencil className="h-4 w-4" />
+                  </button>
+                )}
+                {canManage && activeMeeting.status === "scheduled" && (
+                  <button type="button" title="Dời lịch" onClick={(e) => openRescheduleModal(activeMeeting, e)} className="p-2 rounded-xl text-slate-500 hover:text-cyan-700 hover:bg-cyan-50 transition cursor-pointer shrink-0">
+                    <CalendarDays className="h-4 w-4" />
                   </button>
                 )}
 
@@ -1870,6 +1915,32 @@ function MeetingWorkspace() {
                 >
                   {saving ? "Đang tạo..." : recurring ? "Tạo lịch định kỳ" : "Tạo cuộc họp"}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP DỜI LỊCH */}
+      {reschedulingMeeting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="flex items-center gap-2 text-base font-bold text-slate-900"><CalendarDays className="h-4 w-4 text-cyan-600" />Dời lịch cuộc họp</h3>
+              <button type="button" aria-label="Đóng popup dời lịch" onClick={() => setReschedulingMeeting(null)} className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"><X className="h-5 w-5" /></button>
+            </div>
+            <form onSubmit={reschedule} className="space-y-4 pt-4">
+              <div className="rounded-xl bg-slate-50 p-3">
+                <p className="font-semibold text-slate-800">{reschedulingMeeting.title}</p>
+                <p className="mt-1 text-xs text-slate-500">Lịch hiện tại: {vietnamDateTime(reschedulingMeeting.startsAt).replace("T", " ")} (giờ Việt Nam)</p>
+              </div>
+              <label className="block text-sm font-semibold text-slate-700">Ngày mới
+                <input type="date" required min={vietnamDateTime(new Date()).slice(0, 10)} value={rescheduleDate} onChange={event => setRescheduleDate(event.target.value)} className="mt-1 block w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm focus:border-cyan-500 focus:outline-none" />
+              </label>
+              <p className="rounded-xl bg-cyan-50 p-3 text-xs leading-relaxed text-cyan-900">Chỉ thay đổi ngày. Giờ bắt đầu và thời lượng được giữ nguyên; với lịch định kỳ, chỉ dời buổi này.</p>
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+                <button type="button" onClick={() => setReschedulingMeeting(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Hủy</button>
+                <button type="submit" disabled={saving || !rescheduleDate} className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50">{saving ? "Đang lưu..." : "Dời lịch"}</button>
               </div>
             </form>
           </div>

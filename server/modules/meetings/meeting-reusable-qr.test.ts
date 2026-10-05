@@ -93,7 +93,7 @@ test('one reusable QR records consecutive meetings instead of its source meeting
   const query = state.queries[0] as { companyCode: string; status: { $in: string[] }; startsAt: { $lte: Date }; $or: [{ endsAt: { $gt: Date } }, { endsAt: null; startsAt: { $gt: Date } }] };
   assert.equal(query.companyCode, 'ACME');
   assert.deepEqual(query.status.$in, ['scheduled', 'live', 'paused']);
-  assert.equal(query.startsAt.$lte.getTime(), now.getTime());
+  assert.equal(query.startsAt.$lte.getTime(), now.getTime() + 2 * 60 * 60 * 1000);
   assert.equal(query.$or[0].endsAt.$gt.getTime(), now.getTime());
   assert.equal(query.$or[1].endsAt, null);
   assert.equal(query.$or[1].startsAt.$gt.getTime(), now.getTime() - 2 * 60 * 60 * 1000);

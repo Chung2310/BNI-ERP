@@ -54,7 +54,7 @@ function CompanyQrContent({ api }: { api: CheckInQrApi }) {
         <h3 className="text-lg font-bold text-slate-900">Một QR check-in cố định</h3>
         <p className="mt-2 text-sm text-slate-600">In hoặc lưu mã này để sử dụng lâu dài cho tất cả cuộc họp của đơn vị. Mã không hết hạn và không thay đổi khi tạo, sửa hay kết thúc cuộc họp.</p>
       </div>
-      <p className="text-sm text-slate-500">Khi quét, hệ thống tự xác định cuộc họp đang trong thời gian check-in theo giờ bắt đầu và kết thúc. Cuộc họp đã kết thúc hoặc bị hủy không nhận check-in. Vị trí GPS được kiểm tra theo địa điểm của cuộc họp.</p>
+      <p className="text-sm text-slate-500">QR mở check-in từ tối đa 2 giờ trước giờ bắt đầu đến giờ kết thúc. Khi quét, hệ thống tự xác định cuộc họp phù hợp; cuộc họp đã kết thúc hoặc bị hủy không nhận check-in. Vị trí GPS được kiểm tra theo địa điểm của cuộc họp.</p>
       {currentQr && <div className="flex flex-wrap gap-3 text-sm font-semibold text-cyan-700">
         <button type="button" onClick={async () => {
           try { await navigator.clipboard.writeText(currentQr.url); setCopied(true); }
