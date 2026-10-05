@@ -26,7 +26,7 @@ it("loads the same permanent QR across meetings and remounts without browser sto
   expect(screen.queryByText("Thời hạn QR")).toBeNull();
   expect(screen.queryByRole("button", { name: "Tạo mã thay thế" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Hủy QR" })).toBeNull();
-  expect(screen.getByText("Vĩnh viễn · Một mã duy nhất cho mọi cuộc họp")).toBeTruthy();
+  expect(screen.getByText("Sử dụng Zalo để quét mã")).toBeTruthy();
 });
 
 it("provides the company QR without any meeting or GPS configuration", async () => {
