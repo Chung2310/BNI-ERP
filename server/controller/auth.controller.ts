@@ -431,6 +431,14 @@ export const authController = {
           actorName: req.user!.email,
         }, userObj, req.body.jobDescriptionUploadToken);
       }
+      if (Array.isArray(req.body.galleryUploadTokens) && req.body.galleryUploadTokens.length > 0) {
+        await profileResourceService.finalizeGallery({
+          companyCode: userObj.companyCode,
+          branchId: userObj.branchId,
+          actorId: req.user!.id,
+          actorName: req.user!.email,
+        }, userObj, req.body.galleryUploadTokens);
+      }
 
       return res.status(201).json({
         status: "success",
@@ -615,7 +623,16 @@ export const authController = {
       const callerRole = req.user?.role;
       const callerCompanyCode = req.user?.companyCode;
 
-      const updatedUser = await authService.updateUser(id, req.body, callerCompanyCode!, callerRole!, req.user?.id);
+      const { galleryUploadTokens = [], ...updateData } = req.body;
+      const updatedUser = await authService.updateUser(id, updateData, callerCompanyCode!, callerRole!, req.user?.id);
+      if (updatedUser && Array.isArray(galleryUploadTokens) && galleryUploadTokens.length > 0) {
+        await profileResourceService.finalizeGallery({
+          companyCode: updatedUser.companyCode,
+          branchId: updatedUser.branchId,
+          actorId: req.user!.id,
+          actorName: req.user!.email,
+        }, updatedUser, galleryUploadTokens);
+      }
       if (updatedUser && req.body.jobDescriptionUploadToken) {
         await employeeDocumentResourceService.finalizeJobDescription({
           companyCode: updatedUser.companyCode,

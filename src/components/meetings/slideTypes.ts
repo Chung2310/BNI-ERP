@@ -9,6 +9,9 @@ export interface ProfileSlide {
   email?: string;
   industry: string;
   bio: string;
+  address?: string;
+  targetMarket?: string;
+  galleryImages?: string[];
 }
 
 export interface SlideDeck {

@@ -111,10 +111,10 @@ it("selects the guest in live mode and saves only slide fields with the server v
   fireEvent.change(screen.getByLabelText("Chế độ trình chiếu"), { target: { value: "live" } });
   expect((await screen.findByRole("img")).getAttribute("aria-label")).toContain("Trần Bình");
   fireEvent.click(screen.getByText("Bổ sung thông tin slide"));
-  fireEvent.change(screen.getByLabelText("Bio / giới thiệu ngắn"), { target: { value: "Kết nối kinh doanh" } });
+  fireEvent.change(screen.getByLabelText("Thị trường mục tiêu"), { target: { value: "Kết nối kinh doanh" } });
   fireEvent.click(screen.getByText("Lưu thông tin slide"));
   await waitFor(() => expect(api).toHaveBeenCalledWith("/m/slides/b", "PUT", {
-    version: 4, profile: { name: "Trần Bình", company: "Guest Co", photoURL: "", coverImage: "", phone: "", industry: "", bio: "Kết nối kinh doanh" },
+    version: 4, profile: { name: "Trần Bình", company: "Guest Co", photoURL: "", coverImage: "", phone: "", industry: "", bio: "", address: "", targetMarket: "Kết nối kinh doanh", galleryImages: [] },
   }));
 });
 

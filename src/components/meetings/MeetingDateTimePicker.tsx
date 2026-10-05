@@ -8,6 +8,7 @@ interface MeetingDateTimePickerProps {
   disabled?: boolean;
   className?: string;
   placeholder?: string;
+  ariaLabel?: string;
 }
 
 const pad2 = (n: number) => n.toString().padStart(2, "0");
@@ -41,6 +42,7 @@ export function MeetingDateTimePicker({
   disabled,
   className = "",
   placeholder = "Chọn ngày...",
+  ariaLabel = "Ngày và giờ",
 }: MeetingDateTimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -309,6 +311,7 @@ export function MeetingDateTimePicker({
 
         <input
           type="text"
+          aria-label={ariaLabel}
           disabled={disabled}
           required={required}
           value={inputValue}

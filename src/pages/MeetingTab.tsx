@@ -4,7 +4,10 @@ import { presentationState, type MeetingPresentationState } from "../utils/meeti
 import { MeetingSpeakingTimeFields } from "../components/meetings/MeetingSpeakingTimeFields";
 import { defaultSpeakingTimeSlots, speakingTimeSlotsForEdit, validateSpeakingTimeSlots, type SpeakingTier, type SpeakingTimeSlot } from "../utils/meetingSpeakingTime";
 import { MeetingCalendar } from "../components/meetings/MeetingCalendar";
+import { MeetingScheduleActions } from "../components/meetings/MeetingScheduleActions";
+import { RescheduleMeetingDialog } from "../components/meetings/RescheduleMeetingDialog";
 import { MeetingRecurrenceFields } from "../components/meetings/MeetingRecurrenceFields";
+import { MeetingSeriesBulkEditDialog, type MeetingSeriesBulkEditSeed, type MeetingSeriesChanges } from "../components/meetings/MeetingSeriesBulkEditDialog";
 import { vietnamDateTime, type MeetingRecurrence } from "../utils/meetingRecurrence";
 import { meetingElapsedLabel } from "../components/meetings/meetingElapsedLabel";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -22,7 +25,6 @@ import {
   QrCode,
   Clock3,
   Megaphone,
-  Plus,
   Users,
   Gift,
   Play,
@@ -32,24 +34,24 @@ import {
   X,
   Search,
   Pencil,
-  Trash2,
+  ExternalLink,
   ChevronRight,
   Sparkles,
   RotateCcw,
   ArrowDownToLine,
   Maximize2,
   Minimize2,
-  ExternalLink,
   SlidersHorizontal,
   UserPlus,
 } from "lucide-react";
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
 import { LuckyDrawTab } from "../components/meetings/LuckyDrawTab";
-import { MeetingFlowStepper, loadMeetingFlowOrder, saveMeetingFlowOrder, type MeetingFlowStep } from "../components/meetings/MeetingFlowStepper";
+import { MeetingFlowStepper, MEETING_FLOW_META, loadMeetingFlowOrder, saveMeetingFlowOrder, type MeetingFlowStep } from "../components/meetings/MeetingFlowStepper";
 import { ActiveMembersPanel } from "../components/meetings/ActiveMembersPanel";
 import { SpeakerAvatar } from "../components/meetings/SpeakerAvatar";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
+import { SearchableSelect } from "../components/common/SearchableSelect";
 import { toast } from "./Toast";
 
 type Speaker = {
@@ -168,12 +170,31 @@ function MeetingWorkspace() {
     setFlowStep(step);
     setSlidesOpen(false);
   }, []);
-  const openMeetingFlow = (status: string) => goToFlowStep(status === "scheduled" ? flowOrder[0] : "presentation");
+  const meetingFlowSteps = useRef(new Map<string, MeetingFlowStep>());
+  const getMeetingFlowStep = (meetingId: string): MeetingFlowStep => {
+    const inMemory = meetingFlowSteps.current.get(meetingId);
+    if (inMemory && flowOrder.includes(inMemory)) return inMemory;
+    try {
+      const saved = localStorage.getItem("bni_meeting_flow_step:" + meetingId);
+      if (flowOrder.includes(saved as MeetingFlowStep)) return saved as MeetingFlowStep;
+    } catch { /* Fall back to the initial step when browser storage is unavailable. */ }
+    return "checkin";
+  };
+  const openMeetingFlow = (meeting: Meeting) => {
+    goToFlowStep(getMeetingFlowStep(meeting._id));
+  };
+  useEffect(() => {
+    if (!detailMeetingId || !canManage) return;
+    meetingFlowSteps.current.set(detailMeetingId, flowStep);
+    try {
+      localStorage.setItem("bni_meeting_flow_step:" + detailMeetingId, flowStep);
+    } catch { /* The in-memory state still remembers the step during this visit. */ }
+  }, [detailMeetingId, flowStep, canManage]);
   const [attendedOnly, setAttendedOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "scheduled" | "live" | "ended">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "scheduled" | "live" | "ended" | "cancelled">("all");
   const [tick, setTick] = useState(Date.now);
   const [saving, setSaving] = useState(false);
   const [finishRequested, setFinishRequested] = useState(false);
@@ -258,6 +279,11 @@ function MeetingWorkspace() {
 
   // Edit Meeting Modal state
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
+  const [bulkEditingMeeting, setBulkEditingMeeting] = useState<Meeting | null>(null);
+  const [bulkMeetingCandidates, setBulkMeetingCandidates] = useState<Meeting[]>([]);
+  const [bulkEditingSeed, setBulkEditingSeed] = useState<MeetingSeriesBulkEditSeed | null>(null);
+  const [bulkEditingLoading, setBulkEditingLoading] = useState(false);
+  const [bulkEditingSaving, setBulkEditingSaving] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editStartsAt, setEditStartsAt] = useState("");
   const [editEndsAt, setEditEndsAt] = useState("");
@@ -269,11 +295,12 @@ function MeetingWorkspace() {
   const [editTiers, setEditTiers] = useState<SpeakingTimeSlot[]>([]);
   const [editFallbackSeconds, setEditFallbackSeconds] = useState(20);
   const [reschedulingMeeting, setReschedulingMeeting] = useState<Meeting | null>(null);
-  const [rescheduleDate, setRescheduleDate] = useState("");
 
   // Delete Meeting Confirmation Dialog state
   const [deletingMeeting, setDeletingMeeting] = useState<Meeting | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [cancellingMeeting, setCancellingMeeting] = useState<Meeting | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // End Meeting Confirmation Dialog state
   const [endingMeeting, setEndingMeeting] = useState<Meeting | null>(null);
@@ -321,15 +348,18 @@ function MeetingWorkspace() {
   }, [refresh]);
 
   const activeMeeting = items.find((m) => m._id === detailMeetingId) || null;
-  const [previousInputs11, setPreviousInputs11] = useState<unknown[] | null>(null);
-  if (previousInputs11 === null || !Object.is(previousInputs11[0], activeMeeting?._id) || !Object.is(previousInputs11[1], activeMeeting?.speakers[activeMeeting.currentIndex]?.id)) {
-    setPreviousInputs11([activeMeeting?._id, activeMeeting?.speakers[activeMeeting.currentIndex]?.id]);
+  const canModifyActiveMeeting = canManage && !!activeMeeting && activeMeeting.status !== "ended";
+
+  useEffect(() => {
+    if (editingMeeting && items.some(item => item._id === editingMeeting._id && item.status === "ended")) setEditingMeeting(null);
+  }, [items, editingMeeting]);
+  const activePresentationSpeakerId = activeMeeting?.speakers[activeMeeting.currentIndex]?.id;
+  useEffect(() => {
     setPresentationSpeakerId("");
     setCheckedSpeakerIds([]);
     setSpeakerSearch("");
     setSpeakerTypeFilter("all");
-
-  }
+  }, [activeMeeting?._id, activePresentationSpeakerId]);
 
   const speakersWithIndex = useMemo(() => {
     if (!activeMeeting?.speakers) return [];
@@ -406,11 +436,12 @@ function MeetingWorkspace() {
   const create = (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
+    if (recurring && !recurrence.startDate) { toast.error("Vui lòng chọn ngày bắt đầu chu kỳ."); return; }
     const timeSlotError = validateSpeakingTimeSlots(tiers);
     if (timeSlotError) { toast.error(timeSlotError); return; }
     void run(async () => {
       const result = await api(recurring ? "/series" : "", "POST", {
-        title,
+        ...(!recurring ? { title } : {}),
         ...(recurring ? { recurrence } : { startsAt: new Date(startsAt + ":00+07:00").toISOString(), endsAt: new Date(endsAt + ":00+07:00").toISOString() }),
         location,
         ...(gpsPoint || {}),
@@ -434,12 +465,13 @@ function MeetingWorkspace() {
         setView("calendar"); setDetailMeetingId(null);
         toast.success("Đã tạo " + result.length + " buổi họp định kỳ.");
       } else { detailMeetingIdRef.current = result._id; setDetailMeetingId(result._id); }
-      openMeetingFlow("scheduled");
+      if (!recurring) openMeetingFlow(result);
     });
   };
 
   const openEditModal = (m: Meeting, e?: React.MouseEvent) => {
     e?.stopPropagation();
+    if (m.status === "ended") return;
     setReschedulingMeeting(null);
     setEditingMeeting(m);
     setPrioritySpeakerId("");
@@ -463,34 +495,6 @@ function MeetingWorkspace() {
     }
   };
 
-  const openRescheduleModal = (m: Meeting, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    if (m.status !== "scheduled") return;
-    setEditingMeeting(null);
-    setRescheduleDate(vietnamDateTime(m.startsAt).slice(0, 10));
-    setReschedulingMeeting(m);
-  };
-
-  const reschedule = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reschedulingMeeting || !rescheduleDate) return;
-    const currentLocalDateTime = vietnamDateTime(reschedulingMeeting.startsAt);
-    const startTime = currentLocalDateTime.slice(11, 16);
-    const startsAt = new Date(rescheduleDate + "T" + startTime + ":00+07:00");
-    if (!Number.isFinite(startsAt.getTime())) {
-      toast.error("Ngày dời lịch không hợp lệ.");
-      return;
-    }
-
-    void run(async () => {
-      await api("/" + reschedulingMeeting._id, "PUT", {
-        version: reschedulingMeeting.__v,
-        startsAt: startsAt.toISOString(),
-      });
-      setReschedulingMeeting(null);
-      toast.success("Đã dời lịch cuộc họp.");
-    });
-  };
 
   const update = (e: React.FormEvent) => {
     e.preventDefault();
@@ -515,6 +519,65 @@ function MeetingWorkspace() {
       setEditingMeeting(null);
       toast.success("Cập nhật cuộc họp thành công!");
     });
+  };
+
+  const openBulkEditSelection = async () => {
+    if (!editingMeeting?.seriesId || editingMeeting.status !== "scheduled") return;
+    const originalStart = vietnamDateTime(editingMeeting.startsAt);
+    const originalStartMs = new Date(editingMeeting.startsAt).getTime();
+    const originalEndMs = editingMeeting.endsAt ? new Date(editingMeeting.endsAt).getTime() : originalStartMs + 120 * 60000;
+    const originalDuration = Math.max(1, Math.round((originalEndMs - originalStartMs) / 60000));
+    const formStart = editStartsAt || originalStart;
+    const formEnd = editEndsAt || vietnamDateTime(new Date(originalStartMs + originalDuration * 60000));
+    const requestedDuration = new Date(formEnd + ":00+07:00").getTime() - new Date(formStart + ":00+07:00").getTime();
+    const validRequestedDuration = Number.isFinite(requestedDuration) && requestedDuration > 0 && requestedDuration <= 24 * 60 * 60000;
+    const durationMinutes = validRequestedDuration ? Math.round(requestedDuration / 60000) : originalDuration;
+    const startsTime = formStart.slice(11, 16) || originalStart.slice(11, 16);
+    const seed: MeetingSeriesBulkEditSeed = {
+      location: editLocation,
+      coverImage: editCoverImage,
+      startsTime,
+      durationMinutes,
+      tiers: editTiers,
+      fallbackSeconds: editFallbackSeconds,
+    };
+    setBulkMeetingCandidates([]);
+    setBulkEditingSeed(seed);
+    setBulkEditingMeeting(editingMeeting);
+    setBulkEditingLoading(true);
+    try {
+      const allMeetings: Meeting[] = await api("?history=all");
+      const now = Date.now();
+      setBulkMeetingCandidates(allMeetings
+        .filter(item => item.seriesId === editingMeeting.seriesId && item.status === "scheduled" && new Date(item.startsAt).getTime() > now)
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
+    } catch (error) {
+      setBulkEditingMeeting(null);
+      setBulkEditingSeed(null);
+      toast.error(error instanceof Error ? error.message : "Không thể tải các buổi họp định kỳ.");
+    } finally {
+      setBulkEditingLoading(false);
+    }
+  };
+
+  const closeBulkEditSelection = () => {
+    setBulkEditingMeeting(null);
+    setBulkEditingSeed(null);
+    setBulkMeetingCandidates([]);
+  };
+
+  const applyBulkMeetingChanges = async (meetingIds: string[], changes: MeetingSeriesChanges) => {
+    if (!bulkEditingMeeting) return;
+    setBulkEditingSaving(true);
+    try {
+      await api(`/${bulkEditingMeeting._id}/series`, "PUT", { meetingIds, changes });
+      closeBulkEditSelection();
+      setEditingMeeting(null);
+      await refresh();
+      toast.success("Cập nhật thành công.");
+    } finally {
+      setBulkEditingSaving(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -706,25 +769,27 @@ function MeetingWorkspace() {
     if (statusFilter === "all") return true;
     if (statusFilter === "scheduled") return m.status === "scheduled";
     if (statusFilter === "live") return m.status === "live" || m.status === "paused";
-    if (statusFilter === "ended") return m.status === "ended" || m.status === "cancelled";
+    if (statusFilter === "ended") return m.status === "ended";
+    if (statusFilter === "cancelled") return m.status === "cancelled";
     return true;
   };
   const filteredItems = items.filter(matchesMeetingFilter);
 
   return (
-    <div className="@container w-full max-h-[85vh] overflow-y-auto px-0.5 pb-5 text-left sm:pr-2" id="meeting_tab_view">
+    <div className={`@container w-full px-0.5 text-left sm:pr-2 ${view === "calendar" ? "flex flex-col sm:h-full sm:min-h-0" : "max-h-[85vh] overflow-y-auto pb-5"}`} id="meeting_tab_view">
       {/* Header bar */}
-      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/80 p-3 sm:p-5 shadow-xs backdrop-blur-md">
+      <div className="mb-2 flex shrink-0 flex-col gap-2 rounded-2xl border border-slate-200/80 bg-white/80 p-3 shadow-xs">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-cyan-600 rounded-2xl shadow-sm text-white shrink-0">
-              <CalendarDays className="h-6 w-6 text-white" />
+            <div className="p-2 bg-cyan-50 rounded-xl text-cyan-600 shrink-0">
+              <CalendarDays className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-black text-cyan-700 dark:text-cyan-400 tracking-tight">
+              <h1 className="text-lg md:text-xl font-normal text-cyan-700 dark:text-cyan-400 tracking-tight">
                 {canManage ? "Quản lý buổi họp" : "Cuộc họp"}
               </h1>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
+              <p className="hidden lg:block text-[11px] text-slate-500 font-normal mt-0.5">
+                {canManage ? "Lên lịch → Đón tiếp & check-in → Điều hành phát biểu → Quay thưởng" : "Theo dõi lịch họp và thông tin tham dự của bạn"}
               </p>
             </div>
           </div>
@@ -738,28 +803,19 @@ function MeetingWorkspace() {
                   aria-expanded={showSharedQr}
                   aria-controls="company-checkin-qr"
                   onClick={() => setShowSharedQr(true)}
-                  className="flex items-center gap-2 rounded-xl border border-cyan-200 bg-white px-4 py-2.5 text-xs font-bold text-cyan-700 hover:bg-cyan-50"
+                  className="flex items-center gap-2 rounded-xl border border-cyan-200 bg-white px-3 py-2 text-xs font-medium text-cyan-700 hover:bg-cyan-50"
                 >
                   <QrCode className="h-4 w-4" />
-                  <span>QR check-in</span>
+                  <span>Check-in</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => openCreateModal("recurring")}
                   disabled={saving}
-                  className="flex items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 px-4 py-2.5 text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                  className="flex items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 px-3 py-2 text-xs font-medium transition disabled:opacity-50 cursor-pointer"
                 >
                   <CalendarDays className="h-4 w-4" />
                   <span>Tạo lịch định kỳ</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openCreateModal("single")}
-                  disabled={saving}
-                  className="flex items-center gap-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2.5 text-xs font-bold shadow-sm shadow-cyan-600/20 transition cursor-pointer"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Tạo cuộc họp mới</span>
                 </button>
               </>
             )}
@@ -769,7 +825,7 @@ function MeetingWorkspace() {
         {/* Filter Toolbar: Search + Status Tabs */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
           {/* Status Tabs */}
-          <div className="flex gap-1.5 overflow-x-auto pb-1 select-none">
+          <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1 select-none [&>button]:shrink-0 [&>button]:whitespace-nowrap">
             <button
               type="button"
               onClick={() => setStatusFilter("all")}
@@ -811,7 +867,18 @@ function MeetingWorkspace() {
                 }`}
             >
               <span className="h-2 w-2 rounded-full bg-slate-400" />
-              Đã kết thúc {view === "list" && "(" + items.filter((m) => m.status === "ended" || m.status === "cancelled").length + ")"}
+              Đã kết thúc {view === "list" && "(" + items.filter((m) => m.status === "ended").length + ")"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("cancelled")}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer ${statusFilter === "cancelled"
+                ? "bg-cyan-600 text-white shadow-xs"
+                : "bg-slate-50 border border-slate-200/80 text-slate-600 hover:bg-cyan-50 hover:text-cyan-700 hover:border-cyan-200"
+                }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-rose-400" />
+              Đã hủy {view === "list" && "(" + items.filter((m) => m.status === "cancelled").length + ")"}
             </button>
           </div>
 
@@ -830,7 +897,7 @@ function MeetingWorkspace() {
         </div>
       </div>
 
-      <div className="mb-3 inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 border border-slate-200/60" role="group" aria-label="Chế độ xem cuộc họp">
+      <div className="mb-2 inline-flex shrink-0 self-start items-center gap-1 rounded-xl bg-slate-100 p-0.5 border border-slate-200/60" role="group" aria-label="Chế độ xem cuộc họp">
         <button
           type="button"
           aria-pressed={view === "calendar"}
@@ -858,10 +925,11 @@ function MeetingWorkspace() {
       </div>
       {canManage && showSharedQr && <CompanyCheckInQrDialog api={api} companyCode={userProfile?.companyCode} onClose={() => setShowSharedQr(false)} />}
       {/* Grid of Meeting Cards (Dạng danh sách / Thẻ hiển thị) */}
-      {view === "calendar" ? <MeetingCalendar<Meeting> month={calendarMonth} onMonthChange={setCalendarMonth} revision={calendarRevision} load={api} canManage={canManage} filter={matchesMeetingFilter}
-        onOpen={meeting => { setItems(previous => [...previous.filter(item => item._id !== meeting._id), meeting]); setDetailMeetingId(meeting._id); openMeetingFlow(meeting.status); }}
-        onEdit={meeting => openEditModal(meeting)} onReschedule={meeting => openRescheduleModal(meeting)}
-        onCancel={async meeting => { try { await api("/" + meeting._id + "/control", "POST", { action: "cancel", version: meeting.__v }); await refresh(); toast.success("Đã hủy buổi họp."); } catch (error) { toast.error(error.message); throw error; } }}
+      {view === "calendar" ? <MeetingCalendar<Meeting> month={calendarMonth} onMonthChange={setCalendarMonth} revision={calendarRevision} tick={tick} flowStepLabel={meetingId => MEETING_FLOW_META[getMeetingFlowStep(meetingId)].label} load={api} canManage={canManage} filter={matchesMeetingFilter}
+        onOpen={meeting => { setItems(previous => [...previous.filter(item => item._id !== meeting._id), meeting]); setDetailMeetingId(meeting._id); openMeetingFlow(meeting); }}
+        onReschedule={setReschedulingMeeting}
+        onCancel={setCancellingMeeting}
+        onDelete={setDeletingMeeting}
       /> : loading ? <p role="status" className="p-8 text-center text-sm text-slate-500">Đang tải cuộc họp...</p> : loadError ? <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{loadError}<button type="button" onClick={() => { setLoading(true); void refresh(); }} className="ml-3 font-bold">Thử lại</button></div> : filteredItems.length > 0 ? (
         <div className="grid grid-cols-1 @min-[32rem]:grid-cols-2 @min-[48rem]:grid-cols-3 @min-[64rem]:grid-cols-4 gap-3">
           {filteredItems.map((m) => {
@@ -874,13 +942,14 @@ function MeetingWorkspace() {
             const prizeCount = m.luckyDraw?.prizes?.length || 0;
             const winnerCount = (m.luckyDraw?.prizes.reduce((total, prize) => total + prize.winners.length, 0) || 0) + (m.gameWinners?.length || 0);
             const isLive = m.status === "live" || m.status === "paused";
+            const currentMeetingStep = isLive ? MEETING_FLOW_META[detailMeetingId === m._id ? flowStep : getMeetingFlowStep(m._id)] : null;
 
             return (
               <div
                 key={m._id}
                 onClick={() => {
                   setDetailMeetingId(m._id);
-                  openMeetingFlow(m.status);
+                  openMeetingFlow(m);
                 }}
                 className={`group relative flex flex-col justify-between overflow-hidden rounded-lg border bg-white shadow-2xs transition-all duration-200 hover:shadow-md cursor-pointer ${s.border}`}
               >
@@ -934,8 +1003,8 @@ function MeetingWorkspace() {
                     )}
                   </div>
 
-                  {/* Top Action Icons (Sửa, Xóa) */}
-                  {canManage && (
+                  {/* Edit meeting */}
+                  {canManage && m.status !== "ended" && (
                     <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-90 transition-opacity group-hover:opacity-100">
                       <button
                         type="button"
@@ -945,41 +1014,16 @@ function MeetingWorkspace() {
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
-                      {m.status === "scheduled" && <button
-                        type="button"
-                        title="Dời lịch"
-                        onClick={(e) => openRescheduleModal(m, e)}
-                        className="rounded-lg bg-white/90 backdrop-blur-md p-1.5 text-slate-700 hover:bg-white hover:text-cyan-700 shadow-sm border border-slate-200/60 transition cursor-pointer"
-                      >
-                        <CalendarDays className="h-3.5 w-3.5" />
-                      </button>}
-                      <button
-                        type="button"
-                        title="Xóa cuộc họp"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeletingMeeting(m);
-                        }}
-                        className="rounded-lg bg-white/90 backdrop-blur-md p-1.5 text-slate-700 hover:bg-rose-50 hover:text-rose-600 shadow-sm border border-slate-200/60 transition cursor-pointer"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
                     </div>
                   )}
 
                   {/* Time preview on image bottom */}
-                  <div className="absolute bottom-2.5 left-3 right-3 flex items-center gap-1.5 text-xs">
-                    {m.coverImage ? (
-                      <div className="flex items-center gap-1.5 text-white/95 font-medium drop-shadow-sm">
-                        <Clock3 className="h-3.5 w-3.5 text-cyan-300 shrink-0" />
-                        <span className="truncate">{dateText(m.startsAt)}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-slate-600 font-semibold drop-shadow-xs">
-                        <Clock3 className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                        <span className="truncate">{dateText(m.startsAt)}</span>
-                      </div>
-                    )}
+                  <div className="absolute bottom-2.5 left-3 right-3 flex min-w-0 items-center justify-between gap-1.5 text-xs">
+                    <div className={`flex min-w-0 flex-1 items-center gap-1.5 font-medium ${m.coverImage ? "text-white/95 drop-shadow-sm" : "text-slate-600 drop-shadow-xs"}`}>
+                      <Clock3 className={`h-3.5 w-3.5 shrink-0 ${m.coverImage ? "text-cyan-300" : "text-slate-500"}`} />
+                      <span className="truncate">{dateText(m.startsAt)}</span>
+                    </div>
+                    {currentMeetingStep && <span title={`Đang ${currentMeetingStep.label}`} className="max-w-[48%] shrink-0 truncate rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-bold text-cyan-800 shadow-xs">Đang {currentMeetingStep.label}</span>}
                   </div>
                 </div>
 
@@ -1015,12 +1059,23 @@ function MeetingWorkspace() {
                   </div>}
                 </div>
 
+                {canManage && m.status !== "ended" && (
+                  <div className="px-3 pb-3" onClick={(event) => event.stopPropagation()}>
+                    <MeetingScheduleActions
+                      status={m.status}
+                      onCancel={() => setCancellingMeeting(m)}
+                      onReschedule={() => setReschedulingMeeting(m)}
+                      onDelete={() => setDeletingMeeting(m)}
+                    />
+                  </div>
+                )}
+
                 {/* Card Footer: Action Button */}
                 <div className="px-3 pb-3 pt-0 flex items-center gap-2">
                   <button
                     type="button"
                     aria-label={!canManage ? "Xem chi tiết cuộc họp" : isLive ? "Tiếp tục điều hành" : m.status === "scheduled" ? "Mở buổi họp & check-in" : "Xem buổi họp"}
-                    onClick={(event) => { event.stopPropagation(); setDetailMeetingId(m._id); openMeetingFlow(m.status); }}
+                    onClick={(event) => { event.stopPropagation(); setDetailMeetingId(m._id); openMeetingFlow(m); }}
                     className="flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-lg bg-slate-50 group-hover:bg-cyan-600 text-slate-700 group-hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap"
                   >
                     <span className="truncate">{!canManage ? "Xem chi tiết" : isLive ? "Điều hành" : m.status === "scheduled" ? "Check-in" : "Xem cuộc họp"}</span>
@@ -1066,19 +1121,8 @@ function MeetingWorkspace() {
           <CalendarDays className="mx-auto h-12 w-12 text-slate-300" />
           <h3 className="mt-3 text-sm font-bold text-slate-700">Chưa tìm thấy cuộc họp nào</h3>
           <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
-            {canManage ? "Không có cuộc họp nào phù hợp với bộ lọc hiện tại. Bấm nút bên dưới để tạo cuộc họp mới." : "Chưa có cuộc họp phù hợp. Bạn có thể đổi bộ lọc để xem các buổi họp khác."}
+            {canManage ? "Không có cuộc họp nào phù hợp với bộ lọc hiện tại. Bạn có thể tạo lịch định kỳ bằng nút ở đầu trang." : "Chưa có cuộc họp phù hợp. Bạn có thể đổi bộ lọc để xem các buổi họp khác."}
           </p>
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => openCreateModal("single")}
-              disabled={saving}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 text-xs font-bold shadow-sm transition cursor-pointer"
-            >
-              <Plus className="h-4 w-4" />
-              Tạo cuộc họp mới
-            </button>
-          )}
         </div>
       )}
 
@@ -1162,7 +1206,7 @@ function MeetingWorkspace() {
                   </div>
                 )}
 
-                {canManage && (
+                {canModifyActiveMeeting && (
                   <button
                     type="button"
                     title="Sửa cuộc họp"
@@ -1170,11 +1214,6 @@ function MeetingWorkspace() {
                     className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer shrink-0"
                   >
                     <Pencil className="h-4 w-4" />
-                  </button>
-                )}
-                {canManage && activeMeeting.status === "scheduled" && (
-                  <button type="button" title="Dời lịch" onClick={(e) => openRescheduleModal(activeMeeting, e)} className="p-2 rounded-xl text-slate-500 hover:text-cyan-700 hover:bg-cyan-50 transition cursor-pointer shrink-0">
-                    <CalendarDays className="h-4 w-4" />
                   </button>
                 )}
 
@@ -1221,17 +1260,20 @@ function MeetingWorkspace() {
                 )}
               </div>
             </div>
+
+            <MeetingFlowStepper
+              order={flowOrder}
+              current={flowStep}
+              canReorder={canModifyActiveMeeting}
+              badges={{ checkin: activeMeeting.speakers.length, luckyDraw: activeMeeting.luckyDraw?.prizes.reduce((total, prize) => total + prize.winners.length, 0) || 0 }}
+              onSelect={goToFlowStep}
+              onReorder={updateFlowOrder}
+              onFinish={canManage && ["live", "paused"].includes(activeMeeting.status) ? () => setFinishRequested(true) : undefined}
+            />
+
             {/* Modal Body Content (Scrollable) */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              <MeetingFlowStepper
-                order={flowOrder}
-                current={flowStep}
-                canReorder={canManage}
-                badges={{ checkin: activeMeeting.speakers.length, luckyDraw: (activeMeeting.luckyDraw?.prizes.reduce((total, prize) => total + prize.winners.length, 0) || 0) + (activeMeeting.gameWinners?.length || 0) }}
-                onSelect={goToFlowStep}
-                onReorder={updateFlowOrder}
-                onFinish={canManage && ["live", "paused"].includes(activeMeeting.status) ? () => setFinishRequested(true) : undefined}
-              />
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+              {activeMeeting.status === "ended" && <p role="status" className="rounded-xl border border-cyan-100 bg-cyan-50/50 px-4 py-3 text-sm text-slate-600">Cuộc họp đã kết thúc. Bạn chỉ có thể xem thông tin và kết quả.</p>}
               {flowStep === "presentation" && (
                 <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
                   <div role="group" aria-label="Chế độ xem thuyết trình" className="inline-flex rounded-xl bg-slate-100 p-1 shrink-0">
@@ -1239,7 +1281,7 @@ function MeetingWorkspace() {
                     <button type="button" aria-pressed={slidesOpen} onClick={() => setSlidesOpen(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 transition aria-pressed:bg-white aria-pressed:font-semibold aria-pressed:text-cyan-700 aria-pressed:shadow-2xs cursor-pointer"><Megaphone className="h-3.5 w-3.5" /> Slide trình chiếu</button>
                   </div>
 
-                  {!slidesOpen && (
+                  {!slidesOpen && !["ended", "cancelled"].includes(activeMeeting.status) && (
                     <div className="flex flex-wrap items-center gap-2">
                       <button type="button" disabled={saving || !activeMeeting.speakers.length}
                         onClick={() => {
@@ -1336,14 +1378,14 @@ function MeetingWorkspace() {
                 <MeetingSlides
                   key={activeMeeting._id}
                   meeting={activeMeeting}
-                  canManage={canManage}
+                  canManage={canModifyActiveMeeting}
                   api={api}
                   startFromFirst={startPresentation}
                   initialSpeakerId={presentationSpeakerId}
                   onDeferSpeaker={deferSpeaker}
                   onPresentationStarted={presentationStarted}
                   onPresentationClosed={presentationClosed}
-                  onStartPresentation={canManage ? startPresentationTimer : undefined}
+                  onStartPresentation={canModifyActiveMeeting ? startPresentationTimer : undefined}
                   onMoveSpeaker={direction => requestMeetingControl(direction > 0 ? "next" : "previous")}
                   onTogglePause={() => control(activeMeeting.status === "paused" ? "resume" : "pause")}
                   controlBusy={saving}
@@ -1371,7 +1413,7 @@ function MeetingWorkspace() {
               {/* SUBTAB 1: CHECK-IN STEP */}
               {flowStep === "checkin" && (
                 <div className="space-y-4">
-                  <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} onConfigure={() => openEditModal(activeMeeting)} />
+                  <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canModifyActiveMeeting} api={api} companyCode={userProfile?.companyCode} onConfigure={() => openEditModal(activeMeeting)} />
 
                   {/* Guest Checkin Form (MC / Admin) */}
                   {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
@@ -2061,8 +2103,8 @@ function MeetingWorkspace() {
               {/* SUBTAB 2: VÒNG QUAY MAY MẮN (RANDOM.ORG) */}
               {flowStep === "luckyDraw" && (
                 <LuckyDrawTab
-                  meeting={activeMeeting}
-                  canManage={canManage}
+                  meeting={activeMeeting as any}
+                  canManage={canModifyActiveMeeting}
                   onRefreshMeeting={refresh}
                   onStartMeeting={() => control("start")}
                 />
@@ -2082,7 +2124,7 @@ function MeetingWorkspace() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 id="create-meeting-title" className="font-bold text-base text-slate-900 flex items-center gap-2">
                 <CalendarDays className="h-5 w-5 text-cyan-600" />
-                {recurring ? "Tạo lịch định kỳ hằng tuần" : "Tạo cuộc họp BNI mới"}
+                {recurring ? "Tạo lịch định kì" : "Tạo cuộc họp BNI mới"}
               </h3>
               <button
                 type="button"
@@ -2095,7 +2137,7 @@ function MeetingWorkspace() {
             </div>
 
             <form onSubmit={create} className="space-y-4 pt-4 text-xs">
-              <div>
+              {!recurring && <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   Tên cuộc họp <span className="text-rose-500">*</span>
                 </label>
@@ -2106,14 +2148,16 @@ function MeetingWorkspace() {
                   placeholder="Ví dụ: Buổi họp định kỳ Chapter Tuần 40"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none"
                 />
-              </div>
+              </div>}
 
-              {recurring && <MeetingRecurrenceFields value={recurrence} onChange={setRecurrence} />}
+              {recurring && <>
+                <MeetingRecurrenceFields value={recurrence} onChange={setRecurrence} />
+              </>}
 
               <div className={recurring ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 sm:grid-cols-2 gap-3"}>
                 {!recurring && <div>
                   <label className="block font-bold text-slate-700 mb-1">
-                    Thời gian diễn ra (giờ Việt Nam) <span className="text-rose-500">*</span>
+                    Thời gian bắt đầu <span className="text-rose-500">*</span>
                   </label>
                   <MeetingDateTimePicker
                     required
@@ -2133,7 +2177,7 @@ function MeetingWorkspace() {
                 </div>
               </div>
 
-              {!recurring && <label className="block text-sm font-bold text-slate-700">Giờ kết thúc cuộc họp *<input aria-label="Giờ kết thúc cuộc họp" required type="datetime-local" value={endsAt} min={startsAt || undefined} onChange={event => setEndsAt(event.target.value)} className="mt-1 block w-full rounded-xl border border-slate-200 p-2.5" /><span className="mt-1 block text-xs font-normal text-slate-500"></span></label>}
+              {!recurring && <div className="text-sm font-bold text-slate-700"><label className="mb-1 block">Thời gian kết thúc cuộc họp <span className="text-rose-500">*</span></label><MeetingDateTimePicker ariaLabel="Giờ kết thúc cuộc họp" required value={endsAt} onChange={setEndsAt} /><span className="mt-1 block text-xs font-normal text-slate-500">QR dùng chung nhận check-in từ giờ bắt đầu đến trước giờ kết thúc. Mặc định 2 giờ, có thể điều chỉnh.</span></div>}
 
               <MeetingLocationFields value={gpsPoint} onChange={setGpsPoint} radius={gpsRadiusMeters} onRadiusChange={setGpsRadiusMeters} />
 
@@ -2172,33 +2216,6 @@ function MeetingWorkspace() {
           </div>
         </div>
       )}
-
-      {/* POPUP DỜI LỊCH */}
-      {reschedulingMeeting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="flex items-center gap-2 text-base font-bold text-slate-900"><CalendarDays className="h-4 w-4 text-cyan-600" />Dời lịch cuộc họp</h3>
-              <button type="button" aria-label="Đóng popup dời lịch" onClick={() => setReschedulingMeeting(null)} className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"><X className="h-5 w-5" /></button>
-            </div>
-            <form onSubmit={reschedule} className="space-y-4 pt-4">
-              <div className="rounded-xl bg-slate-50 p-3">
-                <p className="font-semibold text-slate-800">{reschedulingMeeting.title}</p>
-                <p className="mt-1 text-xs text-slate-500">Lịch hiện tại: {vietnamDateTime(reschedulingMeeting.startsAt).replace("T", " ")} (giờ Việt Nam)</p>
-              </div>
-              <label className="block text-sm font-semibold text-slate-700">Ngày mới
-                <input type="date" required min={vietnamDateTime(new Date()).slice(0, 10)} value={rescheduleDate} onChange={event => setRescheduleDate(event.target.value)} className="mt-1 block w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm focus:border-cyan-500 focus:outline-none" />
-              </label>
-              <p className="rounded-xl bg-cyan-50 p-3 text-xs leading-relaxed text-cyan-900">Chỉ thay đổi ngày. Giờ bắt đầu và thời lượng được giữ nguyên; với lịch định kỳ, chỉ dời buổi này.</p>
-              <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
-                <button type="button" onClick={() => setReschedulingMeeting(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Hủy</button>
-                <button type="submit" disabled={saving || !rescheduleDate} className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50">{saving ? "Đang lưu..." : "Dời lịch"}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* POPUP SỬA CUỘC HỌP */}
       {editingMeeting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
@@ -2218,7 +2235,6 @@ function MeetingWorkspace() {
             </div>
 
             <form onSubmit={update} className="space-y-4 pt-4 text-xs">
-              {editingMeeting.seriesId && <p className="rounded-lg bg-cyan-50 p-3">Chỉ sửa hoặc dời buổi này. Các buổi còn lại trong chu kỳ giữ nguyên.</p>}
 
 
               <div>
@@ -2237,7 +2253,7 @@ function MeetingWorkspace() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
-                    Thời gian diễn ra (giờ Việt Nam) <span className="text-rose-500">*</span>
+                    Thời gian bắt đầu <span className="text-rose-500">*</span>
                   </label>
                   <MeetingDateTimePicker
                     required
@@ -2258,7 +2274,7 @@ function MeetingWorkspace() {
                 </div>
               </div>
 
-              <label className="block text-sm font-bold text-slate-700">Giờ kết thúc cuộc họp *<input aria-label="Giờ kết thúc cuộc họp" required type="datetime-local" value={editEndsAt} min={editStartsAt || undefined} onChange={event => setEditEndsAt(event.target.value)} className="mt-1 block w-full rounded-xl border border-slate-200 p-2.5" /><span className="mt-1 block text-xs font-normal text-slate-500"></span></label>
+              <div className="text-sm font-bold text-slate-700"><label className="mb-1 block">Thời gian kết thúc cuộc họp <span className="text-rose-500">*</span></label><MeetingDateTimePicker ariaLabel="Giờ kết thúc cuộc họp" required value={editEndsAt} onChange={setEditEndsAt} /><span className="mt-1 block text-xs font-normal text-slate-500">QR dùng chung nhận check-in từ giờ bắt đầu đến trước giờ kết thúc. Mặc định 2 giờ, có thể điều chỉnh.</span></div>
 
               <MeetingLocationFields value={editGpsPoint} onChange={setEditGpsPoint} radius={editGpsRadiusMeters} onRadiusChange={setEditGpsRadiusMeters} />
 
@@ -2280,13 +2296,18 @@ function MeetingWorkspace() {
               {canManage && orderingMeeting && ["scheduled", "live", "paused"].includes(orderingMeeting.status) && orderingMeeting.speakers.length > 0 && <div className="mb-4 space-y-2 rounded-xl border border-cyan-100 bg-cyan-50/40 p-3">
                 <h4 className="font-bold text-slate-800">Sắp xếp thứ tự thuyết trình</h4>
                 <div className="flex flex-wrap items-end gap-3">
-                  <label className="min-w-48 flex-1 text-xs font-semibold">Chọn người phát biểu
-                    <select aria-label="Chọn người để sắp xếp" disabled={saving} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm"
+                  <label className="min-w-48 flex-1 text-xs font-normal">Chọn người phát biểu
+                    <SearchableSelect ariaLabel="Chọn người để sắp xếp" searchPlaceholder="Tìm khách hoặc thành viên..."
+                      placeholder={pendingStart >= orderingMeeting.speakers.length ? "Không còn người đang chờ phát biểu" : "Chọn khách hoặc thành viên"}
+                      className="mt-1" compact subtle disabled={saving}
                       value={orderingMeeting.speakers.slice(pendingStart).some(person => person.id === prioritySpeakerId) ? prioritySpeakerId : orderingMeeting.speakers[pendingStart]?.id || ""}
-                      onChange={event => setPrioritySpeakerId(event.target.value)}>
-                      {pendingStart >= orderingMeeting.speakers.length && <option value="">Không còn người đang chờ phát biểu</option>}
-                      {orderingMeeting.speakers.map((person, index) => <option key={person.id} value={person.id} disabled={index < pendingStart}>{person.name}{index < pendingStart ? index === orderingMeeting.currentIndex ? " — Đang phát biểu" : " — Đã phát biểu" : ""}</option>)}
-                    </select>
+                      onChange={setPrioritySpeakerId}
+                      options={orderingMeeting.speakers.map((person, index) => ({
+                        value: person.id,
+                        label: `${person.name}${index < pendingStart ? index === orderingMeeting.currentIndex ? " — Đang phát biểu" : " — Đã phát biểu" : ""}`,
+                        searchText: person.name,
+                        disabled: index < pendingStart,
+                      }))} />
                   </label>
                   <label className="text-xs font-semibold">Thứ tự ưu tiên
                     <input aria-label="Thứ tự ưu tiên" type="number" inputMode="numeric" min={1} max={Math.max(1, orderingMeeting.speakers.length - pendingStart)} disabled={saving || pendingStart >= orderingMeeting.speakers.length}
@@ -2315,6 +2336,12 @@ function MeetingWorkspace() {
                 >
                   Hủy
                 </button>
+                {editingMeeting.seriesId && editingMeeting.status === "scheduled" && (
+                  <button type="button" disabled={saving || bulkEditingLoading} onClick={() => void openBulkEditSelection()} className="rounded-xl border border-cyan-200 bg-white px-4 py-2 font-bold text-cyan-800 hover:bg-cyan-50 disabled:opacity-50">
+                    {bulkEditingLoading ? <>&#272;ang t&#7843;i...</> : <>S&#7917;a h&#224;ng lo&#7841;t</>}
+                  </button>
+                )}
+
                 <button
                   type="submit"
                   disabled={saving}
@@ -2329,6 +2356,7 @@ function MeetingWorkspace() {
       )}
 
       {canManage && completionKey && dismissedCompletion !== completionKey && <SpeechesCompleteDialog onClose={dismissCompletion} />}
+      {bulkEditingMeeting && bulkEditingSeed && <MeetingSeriesBulkEditDialog key={bulkEditingMeeting._id} meeting={bulkEditingMeeting} meetings={bulkMeetingCandidates} seed={bulkEditingSeed} loading={bulkEditingLoading} saving={bulkEditingSaving} onClose={closeBulkEditSelection} onApply={applyBulkMeetingChanges} />}
       <ConfirmDialog isOpen={finishRequested} title="Kết thúc buổi họp?" description="Sau khi kết thúc, buổi họp ngừng nhận check-in và điều hành phát biểu." confirmLabel="Kết thúc buổi họp" isSubmitting={saving} onClose={() => setFinishRequested(false)} onConfirm={async () => { await control("finish"); setFinishRequested(false); }} />
       {/* POPUP XÁC NHẬN BẮT ĐẦU CUỘC HỌP */}
       <ConfirmDialog
@@ -2358,6 +2386,23 @@ function MeetingWorkspace() {
         onConfirm={handleEndMeeting}
         onClose={() => setEndingMeeting(null)}
       />
+      {reschedulingMeeting && <RescheduleMeetingDialog key={reschedulingMeeting._id} meeting={reschedulingMeeting} onClose={() => setReschedulingMeeting(null)} onConfirm={async startsAt => {
+        await api(`/${reschedulingMeeting._id}`, "PUT", { startsAt, version: reschedulingMeeting.__v });
+        setCalendarMonth(vietnamDateTime(startsAt).slice(0, 7));
+        await refresh();
+        toast.success("Dời lịch thành công");
+      }} />}
+      <ConfirmDialog isOpen={Boolean(cancellingMeeting)} title="Hủy buổi họp này?" description={`Hủy cuộc họp “${cancellingMeeting?.title || ""}”? Cuộc họp sẽ được đánh dấu Đã hủy. Các buổi khác không thay đổi.`} confirmLabel="Hủy buổi họp" cancelLabel="Giữ lịch" isSubmitting={isCancelling} onClose={() => setCancellingMeeting(null)} onConfirm={async () => {
+        if (!cancellingMeeting || isCancelling) return;
+        setIsCancelling(true);
+        try {
+          await api(`/${cancellingMeeting._id}/control`, "POST", { action: "cancel", version: cancellingMeeting.__v });
+          setCancellingMeeting(null);
+          await refresh();
+          toast.success("Đã hủy buổi họp.");
+        } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể hủy cuộc họp."); }
+        finally { setIsCancelling(false); }
+      }} />
       {/* POPUP XÁC NHẬN XÓA CUỘC HỌP */}
       <ConfirmDialog
         isOpen={!!deletingMeeting}

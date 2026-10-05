@@ -14,14 +14,14 @@ afterEach(() => { cleanup(); sessionStorage.clear(); });
 
 it("lets an organizer open location configuration for meeting check-in", () => {
   const onConfigure = vi.fn();
-  render(<MeetingCheckInPanel meeting={meeting} canManage onConfigure={onConfigure} />);
+  render(<MeetingCheckInPanel meeting={meeting} canManage api={vi.fn().mockResolvedValue(result)} onConfigure={onConfigure} />);
   expect(screen.getByText(/kiểm tra vị trí trong bán kính/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Cấu hình địa điểm & thời gian" }));
   expect(onConfigure).toHaveBeenCalledOnce();
 });
 
 it("tells members to scan the shared QR and confirm their location", () => {
-  render(<MeetingCheckInPanel meeting={meeting} canManage={false} onConfigure={vi.fn()} />);
+  render(<MeetingCheckInPanel meeting={meeting} canManage={false} api={vi.fn().mockResolvedValue(result)} onConfigure={vi.fn()} />);
   expect(screen.getByText(/quét QR chung/)).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Cấu hình địa điểm & thời gian" })).toBeNull();
 });
@@ -38,6 +38,9 @@ it("loads the same permanent company QR after remount without browser storage", 
   expect(screen.getByRole("link", { name: "Mở trang check-in" }).getAttribute("href")).toBe(link);
   expect(api.mock.calls).toEqual([["/checkin-qr"], ["/checkin-qr"]]);
   expect(screen.queryByText("Thời hạn QR")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Tạo mã thay thế" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Hủy QR" })).toBeNull();
+  expect(screen.getByText("Sử dụng Zalo để quét mã")).toBeTruthy();
 });
 
 it("retries a failed company QR load without generating a replacement", async () => {

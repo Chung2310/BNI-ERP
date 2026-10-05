@@ -27,8 +27,8 @@ const meetings = [{
 
 it("ranks active members without reintroducing admins from check-in history", () => {
   render(<ActiveMemberLeaderboard members={members} meetings={meetings} loading={false} />);
-  expect(screen.getByText("Thành viên An")).toBeTruthy();
-  expect(screen.getByText("Thành viên Bình")).toBeTruthy();
+  expect(screen.getAllByText("Thành viên An")).toHaveLength(2);
+  expect(screen.getAllByText("Thành viên Bình")).toHaveLength(2);
   expect(screen.getByText("Top 2")).toBeTruthy();
   expect(screen.queryByText(/Admin/)).toBeNull();
   expect(screen.queryByText("Đã ngừng hoạt động")).toBeNull();

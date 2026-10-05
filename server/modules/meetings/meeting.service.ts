@@ -1,5 +1,6 @@
 import { recurringMeetingDates } from "../../../src/utils/meetingRecurrence";
 import { normalizeLoginIdentifier } from "../../../src/utils/loginIdentifier";
+import { reserveMeetingNumbers } from "./meeting-sequence";
 import { randomBytes, randomInt, randomUUID, createHash } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { encryptSecret, decryptSecret } from '../../security/crypto';
@@ -41,6 +42,10 @@ export function assertVersion(item: MeetingDocument, version: number) {
   if (item.__v !== version) {
     throw new MeetingError(409, 'Cuộc họp đã thay đổi. Vui lòng tải lại trước khi thao tác.');
   }
+}
+
+export function assertMeetingEditable(item: { status: string }) {
+  if (item.status === 'ended') throw new MeetingError(409, 'Cuộc họp đã kết thúc, chỉ có thể xem thông tin.');
 }
 
 export async function saveMeeting(item: MeetingDocument) {
@@ -105,6 +110,7 @@ export async function saveMeeting(item: MeetingDocument) {
 }
 
 export async function recordGameWinner(item: MeetingDocument, input: WinnerInput, actorId: string) {
+  assertMeetingEditable(item);
   const existing = (item.gameWinners || []).find((winner) => winner.id === input.id);
   if (existing) return existing;
   const attendee = (item.speakers || []).find((speaker) => speaker.id === input.winnerId || speaker.userId === input.winnerId);
@@ -143,7 +149,9 @@ export async function createRecurringMeetings(companyCode: string, actorId: stri
   try { dates = recurringMeetingDates(recurrence); } catch (error) { throw new MeetingError(400, error.message); }
   if (!dates.length || dates.some(date => date <= new Date())) throw new MeetingError(400, "Các buổi họp phải ở tương lai. Vui lòng chọn lại ngày bắt đầu.");
   const seriesId = randomUUID();
-  const rows = dates.map(startsAt => ({ ...details, companyCode, createdBy: actorId, seriesId, startsAt, endsAt: new Date(startsAt.getTime() + (recurrence.durationMinutes ?? 120) * 60000), originalStartsAt: startsAt, reminderAt: reminderDueAt(startsAt, details.reminderDays ?? 1) }));
+  const customTitle = details.title?.trim();
+  const firstNumber = customTitle ? 0 : await reserveMeetingNumbers(companyCode, dates.length);
+  const rows = dates.map((startsAt, index) => ({ ...details, title: customTitle || `BNI Chapter #${firstNumber + index}`, companyCode, createdBy: actorId, seriesId, startsAt, endsAt: new Date(startsAt.getTime() + (recurrence.durationMinutes ?? 120) * 60000), originalStartsAt: startsAt, reminderAt: reminderDueAt(startsAt, details.reminderDays ?? 1) }));
   try {
     const meetings = await MeetingModel.insertMany(rows, { ordered: true });
     emitToCompany(companyCode, 'meeting_updated', { seriesId });
@@ -157,6 +165,7 @@ export async function createRecurringMeetings(companyCode: string, actorId: stri
 
 export async function updateMeeting(companyCode: string, id: string, input: Partial<MeetingInput> & { version?: number }) {
   const item = await getMeeting(companyCode, id);
+  assertMeetingEditable(item);
   if (input.version !== undefined) assertVersion(item, input.version);
   const timeChanged = input.startsAt !== undefined && new Date(input.startsAt).getTime() !== item.startsAt.getTime();
   if (timeChanged && (item.status !== 'scheduled' || !Number.isFinite(new Date(input.startsAt).getTime()) || new Date(input.startsAt) <= new Date())) {
@@ -208,9 +217,65 @@ export async function updateMeeting(companyCode: string, id: string, input: Part
   return saveMeeting(item);
 }
 
+export async function bulkUpdateMeetingSeries(companyCode: string, id: string, input: any) {
+  const anchor = await getMeeting(companyCode, id);
+  if (!anchor.seriesId) throw new MeetingError(400, 'Cuộc họp này không thuộc chu kỳ định kỳ.');
+  const meetingIds: string[] = input.meetingIds;
+  if (!meetingIds.length) throw new MeetingError(400, 'Vui l\u00f2ng ch\u1ecdn \u00edt nh\u1ea5t m\u1ed9t bu\u1ed5i h\u1ecdp.');
+  const selected = await MeetingModel.find({ companyCode, seriesId: anchor.seriesId, _id: { $in: meetingIds }, status: 'scheduled', startsAt: { $gt: new Date() } }).lean();
+  if (!selected.length) throw new MeetingError(404, 'Kh\u00f4ng c\u00f3 bu\u1ed5i h\u1ecdp n\u00e0o trong danh s\u00e1ch c\u00f3 th\u1ec3 c\u1eadp nh\u1eadt.');
+  if (selected.length !== meetingIds.length) throw new MeetingError(409, 'Danh s\u00e1ch bu\u1ed5i h\u1ecdp \u0111\u00e3 thay \u0111\u1ed5i. H\u00e3y t\u1ea3i l\u1ea1i l\u1ecbch r\u1ed3i th\u1eed l\u1ea1i.');
+
+  const changes = input.changes;
+  const updates = selected.map((item: any) => {
+    const set: Record<string, unknown> = {};
+    for (const key of ['location', 'coverImage', 'tiers', 'fallbackSeconds'] as const) {
+      if (changes[key] !== undefined) set[key] = changes[key];
+    }
+    if (item.status === 'scheduled' && (changes.tiers !== undefined || changes.fallbackSeconds !== undefined)) {
+      set.speakers = allocateSpeakers(
+        (item.speakers || []).map((person: any) => typeof person.toObject === 'function' ? person.toObject() : person),
+        changes.tiers ?? item.tiers,
+        changes.fallbackSeconds ?? item.fallbackSeconds ?? 20,
+      );
+    }
+    if (changes.startsTime !== undefined) {
+      const date = new Date(new Date(item.startsAt).getTime() + 7 * 3600000).toISOString().slice(0, 10);
+      const startsAt = new Date(date + 'T' + changes.startsTime + ':00+07:00');
+      if (startsAt <= new Date()) throw new MeetingError(400, 'Gi\u1edd m\u1edbi khi\u1ebfn m\u1ed9t ho\u1eb7c nhi\u1ec1u bu\u1ed5i h\u1ecdp kh\u00f4ng c\u00f2n \u1edf t\u01b0\u01a1ng lai.');
+      const duration = changes.durationMinutes !== undefined ? changes.durationMinutes * 60000 : item.endsAt ? new Date(item.endsAt).getTime() - new Date(item.startsAt).getTime() : DEFAULT_MEETING_DURATION_MS;
+      set.startsAt = startsAt;
+      set.endsAt = new Date(startsAt.getTime() + duration);
+    } else {
+      if (changes.durationMinutes !== undefined) set.endsAt = new Date(new Date(item.startsAt).getTime() + changes.durationMinutes * 60000);
+    }
+
+    const qrChanged = changes.startsTime !== undefined || changes.durationMinutes !== undefined;
+    return {
+      updateOne: {
+        filter: { _id: item._id, companyCode, seriesId: anchor.seriesId, status: 'scheduled', __v: item.__v },
+        update: {
+          ...(Object.keys(set).length ? { $set: set } : {}),
+          $inc: { __v: 1, ...(changes.startsTime !== undefined || changes.durationMinutes !== undefined ? { revision: 1 } : {}) },
+          ...(qrChanged ? { $unset: { checkInQrTokenHash: 1, checkInQrTokenEncrypted: 1, checkInQrExpiresAt: 1 } } : {}),
+        },
+      },
+    };
+  });
+  const result = await MeetingModel.bulkWrite(updates as any, { ordered: true });
+  if (result.matchedCount !== selected.length) {
+    emitToCompany(companyCode, 'meeting_updated', { seriesId: anchor.seriesId });
+    throw new MeetingError(409, 'Một buổi họp vừa thay đổi hoặc bắt đầu. Hãy tải lại lịch rồi thử lại.');
+  }
+  emitToCompany(companyCode, 'meeting_updated', { seriesId: anchor.seriesId });
+  return { updatedCount: result.modifiedCount, seriesId: anchor.seriesId };
+}
+
 export async function deleteMeeting(companyCode: string, id: string) {
   const item = await getMeeting(companyCode, id);
-  await MeetingModel.deleteOne({ _id: item._id, companyCode });
+  assertMeetingEditable(item);
+  const result = await MeetingModel.deleteOne({ _id: item._id, companyCode, status: { $ne: 'ended' } });
+  if (!result.deletedCount) throw new MeetingError(409, 'Cuộc họp đã thay đổi. Vui lòng tải lại trước khi thao tác.');
   emitToCompany(companyCode, 'meeting_updated', {
     id: String(item._id),
     deleted: true,
@@ -225,6 +290,7 @@ export async function checkInFromModule(item: MeetingDocument, input: CheckInInp
 }
 
 export async function checkIn(item: MeetingDocument, input: CheckInInput, actorId: string, canManage: boolean) {
+  assertMeetingEditable(item);
   if (!['scheduled', 'live', 'paused'].includes(item.status)) {
     throw new MeetingError(409, 'Cuộc họp đã dừng check-in.');
   }
@@ -323,6 +389,7 @@ export async function notifyNextSpeaker(item: MeetingDocument) {
 }
 
 export async function reorderMeetingSpeakers(item: MeetingDocument, speakerIds: unknown) {
+  assertMeetingEditable(item);
   if (!['scheduled', 'live', 'paused'].includes(item.status) || !Array.isArray(speakerIds)
     || speakerIds.length !== item.speakers.length || new Set(speakerIds).size !== item.speakers.length
     || speakerIds.some(id => !item.speakers.some((speaker) => speaker.id === id))) {
@@ -346,6 +413,7 @@ export async function deferMeetingSpeaker(item: MeetingDocument, speakerId: stri
 }
 
 export async function deferMeetingSpeakers(item: MeetingDocument, speakerIds: unknown, now = new Date()) {
+  assertMeetingEditable(item);
   if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp không còn nhận điều hành phát biểu.');
   if (!Array.isArray(speakerIds) || !speakerIds.length || speakerIds.length > 1000 || speakerIds.some(id => typeof id !== 'string' || !id) || new Set(speakerIds).size !== speakerIds.length) throw new MeetingError(400, 'Chọn danh sách người cần để cuối lượt hợp lệ.');
   const ids = new Set(speakerIds);
@@ -374,6 +442,7 @@ export async function deferMeetingSpeakers(item: MeetingDocument, speakerIds: un
 }
 
 export async function startMeetingPresentation(item: MeetingDocument, speakerId: string, now = new Date()) {
+  assertMeetingEditable(item);
   if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp hiện không thể bắt đầu thuyết trình.');
   const index = item.speakers.findIndex((speaker) => speaker.id === speakerId);
   if (index < 0) throw new MeetingError(400, 'Không tìm thấy người thuyết trình.');
@@ -401,6 +470,7 @@ export async function startMeetingPresentation(item: MeetingDocument, speakerId:
 }
 
 export async function controlMeeting(item: MeetingDocument, action: string, now = new Date()) {
+  assertMeetingEditable(item);
   const status = item.status;
   if (['start_speaker', 'reset_speaker', 'next', 'previous'].includes(action) && !item.speakers[item.currentIndex]) {
     throw new MeetingError(409, 'Không có người đang chờ phát biểu.');
@@ -488,6 +558,7 @@ export async function controlMeeting(item: MeetingDocument, action: string, now 
 // ==========================================
 
 export async function updateLuckyDrawConfig(item: MeetingDocument, config: { enabled?: boolean; allowRepeatWinners?: boolean; drawMode?: 'attendees' | 'numbers'; numberMin?: number; numberMax?: number }) {
+  assertMeetingEditable(item);
   if (!item.luckyDraw) {
     item.set('luckyDraw', {
       enabled: true,
@@ -509,6 +580,7 @@ export async function updateLuckyDrawConfig(item: MeetingDocument, config: { ena
 }
 
 export async function addOrUpdatePrize(item: MeetingDocument, prizeInput: PrizeInput) {
+  assertMeetingEditable(item);
   if (!item.luckyDraw) {
     item.set('luckyDraw', {
       enabled: true,
@@ -551,6 +623,7 @@ export async function addOrUpdatePrize(item: MeetingDocument, prizeInput: PrizeI
 }
 
 export async function deletePrize(item: MeetingDocument, prizeId: string) {
+  assertMeetingEditable(item);
   if (!item.luckyDraw?.prizes) return item.luckyDraw;
   item.set('luckyDraw.prizes', item.luckyDraw.prizes.filter((p) => p.id !== prizeId));
   await saveMeeting(item);
@@ -562,6 +635,7 @@ export async function deletePrize(item: MeetingDocument, prizeId: string) {
  * ĐIỀU KIỆN QUAN TRỌNG: Chỉ quay khi cuộc họp đã bắt đầu (status !== 'scheduled')!
  */
 export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, actorId: string, broadcast = false) {
+  assertMeetingEditable(item);
   // 1. Kiểm tra trạng thái cuộc họp: CHỈ QUAY KHI CUỘC HỌP ĐÃ BẮT ĐẦU
   if (item.status === 'scheduled') {
     throw new MeetingError(
@@ -712,6 +786,7 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
 }
 
 export async function redrawPrizeWinner(item: MeetingDocument, prizeId: string, winnerRecordId: string) {
+  assertMeetingEditable(item);
   if (!item.luckyDraw?.prizes) throw new MeetingError(404, 'Không có cấu hình giải thưởng.');
   const prize = item.luckyDraw.prizes.find((p) => p.id === prizeId);
   if (!prize) throw new MeetingError(404, 'Không tìm thấy giải thưởng.');
@@ -729,6 +804,7 @@ export async function redrawPrizeWinner(item: MeetingDocument, prizeId: string, 
 }
 
 export async function resetLuckyDrawWinners(item: MeetingDocument, prizeId?: string) {
+  assertMeetingEditable(item);
   if (!item.luckyDraw?.prizes) return item.luckyDraw;
   if (prizeId) {
     const prize = item.luckyDraw.prizes.find((p) => p.id === prizeId);

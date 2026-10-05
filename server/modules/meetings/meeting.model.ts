@@ -17,6 +17,8 @@ const speaker = new Schema(
       type: new Schema({
         name: String, company: String, photoURL: String, coverImage: String,
         phone: String, email: String, industry: String, bio: String,
+        address: String, targetMarket: String,
+        galleryImages: { type: [String], default: undefined },
       }, { _id: false }),
       default: undefined,
     },

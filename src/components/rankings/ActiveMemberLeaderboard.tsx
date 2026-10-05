@@ -1,3 +1,4 @@
+import { MEMBER_RANKING_PODIUM } from "../../config/memberRankingPodium";
 import { useMemo } from "react";
 import { Crown, Trophy, Users } from "lucide-react";
 import type { UserProfile } from "../../types/common";
@@ -103,250 +104,104 @@ export function ActiveMemberLeaderboard({ members: chapterMembers, meetings: fil
   }, [chapterMembers, filteredMeetings]);
 
   const topFiveMembers = useMemo(() => memberRankings.slice(0, 5), [memberRankings]);
-  const nextFiveMembers = useMemo(() => memberRankings.slice(5, 10), [memberRankings]);
+  const topTenMembers = useMemo(() => memberRankings.slice(0, 10), [memberRankings]);
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
+    <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs sm:p-5">
+      <header className="flex flex-col justify-between gap-2 border-b border-slate-100 pb-3.5 sm:flex-row sm:items-center">
         <div>
           <div className="flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-amber-500" />
-            <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">
-              Bảng xếp hạng thành viên tích cực
-            </h3>
-            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-              Top {Math.min(10, memberRankings.length)}
-            </span>
+            <Trophy className="h-4 w-4 text-sky-500" />
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-800">BẢNG XẾP HẠNG THÀNH VIÊN TÍCH CỰC</h3>
+            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">Top {Math.min(10, memberRankings.length)}</span>
           </div>
+          <p className="mt-0.5 text-xs text-slate-400">Xếp hạng theo số buổi điểm danh tham gia và thói quen đến sớm chuẩn giờ</p>
         </div>
-      </div>
+      </header>
 
       {loading ? (
         <p role="status" className="py-10 text-center text-xs text-slate-500">Đang tải bảng xếp hạng…</p>
-      ) : memberRankings.length === 0 || topFiveMembers.every((m) => m.attendedCount === 0) ? (
+      ) : memberRankings.length === 0 || topFiveMembers.every(member => member.attendedCount === 0) ? (
         <div className="py-10 text-center text-xs text-slate-400">
-          <Trophy className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+          <Trophy className="mx-auto mb-2 h-8 w-8 text-slate-300" />
           <p>Chưa có dữ liệu điểm danh thành viên trong khoảng thời gian đã chọn.</p>
         </div>
       ) : (
         <div className="pt-6">
-          {/* Top 5 - Bục Podium 5 cột cao thấp, Top 1 ở chính giữa (#4 - #2 - #1 - #3 - #5) */}
-          {(() => {
-            const PODIUM_SLOTS = [
-              {
-                rankIndex: 3, // #4 (ngoài cùng bên trái)
-                rankNum: 4,
-                heightClass: "h-28 sm:h-36",
-                bgColor: "bg-blue-500",
-                textColor: "text-white",
-                dividerColor: "border-white/20",
-                borderColor: "border-blue-400/50",
-                badgeColor: "bg-blue-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                ringColor: "ring-2 ring-blue-400",
-              },
-              {
-                rankIndex: 1, // #2 (trái giữa)
-                rankNum: 2,
-                heightClass: "h-44 sm:h-52",
-                bgColor: "bg-red-500",
-                textColor: "text-white",
-                dividerColor: "border-white/20",
-                borderColor: "border-red-400/50",
-                badgeColor: "bg-red-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                ringColor: "ring-2 ring-red-400",
-              },
-              {
-                rankIndex: 0, // #1 (CHÍNH GIỮA - TOP 1 QUÁN QUÂN)
-                rankNum: 1,
-                heightClass: "h-56 sm:h-64",
-                bgColor: "bg-yellow-400",
-                textColor: "text-slate-900",
-                dividerColor: "border-slate-900/15",
-                borderColor: "border-yellow-400 shadow-sm",
-                badgeColor: "bg-amber-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                ringColor: "ring-2 ring-yellow-400",
-                isTop1: true,
-              },
-              {
-                rankIndex: 2, // #3 (phải giữa)
-                rankNum: 3,
-                heightClass: "h-36 sm:h-44",
-                bgColor: "bg-green-500",
-                textColor: "text-white",
-                dividerColor: "border-white/20",
-                borderColor: "border-green-400/50",
-                badgeColor: "bg-green-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                ringColor: "ring-2 ring-green-400",
-              },
-              {
-                rankIndex: 4, // #5 (ngoài cùng bên phải)
-                rankNum: 5,
-                heightClass: "h-22 sm:h-28",
-                bgColor: "bg-orange-500",
-                textColor: "text-white",
-                dividerColor: "border-white/20",
-                borderColor: "border-orange-400/50",
-                badgeColor: "bg-orange-500 text-white font-semibold ring-2 ring-white shadow-2xs",
-                ringColor: "ring-2 ring-orange-400",
-              },
-            ];
-
-            return (
-              <div className="grid grid-cols-5 gap-2 sm:gap-4 items-end min-h-[300px] sm:min-h-[340px] px-1 sm:px-4 pb-2 border-b border-slate-100">
-                {PODIUM_SLOTS.map((slot) => {
-                  const m = topFiveMembers[slot.rankIndex];
-
-                  if (!m) {
-                    return (
-                      <div key={`empty-${slot.rankNum}`} className="flex flex-col items-center justify-end h-full opacity-40">
-                        <div className="flex flex-col items-center mb-2.5 w-full">
-                          <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-400 text-xs font-medium mb-1.5 bg-slate-50/50">
-                            #{slot.rankNum}
-                          </div>
-                          <p className="text-xs text-slate-400 text-center font-normal">Chờ thành viên</p>
-                          <p className="text-[10px] text-slate-300 text-center">-</p>
-                        </div>
-                        <div
-                          className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center py-2 px-1 text-slate-400 ${slot.heightClass}`}
-                        >
-                          <span className="text-xs font-normal text-slate-300">#{slot.rankNum}</span>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div key={m.id || `rank-${slot.rankNum}`} className="flex flex-col items-center justify-end h-full group">
-                      {/* Header info above column: Avatar & Name */}
-                      <div className="flex flex-col items-center mb-2.5 w-full">
-                        {slot.isTop1 && (
-                          <Crown className="h-4 w-4 text-amber-500 fill-amber-400 drop-shadow-xs -mb-0.5" />
-                        )}
+          <div className="grid min-h-[300px] grid-cols-5 items-end gap-2 border-b border-slate-100 px-1 pb-2 sm:min-h-[340px] sm:gap-4 sm:px-4">
+            {MEMBER_RANKING_PODIUM.map(slot => {
+              const member = topFiveMembers[slot.rankIndex];
+              return (
+                <div key={slot.rankNum} className="flex h-full flex-col items-center justify-end">
+                  <div className="mb-2.5 flex w-full flex-col items-center">
+                    {member ? (
+                      <>
+                        {slot.isTop1 && <Crown className="-mb-0.5 h-4 w-4 fill-sky-300 text-sky-500" />}
                         <div className="relative mb-1.5">
-                          <UserAvatar
-                            name={m.name}
-                            photoURL={m.photoURL}
-                            className="h-10 w-10 sm:h-12 sm:w-12 rounded-full"
-                            textClassName="text-xs sm:text-sm font-semibold"
-                            ringClassName={`shadow-2xs ${slot.ringColor}`}
-                          />
-                          <span
-                            className={`absolute -bottom-1 -right-1 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full text-[10px] sm:text-xs ${slot.badgeColor}`}
-                          >
-                            #{slot.rankNum}
-                          </span>
+                          {member.photoURL ? (
+                            <img src={member.photoURL} alt={member.name} className={`h-10 w-10 rounded-full object-cover sm:h-12 sm:w-12 ${slot.ringColor}`} onError={event => { (event.target as HTMLElement).style.display = "none"; }} />
+                          ) : (
+                            <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-sky-50 text-xs font-medium text-sky-700 sm:h-12 sm:w-12 sm:text-sm ${slot.ringColor}`}>{(member.name || "?").trim().charAt(0).toUpperCase()}</div>
+                          )}
+                          <span className={`absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px] sm:h-5 sm:w-5 sm:text-xs ${slot.badgeColor}`}>#{slot.rankNum}</span>
                         </div>
-
-                        <p
-                          className="text-xs font-medium text-slate-700 text-center truncate max-w-[70px] sm:max-w-[120px]"
-                          title={m.name}
-                        >
-                          {m.name}
-                        </p>
-                        {m.companyName && (
-                          <p
-                            className="text-[10px] text-slate-400 text-center truncate max-w-[70px] sm:max-w-[120px]"
-                            title={m.companyName}
-                          >
-                            {m.companyName}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* The Pillar / Column bar */}
-                      <div
-                        className={`w-full max-w-[70px] sm:max-w-[110px] rounded-t-xl sm:rounded-t-2xl border flex flex-col items-center justify-between py-2.5 sm:py-3 px-1 transition-all duration-300 ease-out group-hover:scale-[1.02] ${slot.heightClass} ${slot.bgColor} ${slot.borderColor} ${slot.textColor}`}
-                      >
+                        <p className="max-w-[70px] truncate text-center text-xs font-medium text-slate-700 sm:max-w-[120px]" title={member.name}>{member.name}</p>
+                        {member.companyName && <p className="max-w-[70px] truncate text-center text-[10px] text-slate-400 sm:max-w-[120px]" title={member.companyName}>{member.companyName}</p>}
+                      </>
+                    ) : (
+                      <>
+                        <div className="mb-1.5 flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-400 sm:h-12 sm:w-12">#{slot.rankNum}</div>
+                        <p className="text-center text-xs text-slate-400">Chờ thành viên</p>
+                        <p className="text-center text-[10px] text-slate-300">-</p>
+                      </>
+                    )}
+                  </div>
+                  <div className={`flex w-full max-w-[70px] flex-col items-center justify-between rounded-t-xl border px-1 py-2.5 transition-all sm:max-w-[110px] sm:rounded-t-2xl sm:py-3 ${slot.heightClass} ${member ? `${slot.bgColor} ${slot.borderColor} ${slot.textColor}` : "border-dashed border-slate-200 bg-slate-50/50 text-slate-300"}`}>
+                    {member ? (
+                      <>
                         <div className="text-center">
-                          <span className="block text-xs sm:text-sm font-semibold tracking-normal">
-                            {m.attendedCount} buổi
-                          </span>
-                          <span className="block text-[10px] font-normal opacity-90 mt-0.5">
-                            {m.attendanceRate}%
-                          </span>
+                          <span className="block text-xs font-medium tracking-normal sm:text-sm">{member.attendedCount} buổi</span>
+                          <span className="mt-0.5 block text-[10px]">{member.attendanceRate}%</span>
                         </div>
-
-                        <div className={`text-center border-t ${slot.dividerColor} pt-1.5 w-full`}>
-                          <span className="block text-[10px] font-medium opacity-90 truncate">
-                            {m.avgEarlyMinutes > 0
-                              ? `Sớm +${m.avgEarlyMinutes}p`
-                              : m.attendedCount > 0
-                                ? "Đúng giờ"
-                                : "Chưa họp"}
-                          </span>
+                        <div className={`w-full border-t pt-1.5 text-center text-[10px] ${slot.dividerColor}`}>
+                          {member.avgEarlyMinutes > 0 ? `Sớm +${member.avgEarlyMinutes}p` : member.attendedCount > 0 ? "Đúng giờ" : "Chưa họp"}
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
+                      </>
+                    ) : <span className="text-xs">#{slot.rankNum}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-          {/* Top 6 to 10 - Danh sách dạng bảng gọn gàng */}
-          {nextFiveMembers.length > 0 && (
-            <div className="mt-5 pt-3">
-              <div className="flex items-center justify-between mb-2.5">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5 text-slate-400" />
-                  Thành viên tiếp theo (Hạng 6 - 10)
-                </p>
-                <span className="text-[11px] text-slate-400">
-                  Hiển thị {nextFiveMembers.length} thành viên
-                </span>
-              </div>
-              <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xs">
-                {nextFiveMembers.map((m, idx) => (
-                  <div
-                    key={m.id}
-                    className="flex items-center justify-between p-2.5 sm:px-4 hover:bg-slate-50/80 transition-colors text-xs"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 font-mono font-medium text-slate-500 text-xs">
-                        #{idx + 6}
-                      </span>
-                      <UserAvatar
-                        name={m.name}
-                        photoURL={m.photoURL}
-                        className="h-8 w-8 rounded-full"
-                        textClassName="text-xs font-medium"
-                        ringClassName="border border-slate-200 shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <p className="font-medium text-slate-800 truncate">{m.name}</p>
-                        {m.companyName && (
-                          <p className="text-[10px] text-slate-400 truncate">{m.companyName}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 sm:gap-6 text-right shrink-0">
-                      <div>
-                        <span className="font-semibold text-slate-700">{m.attendedCount}</span>
-                        <span className="text-slate-400 ml-1">buổi ({m.attendanceRate}%)</span>
-                      </div>
-                      <span
-                        className={`text-[11px] font-normal px-2 py-0.5 rounded-full ${m.avgEarlyMinutes > 0
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : m.attendedCount > 0
-                              ? "bg-sky-50 text-sky-700 border border-sky-200"
-                              : "bg-slate-100 text-slate-500"
-                          }`}
-                      >
-                        {m.avgEarlyMinutes > 0
-                          ? `Sớm +${m.avgEarlyMinutes}p`
-                          : m.attendedCount > 0
-                            ? "Đúng giờ"
-                            : "Chưa họp"}
-                      </span>
+          <div className="mt-5 pt-3">
+            <div className="mb-2.5 flex items-center justify-between">
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600"><Users className="h-3.5 w-3.5 text-sky-500" />TOP 10</p>
+              <span className="text-[11px] text-slate-400">Hiển thị {topTenMembers.length} thành viên</span>
+            </div>
+            <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200/80 bg-white">
+              {topTenMembers.map((member, index) => (
+                <div key={member.id} className="flex items-center justify-between gap-3 p-2.5 text-xs transition-colors hover:bg-sky-50/50 sm:px-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-sky-50 font-mono text-xs font-medium text-sky-700">#{index + 1}</span>
+                    {member.photoURL ? <img src={member.photoURL} alt={member.name} className="h-8 w-8 shrink-0 rounded-full border border-sky-100 object-cover" onError={event => { (event.target as HTMLElement).style.display = "none"; }} /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-50 text-xs font-medium text-cyan-700">{(member.name || "?").trim().charAt(0).toUpperCase()}</div>}
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-slate-800">{member.name}</p>
+                      {member.companyName && <p className="truncate text-[10px] text-slate-400">{member.companyName}</p>}
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div className="flex shrink-0 items-center gap-3 text-right sm:gap-6">
+                    <div><span className="font-medium text-slate-700">{member.attendedCount}</span><span className="ml-1 text-slate-400">buổi ({member.attendanceRate}%)</span></div>
+                    <span className={`rounded-full border px-2 py-0.5 text-[11px] ${member.avgEarlyMinutes > 0 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : member.attendedCount > 0 ? "border-sky-200 bg-sky-50 text-sky-700" : "border-slate-200 bg-slate-50 text-slate-500"}`}>
+                      {member.avgEarlyMinutes > 0 ? `Sớm +${member.avgEarlyMinutes}p` : member.attendedCount > 0 ? "Đúng giờ" : "Chưa họp"}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }
