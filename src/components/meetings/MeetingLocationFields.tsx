@@ -23,7 +23,6 @@ export function MeetingLocationFields({ value, onChange, radius, onRadiusChange 
   };
   return <fieldset className="space-y-3 rounded-xl border border-cyan-100 bg-cyan-50/50 p-4">
     <legend className="px-1 font-bold text-slate-800">Vị trí check-in</legend>
-    <p className="text-xs leading-relaxed text-slate-600">Có thể lên lịch trước và bổ sung GPS sau. Phải lưu đúng tọa độ địa điểm trước khi mở QR. Chỉ dùng vị trí hiện tại khi bạn đang ở nơi tổ chức. Đổi tọa độ hoặc bán kính sẽ đóng QR cũ; cần mở lại QR sau khi lưu.</p>
     <button
       type="button"
       disabled={busy}
