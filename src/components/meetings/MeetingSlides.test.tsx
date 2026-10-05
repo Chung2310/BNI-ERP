@@ -6,6 +6,7 @@ import { MeetingSlides } from "./MeetingSlides";
 
 vi.mock("./profileSlideRenderer", () => ({
   SLIDE_WIDTH: 1920, SLIDE_HEIGHT: 1080,
+  DEFAULT_PROFILE_PHOTO: "/member-slide/default-pfp.jpg",
   loadSlideImage: vi.fn().mockResolvedValue(null),
   renderProfileSlide: vi.fn(async () => ({ canvas: document.createElement("canvas"), warnings: [] })),
 }));

@@ -29,7 +29,8 @@ it.each(["guest", "member"] as const)("fills the template with %s data and hides
   await renderProfileSlide({ ...slide, company: " ", industry: "", phone: " ", address: "", targetMarket: " ", galleryImages: [], photoURL: "" });
   const sparseText = ctx.fillText.mock.calls.map(call => call[0]).join(" ");
   for (const value of ["HOTLINE", "LĨNH VỰC HOẠT ĐỘNG", "THỊ TRƯỜNG MỤC TIÊU", "SẢN PHẨM TIÊU BIỂU", "ACME"]) expect(sparseText).not.toContain(value);
-  expect(ctx.arc).not.toHaveBeenCalled();
+  expect(ctx.arc).toHaveBeenCalledWith(338, 468, 180, 0, Math.PI * 2);
+  expect(ctx.drawImage.mock.calls.some(call => call.length === 9 && call[5] === 158 && call[6] === 288)).toBe(true);
   expect(ctx.drawImage).toHaveBeenCalledWith(expect.anything(), 100, 247, 480, 456);
 });
 

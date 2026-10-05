@@ -5,7 +5,7 @@ import { meetingService } from "../../services/meetingService";
 import { meetingLiveApi, type MeetingLiveSnapshot } from "../../services/meetingLiveService";
 import { presentationState } from "../../utils/meetingPresentation";
 import { renderProfileSlide, loadSlideImage, SLIDE_WIDTH, SLIDE_HEIGHT } from "./profileSlideRenderer";
-import { drawSlideTimer, getSlideTimer } from "./slideTimer";
+import { SpeakerPresentationFrame } from "./SpeakerPresentationFrame";
 import type { ProfileSlide } from "./slideTypes";
 import { ActiveMembersPanel } from "./ActiveMembersPanel";
 
@@ -30,7 +30,6 @@ function SpeakerCanvas({ meeting, slide, now }: { meeting: Meeting; slide: Profi
     const ctx = canvas.current?.getContext("2d");
     if (!ctx || !rendered || rendered.source !== slideKey) return;
     ctx.drawImage(rendered.canvas, 0, 0);
-    drawSlideTimer(ctx, getSlideTimer(meeting, slide?.id, now));
   }, [rendered, meeting, slide, slideKey, now]);
   if (!slide) return <StageMessage text={meeting.speechesCompletedAt ? "Đã hoàn tất phần phát biểu" : "Chờ người phát biểu"} />;
   return <div className="relative w-full bg-white">
@@ -103,7 +102,7 @@ function DrawStage({ meeting }: { meeting: Meeting }) {
   </div>;
 }
 
-export function MeetingStage({ snapshot, now }: { snapshot: MeetingLiveSnapshot; now: number }) {
+export function MeetingStage({ snapshot, now, fill = false }: { snapshot: MeetingLiveSnapshot; now: number; fill?: boolean }) {
   const { meeting, slides } = snapshot;
   useEffect(() => {
     const start = Math.max(0, meeting.currentIndex);
@@ -121,11 +120,7 @@ export function MeetingStage({ snapshot, now }: { snapshot: MeetingLiveSnapshot;
   if (view === "luckyDraw") return <DrawStage meeting={meeting} />;
   if (view === "waiting") return <StageMessage title={meeting.title} text="Vui lòng chờ" />;
   const speaker = meeting.speakers[meeting.currentIndex];
-  const upcoming = meeting.speakers.slice(meeting.currentIndex + 1, meeting.currentIndex + 4);
-  return <div className="relative">
+  return <SpeakerPresentationFrame meeting={meeting} slides={slides} speakerId={speaker?.id} now={now} fill={fill}>
     <SpeakerStage meeting={meeting} slide={slides.find(item => item.id === speaker?.id)} now={now} />
-    {!!speaker && upcoming.length > 0 && <div className="absolute right-4 top-4 max-w-[65%] rounded-lg bg-white/95 px-3 py-2 text-xs font-medium text-slate-700 md:text-lg">
-      Tiếp theo: {upcoming.map(person => person.name).join(" · ")}
-    </div>}
-  </div>;
+  </SpeakerPresentationFrame>;
 }

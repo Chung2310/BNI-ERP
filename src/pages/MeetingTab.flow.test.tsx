@@ -5,6 +5,7 @@ import { cleanup, render, screen, fireEvent, waitFor, act, within } from "@testi
 import MeetingTab from "./MeetingTab";
 vi.mock("../components/meetings/profileSlideRenderer", () => ({
   SLIDE_WIDTH: 1920, SLIDE_HEIGHT: 1080, loadSlideImage: vi.fn().mockResolvedValue(null),
+  DEFAULT_PROFILE_PHOTO: "/member-slide/default-pfp.jpg",
   renderProfileSlide: vi.fn(async () => ({ canvas: document.createElement("canvas"), warnings: [] })),
 }));
 const auth = vi.hoisted(() => ({ manage: true }));

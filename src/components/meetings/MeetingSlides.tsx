@@ -5,6 +5,7 @@ import { renderProfileSlide, loadSlideImage, SLIDE_WIDTH, SLIDE_HEIGHT } from ".
 import { getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
 import { SlideTransitionDelayInput } from "./SlideTransitionDelayInput";
 import { SpeechesCompleteMessage } from "./SpeechesCompleteDialog";
+import { SpeakerPresentationFrame } from "./SpeakerPresentationFrame";
 import type { ProfileSlide, SlideDeck } from "./slideTypes";
 import { SpeakerAvatar } from "./SpeakerAvatar";
 
@@ -552,12 +553,14 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         </div>
       </aside>
       <div className="min-w-0 space-y-3">
-        <div className="relative aspect-video overflow-hidden rounded-2xl bg-slate-900 shadow-sm">
+        <SpeakerPresentationFrame meeting={meeting} slides={deck.slides} speakerId={active?.id} now={now}>
+        <div className="relative aspect-video overflow-hidden bg-slate-900 shadow-sm">
           {canvas(preview)}
           {(drawing || !active || drawError) && <div className="absolute inset-0 grid place-items-center p-6 text-center text-xs text-white/90">
             {speechesComplete && followsSpeaker ? <div className="rounded-2xl bg-white p-8"><SpeechesCompleteMessage /></div> : drawError || (loading ? "Đang tải hồ sơ…" : active ? "Đang chuẩn bị ảnh và font…" : followsSpeaker ? "Chưa có người đang phát biểu." : deck.slides.length ? "Chọn ít nhất một người để trình chiếu." : "Chưa có người check-in. Hãy check-in thành viên hoặc khách mời trước.")}
           </div>}
         </div>
+        </SpeakerPresentationFrame>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <button aria-label="Slide trước" className={button} disabled={!canMove(-1)} onClick={() => move(-1)}><ChevronLeft size={14} /></button>
@@ -586,9 +589,11 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         </form>}
       </div>
     </div>
-    {presenting && createPortal(<div ref={presentationDialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Trình chiếu hồ sơ" className="fixed inset-0 z-[10000] flex items-center justify-center bg-black" style={{ cursor: "none", outline: "none" }}>
-      <div className="relative" style={{ width: "min(100vw, 177.7778vh)", height: "min(100vh, 56.25vw)" }}>
-        {canvas(screen)}
+    {presenting && createPortal(<div ref={presentationDialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Trình chiếu hồ sơ" className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-100" style={{ cursor: "none", outline: "none" }}>
+      <div className="relative h-full w-full">
+        <SpeakerPresentationFrame meeting={meeting} slides={deck.slides} speakerId={active?.id} now={now} fill>
+          {canvas(screen)}
+        </SpeakerPresentationFrame>
       </div>
       {(loading || error || drawing || !active || drawError) && <div role="status" className="absolute text-white">{speechesComplete && followsSpeaker ? <div className="max-w-2xl rounded-3xl bg-white p-12"><SpeechesCompleteMessage /></div> : error || drawError || (loading ? "Đang tải slide…" : active ? "Đang chuẩn bị slide…" : "Chờ người phát biểu…")}</div>}
     </div>, document.body)}
