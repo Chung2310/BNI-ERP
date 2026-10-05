@@ -20,6 +20,14 @@ test("slides include guest contact details and use current member profile fields
   assert.equal(member.bio, "Current bio");
 });
 
+test("adds a title to member names based on gender", () => {
+  assert.equal(buildProfileSlide({ id: "f", userId: "female" }, { displayName: "Nguyễn An", gender: "female" }).name, "Ms. Nguyễn An");
+  assert.equal(buildProfileSlide({ id: "m", userId: "male" }, { displayName: "Trần Bình", gender: "male" }).name, "Mr. Trần Bình");
+  assert.equal(buildProfileSlide({ id: "o", userId: "other" }, { displayName: "Lê Chi", gender: "other" }).name, "Lê Chi");
+  assert.equal(buildProfileSlide({ id: "n", userId: "none" }, { displayName: "Phạm Dũng" }).name, "Phạm Dũng");
+  assert.equal(buildProfileSlide({ id: "g", name: "Khách mời" }).name, "Khách mời");
+});
+
 test("slides read new member fields, limit gallery to five and honor empty overrides", () => {
   const profile = { address: "Bắc Ninh", targetMarket: "Doanh nghiệp", galleryImages: Array.from({ length: 6 }, (_, i) => `https://example.com/${i}.jpg`) };
   const member = buildProfileSlide({ id: "m", userId: "u" }, profile);
