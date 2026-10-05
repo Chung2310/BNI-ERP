@@ -78,8 +78,23 @@ describe("AuthContext company module sync", () => {
     await waitFor(() => expect(screen.getByLabelText("modules").textContent).toBe("hr,chat"));
 
     vi.mocked(authService.getMe).mockResolvedValue({ ...profile, enabledModules: ["student"] } as any);
+    await waitFor(() => expect(statusListener).toBeTypeOf("function"));
     await act(async () => statusListener?.(true));
 
     await waitFor(() => expect(screen.getByLabelText("modules").textContent).toBe("student"));
   });
+});
+
+it("keeps the authenticated user and token when an old session-replaced event is received", async () => {
+  const listeners = new Map<string, (event: unknown) => void>();
+  vi.mocked(socketService.on).mockImplementation((name, callback) => {
+    listeners.set(name, callback);
+    return () => { listeners.delete(name); };
+  });
+  render(<AuthProvider><ProfileProbe /></AuthProvider>);
+  await waitFor(() => expect(screen.getByLabelText("modules").textContent).toBe("hr,chat"));
+  await act(async () => listeners.get("auth:session-replaced")?.({ code: "SESSION_REPLACED" }));
+  expect(screen.getByLabelText("modules").textContent).toBe("hr,chat");
+  expect(localStorage.getItem("accessToken")).toBe("token");
+  expect(toast.error).not.toHaveBeenCalled();
 });

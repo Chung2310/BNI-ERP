@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, it, vi } from "vitest";
 import { UserModel } from "../model/user.model";
 import { CompanyModel } from "../model/company.model";
 import { authService } from "./auth.service";
-import { getJwtRefreshSecret } from "../config/env";
+import { getJwtAccessSecret, getJwtRefreshSecret } from "../config/env";
 import * as socketModule from "../socket";
 
 function makeUser(activeSessionId = "") {
@@ -24,7 +24,7 @@ function makeUser(activeSessionId = "") {
   } as any;
 }
 
-describe("regular user single active session", () => {
+describe("regular user concurrent device sessions", () => {
   let user: any;
   const originalUserFindOne = UserModel.findOne;
   const originalUserFindById = UserModel.findById;
@@ -47,42 +47,50 @@ describe("regular user single active session", () => {
     vi.restoreAllMocks();
   });
 
-  it("replaces the active regular session on the second login", async () => {
+  it("issues separate device tokens without changing the account's existing session", async () => {
+    user.activeSessionId = "legacy-device";
     const first = await authService.login("user@example.com", "password123");
-    const firstRefresh = jwt.verify(first.refreshToken, getJwtRefreshSecret()) as any;
-    assert.equal(firstRefresh.sid, user.activeSessionId);
-
-    const firstSessionId = user.activeSessionId;
     const second = await authService.login("user@example.com", "password123");
+    const firstRefresh = jwt.verify(first.refreshToken, getJwtRefreshSecret()) as any;
     const secondRefresh = jwt.verify(second.refreshToken, getJwtRefreshSecret()) as any;
 
-    assert.ok(firstSessionId);
-    assert.notEqual(secondRefresh.sid, firstSessionId);
-    assert.equal(secondRefresh.sid, user.activeSessionId);
+    assert.ok(firstRefresh.sid);
+    assert.notEqual(secondRefresh.sid, firstRefresh.sid);
+    assert.equal(user.activeSessionId, "legacy-device");
+    assert.equal(user.save.mock.calls.length, 0);
   });
 
-  it("rejects refresh tokens from a displaced regular session", async () => {
+  it("keeps both devices able to refresh after a second login", async () => {
     const first = await authService.login("user@example.com", "password123");
-    const firstRefreshToken = first.refreshToken;
-    await authService.login("user@example.com", "password123");
-
-    await assert.rejects(() => authService.refresh(firstRefreshToken), /thiết bị khác|SESSION_REPLACED|không hợp lệ/i);
+    const second = await authService.login("user@example.com", "password123");
+    for (const device of [first, second, first]) {
+      const original = jwt.verify(device.refreshToken, getJwtRefreshSecret()) as any;
+      const renewed = await authService.refresh(device.refreshToken);
+      const payload = jwt.verify(renewed.accessToken, getJwtAccessSecret()) as any;
+      assert.equal(payload.sid, original.sid);
+      assert.equal(payload.id, user._id);
+    }
   });
-  it("emits a socket event to the displaced regular session", async () => {
+
+  it("still rejects invalid or expired refresh tokens and disabled accounts", async () => {
+    const first = await authService.login("user@example.com", "password123");
+    const expired = jwt.sign({ id: user._id, sid: "expired" }, getJwtRefreshSecret(), { expiresIn: -1 });
+    await assert.rejects(authService.refresh("invalid"));
+    await assert.rejects(authService.refresh(expired));
+    user.disabledAt = new Date();
+    await assert.rejects(authService.refresh(first.refreshToken));
+  });
+  it("does not send a forced logout event to another device", async () => {
     const socketCalls: Array<{ sessionId: string; eventName: string; data: any }> = [];
     socketModule.setEmitToUserSessionMockForTesting((sessionId, eventName, data) => {
       socketCalls.push({ sessionId, eventName, data });
     });
 
     await authService.login("user@example.com", "password123");
-    const firstSessionId = user.activeSessionId;
     assert.deepEqual(socketCalls, []);
 
     await authService.login("user@example.com", "password123");
 
-    assert.equal(socketCalls.length, 1);
-    assert.equal(socketCalls[0].sessionId, firstSessionId);
-    assert.equal(socketCalls[0].eventName, "auth:session-replaced");
-    assert.equal(socketCalls[0].data.code, "SESSION_REPLACED");
+    assert.deepEqual(socketCalls, []);
   });
 });

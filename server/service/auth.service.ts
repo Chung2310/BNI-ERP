@@ -19,18 +19,6 @@ import { clearModuleCache } from "../middleware/require-module";
 import { createCompanyAdminUser } from "../utils/company-admin-user";
 
 import { getJwtAccessSecret, getJwtRefreshSecret } from "../config/env";
-export const REGULAR_SESSION_REPLACED_CODE = "SESSION_REPLACED";
-export const REGULAR_SESSION_REPLACED_EVENT = "auth:session-replaced";
-export const REGULAR_SESSION_REPLACED_MESSAGE = "Phiên đăng nhập đã được sử dụng trên thiết bị khác. Vui lòng đăng nhập lại.";
-
-function assertRegularSessionCurrent(user: IUser, sessionId?: string) {
-  if (!sessionId || user.activeSessionId !== sessionId) {
-    const error = new Error(REGULAR_SESSION_REPLACED_MESSAGE);
-    (error as Error & { code?: string }).code = REGULAR_SESSION_REPLACED_CODE;
-    throw error;
-  }
-}
-
 /**
  * Chặn đăng nhập/làm mới token cho tài khoản bị vô hiệu hoá hoặc thuộc doanh nghiệp không còn active.
  */
@@ -113,7 +101,7 @@ export const authService = {
   /**
    * Đăng nhập tài khoản
    */
-  async login(identifier: string, password?: string, requestMetadata?: any) {
+  async login(identifier: string, password?: string) {
     const user = await findLoginAccount(identifier);
 
     if (!user || !user.password) {
@@ -131,25 +119,8 @@ export const authService = {
 
     await assertAccountUsable(user);
 
-    const previousSessionId = user.activeSessionId;
-    const sessionId = crypto.randomUUID();
-    const now = new Date();
-    user.activeSessionId = sessionId;
-    user.activeSessionIssuedAt = now;
-    user.activeSessionLastSeenAt = now;
-    user.activeSessionUserAgent = requestMetadata?.userAgent || "";
-    user.activeSessionIp = requestMetadata?.sourceIp || "";
-    await user.save();
-
-    if (previousSessionId && previousSessionId !== sessionId) {
-      const { emitToUserSession } = await import("../socket");
-      emitToUserSession(previousSessionId, REGULAR_SESSION_REPLACED_EVENT, {
-        code: REGULAR_SESSION_REPLACED_CODE,
-        message: REGULAR_SESSION_REPLACED_MESSAGE,
-      });
-    }
-
-    const tokens = this.generateTokens(user, sessionId);
+    // Each device gets its own token pair without replacing other devices' sessions.
+    const tokens = this.generateTokens(user, crypto.randomUUID());
     return { kind: "authenticated" as const, user, ...tokens };
   },
 
@@ -166,7 +137,6 @@ export const authService = {
       }
 
       await assertAccountUsable(user);
-      assertRegularSessionCurrent(user, decoded.sid);
 
       const payload = {
         id: user._id,

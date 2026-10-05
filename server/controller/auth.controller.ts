@@ -116,7 +116,7 @@ export const authController = {
   async login(req: Request, res: Response) {
     try {
       const { identifier, email, password } = req.body;
-      const result = await authService.login(identifier ?? email, password, getRequestMetadata(req));
+      const result = await authService.login(identifier ?? email, password);
       const { user, accessToken, refreshToken } = result;
 
       // Lưu Refresh Token vào HTTPOnly Cookie bảo mật
@@ -205,14 +205,7 @@ export const authController = {
    */
   async logout(req: AuthenticatedRequest, res: Response) {
     try {
-      const userId = req.user?.id;
-      if (userId) {
-        const activeSessionClear = req.user?.sessionId
-          ? { $set: { status: "offline" }, $unset: { activeSessionId: "", activeSessionIssuedAt: "", activeSessionLastSeenAt: "", activeSessionUserAgent: "", activeSessionIp: "" } }
-          : { $set: { status: "offline" } };
-        await UserModel.updateOne({ _id: userId, ...(req.user?.sessionId ? { activeSessionId: req.user.sessionId } : {}) }, activeSessionClear);
-      }
-
+      // Clear only this browser's cookie. Socket disconnect handles presence across devices.
       res.clearCookie("refreshToken", {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
