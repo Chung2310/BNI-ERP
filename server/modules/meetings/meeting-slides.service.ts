@@ -1,5 +1,5 @@
 import { UserModel } from '../../model/user.model';
-import { assertVersion, getMeeting, MeetingError, saveMeeting } from './meeting.service';
+import { assertMeetingEditable, assertVersion, getMeeting, MeetingError, saveMeeting } from './meeting.service';
 
 const fields = ['name', 'company', 'photoURL', 'coverImage', 'phone', 'email', 'industry', 'bio'] as const;
 
@@ -37,6 +37,7 @@ export async function getMeetingSlides(companyCode: string, meetingId: string) {
 
 export async function updateMeetingSlide(companyCode: string, meetingId: string, speakerId: string, input: any) {
   const meeting = await getMeeting(companyCode, meetingId);
+  assertMeetingEditable(meeting);
   assertVersion(meeting, input.version);
   const speaker = meeting.speakers.find(s => s.id === speakerId);
   if (!speaker) throw new MeetingError(404, 'Không tìm thấy người tham gia.');

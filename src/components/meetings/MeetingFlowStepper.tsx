@@ -57,7 +57,7 @@ export function MeetingFlowStepper({ order, current, canReorder, badges, onSelec
   };
 
   return (
-    <div className="sticky top-0 z-10 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 border-b border-slate-200/80 bg-white/95 px-4 py-3 sm:px-6 backdrop-blur" aria-label="Quy trình điều hành cuộc họp">
+    <div className="relative z-10 shrink-0 border-b border-slate-200/80 bg-white px-4 py-3 sm:px-6" aria-label="Quy trình điều hành cuộc họp">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <ol className="flex flex-1 items-center gap-1 overflow-x-auto pb-1 lg:pb-0">
           {order.map((step, index) => {
@@ -81,7 +81,7 @@ export function MeetingFlowStepper({ order, current, canReorder, badges, onSelec
                   onDrop={e => { e.preventDefault(); drop(index); setDragIndex(null); setOverIndex(null); }}
                   onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
                   className={`group flex items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-medium transition-all duration-200 cursor-pointer select-none
-                    ${active ? "border-cyan-500 bg-cyan-600 text-white shadow-md shadow-cyan-600/20" : done ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100" : "border-slate-200 bg-white text-slate-600 hover:border-cyan-300 hover:text-cyan-700"}
+                    ${active ? "border-cyan-400/70 bg-cyan-600 text-white shadow-md shadow-cyan-600/20" : done ? "border-cyan-500/30 bg-emerald-50 text-emerald-800 hover:border-cyan-500/50 hover:bg-emerald-100" : "border-cyan-500/30 bg-white text-slate-600 hover:border-cyan-500/50 hover:text-cyan-700"}
                     ${dragIndex === index ? "opacity-40 scale-95" : ""}
                     ${overIndex === index && dragIndex !== index ? "ring-2 ring-cyan-400 ring-offset-1" : ""}`}
                 >
@@ -91,7 +91,11 @@ export function MeetingFlowStepper({ order, current, canReorder, badges, onSelec
                   </span>
                   <Icon className="h-3.5 w-3.5" />
                   <span className="whitespace-nowrap">{meta.label}</span>
-                  {badge ? <span className={`rounded-full px-1.5 text-[10px] font-bold ${active ? "bg-white/25" : "bg-amber-400 text-slate-900"}`}>{badge}</span> : null}
+                  {badge ? (
+                    <span className={`inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full border px-1.5 text-[11px] font-normal leading-none tabular-nums ${active ? "border-white/30 bg-white/20 text-white" : "border-cyan-200 bg-white text-cyan-700"}`}>
+                      {badge}
+                    </span>
+                  ) : null}
                 </button>
                 {index < order.length - 1 && (
                   <ChevronRight aria-hidden className={`h-4 w-4 shrink-0 ${index < currentIndex ? "text-emerald-500" : "text-slate-300"}`} />
@@ -120,7 +124,7 @@ export function MeetingFlowStepper({ order, current, canReorder, badges, onSelec
           {isLast ? (
             onFinish && (
               <button type="button" onClick={onFinish} className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-900 cursor-pointer">
-                <Check className="h-3.5 w-3.5" /> Hoàn tất quy trình
+                <Check className="h-3.5 w-3.5" /> Hoàn tất
               </button>
             )
           ) : (
@@ -129,7 +133,7 @@ export function MeetingFlowStepper({ order, current, canReorder, badges, onSelec
               onClick={() => onSelect(order[currentIndex + 1])}
               className="flex items-center gap-1.5 rounded-xl bg-cyan-600 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-cyan-600/20 hover:bg-cyan-700 cursor-pointer"
             >
-              Tiếp tục: {MEETING_FLOW_META[order[currentIndex + 1]].label} <ChevronRight className="h-3.5 w-3.5" />
+              Tiếp tục <ChevronRight className="h-3.5 w-3.5" />
             </button>
           )}
         </div>

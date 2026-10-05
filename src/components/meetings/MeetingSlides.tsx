@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Download, ChevronLeft, ChevronRight, Play, Pause, RefreshCw, Pencil, ArrowDownToLine } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, Pause, RotateCcw, Pencil, ArrowDownToLine } from "lucide-react";
 import { renderProfileSlide, loadSlideImage, SLIDE_WIDTH, SLIDE_HEIGHT } from "./profileSlideRenderer";
 import { drawSlideTimer, getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
 import { SlideTransitionDelayInput } from "./SlideTransitionDelayInput";
@@ -343,7 +343,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   }, [startFromFirst, loading, error, deck.slides, initialSpeakerId, currentSpeakerId, beginPresentation, onPresentationStarted]);
 
   async function save(reset = false) {
-    if (!active || saving) return;
+    if (!canManage || !active || saving) return;
     setSaving(true); setError("");
     try {
       const id = active.id;
@@ -354,27 +354,6 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
     finally { setSaving(false); }
   }
 
-  function download() {
-    if (!rendered.current || !active) return;
-    try {
-      const snapshot = document.createElement("canvas");
-      snapshot.width = SLIDE_WIDTH; snapshot.height = SLIDE_HEIGHT;
-      const ctx = snapshot.getContext("2d");
-      if (!ctx) throw new Error("Canvas unavailable");
-      ctx.drawImage(rendered.current, 0, 0);
-      drawSlideTimer(ctx, timer);
-      snapshot.toBlob(blob => {
-        if (!blob) { setDrawError("Không thể xuất ảnh. Vui lòng thử lại."); return; }
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `BNI-${active.name.replace(/[^\p{L}\p{N} _-]/gu, "").slice(0, 80) || "slide"}.png`;
-        link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }, "image/png");
-    } catch { setDrawError("Không thể xuất ảnh do quyền truy cập ảnh nguồn. Hãy dùng ảnh đã tải lên hệ thống."); }
-  }
-
-  const ready = !!active && !drawing && !drawError && !loading && !error;
   const canvas = (ref: React.RefObject<HTMLCanvasElement>) => <canvas ref={ref} width={SLIDE_WIDTH} height={SLIDE_HEIGHT}
     role="img" aria-label={active ? `Slide ${active.kind === "member" ? "thành viên" : "khách mời"}: ${active.name}, ${active.company}, ${[active.phone, active.email, active.industry].filter(Boolean).join(", ")}, ${active.bio}` : "Chưa chọn người"}
     style={{ width: "100%", height: "100%", objectFit: "contain", visibility: drawing || !active || drawError ? "hidden" : "visible" }} />;
@@ -408,8 +387,16 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         </label>
       )}
       <div className="hidden sm:block w-px h-5 bg-slate-200" />
-      <button className={button} disabled={loading || !!draft} onClick={() => setRevision(v => v + 1)}><RefreshCw size={14} /> Làm mới hồ sơ</button>
-      <button className={button} disabled={!ready} onClick={download}><Download size={14} /> Tải PNG</button>
+      <button
+        type="button"
+        className={button}
+        title="Làm mới hồ sơ"
+        aria-label="Làm mới hồ sơ"
+        disabled={loading || !!draft}
+        onClick={() => setRevision(v => v + 1)}
+      >
+        <RotateCcw size={14} aria-hidden="true" />
+      </button>
       {canManage && isSpeakingLive ? (
         <button
           ref={launchButton}
@@ -584,7 +571,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
           {canManage && active && !draft && <button className={button} disabled={loading || !!error} onClick={() => { setSelectedId(active.id); draftVersion.current = deck.version; setDraft({ ...active }); }}><Pencil size={14} /> Bổ sung thông tin slide</button>}
         </div>
         {warnings.map(w => <p key={w} role="status" className="text-sm text-amber-700">{w}</p>)}
-        {draft && <form className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs" onSubmit={e => { e.preventDefault(); void save(); }}>
+        {canManage && draft && <form className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs" onSubmit={e => { e.preventDefault(); void save(); }}>
           <p className="text-sm font-medium text-slate-800">Thông tin riêng cho slide trong cuộc họp này</p>
           <p className="text-xs text-slate-500">Tự điền từ hồ sơ khi chưa có bản chỉnh riêng. Bio có thể nhập tại đây. Lưu sẽ giữ bản thông tin hiện tại cho slide; dùng “Dùng lại hồ sơ” để lấy thông tin hồ sơ mới nhất.</p>
           <div className="grid gap-3 sm:grid-cols-2">

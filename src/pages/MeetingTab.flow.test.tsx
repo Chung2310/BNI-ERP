@@ -346,7 +346,6 @@ it("launches the current profile from MC controls and explains the post-speech d
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
   fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
-  expect(screen.getByText(/Đây là thời gian chờ chuyển lượt/)).toBeTruthy();
   expect((screen.getByLabelText("Số giây chờ chuyển slide sau khi hết giờ") as HTMLInputElement).value).toBe("3");
   const requestFullscreen = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(document.documentElement, "requestFullscreen", { configurable: true, value: requestFullscreen });
@@ -666,13 +665,24 @@ it("creates a weekly series from its own popup and returns to the calendar", asy
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Tạo lịch định kỳ" }));
-  const dialog = within(screen.getByRole("dialog", { name: "Tạo lịch định kỳ hằng tuần" }));
+  const dialog = within(screen.getByRole("dialog", { name: "Tạo lịch định kì" }));
   expect(dialog.queryByPlaceholderText("Chọn ngày...")).toBeNull();
   expect(dialog.queryByLabelText("Giờ kết thúc cuộc họp")).toBeNull();
   expect(dialog.queryByRole("checkbox", { name: "Tạo lịch định kỳ hằng tuần" })).toBeNull();
   expect(dialog.queryByRole("checkbox", { name: /Cho phép điểm danh trực tiếp/ })).toBeNull();
-  fireEvent.change(dialog.getByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40"), { target: { value: "Họp tuần" } });
-  fireEvent.change(dialog.getByLabelText("Ngày bắt đầu chu kỳ"), { target: { value: "2030-01-01" } });
+  expect(dialog.queryByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40")).toBeNull();
+  fireEvent.click(dialog.getByRole("button", { name: "Ngày bắt đầu chu kỳ" }));
+  const calendar = within(dialog.getByRole("dialog", { name: "Lịch chọn ngày" }));
+  fireEvent.change(calendar.getByLabelText("Chọn năm"), { target: { value: "2030" } });
+  fireEvent.change(calendar.getByLabelText("Chọn tháng"), { target: { value: "0" } });
+  fireEvent.click(calendar.getByRole("button", { name: "1" }));
+  expect(dialog.getByText("01/01/2030")).toBeTruthy();
+  expect(dialog.queryByText("Giờ bắt đầu (Việt Nam)")).toBeNull();
+  fireEvent.click(dialog.getByRole("button", { name: "Giờ bắt đầu chu kỳ" }));
+  const timePicker = within(dialog.getByRole("dialog", { name: "Chọn giờ" }));
+  fireEvent.click(within(timePicker.getByRole("group", { name: "Giờ" })).getByRole("button", { name: "19" }));
+  fireEvent.click(within(timePicker.getByRole("group", { name: "Phút" })).getByRole("button", { name: "07" }));
+  expect(dialog.getByRole("button", { name: "Giờ bắt đầu chu kỳ" }).textContent).toBe("19:07");
   expect(dialog.getByText(/Sẽ tạo 26 buổi/)).toBeTruthy();
   fireEvent.click(dialog.getByRole("button", { name: "Tạo lịch định kỳ" }));
   await waitFor(() => expect(fetchMock.mock.calls.some(([url, options]) => String(url).endsWith("/series") && options?.method === "POST")).toBe(true));
@@ -680,47 +690,29 @@ it("creates a weekly series from its own popup and returns to the calendar", asy
   const payload = JSON.parse(request[1].body);
   expect(payload.tiers).toEqual([{ startTime: "07:00", endTime: "08:00", seconds: 30 }, { startTime: "08:00", endTime: "09:00", seconds: 20 }]);
   expect(payload).not.toHaveProperty("allowDirectCheckIn");
-  expect(payload).toMatchObject({ title: "Họp tuần", recurrence: { startDate: "2030-01-01", months: 6, weekday: 3, time: "07:00" } });
+  expect(payload).not.toHaveProperty("title");
+  expect(payload).toMatchObject({ recurrence: { startDate: "2030-01-01", months: 6, weekday: 3, time: "19:07" } });
   expect(payload).not.toHaveProperty("startsAt");
   expect(payload).not.toHaveProperty("endsAt");
-  await waitFor(() => expect((screen.getByLabelText("Tháng xem lịch") as HTMLInputElement).value).toBe("2030-01"));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Tháng xem lịch" }).textContent).toBe("Tháng 1, 2030"));
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
-it("creates only one meeting after cancelling the recurring popup", async () => {
+it("cancels the recurring popup without creating meetings", async () => {
   const fetchMock = vi.fn(async (_url: any, options: any) => ({
     ok: true, json: async () => ({ data: options?.method === "POST" ? meeting : [meeting] }),
   }));
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Tạo lịch định kỳ" }));
-  const recurringDialog = within(screen.getByRole("dialog", { name: "Tạo lịch định kỳ hằng tuần" }));
-  fireEvent.change(recurringDialog.getByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40"), { target: { value: "Lịch định kỳ chưa lưu" } });
-  fireEvent.change(recurringDialog.getByLabelText("Ngày bắt đầu chu kỳ"), { target: { value: "2030-01-01" } });
+  const recurringDialog = within(screen.getByRole("dialog", { name: "Tạo lịch định kì" }));
+  fireEvent.click(recurringDialog.getByRole("button", { name: "Ngày bắt đầu chu kỳ" }));
+  fireEvent.click(recurringDialog.getByRole("button", { name: "Hôm nay" }));
   fireEvent.click(recurringDialog.getByRole("button", { name: "Hủy" }));
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(fetchMock.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
-  fireEvent.click(screen.getByRole("button", { name: "Tạo cuộc họp mới" }));
-  const dialog = within(screen.getByRole("dialog", { name: "Tạo cuộc họp BNI mới" }));
-  expect(dialog.queryByLabelText("Ngày bắt đầu chu kỳ")).toBeNull();
-  expect(dialog.queryByRole("checkbox", { name: "Tạo lịch định kỳ hằng tuần" })).toBeNull();
-  expect(dialog.queryByRole("checkbox", { name: /Cho phép điểm danh trực tiếp/ })).toBeNull();
-  const titleInput = dialog.getByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40");
-  expect((titleInput as HTMLInputElement).value).toBe("");
-  fireEvent.change(titleInput, { target: { value: "Họp một lần" } });
-  const startInput = dialog.getByPlaceholderText("Chọn ngày...");
-  fireEvent.change(startInput, { target: { value: "02/01/2030 07:00" } });
-  fireEvent.blur(startInput);
-  expect((dialog.getByLabelText("Giờ kết thúc cuộc họp") as HTMLInputElement).value).toBe("2030-01-02T09:00");
-  fireEvent.click(dialog.getByRole("button", { name: "Tạo cuộc họp" }));
-  await waitFor(() => expect(fetchMock.mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(1));
-  const request = fetchMock.mock.calls.find(([, options]) => options?.method === "POST")!;
-  expect(request[0]).toBe("/api/v1/meetings");
-  const payload = JSON.parse(request[1].body);
-  expect(payload.tiers).toEqual([{ startTime: "07:00", endTime: "08:00", seconds: 30 }, { startTime: "08:00", endTime: "09:00", seconds: 20 }]);
-  expect(payload).not.toHaveProperty("allowDirectCheckIn");
-  expect(payload).toMatchObject({ title: "Họp một lần", startsAt: "2030-01-02T00:00:00.000Z", endsAt: "2030-01-02T02:00:00.000Z" });
-  expect(payload).not.toHaveProperty("recurrence");
+  expect(screen.queryByRole("button", { name: "Tạo cuộc họp mới" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Tạo lịch định kỳ" })).toBeTruthy();
 });
 
 it("edits time slots, blocks overlaps and saves the configured fallback", async () => {

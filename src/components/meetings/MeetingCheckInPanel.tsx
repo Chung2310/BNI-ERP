@@ -16,6 +16,6 @@ export function MeetingCheckInPanel({ meeting, canManage, api, companyCode, onCo
     {canManage ? <>
       <CompanyCheckInQrPanel api={api} companyCode={companyCode} />
       <p className="text-sm text-slate-600">{hasGps ? "Cuộc họp này kiểm tra vị trí trong bán kính " + (meeting.gpsRadiusMeters || 200) + " m." : "Cần bổ sung GPS địa điểm để cuộc họp này nhận check-in."} <button type="button" onClick={onConfigure} className="font-semibold text-cyan-700 hover:text-cyan-900">Cấu hình địa điểm & thời gian</button></p>
-    </> : <p className="rounded-xl bg-cyan-50 p-4 text-sm">Quét QR check-in cố định của đơn vị, chọn Thành viên hoặc Khách mời và cho phép xác nhận vị trí.</p>}
+    </> : open && <p className="rounded-xl bg-cyan-50 p-4 text-sm">Quét QR check-in cố định của đơn vị, chọn Thành viên hoặc Khách mời và cho phép xác nhận vị trí.</p>}
   </section>;
 }

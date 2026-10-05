@@ -19,6 +19,8 @@ interface TimeInput24Props {
   required?: boolean;
   disabled?: boolean;
   variant?: "default" | "flat";
+  ariaLabel?: string;
+  minuteStep?: 1 | 5;
 }
 
 export function TimeInput24({
@@ -28,6 +30,8 @@ export function TimeInput24({
   required,
   disabled,
   variant = "default",
+  ariaLabel,
+  minuteStep = 5,
 }: TimeInput24Props) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -38,9 +42,10 @@ export function TimeInput24({
   const [selectedHour, selectedMinute] = current ? current.split(":") : ["", ""];
 
   // Giữ lại giá trị phút lệch (ví dụ: 09:07) bằng cách sắp xếp động vào danh sách
-  const minutesOptions = current && !MINUTES_STEP5.includes(selectedMinute)
-    ? [...MINUTES_STEP5, selectedMinute].sort()
-    : MINUTES_STEP5;
+  const minuteValues = minuteStep === 1 ? Array.from({ length: 60 }, (_, i) => pad2(i)) : MINUTES_STEP5;
+  const minutesOptions = current && !minuteValues.includes(selectedMinute)
+    ? [...minuteValues, selectedMinute].sort()
+    : minuteValues;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -90,6 +95,9 @@ export function TimeInput24({
     <div ref={containerRef} className={`relative inline-block text-xs text-slate-800 ${className}`}>
       <button
         type="button"
+        aria-label={ariaLabel}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
         className={
@@ -103,7 +111,7 @@ export function TimeInput24({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1.5 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl p-3.5 flex flex-col w-[170px] select-none animate-fade-in animate-scale-in">
+        <div role="dialog" aria-label="Chọn giờ" className="absolute right-0 mt-1.5 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl p-3.5 flex flex-col w-[170px] select-none animate-fade-in animate-scale-in">
           <div className="grid grid-cols-2 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 font-sans">
             <div>Giờ</div>
             <div>Phút</div>
@@ -113,6 +121,8 @@ export function TimeInput24({
             {/* Danh sách giờ */}
             <div
               ref={hourRef}
+              role="group"
+              aria-label="Giờ"
               className="flex-1 overflow-y-auto pr-1 space-y-0.5 scrolling-touch scrollbar-thin"
               style={{ scrollbarWidth: "thin" }}
             >
@@ -142,6 +152,8 @@ export function TimeInput24({
             {/* Danh sách phút */}
             <div
               ref={minuteRef}
+              role="group"
+              aria-label="Phút"
               className="flex-1 overflow-y-auto pl-1 space-y-0.5 scrolling-touch scrollbar-thin"
               style={{ scrollbarWidth: "thin" }}
             >

@@ -43,5 +43,6 @@ export const qrMemberInput = Joi.object({ email: Joi.string().email().max(254).r
 export const qrGuestInput = Joi.object({ name: Joi.string().trim().min(2).max(150).required(), email: Joi.string().email().max(254).allow('').default(''), phone: Joi.string().trim().max(40).allow('').default(''), company: Joi.string().trim().max(150).allow('').default(''), industry: Joi.string().trim().max(150).allow('').default(''), bio: Joi.string().trim().max(1000).allow('').default(''), latitude: Joi.number().min(-90).max(90).required(), longitude: Joi.number().min(-180).max(180).required() });
 
 export const recurringMeetingInput = meetingInput.fork(["startsAt", "endsAt"], () => Joi.forbidden()).keys({
+  title: Joi.string().trim().max(200).allow("").optional(),
   recurrence: Joi.object({ durationMinutes: Joi.number().integer().min(1).max(1440).default(120), startDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required(), months: Joi.number().integer().min(1).max(12).required(), weekday: Joi.number().integer().min(0).max(6).required(), time: Joi.string().pattern(/^([01]\d|2[0-3]):[0-5]\d$/).required() }).required(),
 });
