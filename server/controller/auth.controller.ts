@@ -1,3 +1,4 @@
+import { findLoginAccount } from "../utils/login-account";
 import type { IUser } from "../interface/user.interface";
 import { Request, Response } from "express";
 import { authService } from "../service/auth.service";
@@ -114,8 +115,8 @@ export const authController = {
    */
   async login(req: Request, res: Response) {
     try {
-      const { email, password } = req.body;
-      const result = await authService.login(email, password, getRequestMetadata(req));
+      const { identifier, email, password } = req.body;
+      const result = await authService.login(identifier ?? email, password, getRequestMetadata(req));
       const { user, accessToken, refreshToken } = result;
 
       // Lưu Refresh Token vào HTTPOnly Cookie bảo mật
@@ -154,8 +155,8 @@ export const authController = {
         user: userObj,
       });
     } catch (error: any) {
-      const attemptedEmail = String(req.body?.email || "").trim().toLowerCase();
-      if (attemptedEmail) void UserModel.findOne({ email: attemptedEmail }).select("_id companyCode").lean().then((attemptedUser: any) => {
+      const attemptedIdentifier = req.body?.identifier ?? req.body?.email;
+      if (attemptedIdentifier) void findLoginAccount(attemptedIdentifier).then((attemptedUser: any) => {
         if (attemptedUser) return recordUserActivity({
           userId: String(attemptedUser._id), companyCode: attemptedUser.companyCode || "SYSTEM", actionType: "auth.login",
           category: "authentication", result: "failure", method: "POST", route: "/api/v1/auth/login",

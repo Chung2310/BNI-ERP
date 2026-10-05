@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CompanyModel } from "../model/company.model";
@@ -14,6 +15,7 @@ test("login allows a legacy company without lifecycleStatus", async () => {
   UserModel.findOne = (() => Promise.resolve({
     _id: "legacy-user-id",
     email: "legacy@example.com",
+    password: bcrypt.hashSync("password123", 4),
     role: "user",
     companyCode: "LEGACY",
     save: async function () { return this; },
@@ -26,7 +28,7 @@ test("login allows a legacy company without lifecycleStatus", async () => {
   })) as unknown as typeof CompanyModel.findOne;
 
   try {
-    const result = await authService.login("legacy@example.com");
+    const result = await authService.login("legacy@example.com", "password123");
     assert.equal(result.kind, "authenticated");
   } finally {
     UserModel.findOne = originalFindUser;

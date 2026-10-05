@@ -54,15 +54,15 @@ export const authService = {
     return result.data;
   },
 
-  // Đăng nhập bằng Email & Mật khẩu
-  async loginWithEmail(email: string, password: string): Promise<any> {
+  // Đăng nhập bằng số điện thoại hoặc email và mật khẩu
+  async loginWithIdentifier(identifier: string, password: string): Promise<any> {
     const res = await fetch("/api/v1/auth/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-device-id": getDeviceId(),
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identifier, password }),
     });
 
     if (!res.ok) {

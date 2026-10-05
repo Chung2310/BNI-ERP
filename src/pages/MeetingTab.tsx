@@ -1,3 +1,8 @@
+import { MeetingSpeakingTimeFields } from "../components/meetings/MeetingSpeakingTimeFields";
+import { defaultSpeakingTimeSlots, speakingTimeSlotsForEdit, validateSpeakingTimeSlots, type SpeakingTier, type SpeakingTimeSlot } from "../utils/meetingSpeakingTime";
+import { MeetingCalendar } from "../components/meetings/MeetingCalendar";
+import { MeetingRecurrenceFields } from "../components/meetings/MeetingRecurrenceFields";
+import { vietnamDateTime, type MeetingRecurrence } from "../utils/meetingRecurrence";
 import { meetingElapsedLabel } from "../components/meetings/meetingElapsedLabel";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MemberMeetingDetail, { memberAttendance, memberAttendanceLabel } from "../components/meetings/MemberMeetingDetail";
@@ -5,11 +10,13 @@ import { SpeechesCompleteDialog } from "../components/meetings/SpeechesCompleteD
 import { SlideTransitionDelayInput } from "../components/meetings/SlideTransitionDelayInput";
 import { MeetingSlides } from "../components/meetings/MeetingSlides";
 import { MeetingCheckInPanel } from "../components/meetings/MeetingCheckInPanel";
+import { CompanyCheckInQrDialog } from "../components/meetings/CompanyCheckInQrDialog";
 import { MeetingLocationFields } from "../components/meetings/MeetingLocationFields";
 import { MeetingCoverImageField } from "../components/meetings/MeetingCoverImageField";
 import { MeetingDateTimePicker } from "../components/meetings/MeetingDateTimePicker";
 import {
   CalendarDays,
+  QrCode,
   Clock3,
   ImagePlus,
   Megaphone,
@@ -77,6 +84,8 @@ type LuckyDrawPrize = {
 };
 
 type Meeting = {
+  seriesId?: string;
+  originalStartsAt?: string;
   _id: string;
   title: string;
   description?: string;
@@ -85,14 +94,14 @@ type Meeting = {
   longitude?: number;
   gpsRadiusMeters?: number;
   checkInQrExpiresAt?: string;
-  allowDirectCheckIn?: boolean;
   coverImage?: string;
   startsAt: string;
+  endsAt?: string;
   startedAt?: string;
   reminderDays: number;
   status: "scheduled" | "live" | "paused" | "ended" | "cancelled";
   speakers: Speaker[];
-  tiers: Array<{ count: number; seconds: number }>;
+  tiers: SpeakingTier[];
   fallbackSeconds: number;
   currentIndex: number;
   speakerStartedAt?: string;
@@ -143,12 +152,23 @@ const dateText = (s: string) => {
   }
 };
 
+function defaultEnd(value: string) {
+  return value ? vietnamDateTime(new Date(new Date(value + ":00+07:00").getTime() + 2 * 60 * 60 * 1000)) : "";
+}
+
 export default function MeetingTab() {
   const { hasPermission, userProfile } = useAuth();
   const canManage = hasPermission("meetings:manage") || hasPermission("access:manage");
 
+  const [showSharedQr, setShowSharedQr] = useState(false);
+  const [view, setView] = useState<"calendar" | "list">("calendar");
+  const [calendarMonth, setCalendarMonth] = useState(() => vietnamDateTime(new Date()).slice(0,7));
+  const [calendarRevision, setCalendarRevision] = useState(0);
+  const [recurrence, setRecurrence] = useState<MeetingRecurrence>({ startDate: "", months: 6, weekday: 3, time: "07:00" });
   const [items, setItems] = useState<Meeting[]>([]);
   const [detailMeetingId, setDetailMeetingId] = useState<string | null>(null);
+  const detailMeetingIdRef = useRef<string | null>(null);
+  detailMeetingIdRef.current = detailMeetingId;
   const [activeSubTab, setActiveSubTab] = useState<"checkin" | "speakers" | "luckyDraw" | "slides">("checkin");
   const [attendedOnly, setAttendedOnly] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -223,32 +243,30 @@ export default function MeetingTab() {
   }, [isModalFullscreen]);
 
   // Create Meeting Modal state
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createModal, setCreateModal] = useState<"single" | "recurring" | null>(null);
+  const recurring = createModal === "recurring";
   const [title, setTitle] = useState("");
   const [startsAt, setStartsAt] = useState("");
+  const [endsAt, setEndsAt] = useState("");
   const [location, setLocation] = useState("");
   const [gpsPoint, setGpsPoint] = useState<{latitude:number;longitude:number}|null>(null);
-  const [allowDirectCheckIn, setAllowDirectCheckIn] = useState(false);
-  const [editAllowDirectCheckIn, setEditAllowDirectCheckIn] = useState(false);
   const [gpsRadiusMeters, setGpsRadiusMeters] = useState(200);
   const [coverImage, setCoverImage] = useState("");
   const [reminderDays, setReminderDays] = useState(1);
-  const [tiers, setTiers] = useState([
-    { count: 10, seconds: 30 },
-    { count: 10, seconds: 20 },
-  ]);
+  const [tiers, setTiers] = useState<SpeakingTimeSlot[]>(defaultSpeakingTimeSlots);
   const [fallbackSeconds, setFallbackSeconds] = useState(20);
 
   // Edit Meeting Modal state
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editStartsAt, setEditStartsAt] = useState("");
+  const [editEndsAt, setEditEndsAt] = useState("");
   const [editLocation, setEditLocation] = useState("");
   const [editGpsPoint, setEditGpsPoint] = useState<{latitude:number;longitude:number}|null>(null);
   const [editGpsRadiusMeters, setEditGpsRadiusMeters] = useState(200);
   const [editCoverImage, setEditCoverImage] = useState("");
   const [editReminderDays, setEditReminderDays] = useState(1);
-  const [editTiers, setEditTiers] = useState<Array<{ count: number; seconds: number }>>([]);
+  const [editTiers, setEditTiers] = useState<SpeakingTimeSlot[]>([]);
   const [editFallbackSeconds, setEditFallbackSeconds] = useState(20);
 
   // Delete Meeting Confirmation Dialog state
@@ -295,7 +313,12 @@ export default function MeetingTab() {
   const refresh = useCallback(async () => {
     try {
       const next: Meeting[] = await api("");
+      const selectedId = detailMeetingIdRef.current;
+      if (selectedId && !next.some(item => item._id === selectedId)) {
+        try { next.push(await api("/" + selectedId)); } catch { setDetailMeetingId(null); }
+      }
       setItems(next);
+      setCalendarRevision(value => value + 1);
       setLoadError("");
     } catch (e: any) {
       setLoadError(e.message || "Không thể tải danh sách cuộc họp");
@@ -370,16 +393,33 @@ export default function MeetingTab() {
     }
   };
 
+  const openCreateModal = (mode: "single" | "recurring") => {
+    setTitle("");
+    setStartsAt("");
+    setEndsAt("");
+    setLocation("");
+    setGpsPoint(null);
+    setGpsRadiusMeters(200);
+    setCoverImage("");
+    setReminderDays(1);
+    setTiers(defaultSpeakingTimeSlots());
+    setFallbackSeconds(20);
+    setRecurrence({ startDate: "", months: 6, weekday: 3, time: "07:00" });
+    setCreateModal(mode);
+  };
+
   const create = (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
+    const timeSlotError = validateSpeakingTimeSlots(tiers);
+    if (timeSlotError) { toast.error(timeSlotError); return; }
     void run(async () => {
-      const result = await api("", "POST", {
+      const result = await api(recurring ? "/series" : "", "POST", {
         title,
-        startsAt: new Date(startsAt).toISOString(),
+        ...(recurring ? { recurrence } : { startsAt: new Date(startsAt + ":00+07:00").toISOString(), endsAt: new Date(endsAt + ":00+07:00").toISOString() }),
         location,
         ...(gpsPoint || {}),
         gpsRadiusMeters,
-        allowDirectCheckIn,
         coverImage,
         reminderDays,
         tiers,
@@ -387,13 +427,18 @@ export default function MeetingTab() {
       });
       setTitle("");
       setStartsAt("");
+      setEndsAt("");
       setLocation("");
       setGpsPoint(null);
-      setAllowDirectCheckIn(false);
       setCoverImage("");
-      setShowCreateModal(false);
-      toast.success("Tạo cuộc họp mới thành công!");
-      setDetailMeetingId(result._id);
+      setCreateModal(null);
+      if (!recurring) toast.success("Tạo cuộc họp mới thành công!");
+      if (recurring) {
+        const first = result[0];
+        setCalendarMonth(vietnamDateTime(first.startsAt).slice(0,7));
+        setView("calendar"); setDetailMeetingId(null);
+        toast.success("Đã tạo " + result.length + " buổi họp định kỳ.");
+      } else { detailMeetingIdRef.current = result._id; setDetailMeetingId(result._id); }
       setActiveSubTab("checkin");
     });
   };
@@ -404,45 +449,39 @@ export default function MeetingTab() {
     setPrioritySpeakerId("");
     setPriorityPosition(1);
     setEditTitle(m.title);
-    setEditAllowDirectCheckIn(m.allowDirectCheckIn === true);
     setEditLocation(m.location || "");
     setEditGpsPoint(typeof m.latitude === "number" && typeof m.longitude === "number" ? { latitude: m.latitude, longitude: m.longitude } : null);
     setEditGpsRadiusMeters(m.gpsRadiusMeters || 200);
     setEditCoverImage(m.coverImage || "");
     setEditReminderDays(m.reminderDays ?? 1);
-    setEditTiers(
-      m.tiers?.length
-        ? m.tiers.map((t) => ({ ...t }))
-        : [
-          { count: 10, seconds: 30 },
-          { count: 10, seconds: 20 },
-        ]
-    );
+    setEditTiers(speakingTimeSlotsForEdit(m.tiers));
     setEditFallbackSeconds(m.fallbackSeconds || 20);
 
     // Format startsAt for datetime-local
     try {
-      const d = new Date(m.startsAt);
-      const tzOffset = d.getTimezoneOffset() * 60000;
-      const localISOTime = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
-      setEditStartsAt(localISOTime);
+      setEditStartsAt(vietnamDateTime(m.startsAt));
+      setEditEndsAt(vietnamDateTime(m.endsAt || new Date(new Date(m.startsAt).getTime() + 120 * 60000)));
     } catch {
       setEditStartsAt("");
+      setEditEndsAt("");
     }
   };
 
   const update = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMeeting) return;
+    const timeSlotError = validateSpeakingTimeSlots(editTiers);
+    if (timeSlotError) { toast.error(timeSlotError); return; }
     void run(async () => {
       await api(`/${editingMeeting._id}`, "PUT", {
+        version: editingMeeting.__v,
         title: editTitle,
-        startsAt: new Date(editStartsAt).toISOString(),
+        ...(editingMeeting.status === "scheduled" ? { startsAt: new Date(editStartsAt + ":00+07:00").toISOString() } : {}),
+        endsAt: new Date(editEndsAt + ":00+07:00").toISOString(),
         location: editLocation,
         latitude: editGpsPoint?.latitude ?? null,
         longitude: editGpsPoint?.longitude ?? null,
         gpsRadiusMeters: editGpsRadiusMeters,
-        allowDirectCheckIn: editAllowDirectCheckIn,
         coverImage: editCoverImage,
         reminderDays: editReminderDays,
         tiers: editTiers,
@@ -653,7 +692,7 @@ export default function MeetingTab() {
     },
   };
 
-  const filteredItems = items.filter((m) => {
+  const matchesMeetingFilter = (m: Meeting) => {
     const matchesSearch =
       m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (m.location && m.location.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -665,45 +704,67 @@ export default function MeetingTab() {
     if (statusFilter === "live") return m.status === "live" || m.status === "paused";
     if (statusFilter === "ended") return m.status === "ended" || m.status === "cancelled";
     return true;
-  });
+  };
+  const filteredItems = items.filter(matchesMeetingFilter);
 
   return (
     <div className="@container w-full max-h-[85vh] overflow-y-auto px-0.5 pb-5 text-left sm:pr-2" id="meeting_tab_view">
       {/* Header bar */}
-      <div className="mb-4 flex flex-col gap-3">
+      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/80 p-3 sm:p-5 shadow-xs backdrop-blur-md">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-to-br from-cyan-600 to-teal-700 rounded-2xl shadow-sm text-white shrink-0">
+            <div className="p-2.5 bg-cyan-600 rounded-2xl shadow-sm text-white shrink-0">
               <CalendarDays className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="font-extrabold text-slate-900 text-xl md:text-2xl tracking-tight">
+              <h1 className="text-xl md:text-2xl font-black text-cyan-700 dark:text-cyan-400 tracking-tight">
                 {canManage ? "Quản lý buổi họp" : "Cuộc họp"}
               </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
                 {canManage ? "Lên lịch → Đón tiếp & check-in → Điều hành phát biểu → Quay thưởng" : "Theo dõi lịch họp và thông tin tham dự của bạn"}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-
-
+          <div className="flex flex-wrap items-center gap-2">
             {canManage && (
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2.5 text-xs font-bold shadow-sm shadow-cyan-600/20 transition cursor-pointer"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Tạo cuộc họp mới</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  aria-expanded={showSharedQr}
+                  aria-controls="company-checkin-qr"
+                  onClick={() => setShowSharedQr(true)}
+                  className="flex items-center gap-2 rounded-xl border border-cyan-200 bg-white px-4 py-2.5 text-xs font-bold text-cyan-700 hover:bg-cyan-50"
+                >
+                  <QrCode className="h-4 w-4" />
+                  <span>QR check-in chung</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openCreateModal("recurring")}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 px-4 py-2.5 text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  <span>Tạo lịch định kỳ</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openCreateModal("single")}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2.5 text-xs font-bold shadow-sm shadow-cyan-600/20 transition cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Tạo cuộc họp mới</span>
+                </button>
+              </>
             )}
           </div>
         </div>
 
         {/* Filter Toolbar: Search + Status Tabs */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
           {/* Status Tabs */}
           <div className="flex gap-1.5 overflow-x-auto pb-1 select-none">
             <button
@@ -711,45 +772,47 @@ export default function MeetingTab() {
               onClick={() => setStatusFilter("all")}
               className={`px-3.5 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer ${statusFilter === "all"
                 ? "bg-cyan-600 text-white shadow-xs"
-                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                : "bg-slate-50 border border-slate-200/80 text-slate-600 hover:bg-cyan-50 hover:text-cyan-700 hover:border-cyan-200"
                 }`}
             >
-              Tất cả ({items.length})
+              Tất cả {view === "list" && "(" + items.length + ")"}
             </button>
             <button
               type="button"
               onClick={() => setStatusFilter("live")}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer ${statusFilter === "live"
-                ? "bg-green-600 text-white shadow-xs"
-                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                ? "bg-cyan-600 text-white shadow-xs"
+                : "bg-slate-50 border border-slate-200/80 text-slate-600 hover:bg-cyan-50 hover:text-cyan-700 hover:border-cyan-200"
                 }`}
             >
-              <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-              Đang diễn ra ({items.filter((m) => m.status === "live" || m.status === "paused").length})
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              Đang diễn ra {view === "list" && "(" + items.filter((m) => m.status === "live" || m.status === "paused").length + ")"}
             </button>
             <button
               type="button"
               onClick={() => setStatusFilter("scheduled")}
-              className={`px-3.5 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer ${statusFilter === "scheduled"
-                ? "bg-amber-600 text-white shadow-xs"
-                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer ${statusFilter === "scheduled"
+                ? "bg-cyan-600 text-white shadow-xs"
+                : "bg-slate-50 border border-slate-200/80 text-slate-600 hover:bg-cyan-50 hover:text-cyan-700 hover:border-cyan-200"
                 }`}
             >
-              Sắp diễn ra ({items.filter((m) => m.status === "scheduled").length})
+              <span className="h-2 w-2 rounded-full bg-amber-400" />
+              Sắp diễn ra {view === "list" && "(" + items.filter((m) => m.status === "scheduled").length + ")"}
             </button>
             <button
               type="button"
               onClick={() => setStatusFilter("ended")}
-              className={`px-3.5 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer ${statusFilter === "ended"
-                ? "bg-slate-700 text-white shadow-xs"
-                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer ${statusFilter === "ended"
+                ? "bg-cyan-600 text-white shadow-xs"
+                : "bg-slate-50 border border-slate-200/80 text-slate-600 hover:bg-cyan-50 hover:text-cyan-700 hover:border-cyan-200"
                 }`}
             >
-              Đã kết thúc ({items.filter((m) => m.status === "ended" || m.status === "cancelled").length})
+              <span className="h-2 w-2 rounded-full bg-slate-400" />
+              Đã kết thúc {view === "list" && "(" + items.filter((m) => m.status === "ended" || m.status === "cancelled").length + ")"}
             </button>
           </div>
 
-          {!canManage && <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={attendedOnly} onChange={event => setAttendedOnly(event.target.checked)} />Chỉ buổi đã check-in</label>}
+          {!canManage && <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer"><input type="checkbox" className="rounded text-cyan-600 focus:ring-cyan-500" checked={attendedOnly} onChange={event => setAttendedOnly(event.target.checked)} />Chỉ buổi đã check-in</label>}
           {/* Search Box */}
           <div className="relative min-w-[240px]">
             <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -758,14 +821,47 @@ export default function MeetingTab() {
               placeholder="Tìm theo tên cuộc họp, địa điểm..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:border-cyan-500 focus:outline-none shadow-2xs"
+              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none shadow-2xs"
             />
           </div>
         </div>
       </div>
 
+      <div className="mb-3 inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 border border-slate-200/60" role="group" aria-label="Chế độ xem cuộc họp">
+        <button
+          type="button"
+          aria-pressed={view === "calendar"}
+          onClick={() => setView("calendar")}
+          className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+            view === "calendar"
+              ? "bg-white text-cyan-700 shadow-xs border border-slate-200/60"
+              : "text-slate-600 hover:text-cyan-700"
+          }`}
+        >
+          <CalendarDays className="h-3.5 w-3.5" />
+          <span>Lịch tháng</span>
+        </button>
+        <button
+          type="button"
+          aria-pressed={view === "list"}
+          onClick={() => setView("list")}
+          className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+            view === "list"
+              ? "bg-white text-cyan-700 shadow-xs border border-slate-200/60"
+              : "text-slate-600 hover:text-cyan-700"
+          }`}
+        >
+          <Users className="h-3.5 w-3.5" />
+          <span>Danh sách</span>
+        </button>
+      </div>
+      {canManage && showSharedQr && <CompanyCheckInQrDialog api={api} companyCode={userProfile?.companyCode} onClose={() => setShowSharedQr(false)} />}
       {/* Grid of Meeting Cards (Dạng danh sách / Thẻ hiển thị) */}
-      {loading ? <p role="status" className="p-8 text-center text-sm text-slate-500">Đang tải cuộc họp...</p> : loadError ? <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{loadError}<button type="button" onClick={() => { setLoading(true); void refresh(); }} className="ml-3 font-bold">Thử lại</button></div> : filteredItems.length > 0 ? (
+      {view === "calendar" ? <MeetingCalendar<Meeting> month={calendarMonth} onMonthChange={setCalendarMonth} revision={calendarRevision} load={api} canManage={canManage} filter={matchesMeetingFilter}
+        onOpen={meeting => { setItems(previous => [...previous.filter(item => item._id !== meeting._id), meeting]); setDetailMeetingId(meeting._id); setActiveSubTab(meeting.status === "scheduled" ? "checkin" : "speakers"); }}
+        onEdit={meeting => openEditModal(meeting)}
+        onCancel={async meeting => { try { await api("/" + meeting._id + "/control", "POST", { action: "cancel", version: meeting.__v }); await refresh(); toast.success("Đã hủy buổi họp."); } catch (error: any) { toast.error(error.message); throw error; } }}
+      /> : loading ? <p role="status" className="p-8 text-center text-sm text-slate-500">Đang tải cuộc họp...</p> : loadError ? <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{loadError}<button type="button" onClick={() => { setLoading(true); void refresh(); }} className="ml-3 font-bold">Thử lại</button></div> : filteredItems.length > 0 ? (
         <div className="grid grid-cols-1 @min-[32rem]:grid-cols-2 @min-[48rem]:grid-cols-3 @min-[64rem]:grid-cols-4 gap-3">
           {filteredItems.map((m) => {
             const s = statusMap[m.status] || {
@@ -966,7 +1062,8 @@ export default function MeetingTab() {
           {canManage && (
             <button
               type="button"
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => openCreateModal("single")}
+              disabled={saving}
               className="mt-4 inline-flex items-center gap-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 text-xs font-bold shadow-sm transition cursor-pointer"
             >
               <Plus className="h-4 w-4" />
@@ -1029,16 +1126,40 @@ export default function MeetingTab() {
 
               {/* Sub-tab Switcher & Actions */}
               <div className="flex items-center justify-between sm:justify-end gap-2">
-                <div className="flex overflow-x-auto bg-slate-100 p-1 rounded-xl">
-                  <button type="button" onClick={() => setActiveSubTab("slides")} aria-pressed={activeSubTab === "slides"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700 aria-pressed:font-semibold">Thuyết trình</button>
-                  <button type="button" onClick={() => setActiveSubTab("checkin")} aria-pressed={activeSubTab === "checkin"} className="shrink-0 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 aria-pressed:bg-white aria-pressed:text-cyan-700 aria-pressed:font-semibold">Check-in ({activeMeeting.speakers.length})</button>
+                <div className="flex overflow-x-auto bg-slate-100 p-1 rounded-xl gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setActiveSubTab("slides")}
+                    aria-pressed={activeSubTab === "slides"}
+                    className={`shrink-0 rounded-lg px-3 py-1.5 text-xs transition cursor-pointer ${
+                      activeSubTab === "slides"
+                        ? "bg-white text-cyan-700 shadow-xs font-bold border border-slate-200/60"
+                        : "text-slate-600 hover:text-cyan-700 font-medium"
+                    }`}
+                  >
+                    Thuyết trình
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSubTab("checkin")}
+                    aria-pressed={activeSubTab === "checkin"}
+                    className={`shrink-0 rounded-lg px-3 py-1.5 text-xs transition cursor-pointer ${
+                      activeSubTab === "checkin"
+                        ? "bg-white text-cyan-700 shadow-xs font-bold border border-slate-200/60"
+                        : "text-slate-600 hover:text-cyan-700 font-medium"
+                    }`}
+                  >
+                    Check-in ({activeMeeting.speakers.length})
+                  </button>
                   <button
                     type="button"
                     onClick={() => setActiveSubTab("speakers")}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition cursor-pointer ${activeSubTab === "speakers"
-                      ? "bg-white text-cyan-700 shadow-2xs font-semibold"
-                      : "text-slate-600 hover:text-slate-900 font-medium"
-                      }`}
+                    aria-pressed={activeSubTab === "speakers"}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition cursor-pointer ${
+                      activeSubTab === "speakers"
+                        ? "bg-white text-cyan-700 shadow-xs font-bold border border-slate-200/60"
+                        : "text-slate-600 hover:text-cyan-700 font-medium"
+                    }`}
                   >
                     <Users className="h-3.5 w-3.5" />
                     <span>Điều hành</span>
@@ -1047,15 +1168,17 @@ export default function MeetingTab() {
                   <button
                     type="button"
                     onClick={() => setActiveSubTab("luckyDraw")}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition cursor-pointer ${activeSubTab === "luckyDraw"
-                      ? "bg-cyan-600 text-white shadow-2xs font-semibold"
-                      : "text-slate-600 hover:text-slate-900 font-medium"
-                      }`}
+                    aria-pressed={activeSubTab === "luckyDraw"}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition cursor-pointer ${
+                      activeSubTab === "luckyDraw"
+                        ? "bg-white text-cyan-700 shadow-xs font-bold border border-slate-200/60"
+                        : "text-slate-600 hover:text-cyan-700 font-medium"
+                    }`}
                   >
                     <Gift className="h-3.5 w-3.5" />
                     <span>Quay thưởng</span>
                     {activeMeeting.luckyDraw?.winners?.length ? (
-                      <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-400 text-slate-900 font-extrabold">
+                      <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-100 text-amber-800 font-extrabold border border-amber-300">
                         {activeMeeting.luckyDraw.winners.length}
                       </span>
                     ) : null}
@@ -1212,7 +1335,7 @@ export default function MeetingTab() {
                               : null;
                             setStartPresentation(true); setActiveSubTab("slides");
                           }}
-                          className="flex items-center gap-1.5 rounded-xl bg-cyan-700 px-4 py-2 text-xs font-medium text-white disabled:opacity-40 hover:bg-cyan-800 transition cursor-pointer">
+                          className="flex items-center gap-1.5 rounded-xl bg-cyan-600 px-4 py-2 text-xs font-bold text-white shadow-sm shadow-cyan-600/20 disabled:opacity-40 hover:bg-cyan-700 transition cursor-pointer">
                           <Play className="h-3.5 w-3.5" /> Bắt đầu thuyết trình
                         </button>
                   {canManage && activeMeeting.status === "scheduled" && (
@@ -1465,7 +1588,7 @@ export default function MeetingTab() {
                   </div>}
 
                   </>)}
-                  {activeSubTab === "checkin" && <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} onRefresh={refresh} onConfigure={() => openEditModal(activeMeeting)} onOperate={() => setActiveSubTab("speakers")} />}
+                  {activeSubTab === "checkin" && <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canManage} api={api} companyCode={userProfile?.companyCode} onConfigure={() => openEditModal(activeMeeting)} onOperate={() => setActiveSubTab("speakers")} />}
                   {/* Guest Checkin Form (MC / Admin) */}
                   {canManage && (activeSubTab === "checkin" || activeSubTab === "speakers") && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
                     <form
@@ -1730,18 +1853,19 @@ export default function MeetingTab() {
         </div>
       )}
 
-      {/* POPUP TẠO CUỘC HỌP MỚI */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+      {/* POPUP TẠO CUỘC HỌP ĐƠN LẺ / LỊCH ĐỊNH KỲ */}
+      {createModal && (
+        <div key={createModal} role="dialog" aria-modal="true" aria-labelledby="create-meeting-title" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="max-h-[90dvh] overflow-y-auto w-full max-w-2xl rounded-2xl bg-white p-5 sm:p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+              <h3 id="create-meeting-title" className="font-bold text-base text-slate-900 flex items-center gap-2">
                 <CalendarDays className="h-5 w-5 text-cyan-600" />
-                Tạo cuộc họp BNI mới
+                {recurring ? "Tạo lịch định kỳ hằng tuần" : "Tạo cuộc họp BNI mới"}
               </h3>
               <button
                 type="button"
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => setCreateModal(null)}
+                aria-label="Đóng popup tạo lịch"
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
               >
                 <X className="h-5 w-5" />
@@ -1762,17 +1886,19 @@ export default function MeetingTab() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
+              {recurring && <MeetingRecurrenceFields value={recurrence} onChange={setRecurrence} />}
+
+              <div className={recurring ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 sm:grid-cols-2 gap-3"}>
+                {!recurring && <div>
                   <label className="block font-bold text-slate-700 mb-1">
-                    Thời gian diễn ra <span className="text-rose-500">*</span>
+                    Thời gian diễn ra (giờ Việt Nam) <span className="text-rose-500">*</span>
                   </label>
                   <MeetingDateTimePicker
                     required
                     value={startsAt}
-                    onChange={setStartsAt}
+                    onChange={value => { setStartsAt(value); if (!endsAt || endsAt <= value) setEndsAt(defaultEnd(value)); }}
                   />
-                </div>
+                </div>}
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Địa điểm / Link họp</label>
@@ -1785,7 +1911,8 @@ export default function MeetingTab() {
                 </div>
               </div>
 
-              <label className="block rounded-xl border border-cyan-100 bg-cyan-50 p-4 text-sm"><span className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={allowDirectCheckIn} onChange={event => setAllowDirectCheckIn(event.target.checked)} />Cho phép điểm danh trực tiếp trước khi cuộc họp bắt đầu</span><span className="mt-2 block text-xs text-slate-600">Khi cuộc họp bắt đầu, thành viên có thể bấm Điểm danh trực tiếp. Bật tùy chọn này để cho phép điểm danh trước giờ bắt đầu. Luôn yêu cầu GPS trong bán kính địa điểm họp.</span></label>
+              {!recurring && <label className="block text-sm font-bold text-slate-700">Giờ kết thúc cuộc họp *<input aria-label="Giờ kết thúc cuộc họp" required type="datetime-local" value={endsAt} min={startsAt || undefined} onChange={event => setEndsAt(event.target.value)} className="mt-1 block w-full rounded-xl border border-slate-200 p-2.5" /><span className="mt-1 block text-xs font-normal text-slate-500">QR dùng chung nhận check-in từ giờ bắt đầu đến trước giờ kết thúc. Mặc định 2 giờ, có thể điều chỉnh.</span></label>}
+
               <MeetingLocationFields value={gpsPoint} onChange={setGpsPoint} radius={gpsRadiusMeters} onRadiusChange={setGpsRadiusMeters} />
 
               <MeetingCoverImageField value={coverImage} onChange={setCoverImage} />
@@ -1801,81 +1928,12 @@ export default function MeetingTab() {
                 />
               </div>
 
-              {/* Tiers duration config */}
-              <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 space-y-2">
-                <span className="block font-bold text-[11px] text-slate-600 uppercase tracking-wider">
-                  Cấu hình theo toàn bộ thứ tự check-in
-                </span>
-                <p className="text-[10px] text-slate-500">
-                  Tính theo toàn bộ danh sách check-in, gồm thành viên và khách mời. Các lượt vượt tổng số nhóm dùng thời lượng mặc định.
-                </p>
-                {tiers.map((t, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
-                    <span className="col-span-3 text-[10px] font-semibold text-slate-600">Cấp {i + 1}</span>
-                    <div>
-                      <span className="text-[10px] text-slate-500">Số lượng người:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={t.count}
-                        onChange={(e) =>
-                          setTiers((ts) =>
-                            ts.map((v, j) => (j === i ? { ...v, count: +e.target.value } : v))
-                          )
-                        }
-                        className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white p-1.5 text-xs text-slate-800"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500">Số giây phát biểu:</span>
-                      <input
-                        type="number"
-                        min="5"
-                        value={t.seconds}
-                        onChange={(e) =>
-                          setTiers((ts) =>
-                            ts.map((v, j) => (j === i ? { ...v, seconds: +e.target.value } : v))
-                          )
-                        }
-                        className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white p-1.5 text-xs text-slate-800"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      aria-label={`Remove tier ${i + 1}`}
-                      title="Xóa cấp"
-                      disabled={tiers.length <= 1}
-                      onClick={() => setTiers((current) => current.filter((_, index) => index !== i))}
-                      className="mb-0.5 rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30 cursor-pointer"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-2">
-                  <span className="text-[10px] text-slate-500">
-                    Tổng số lượt theo các cấp: {tiers.reduce((total, tier) => total + tier.count, 0)} người
-                  </span>
-                  <button
-                    type="button"
-                    disabled={tiers.length >= 20}
-                    onClick={() =>
-                      setTiers((current) => [
-                        ...current,
-                        { count: 10, seconds: current[current.length - 1]?.seconds || fallbackSeconds },
-                      ])
-                    }
-                    className="rounded-lg bg-cyan-50 px-3 py-1.5 text-[11px] font-bold text-cyan-700 hover:bg-cyan-100 disabled:opacity-40 cursor-pointer"
-                  >
-                    + Thêm cấp thời lượng
-                  </button>
-                </div>
-              </div>
+              <MeetingSpeakingTimeFields value={tiers} onChange={setTiers} fallbackSeconds={fallbackSeconds} onFallbackChange={setFallbackSeconds} />
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => setCreateModal(null)}
                   className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 font-bold text-slate-700 cursor-pointer"
                 >
                   Hủy
@@ -1885,7 +1943,7 @@ export default function MeetingTab() {
                   disabled={saving}
                   className="rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-5 py-2 font-bold shadow-sm shadow-cyan-600/20 disabled:opacity-50 cursor-pointer"
                 >
-                  {saving ? "Đang tạo..." : "Tạo cuộc họp"}
+                  {saving ? "Đang tạo..." : recurring ? "Tạo lịch định kỳ" : "Tạo cuộc họp"}
                 </button>
               </div>
             </form>
@@ -1912,6 +1970,7 @@ export default function MeetingTab() {
             </div>
 
             <form onSubmit={update} className="space-y-4 pt-4 text-xs">
+              {editingMeeting.seriesId && <p className="rounded-lg bg-cyan-50 p-3">Chỉ sửa hoặc dời buổi này. Các buổi còn lại trong chu kỳ giữ nguyên.</p>}
 
 
               <div>
@@ -1930,12 +1989,13 @@ export default function MeetingTab() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
-                    Thời gian diễn ra <span className="text-rose-500">*</span>
+                    Thời gian diễn ra (giờ Việt Nam) <span className="text-rose-500">*</span>
                   </label>
                   <MeetingDateTimePicker
                     required
+                    disabled={editingMeeting.status !== "scheduled"}
                     value={editStartsAt}
-                    onChange={setEditStartsAt}
+                    onChange={value => { const duration = new Date(editEndsAt + ":00+07:00").getTime() - new Date(editStartsAt + ":00+07:00").getTime(); setEditStartsAt(value); if (value) setEditEndsAt(vietnamDateTime(new Date(new Date(value + ":00+07:00").getTime() + (duration > 0 ? duration : 120 * 60000)))); }}
                   />
                 </div>
 
@@ -1950,7 +2010,8 @@ export default function MeetingTab() {
                 </div>
               </div>
 
-              <label className="block rounded-xl border border-cyan-100 bg-cyan-50 p-4 text-sm"><span className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={editAllowDirectCheckIn} onChange={event => setEditAllowDirectCheckIn(event.target.checked)} />Cho phép điểm danh trực tiếp trước khi cuộc họp bắt đầu</span><span className="mt-2 block text-xs text-slate-600">Khi cuộc họp bắt đầu, thành viên có thể bấm Điểm danh trực tiếp. Bật tùy chọn này để cho phép điểm danh trước giờ bắt đầu. Luôn yêu cầu GPS trong bán kính địa điểm họp.</span></label>
+              <label className="block text-sm font-bold text-slate-700">Giờ kết thúc cuộc họp *<input aria-label="Giờ kết thúc cuộc họp" required type="datetime-local" value={editEndsAt} min={editStartsAt || undefined} onChange={event => setEditEndsAt(event.target.value)} className="mt-1 block w-full rounded-xl border border-slate-200 p-2.5" /><span className="mt-1 block text-xs font-normal text-slate-500">QR dùng chung nhận check-in từ giờ bắt đầu đến trước giờ kết thúc. Mặc định 2 giờ, có thể điều chỉnh.</span></label>
+
               <MeetingLocationFields value={editGpsPoint} onChange={setEditGpsPoint} radius={editGpsRadiusMeters} onRadiusChange={setEditGpsRadiusMeters} />
 
               <MeetingCoverImageField value={editCoverImage} onChange={setEditCoverImage} />
@@ -1966,76 +2027,7 @@ export default function MeetingTab() {
                 />
               </div>
 
-              {/* Tiers duration config */}
-              <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 space-y-2">
-                <span className="block font-bold text-[11px] text-slate-600 uppercase tracking-wider">
-                  Cấu hình theo toàn bộ thứ tự check-in
-                </span>
-                <p className="text-[10px] text-slate-500">
-                  Tính theo toàn bộ danh sách check-in, gồm thành viên và khách mời. Các lượt vượt tổng số nhóm dùng thời lượng mặc định.
-                </p>
-                {editTiers.map((t, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
-                    <span className="col-span-3 text-[10px] font-semibold text-slate-600">Cấp {i + 1}</span>
-                    <div>
-                      <span className="text-[10px] text-slate-500">Số lượng người:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={t.count}
-                        onChange={(e) =>
-                          setEditTiers((ts) =>
-                            ts.map((v, j) => (j === i ? { ...v, count: +e.target.value } : v))
-                          )
-                        }
-                        className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white p-1.5 text-xs text-slate-800"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500">Số giây phát biểu:</span>
-                      <input
-                        type="number"
-                        min="5"
-                        value={t.seconds}
-                        onChange={(e) =>
-                          setEditTiers((ts) =>
-                            ts.map((v, j) => (j === i ? { ...v, seconds: +e.target.value } : v))
-                          )
-                        }
-                        className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white p-1.5 text-xs text-slate-800"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      aria-label={`Remove tier ${i + 1}`}
-                      title="Xóa cấp"
-                      disabled={editTiers.length <= 1}
-                      onClick={() => setEditTiers((current) => current.filter((_, index) => index !== i))}
-                      className="mb-0.5 rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30 cursor-pointer"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-2">
-                  <span className="text-[10px] text-slate-500">
-                    Tổng số lượt theo các cấp: {editTiers.reduce((total, tier) => total + tier.count, 0)} người
-                  </span>
-                  <button
-                    type="button"
-                    disabled={editTiers.length >= 20}
-                    onClick={() =>
-                      setEditTiers((current) => [
-                        ...current,
-                        { count: 10, seconds: current[current.length - 1]?.seconds || editFallbackSeconds },
-                      ])
-                    }
-                    className="rounded-lg bg-cyan-50 px-3 py-1.5 text-[11px] font-bold text-cyan-700 hover:bg-cyan-100 disabled:opacity-40 cursor-pointer"
-                  >
-                    + Thêm cấp thời lượng
-                  </button>
-                </div>
-              </div>
+              <MeetingSpeakingTimeFields value={editTiers} onChange={setEditTiers} fallbackSeconds={editFallbackSeconds} onFallbackChange={setEditFallbackSeconds} />
 
               {canManage && orderingMeeting && ["scheduled", "live", "paused"].includes(orderingMeeting.status) && orderingMeeting.speakers.length > 0 && <div className="mb-4 space-y-2 rounded-xl border border-cyan-100 bg-cyan-50/40 p-3">
                 <h4 className="font-bold text-slate-800">Sắp xếp thứ tự thuyết trình</h4>

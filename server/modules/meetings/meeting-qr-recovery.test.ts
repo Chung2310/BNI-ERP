@@ -3,58 +3,74 @@ import test from 'node:test';
 import { createHash } from 'node:crypto';
 import { setRateLimitRedisClientForTesting } from '../../infrastructure/rate-limit-redis';
 setRateLimitRedisClientForTesting({ eval: async () => [1, 1000], decr: async () => 0, del: async () => 0 });
-const { createCheckInQr, getCheckInQr } = await import('./meeting.service');
-const { MeetingModel } = await import('./meeting.model');
+const { getCompanyCheckInQr } = await import('./meeting.service');
+const { MeetingModel, MeetingCheckInQrModel } = await import('./meeting.model');
+const { encryptSecret } = await import('../../security/crypto');
 process.env.APP_ENCRYPTION_KEY = '11'.repeat(32);
-function setup(t: any) {
-  let saves = 0;
-  const item: any = { _id: 'meeting-a', companyCode: 'ACME', title: 'Test', status: 'live', latitude: 10, longitude: 106, save: async () => { saves++; } };
-  const queries: any[] = [];
-  t.mock.method(MeetingModel, 'findOne', (query: any) => {
-    queries.push(query);
-    const value = query.companyCode === 'ACME' ? item : null;
-    return Object.assign(Promise.resolve(value), { select: async () => value });
+
+test('concurrent first requests converge on the persisted company token', async t => {
+  let stored: any = null;
+  let writes = 0;
+  t.mock.method(MeetingCheckInQrModel, 'findOne', () => {
+    const snapshot = stored;
+    return { select: async () => snapshot };
   });
-  return { item, saves: () => saves, queries };
-}
-test('new QR is encrypted and restored repeatedly without changing token or expiry', async t => {
-  const { item, saves } = setup(t);
-  const generated = await createCheckInQr('ACME', 'meeting-a', 1);
-  assert.ok(item.checkInQrTokenEncrypted);
-  assert.notEqual(item.checkInQrTokenEncrypted, generated.token);
-  const first = await getCheckInQr('ACME', 'meeting-a');
-  const second = await getCheckInQr('ACME', 'meeting-a');
-  assert.deepEqual(first, second);
-  assert.equal(first?.checkInUrl, '/meeting-checkin/' + generated.token);
-  assert.equal(first?.expiresAt, generated.expiresAt);
-  assert.equal(saves(), 1);
-  assert.equal(MeetingModel.schema.path('checkInQrTokenEncrypted').options.select, false);
+  t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', (query: any, update: any, options: any) => ({
+    select: async (projection: string) => {
+      assert.deepEqual(query, { companyCode: 'ACME', tokenHash: { $exists: false }, tokenEncrypted: { $exists: false } });
+      assert.equal(options.upsert, true);
+      assert.equal(projection, '+tokenEncrypted');
+      if (stored) throw Object.assign(new Error('Duplicate company'), { code: 11000 });
+      writes++;
+      stored = { companyCode: 'ACME', ...update.$set };
+      return stored;
+    },
+  }));
+  const lookup = t.mock.method(MeetingModel, 'findOne', () => { throw new Error('Must not depend on a meeting'); });
+  const results = await Promise.all(Array.from({ length: 8 }, () => getCompanyCheckInQr('ACME')));
+  assert.equal(writes, 1);
+  assert.equal(new Set(results.map(result => result.checkInUrl)).size, 1);
+  assert.ok(results.every(result => result.expiresAt === null));
+  assert.equal(lookup.mock.callCount(), 0);
+  assert.ok(MeetingCheckInQrModel.schema.path('companyCode').options.unique);
 });
-test('old cached token can be migrated only if it matches the current hash', async t => {
-  const { item, saves } = setup(t);
+
+test('different companies receive independent permanent tokens', async t => {
+  const records = new Map<string, any>();
+  t.mock.method(MeetingCheckInQrModel, 'findOne', (query: any) => ({ select: async () => records.get(query.companyCode) || null }));
+  t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', (query: any, update: any) => ({ select: async () => {
+    const record = { companyCode: query.companyCode, ...update.$set };
+    records.set(query.companyCode, record);
+    return record;
+  } }));
+  const a = await getCompanyCheckInQr('ACME');
+  const b = await getCompanyCheckInQr('OTHER');
+  assert.notEqual(a.checkInUrl, b.checkInUrl);
+  assert.deepEqual(await getCompanyCheckInQr('ACME'), a);
+  assert.deepEqual(await getCompanyCheckInQr('OTHER'), b);
+  await assert.rejects(getCompanyCheckInQr(''), { status: 403 });
+});
+
+test('a previously revoked empty record is initialized once', async t => {
+  let record: any = { companyCode: 'ACME', revokedAt: new Date() };
+  const lookup = t.mock.method(MeetingCheckInQrModel, 'findOne', () => ({ select: async () => record }));
+  const initialize = t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', (_query: any, update: any) => ({ select: async () => {
+    record = { companyCode: 'ACME', ...update.$set };
+    return record;
+  } }));
+  const first = await getCompanyCheckInQr('ACME');
+  assert.deepEqual(await getCompanyCheckInQr('ACME'), first);
+  assert.equal(initialize.mock.callCount(), 1);
+  assert.equal(lookup.mock.callCount(), 2);
+});
+
+test('unreadable or mismatched encrypted tokens fail without silently replacing the QR', async t => {
   const token = 'A'.repeat(43);
-  item.checkInQrTokenHash = createHash('sha256').update(token).digest('hex');
-  item.checkInQrExpiresAt = new Date(Date.now() + 60000);
-  assert.equal((await getCheckInQr('ACME', 'meeting-a'))?.legacy, true);
-  await assert.rejects(getCheckInQr('ACME', 'meeting-a', 'B'.repeat(43)), { status: 409 });
-  const restored = await getCheckInQr('ACME', 'meeting-a', token);
-  assert.equal(restored?.checkInUrl, '/meeting-checkin/' + token);
-  assert.equal(saves(), 1);
-  assert.deepEqual(await getCheckInQr('ACME', 'meeting-a'), restored);
-});
-test('expired and closed QR cannot be recovered; explicit replacement rotates it', async t => {
-  const { item } = setup(t);
-  const old = await createCheckInQr('ACME', 'meeting-a', 1);
-  const replacement = await createCheckInQr('ACME', 'meeting-a', 1);
-  assert.notEqual(old.token, replacement.token);
-  await assert.rejects(getCheckInQr('ACME', 'meeting-a', old.token), { status: 409 });
-  item.status = 'ended';
-  assert.equal(await getCheckInQr('ACME', 'meeting-a'), null);
-  item.status = 'live'; item.checkInQrExpiresAt = new Date(0);
-  assert.equal(await getCheckInQr('ACME', 'meeting-a'), null);
-});
-test('recovery is scoped to the meeting company', async t => {
-  const { queries } = setup(t);
-  await assert.rejects(getCheckInQr('OTHER', 'meeting-a'), { status: 404 });
-  assert.deepEqual(queries[0], { _id: 'meeting-a', companyCode: 'OTHER' });
+  const record: any = { companyCode: 'ACME', tokenHash: createHash('sha256').update(token).digest('hex'), tokenEncrypted: 'invalid', expiresAt: null };
+  t.mock.method(MeetingCheckInQrModel, 'findOne', () => ({ select: async () => record }));
+  const write = t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', () => { throw new Error('Must not rotate'); });
+  await assert.rejects(getCompanyCheckInQr('ACME'), { status: 409 });
+  record.tokenEncrypted = encryptSecret('B'.repeat(43));
+  await assert.rejects(getCompanyCheckInQr('ACME'), { status: 409 });
+  assert.equal(write.mock.callCount(), 0);
 });

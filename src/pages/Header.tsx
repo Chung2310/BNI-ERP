@@ -21,8 +21,9 @@ interface HeaderProps {
 }
 
 const searchIndex = [
+  { label: "Bảng xếp hạng", tab: "BẢNG XẾP HẠNG" as TabType, keywords: "bang xep hang bxh ranking leaderboard thanh vien tich cuc vang muon luoi" },
   { label: "Tổng quan Doanh nghiệp", tab: "TỔNG QUAN" as TabType, keywords: "tong quan dashboard kpi hieu suat bieu do" },
-  { label: "Sơ đồ tổ chức", tab: "NHÂN SỰ" as TabType, subTab: "SƠ ĐỒ TỔ CHỨC", keywords: "hr so do to chuc thanh vien doanh nghiep phong ban" },
+  { label: "Thành viên", tab: "NHÂN SỰ" as TabType, subTab: "SƠ ĐỒ TỔ CHỨC", keywords: "hr so do to chuc thanh vien doanh nghiep phong ban" },
   { label: "Email chúc mừng", tab: "NHÂN SỰ" as TabType, subTab: "EMAIL CHÚC MỪNG", keywords: "email chuc mung sinh nhat ky niem" },
   { label: "Quản lý tài nguyên", tab: "QUẢN LÝ TÀI NGUYÊN" as TabType, keywords: "tai lieu file drive upload tai nguyen" },
   { label: "Trò chuyện nội bộ", tab: "TRÒ CHUYỆN" as TabType, keywords: "chat tro chuyen tin nhan nhom" },

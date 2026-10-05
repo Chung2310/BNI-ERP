@@ -1,3 +1,4 @@
+import { findLoginAccount } from "../utils/login-account";
 import { stripLegacyUserFields } from "../utils/legacy-user-fields";
 import { verifySelfAccountDeletion } from "./self-account-deletion";
 import { PushSubscriptionModel } from "../model/push-subscription.model";
@@ -112,11 +113,10 @@ export const authService = {
   /**
    * Đăng nhập tài khoản
    */
-  async login(email: string, password?: string, requestMetadata?: any) {
-    const emailLower = email.toLowerCase().trim();
-    const user = await UserModel.findOne({ email: emailLower });
+  async login(identifier: string, password?: string, requestMetadata?: any) {
+    const user = await findLoginAccount(identifier);
 
-    if (!user) {
+    if (!user || !user.password) {
       throw new Error("Tài khoản hoặc mật khẩu không chính xác.");
     }
 

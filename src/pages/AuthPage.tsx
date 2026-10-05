@@ -1,3 +1,4 @@
+import { normalizeLoginIdentifier } from "../utils/loginIdentifier";
 import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { Mail, Lock, RefreshCw, ArrowRight, Eye, EyeOff, AlertCircle, ArrowLeft } from "lucide-react";
@@ -11,31 +12,31 @@ import {
 import { parseFirebaseError } from "../utils/firebaseErrorParser";
 
 export default function AuthPage() {
-  const { loginWithEmail } = useAuth();
-  const [email, setEmail] = useState("");
+  const { loginWithIdentifier } = useAuth();
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
-  
+
   // Error states for local validation & server responses
   const [error, setError] = useState<string | null>(null);
-  const [emailError, setEmailError] = useState<string | null>(null);
+  const [identifierError, setIdentifierError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const validateForm = () => {
     let isValid = true;
-    setEmailError(null);
+    setIdentifierError(null);
     setPasswordError(null);
     setError(null);
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email.trim()) {
-      setEmailError("Email không được để trống.");
+    // Validate identifier format
+
+    if (!identifier.trim()) {
+      setIdentifierError("Vui lòng nhập số điện thoại hoặc email.");
       isValid = false;
-    } else if (!emailRegex.test(email.trim())) {
-      setEmailError("Địa chỉ email không đúng định dạng.");
+    } else if (!normalizeLoginIdentifier(identifier)) {
+      setIdentifierError("Số điện thoại hoặc email không đúng định dạng.");
       isValid = false;
     }
 
@@ -57,7 +58,7 @@ export default function AuthPage() {
 
     setLoading(true);
     try {
-      await loginWithEmail(email.trim(), password.trim(), rememberMe);
+      await loginWithIdentifier(identifier.trim(), password, rememberMe);
     } catch (err: any) {
       console.error(err);
       const msg = parseFirebaseError(err, "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
@@ -69,7 +70,7 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-dvh w-full flex items-center justify-center bg-gradient-to-br from-[#f6f8fd] via-[#eef2f7] to-[#e3ecf5] p-4 py-8 overflow-y-auto relative font-sans">
-      
+
       {/* Background Decorative Blobs */}
       <div className="pointer-events-none absolute left-[-20%] top-[-8%] h-[360px] w-[360px] rounded-full bg-blue-400/10 blur-[90px] sm:left-[-10%] sm:top-[-10%] sm:h-[600px] sm:w-[600px] sm:blur-[120px]" />
       <div className="pointer-events-none absolute bottom-[-8%] right-[-20%] h-[360px] w-[360px] rounded-full bg-indigo-400/10 blur-[90px] sm:bottom-[-10%] sm:right-[-10%] sm:h-[600px] sm:w-[600px] sm:blur-[120px]" />
@@ -85,7 +86,7 @@ export default function AuthPage() {
             <span>Về trang chủ</span>
           </a>
         </div>
-        
+
         {/* Brand Header */}
         <div className="text-center space-y-3">
           <div className="inline-block relative">
@@ -112,45 +113,49 @@ export default function AuthPage() {
 
         {/* Input Form */}
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
-          
+
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Địa chỉ Email *</label>
+            <label htmlFor="login-identifier" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Số điện thoại hoặc email *</label>
             <div className="relative group">
               <Mail className={`absolute left-3.5 top-3.5 h-4 w-4 transition-colors ${
-                emailError ? "text-red-500" : "text-slate-400 group-focus-within:text-blue-600"
+                identifierError ? "text-red-500" : "text-slate-400 group-focus-within:text-blue-600"
               }`} />
-              <input 
-                type="email" 
-                placeholder="name@company.com" 
-                value={email}
+              <input
+                id="login-identifier"
+                type="text"
+                autoComplete="username"
+                placeholder="Số điện thoại hoặc email"
+                value={identifier}
                 onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (emailError) setEmailError(null);
+                  setIdentifier(e.target.value);
+                  if (identifierError) setIdentifierError(null);
                   if (error) setError(null);
                 }}
                 className={`w-full pl-11 pr-4 py-3 bg-slate-50 border rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white outline-none transition-all duration-200 ${
-                  emailError 
-                    ? "border-red-300 focus:ring-4 focus:ring-red-500/10 focus:border-red-500" 
+                  identifierError
+                    ? "border-red-300 focus:ring-4 focus:ring-red-500/10 focus:border-red-500"
                     : "border-slate-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500"
                 }`}
               />
             </div>
-            {emailError && (
+            {identifierError && (
               <span className="text-[10px] text-red-500 font-bold mt-1 block pl-1 animate-fade-in-up">
-                {emailError}
+                {identifierError}
               </span>
             )}
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Mật khẩu *</label>
+            <label htmlFor="login-password" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Mật khẩu *</label>
             <div className="relative group">
               <Lock className={`absolute left-3.5 top-3.5 h-4 w-4 transition-colors ${
                 passwordError ? "text-red-500" : "text-slate-400 group-focus-within:text-blue-600"
               }`} />
-              <input 
-                type={showPassword ? "text" : "password"} 
-                placeholder="••••••••" 
+              <input
+                id="login-password"
+                autoComplete="current-password"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -158,8 +163,8 @@ export default function AuthPage() {
                   if (error) setError(null);
                 }}
                 className={`w-full pl-11 pr-11 py-3 bg-slate-50 border rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white outline-none transition-all duration-200 ${
-                  passwordError 
-                    ? "border-red-300 focus:ring-4 focus:ring-red-500/10 focus:border-red-500" 
+                  passwordError
+                    ? "border-red-300 focus:ring-4 focus:ring-red-500/10 focus:border-red-500"
                     : "border-slate-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500"
                 }`}
               />
@@ -181,18 +186,18 @@ export default function AuthPage() {
           {/* Remember me checkbox */}
           <div className="flex items-center justify-between text-xs select-none pt-1">
             <label className="flex items-center gap-2 text-slate-600 cursor-pointer">
-              <input 
-                type="checkbox" 
-                checked={rememberMe} 
-                onChange={(e) => setRememberMe(e.target.checked)} 
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
                 className="rounded border-slate-300 bg-white text-blue-600 focus:ring-blue-500 h-4 w-4"
               />
               <span>Ghi nhớ đăng nhập</span>
             </label>
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={loading}
             className="w-full mt-2 py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-600/10 hover:shadow-lg hover:shadow-blue-600/20 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer duration-200"
           >

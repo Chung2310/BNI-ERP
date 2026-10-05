@@ -1,3 +1,4 @@
+import { normalizeLoginIdentifier } from "../../src/utils/loginIdentifier";
 import { Router } from "express";
 import Joi from "joi";
 import { authController } from "../controller/auth.controller";
@@ -83,18 +84,13 @@ const registerSchema = {
   }),
 };
 
-const loginSchema = {
+const loginIdentifierSchema = Joi.string().trim().max(254).custom((value, helpers) => normalizeLoginIdentifier(value) ? value : helpers.error("any.invalid"));
+export const loginSchema = {
   body: Joi.object({
-    email: Joi.string().pattern(emailRegex).required().messages({
-      "any.required": "Trường 'email' là bắt buộc và không thể thiếu.",
-      "string.empty": "Trường 'email' không được để trống.",
-      "string.pattern.base": "Địa chỉ email không đúng định dạng.",
-    }),
-    password: Joi.string().required().messages({
-      "any.required": "Trường 'password' là bắt buộc và không thể thiếu.",
-      "string.empty": "Trường 'password' không được để trống.",
-    }),
-  }),
+    identifier: loginIdentifierSchema,
+    email: loginIdentifierSchema,
+    password: Joi.string().required(),
+  }).xor("identifier", "email"),
 };
 
 const updateProfileSchema = {

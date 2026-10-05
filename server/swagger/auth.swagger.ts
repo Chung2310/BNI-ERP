@@ -58,10 +58,10 @@ export const authSwagger = {
               schema: {
                 type: "object",
                 properties: {
-                  email: { type: "string", example: "test@igen.com" },
+                  identifier: { type: "string", description: "Số điện thoại hoặc email", example: "0987654321" },
                   password: { type: "string", example: "123456" },
                 },
-                required: ["email", "password"],
+                required: ["identifier", "password"],
               },
             },
           },
@@ -91,7 +91,7 @@ export const authSwagger = {
             },
           },
           401: {
-            description: "Email hoặc mật khẩu không chính xác",
+            description: "Tài khoản hoặc mật khẩu không chính xác",
           },
         },
       },

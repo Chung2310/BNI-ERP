@@ -1,3 +1,4 @@
+import type { SpeakingTimeSlot } from "../utils/meetingSpeakingTime";
 import { getAccessToken } from "./authService";
 
 function getAuthHeaders() {
@@ -63,12 +64,12 @@ export interface LuckyDrawConfig {
 export interface Meeting {
   _id: string;
   companyCode: string;
-  allowDirectCheckIn?: boolean;
   title: string;
   description?: string;
   location?: string;
   coverImage?: string;
   startsAt: string;
+    endsAt?: string;
   startedAt?: string;
   createdBy?: string;
   reminderMinutes?: number;
@@ -93,8 +94,8 @@ export const meetingService = {
     if (!res.ok) throw new Error(data.message || "Không thể lưu kết quả quay thưởng.");
     return data.data;
   },
-  async listMeetings(): Promise<Meeting[]> {
-    const res = await fetch("/api/v1/meetings", {
+  async listMeetings(options: { all?: boolean } = {}): Promise<Meeting[]> {
+    const res = await fetch("/api/v1/meetings" + (options.all ? "?history=all" : ""), {
       headers: getAuthHeaders(),
     });
     const data = await res.json();
@@ -117,9 +118,9 @@ export const meetingService = {
     location?: string;
     coverImage?: string;
     startsAt: string;
-    allowDirectCheckIn?: boolean;
+    endsAt?: string;
     reminderMinutes?: number;
-    tiers: Array<{ count: number; seconds: number }>;
+    tiers: SpeakingTimeSlot[];
     fallbackSeconds: number;
   }): Promise<Meeting> {
     const res = await fetch("/api/v1/meetings", {
@@ -140,9 +141,9 @@ export const meetingService = {
       location: string;
       coverImage: string;
       startsAt: string;
+    endsAt?: string;
       reminderDays: number;
-      allowDirectCheckIn: boolean;
-      tiers: Array<{ count: number; seconds: number }>;
+      tiers: SpeakingTimeSlot[];
       fallbackSeconds: number;
     }>
   ): Promise<Meeting> {

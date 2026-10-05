@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from "react";
 
 type Attendee = { id: string; userId?: string; checkedInAt?: string; seconds: number };
 type MemberMeeting = {
-  allowDirectCheckIn?: boolean;
   coverImage?: string;
   gpsRadiusMeters?: number;
   title: string; description?: string; location?: string; startsAt: string;
@@ -49,9 +48,8 @@ export default function MemberMeetingDetail({ meeting, userId, onClose, onCheckI
   const open = ["scheduled", "live", "paused"].includes(meeting.status);
   const current = attendee && meeting.speakers[meeting.currentIndex]?.id === attendee.id
     && ["live", "paused"].includes(meeting.status) && !meeting.speechesCompletedAt;
-  const directCheckInOpen = ["live", "paused"].includes(meeting.status) || meeting.allowDirectCheckIn === true;
-  const canCheckIn = !attendee && open && directCheckInOpen && !!userId;
-  const checkInHint = attendee ? "Bạn đã điểm danh cuộc họp này." : !open ? "Cuộc họp đã đóng điểm danh." : !userId ? "Vui lòng đăng nhập bằng tài khoản thành viên." : !directCheckInOpen ? "Điểm danh trực tiếp sẽ tự mở khi cuộc họp bắt đầu. Bạn vẫn có thể quét mã QR do ban tổ chức cung cấp để điểm danh trước." : "Điểm danh bằng tài khoản thành viên của bạn.";
+  const canCheckIn = !attendee && open && !!userId;
+  const checkInHint = attendee ? "Bạn đã điểm danh cuộc họp này." : !open ? "Cuộc họp đã đóng điểm danh." : !userId ? "Vui lòng đăng nhập bằng tài khoản thành viên." : "Bạn có thể điểm danh trước giờ và trong lúc họp bằng tài khoản thành viên của mình.";
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:p-6"
       onClick={event => { if (event.target === event.currentTarget) onClose(); }}>

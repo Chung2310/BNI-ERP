@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import assert from "node:assert/strict";
 import jwt from "jsonwebtoken";
 import { afterEach, beforeEach, describe, it, vi } from "vitest";
@@ -11,6 +12,7 @@ function makeUser(activeSessionId = "") {
   return {
     _id: "user-1",
     email: "user@example.com",
+    password: bcrypt.hashSync("password123", 4),
     role: "user",
     companyCode: "ACME",
     activeSessionId,
@@ -46,12 +48,12 @@ describe("regular user single active session", () => {
   });
 
   it("replaces the active regular session on the second login", async () => {
-    const first = await authService.login("user@example.com");
+    const first = await authService.login("user@example.com", "password123");
     const firstRefresh = jwt.verify(first.refreshToken, getJwtRefreshSecret()) as any;
     assert.equal(firstRefresh.sid, user.activeSessionId);
 
     const firstSessionId = user.activeSessionId;
-    const second = await authService.login("user@example.com");
+    const second = await authService.login("user@example.com", "password123");
     const secondRefresh = jwt.verify(second.refreshToken, getJwtRefreshSecret()) as any;
 
     assert.ok(firstSessionId);
@@ -60,9 +62,9 @@ describe("regular user single active session", () => {
   });
 
   it("rejects refresh tokens from a displaced regular session", async () => {
-    const first = await authService.login("user@example.com");
+    const first = await authService.login("user@example.com", "password123");
     const firstRefreshToken = first.refreshToken;
-    await authService.login("user@example.com");
+    await authService.login("user@example.com", "password123");
 
     await assert.rejects(() => authService.refresh(firstRefreshToken), /thiết bị khác|SESSION_REPLACED|không hợp lệ/i);
   });
@@ -72,11 +74,11 @@ describe("regular user single active session", () => {
       socketCalls.push({ sessionId, eventName, data });
     });
 
-    await authService.login("user@example.com");
+    await authService.login("user@example.com", "password123");
     const firstSessionId = user.activeSessionId;
     assert.deepEqual(socketCalls, []);
 
-    await authService.login("user@example.com");
+    await authService.login("user@example.com", "password123");
 
     assert.equal(socketCalls.length, 1);
     assert.equal(socketCalls[0].sessionId, firstSessionId);

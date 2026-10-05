@@ -3,6 +3,7 @@ export type TabType =
   | "TỔNG QUAN"
   | "NHÂN SỰ"
   | "CUỘC HỌP"
+  | "BẢNG XẾP HẠNG"
   | "QUẢN LÝ TÀI NGUYÊN"
   | "TRÒ CHUYỆN"
   | "TÀI NGUYÊN"
