@@ -26,7 +26,7 @@ function Harness() {
     setRoleLevel={vi.fn()}
     selectedPermissions={selected}
     setSelectedPermissions={setSelected}
-    userProfile={{ uid: "admin-1", role: "admin" } as any}
+    userProfile={({ uid: "admin-1", role: "admin" } as unknown as React.ComponentProps<typeof RoleModal>["userProfile"])}
     selectedCompanyCode="ACME"
     systemPermissions={permissions}
     submittingRole={false}

@@ -42,7 +42,7 @@ test("terminal middleware returns the exact correlated error envelope", async ()
     assert.equal(conflict.headers.get("x-request-id"), "test-request-1");
 
     const internal = await fetch(`${base}/internal`);
-    const internalBody = await internal.json() as any;
+    const internalBody = await internal.json();
     assert.equal(internal.status, 500);
     assert.equal(internalBody.error.code, "INTERNAL_ERROR");
     assert.equal(internalBody.error.message, "Đã xảy ra lỗi hệ thống.");
@@ -50,9 +50,9 @@ test("terminal middleware returns the exact correlated error envelope", async ()
 
     const missing = await fetch(`${base}/missing`);
     assert.equal(missing.status, 404);
-    assert.equal((await missing.json() as any).error.code, "API_ROUTE_NOT_FOUND");
+    assert.equal((await missing.json()).error.code, "API_ROUTE_NOT_FOUND");
     assert.deepEqual(logs.map(({ level }) => level), ["warn", "error", "warn"]);
-    assert.equal((logs[1].event as any).error.cause.message, "db-secret");
+    assert.equal((logs[1].event).error.cause.message, "db-secret");
     assert.deepEqual(redactLogData({ password: "secret", nested: { token: "jwt", safe: 1 } }), {
       password: "[REDACTED]",
       nested: { token: "[REDACTED]", safe: 1 },
@@ -66,6 +66,6 @@ test("delegates the original error after response headers were sent", () => {
   const source = new Error("stream failed");
   let delegated: unknown;
   const handler = createApiErrorHandler({ warn: () => {}, error: () => {} });
-  handler(source, {} as any, { headersSent: true } as any, ((error: unknown) => { delegated = error; }) as any);
+  handler(source, ({} as unknown as Parameters<typeof handler>[1]), (({ headersSent: true }) as unknown as Parameters<typeof handler>[2]), ((error: unknown) => { delegated = error; }));
   assert.equal(delegated, source);
 });

@@ -7,11 +7,11 @@ const { UserModel } = await import("../../model/user.model");
 const { MeetingModel } = await import("./meeting.model");
 const { meetingInput, updateMeetingInput, recurringMeetingInput } = await import("./meeting.validation");
 
-function setup(t: any) {
+function setup(t: import("node:test").TestContext) {
   const queries: any[] = [];
-  const item: any = { _id: "meeting", companyCode: "ACME", status: "scheduled", latitude: 10, longitude: 106, gpsRadiusMeters: 200,
+  const item = { _id: "meeting", companyCode: "ACME", status: "scheduled", latitude: 10, longitude: 106, gpsRadiusMeters: 200,
     speakers: [], tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20, save: async () => {} };
-  t.mock.method(UserModel, "findOne", (query: any) => {
+  t.mock.method(UserModel, "findOne", (query) => {
     queries.push(query);
     return { select: () => ({ lean: async () => query._id === "member" && query.companyCode === "ACME"
       ? { displayName: "Thành viên", email: "member@test.com" } : null }) };
@@ -40,7 +40,7 @@ test("scheduled legacy meetings allow direct GPS attendance regardless of the ol
   for (const value of [undefined, false, true]) {
     item.allowDirectCheckIn = value;
     item.speakers = [];
-    await checkInFromModule(item, { latitude: 10, longitude: 106 }, "member", false);
+    await checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { latitude: 10, longitude: 106 }, "member", false);
     assert.equal(item.speakers.length, 1);
     assert.equal(item.speakers[0].userId, "member");
   }
@@ -50,8 +50,8 @@ test("members check themselves in once without QR after GPS verification in open
   const { item, queries } = setup(t);
   for (const status of ["scheduled", "live", "paused"]) {
     item.status = status; item.speakers = [];
-    await checkInFromModule(item, { latitude: 10, longitude: 106 }, "member", false);
-    await checkInFromModule(item, { latitude: 10, longitude: 106 }, "member", false);
+    await checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { latitude: 10, longitude: 106 }, "member", false);
+    await checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { latitude: 10, longitude: 106 }, "member", false);
     assert.equal(item.speakers.length, 1);
     assert.equal(item.speakers[0].userId, "member");
     assert.equal(item.speakers[0].name, "Thành viên");
@@ -61,30 +61,30 @@ test("members check themselves in once without QR after GPS verification in open
 });
 test("direct attendance rejects impersonation, guests, closed meetings and unavailable members", async t => {
   const { item } = setup(t);
-  await assert.rejects(checkInFromModule(item, { userId: "other", latitude: 10, longitude: 106 }, "member", false), { status: 403 });
-  await assert.rejects(checkInFromModule(item, { name: "Guest", latitude: 10, longitude: 106 }, "member", false), { status: 403 });
-  await assert.rejects(checkInFromModule(item, { latitude: 10, longitude: 106 }, "foreign", false), { status: 404 });
+  await assert.rejects(checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { userId: "other", latitude: 10, longitude: 106 }, "member", false), { status: 403 });
+  await assert.rejects(checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { name: "Guest", latitude: 10, longitude: 106 }, "member", false), { status: 403 });
+  await assert.rejects(checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { latitude: 10, longitude: 106 }, "foreign", false), { status: 404 });
   for (const status of ["ended", "cancelled"]) {
     item.status = status;
-    await assert.rejects(checkInFromModule(item, { latitude: 10, longitude: 106 }, "member", false), { status: 409 });
+    await assert.rejects(checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { latitude: 10, longitude: 106 }, "member", false), { status: 409 });
   }
   assert.equal(item.speakers.length, 0);
 });
 test("organizers can still check members in with a legacy disabled setting", async t => {
   const { item } = setup(t);
   item.allowDirectCheckIn = false;
-  await checkInFromModule(item, { userId: "member" }, "admin", true);
+  await checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { userId: "member" }, "admin", true);
   assert.equal(item.speakers[0].userId, "member");
 });
 
 test("direct member check-in requires valid GPS inside the configured radius", async t => {
   const { item } = setup(t);
   for (const input of [{}, { latitude: NaN, longitude: 106 }, { latitude: 91, longitude: 106 }]) {
-    await assert.rejects(checkInFromModule(item, input, "member", false), { status: 400 });
+    await assert.rejects(checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), input, "member", false), { status: 400 });
   }
-  await assert.rejects(checkInFromModule(item, { latitude: 11, longitude: 106 }, "member", false), { status: 403 });
+  await assert.rejects(checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { latitude: 11, longitude: 106 }, "member", false), { status: 403 });
   item.latitude = undefined;
-  await assert.rejects(checkInFromModule(item, { latitude: 10, longitude: 106 }, "member", false), { status: 409 });
+  await assert.rejects(checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { latitude: 10, longitude: 106 }, "member", false), { status: 409 });
   assert.equal(item.speakers.length, 0);
 });
 
@@ -93,8 +93,8 @@ test("ongoing meetings allow direct GPS attendance regardless of the old setting
   for (const status of ["live", "paused"]) {
     for (const setting of [false, undefined, true]) {
       item.status = status; item.allowDirectCheckIn = setting; item.speakers = [];
-      await assert.rejects(checkInFromModule(item, { latitude: 11, longitude: 106 }, "member", false), { status: 403 });
-      await checkInFromModule(item, { latitude: 10, longitude: 106 }, "member", false);
+      await assert.rejects(checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { latitude: 11, longitude: 106 }, "member", false), { status: 403 });
+      await checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { latitude: 10, longitude: 106 }, "member", false);
       assert.equal(item.speakers.length, 1);
     }
   }

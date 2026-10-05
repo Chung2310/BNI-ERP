@@ -318,7 +318,7 @@ export default function UserAdminTab() {
           displayName: userDisplayName.trim(),
           email: userEmail.trim(),
           password: userPassword,
-          role: userRole as any,
+          role: userRole,
           companyCode: userCompanyCode,
           companyName: compName,
           parentId: userParentId || undefined,
@@ -341,7 +341,7 @@ export default function UserAdminTab() {
       resetUserForm();
       // Refresh lists
       await fetchUsers();
-    } catch (error: any) {
+    } catch (error) {
       console.error(editingUser ? "Lỗi cập nhật người dùng:" : "Lỗi đăng ký người dùng:", error);
       const errMsg = parseFirebaseError(
         error,
@@ -388,7 +388,7 @@ export default function UserAdminTab() {
       await rolePermissionService.deleteRolePermission(role, code);
       toast.success("Xóa cấu hình vai trò thành công!");
       await fetchRolePermissions();
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
       toast.error(error.message || "Xóa vai trò thất bại.");
     }
@@ -424,7 +424,7 @@ export default function UserAdminTab() {
       toast.success(`Đã xóa người dùng "${userToDelete.displayName}".`);
       setIsDeleteUserModalOpen(false);
       setUserToDelete(null);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Lỗi xóa người dùng:", error);
       toast.error(error.message || "Không thể xóa người dùng.");
     } finally {
@@ -570,7 +570,7 @@ export default function UserAdminTab() {
                         {canEditRole(roleInfo) && (
                           <button
                             onClick={() => {
-                              setEditingRole(roleInfo as any);
+                              setEditingRole(roleInfo);
                               setRoleSlug(roleInfo.role);
                               setRoleDisplayName(roleInfo.displayName);
                               setRoleLevel(roleInfo.level);

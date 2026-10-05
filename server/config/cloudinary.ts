@@ -30,7 +30,7 @@ const legacyAllowedMimeTypes = new Set([
 ]);
 
 export const upload = multer({
-  storage: storage as any,
+  storage: storage,
   limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 5 },
   fileFilter: (_req, file, callback) =>
     callback(null, legacyAllowedMimeTypes.has(file.mimetype)),

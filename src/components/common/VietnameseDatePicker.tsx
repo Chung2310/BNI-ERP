@@ -71,7 +71,9 @@ export function VietnameseDatePicker({
   const [viewMonth, setViewMonth] = useState(parsed ? parsed.month : todayM);
 
   // Sync viewing month/year when value changes from outside
-  useEffect(() => {
+  const [previousInputs1, setPreviousInputs1] = useState<unknown[] | null>(null);
+  if (previousInputs1 === null || !Object.is(previousInputs1[0], value)) {
+    setPreviousInputs1([value]);
     if (value) {
       const p = parseDate(value);
       if (p) {
@@ -79,7 +81,8 @@ export function VietnameseDatePicker({
         setViewMonth(p.month);
       }
     }
-  }, [value]);
+  
+  }
 
   // Check whether to open popup upwards or downwards based on viewport space
   useEffect(() => {

@@ -22,7 +22,7 @@ const FILE_FIELDS = "id,name,mimeType,size,webViewLink,webContentLink,iconLink,t
 export const googleDriveService = {
   /** Tạo thư mục mới trong Drive (parent tùy chọn). Trả về id + webViewLink. */
   async createFolder(accessToken: string, name: string, parentId?: string): Promise<DriveFile> {
-    const metadata: Record<string, any> = { name, mimeType: "application/vnd.google-apps.folder" };
+    const metadata: import("googleapis").drive_v3.Schema$File = { name, mimeType: "application/vnd.google-apps.folder" };
     if (parentId) metadata.parents = [parentId];
 
     const res = await fetch(

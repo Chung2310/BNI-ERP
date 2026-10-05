@@ -44,7 +44,7 @@ export async function getEnabledModulesForCompany(companyCode: string): Promise<
 
 /** Must run after authentication has populated req.user. */
 export function requireModule(key: ModuleKey) {
-  const moduleAccessGuard = async (req: any, res: Response, next: NextFunction) => {
+  const moduleAccessGuard = async (req: import("express").Request, res: Response, next: NextFunction) => {
     try {
       const user = req.user;
 

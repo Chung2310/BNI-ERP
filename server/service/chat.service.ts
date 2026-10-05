@@ -1,3 +1,4 @@
+import { entityId } from "../../src/utils/entityId";
 import { assertChatNotBlocked } from "./chat-blocking";
 import { ChatRoomModel } from "../model/chat-room.model";
 import { ChatMessageModel } from "../model/chat-message.model";
@@ -40,11 +41,11 @@ export const chatService = {
   /**
    * Lấy danh sách các phòng chat mà người dùng tham gia
    */
-  async getRooms(userId: string, companyCode: string): Promise<any[]> {
+  async getRooms(userId: string, companyCode: string) {
     const branchId = (await UserModel.findById(userId).select("branchId").lean())?.branchId;
-    const branchFilter = branchId ? { branchId } : {};
+    
     // Tự động tạo phòng "Trợ lý AI" nếu chưa có
-    let chatbotRoom = await ChatRoomModel.findOne({
+    const chatbotRoom = await ChatRoomModel.findOne({
       isChatbot: true,
       companyCode,
       creatorId: userId,
@@ -86,7 +87,7 @@ Bạn cần tôi hỗ trợ thông tin gì hôm nay?`,
     }
 
     // Tự động tạo phòng "Cloud của tôi" nếu chưa có
-    let cloudRoom = await ChatRoomModel.findOne({
+    const cloudRoom = await ChatRoomModel.findOne({
       isGroup: false,
       isChatbot: { $ne: true },
       companyCode,
@@ -143,8 +144,8 @@ Bạn cần tôi hỗ trợ thông tin gì hôm nay?`,
       if (a.isChatbot && !b.isChatbot) return -1;
       if (!a.isChatbot && b.isChatbot) return 1;
 
-      const aMember = a.members.find((m: any) => m.userId && (m.userId._id || m.userId).toString() === userId);
-      const bMember = b.members.find((m: any) => m.userId && (m.userId._id || m.userId).toString() === userId);
+      const aMember = a.members.find((m) => m.userId && entityId(m.userId) === userId);
+      const bMember = b.members.find((m) => m.userId && entityId(m.userId) === userId);
       const aPinned = aMember?.isPinned ? 1 : 0;
       const bPinned = bMember?.isPinned ? 1 : 0;
 
@@ -586,7 +587,7 @@ Bạn cần tôi hỗ trợ thông tin gì hôm nay?`,
       throw new Error("Phòng chat không tồn tại hoặc bạn không phải là thành viên.");
     }
 
-    const query: any = { roomId };
+    const query: Record<string, unknown> = { roomId };
     if (beforeDate) {
       query.createdAt = { $lt: beforeDate };
     }
@@ -602,7 +603,7 @@ Bạn cần tôi hỗ trợ thông tin gì hôm nay?`,
 
     // Loại bỏ toàn bộ ký tự Markdown khỏi các tin nhắn của Trợ lý AI (kể cả tin nhắn khởi tạo cũ trong DB)
     if (room.isChatbot) {
-      messages.forEach((msg: any) => {
+      messages.forEach((msg) => {
         if (msg.content) {
           msg.content = msg.content
             .replace(/```[\s\S]*?```/g, (m: string) => m.replace(/```[a-zA-Z]*\n?/g, "").replace(/```/g, ""))
@@ -769,7 +770,7 @@ Bạn cần tôi hỗ trợ thông tin gì hôm nay?`,
       throw new Error("Chỉ được ghim tối đa 3 tin nhắn. Vui lòng gỡ bớt tin nhắn đã ghim trước đó.");
     }
 
-    room.pinnedMessageIds.push(messageId as any);
+    room.pinnedMessageIds.push(messageId);
     await room.save();
 
     return await chatService.getFullRoom(roomId);
@@ -927,7 +928,7 @@ Bạn cần tôi hỗ trợ thông tin gì hôm nay?`,
       reactions.splice(existingIdx, 1);
     } else {
       // Chưa thả → thêm mới
-      reactions.push({ emoji, userId } as any);
+      reactions.push({ emoji, userId });
     }
 
     message.reactions = reactions;
@@ -960,7 +961,7 @@ Bạn cần tôi hỗ trợ thông tin gì hôm nay?`,
     }
 
     // 2. Xây dựng đối tượng truy vấn MongoDB
-    const queryObj: any = {
+    const queryObj: Record<string, unknown> = {
       roomId,
       isDeleted: { $ne: true },
     };
@@ -1016,7 +1017,7 @@ Bạn cần tôi hỗ trợ thông tin gì hôm nay?`,
   /**
    * Ghim/Bỏ ghim phòng chat đối với người dùng hiện tại
    */
-  async togglePinRoom(roomId: string, userId: string, companyCode: string): Promise<any> {
+  async togglePinRoom(roomId: string, userId: string, companyCode: string) {
     const room = await ChatRoomModel.findOne({ _id: roomId, companyCode });
     if (!room) {
       throw new Error("Không tìm thấy phòng chat.");

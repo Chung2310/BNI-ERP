@@ -43,13 +43,13 @@ test("register-company persists general business type and core modules", async (
   const originalUserSave = UserModel.prototype.save;
   let savedCompany: any;
 
-  (CompanyModel as any).findOne = async () => null;
-  (CompanyModel.prototype as any).save = async function () {
+  (CompanyModel).findOne = async () => null;
+  (CompanyModel.prototype).save = async function () {
     savedCompany = this;
     return this;
   };
-  (UserModel as any).findOne = async () => null;
-  (UserModel.prototype as any).save = async function () { return this; };
+  (UserModel).findOne = async () => null;
+  (UserModel.prototype).save = async function () { return this; };
 
   try {
     await authService.registerCompanyAndAdmin({

@@ -9,7 +9,8 @@ vi.mock("../components/meetings/profileSlideRenderer", () => ({
 }));
 const auth = vi.hoisted(() => ({ manage: true }));
 vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ hasPermission: () => auth.manage, userProfile: { uid: "member1" } }) }));
-vi.mock("../services/socketService", () => ({ socketService: { on: () => () => {} } }));
+const meetingEvents = vi.hoisted(() => new Set<() => void>());
+vi.mock("../services/socketService", () => ({ socketService: { on: (event: string, callback: () => void) => { if (event === "meeting_updated") meetingEvents.add(callback); return () => { meetingEvents.delete(callback); }; } } }));
 vi.mock("../components/meetings/LuckyDrawTab", () => ({ LuckyDrawTab: () => <div>Quay thưởng đang mở</div> }));
 vi.mock("./Toast", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 const meeting = { _id: "a", title: "Buổi họp A", startsAt: "2026-10-10T08:00:00Z", status: "scheduled", speakers: [], tiers: [{count:10,seconds:30}], fallbackSeconds:20, reminderDays:0, currentIndex:-1, elapsedSeconds:0, __v:0 };
@@ -89,7 +90,7 @@ it("checks multiple people in operations and submits their IDs in one request", 
 });
 
 it("defers from the operation list and starts fullscreen from the selected attendee", async () => {
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as unknown as Parameters<((value: ReturnType<typeof HTMLCanvasElement.prototype.getContext>) => void)>[0]));
   const people = [
     { id: "first", kind: "member", name: "An đang bận", company: "", seconds: 60, deferred: false },
     { id: "second", kind: "guest", name: "Bình khách mời", company: "", seconds: 30, deferred: false },
@@ -129,7 +130,7 @@ it("defers from the operation list and starts fullscreen from the selected atten
 });
 
 it.each(["Escape", "fullscreen"])("returns to the slides presentation tab after exiting presentation via %s", async exit => {
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as unknown as Parameters<((value: ReturnType<typeof HTMLCanvasElement.prototype.getContext>) => void)>[0]));
   const people = [{ id: "first", kind: "guest", name: "Khách đang nói", company: "", seconds: 30 }];
   const live = { ...meeting, status: "live", currentIndex: 0, speakers: people };
   const fetchMock = vi.fn(async url => ({ ok: true, json: async () => ({ data: String(url).endsWith("/slides") ? { slides: people, version: 0 } : String(url).endsWith("/presentation") ? live : [live] }) }));
@@ -155,21 +156,27 @@ it.each(["Escape", "fullscreen"])("returns to the slides presentation tab after 
   } finally {
     cleanup();
     await act(async () => {});
-    delete (document.documentElement as any).requestFullscreen;
-    delete (document as any).fullscreenElement;
-    delete (document as any).exitFullscreen;
+    delete (document.documentElement).requestFullscreen;
+    delete (document).fullscreenElement;
+    delete (document).exitFullscreen;
     vi.restoreAllMocks();
   }
 });
 
 it("shares manual navigation and operating mode between slides and MC controls", async () => {
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as unknown as Parameters<((value: ReturnType<typeof HTMLCanvasElement.prototype.getContext>) => void)>[0]));
   const people = [
     { id: "first", kind: "member", name: "Người đầu", company: "", seconds: 30 },
     { id: "second", kind: "guest", name: "Người tiếp", company: "", seconds: 30 },
   ];
-  let item = { ...meeting, status: "live", currentIndex: 0, speakers: people, speakerStartedAt: new Date().toISOString() };
+  let item = { ...meeting, presentation: { view: "speaker", autoAdvance: false, autoAdvanceDelay: 3 }, status: "live", currentIndex: 0, speakers: people, speakerStartedAt: new Date().toISOString() };
   const fetchMock = vi.fn(async (url, options) => {
+    if (String(url).endsWith("/presentation-state")) {
+      const { version, ...state } = JSON.parse(options.body);
+      expect(version).toBe(item.__v);
+      item = { ...item, presentation: { ...item.presentation, ...state }, __v: item.__v + 1 };
+      return { ok: true, json: async () => ({ data: item }) };
+    }
     if (String(url).endsWith("/control")) {
       const body = JSON.parse(options.body);
       expect(body.version).toBe(item.__v);
@@ -190,11 +197,11 @@ it("shares manual navigation and operating mode between slides and MC controls",
   expect(item.currentIndex).toBe(1);
   fireEvent.change(screen.getByLabelText("Chế độ trình chiếu"), { target: { value: "auto" } });
   fireEvent.click(screen.getByRole("button", { name: "Bảng điều hành" }));
-  expect((screen.getByLabelText("Chế độ điều hành") as HTMLSelectElement).value).toBe("auto");
+  await waitFor(() => expect((screen.getByLabelText("Chế độ điều hành") as HTMLSelectElement).value).toBe("auto"));
   fireEvent.change(screen.getByLabelText("Chế độ điều hành"), { target: { value: "manual" } });
   fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
   await waitFor(() => expect((screen.getByRole("button", { name: "Slide trước" }) as HTMLButtonElement).disabled).toBe(false));
-  expect((screen.getByLabelText("Chế độ trình chiếu") as HTMLSelectElement).value).toBe("manual");
+  await waitFor(() => expect((screen.getByLabelText("Chế độ trình chiếu") as HTMLSelectElement).value).toBe("manual"));
   fireEvent.click(screen.getByRole("button", { name: "Slide trước" }));
   await waitFor(() => expect(screen.getByRole("img").getAttribute("aria-label")).toContain("Người đầu"));
   expect(item.currentIndex).toBe(0);
@@ -294,34 +301,30 @@ it("manual overtime stops at zero; completing the last speaker opens BNI notice 
   expect(item.status).toBe("live");
 });
 
-it("automatic mode completes the final speaker instead of ending the meeting", async () => {
-  localStorage.setItem("bni_auto_advance_speaker", "true");
-  localStorage.setItem("bni_auto_advance_delay", "0");
-  let item = { ...meeting, status: "live", currentIndex: 0, speakerStartedAt: new Date(Date.now() - 60000).toISOString(),
+it("shows server-completed speeches without sending another automatic control command", async () => {
+  let item = { ...meeting, status: "live", currentIndex: 0, __v: 0, speakerStartedAt: new Date().toISOString(),
+    presentation: { view: "speaker", autoAdvance: true, autoAdvanceDelay: 0 },
     speakers: [{ id: "a", name: "An", seconds: 30 }], speechesCompletedAt: undefined as string | undefined };
-  const fetchMock = vi.fn(async (_url, options) => {
-    if (options?.method === "POST") item = { ...item, currentIndex: 1, speakerStartedAt: undefined, speechesCompletedAt: new Date().toISOString() };
-    return { ok: true, json: async () => ({ data: options?.method === "POST" ? item : [item] }) };
-  });
+  const fetchMock = vi.fn(async (_url, _options) => ({ ok: true, json: async () => ({ data: [item] }) }));
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  item = { ...item, __v: 1, currentIndex: 1, speakerStartedAt: undefined, speechesCompletedAt: new Date().toISOString() };
+  act(() => meetingEvents.forEach(callback => callback()));
   await screen.findByRole("dialog", { name: "Hoàn tất phần phát biểu" });
   expect(item.status).toBe("live");
-  expect(fetchMock.mock.calls.some(([, options]) => options?.method === "POST" && JSON.parse(options.body).action === "finish")).toBe(false);
+  expect(fetchMock.mock.calls.every(([, options]) => options?.method !== "POST")).toBe(true);
 });
 
 
 it("launches the current profile from MC controls and explains the post-speech delay", async () => {
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
-  localStorage.setItem("bni_auto_advance_speaker", "true");
-  localStorage.setItem("bni_auto_advance_delay", "3");
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as unknown as Parameters<((value: ReturnType<typeof HTMLCanvasElement.prototype.getContext>) => void)>[0]));
   const people = [
     { id: "first", kind: "member", name: "Người đầu tiên", company: "", seconds: 30 },
     { id: "second", kind: "guest", name: "Khách thứ hai", company: "", seconds: 30 },
   ];
-  const live = { ...meeting, status: "live", currentIndex: 1, speakers: people };
+  const live = { ...meeting, presentation: { view: "speaker", autoAdvance: true, autoAdvanceDelay: 3 }, status: "live", currentIndex: 1, speakers: people };
   const fetchMock = vi.fn(async (url) => ({ ok: true, json: async () => ({ data: String(url).endsWith("/slides") ? { slides: people, version: 0 } : String(url).endsWith("/presentation") ? { ...live, speakerStartedAt: new Date().toISOString(), __v: 1 } : [live] }) }));
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
@@ -339,7 +342,7 @@ it("launches the current profile from MC controls and explains the post-speech d
     expect(canvases.length).toBeGreaterThan(0);
     expect(canvases.every(element => element.getAttribute("aria-label")?.includes("Khách thứ hai"))).toBe(true);
   });
-  delete (document.documentElement as any).requestFullscreen;
+  delete (document.documentElement).requestFullscreen;
   expect(fetchMock.mock.calls.every(([url]) => !String(url).endsWith("/control"))).toBe(true);
   vi.restoreAllMocks();
 });
@@ -406,44 +409,34 @@ it.each(["live", "paused"])("shows the check-in list and explains unavailable pr
 });
 
 
-it.each([0, 3, 150])("slide delay %s waits until speaking time ends before changing the speaker", async delay => {
-  const origin = Date.now();
+it.each([0, 3, 150])("persists slide delay %s without a second browser auto-advance timer", async delay => {
   vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
-  vi.setSystemTime(origin);
-  let item = { ...meeting, status: "live", currentIndex: 0, speakerStartedAt: new Date(origin).toISOString(),
-    speakers: [{ id: "first", kind: "guest", name: "Đầu tiên", company: "", seconds: 30 }, { id: "second", kind: "member", name: "Tiếp theo", company: "", seconds: 60 }] };
+  let item = { ...meeting, status: "live", currentIndex: 0, speakerStartedAt: new Date().toISOString(),
+    presentation: { view: "speaker", autoAdvance: true, autoAdvanceDelay: 3 },
+    speakers: [{ id: "first", name: "First", seconds: 30 }, { id: "second", name: "Second", seconds: 20 }] };
   const fetchMock = vi.fn(async (url, options) => {
-    if (options?.method === "POST") item = { ...item, currentIndex: 1, __v: 1, speakerStartedAt: new Date().toISOString() };
-    return { ok: true, json: async () => ({ data: String(url).endsWith("/slides") ? { slides: item.speakers, version: item.__v } : options?.method === "POST" ? item : [item] }) };
+    if (String(url).endsWith("/presentation-state")) {
+      const { version, ...state } = JSON.parse(options.body);
+      expect(version).toBe(item.__v);
+      item = { ...item, presentation: { ...item.presentation, ...state }, __v: item.__v + 1 };
+      return { ok: true, json: async () => ({ data: item }) };
+    }
+    return { ok: true, json: async () => ({ data: [item] }) };
   });
   vi.stubGlobal("fetch", fetchMock);
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
-  render(<MeetingTab />);
-  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
-  fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
-  await screen.findByText("Đầu tiên");
-
   try {
-    fireEvent.change(screen.getByLabelText("Chế độ trình chiếu"), { target: { value: "auto" } });
-    const field = screen.getByLabelText("Số giây chờ chuyển slide sau khi hết giờ") as HTMLInputElement;
+    render(<MeetingTab />);
+    fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+    const field = screen.getByLabelText("Số giây chờ chuyển slide sau khi hết giờ");
     fireEvent.change(field, { target: { value: String(delay) } });
-    expect(field.value).toBe(String(delay));
-    expect(field.max).toBe("");
-    expect(field.min).toBe("0");
-    const calls = () => fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
-    await act(async () => { vi.advanceTimersByTime(3000); });
-    expect(calls()).toHaveLength(0);
-    await act(async () => { vi.advanceTimersByTime(27000 + delay * 1000 - 250); });
-    expect(calls()).toHaveLength(0);
-    await act(async () => { vi.advanceTimersByTime(250); });
-    expect(calls()).toHaveLength(1);
-    expect(JSON.parse(calls()[0][1].body).action).toBe("next");
-    expect(item.currentIndex).toBe(1);
-  } finally {
-    vi.useRealTimers(); vi.restoreAllMocks();
-  }
+    await waitFor(() => expect(item.presentation.autoAdvanceDelay).toBe(delay));
+    await act(async () => { vi.advanceTimersByTime((31 + delay) * 1000); });
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/control"))).toHaveLength(0);
+    expect(item.currentIndex).toBe(0);
+  } finally { vi.useRealTimers(); }
 });
+
 
 it("opening a paused presentation resumes the countdown from its remaining time", async () => {
   vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
@@ -457,7 +450,7 @@ it("opening a paused presentation resumes the countdown from its remaining time"
     return { ok: true, json: async () => ({ data: String(url).endsWith("/slides") ? { slides: item.speakers, version: item.__v } : options?.method === "POST" ? item : [item] }) };
   });
   vi.stubGlobal("fetch", fetchMock);
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as unknown as Parameters<((value: ReturnType<typeof HTMLCanvasElement.prototype.getContext>) => void)>[0]));
   try {
     render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
@@ -536,7 +529,7 @@ it("shows a retryable loading error instead of an empty meetings list", async ()
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   expect(await screen.findByRole("alert")).toBeTruthy();
   expect(screen.queryByText("Chưa tìm thấy cuộc họp nào")).toBeNull();
-  vi.mocked(fetch).mockResolvedValue({ ok:true, json:async () => ({data:[meeting]}) } as any);
+  vi.mocked(fetch).mockResolvedValue(({ ok:true, json:async () => ({data:[meeting]}) } as unknown as Parameters<((value: Awaited<ReturnType<typeof fetch>>) => void)>[0]));
   fireEvent.click(screen.getByRole("button", { name: "Thử lại" }));
   expect(await screen.findByText("Buổi họp A")).toBeTruthy();
 });
@@ -640,7 +633,7 @@ it("does not show one minute elapsed before a future meeting without an actual s
 });
 it("creates a weekly series from its own popup and returns to the calendar", async () => {
   const instance = { ...meeting, startsAt: "2030-01-02T00:00:00Z", seriesId: "series" };
-  const fetchMock = vi.fn(async (_url: any, _options: any) => ({ ok: true, json: async () => ({ data: [instance] }) }));
+  const fetchMock = vi.fn(async (_url, _options) => ({ ok: true, json: async () => ({ data: [instance] }) }));
   vi.stubGlobal("fetch", fetchMock);
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Tạo lịch định kỳ" }));
@@ -666,7 +659,7 @@ it("creates a weekly series from its own popup and returns to the calendar", asy
 });
 
 it("creates only one meeting after cancelling the recurring popup", async () => {
-  const fetchMock = vi.fn(async (_url: any, options: any) => ({
+  const fetchMock = vi.fn(async (_url, options) => ({
     ok: true, json: async () => ({ data: options?.method === "POST" ? meeting : [meeting] }),
   }));
   vi.stubGlobal("fetch", fetchMock);

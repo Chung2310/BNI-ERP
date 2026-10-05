@@ -1,3 +1,4 @@
+import { parseDateValue } from "../../utils/dateValue";
 import {
   AlertTriangle,
   Building2,
@@ -28,10 +29,10 @@ export function UserDeleteModal({
 }: UserDeleteModalProps) {
   if (!open || !user) return null;
 
-  const formatDate = (dateVal: any) => {
+  const formatDate = (dateVal: unknown) => {
     if (!dateVal) return "Chưa cập nhật";
     try {
-      const d = new Date(dateVal);
+      const d = parseDateValue(dateVal);
       if (isNaN(d.getTime())) return "Chưa cập nhật";
       return d.toLocaleDateString("vi-VN");
     } catch {

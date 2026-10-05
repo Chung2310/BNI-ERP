@@ -3,27 +3,17 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Users,
   Search,
-  Filter,
   Plus,
   Building2,
   Trash2,
   X,
   RefreshCw,
-  Activity,
   Briefcase,
-  MapPin,
   Phone,
   Mail,
-  UserPlus,
-  Maximize2,
-  Minimize2,
   Edit,
-  Link2,
   Upload,
-  Eye,
   CalendarDays,
-  LayoutGrid,
-  Network,
   Camera,
   Image as ImageIcon
 } from "lucide-react";
@@ -36,13 +26,13 @@ import { getApiErrorMessage } from "../../utils/errorMessage";
 import { filterOrgChartEmployees, getManagerForEmployee } from "./orgChartUtils";
 
 interface OrgChartTabProps {
-  userProfile: any;
+  userProfile: import("../../types").UserProfile;
   selectedCompanyCode: string;
   usersList: UserProfile[];
   employees: EmployeeNode[];
   fetchUsers: () => Promise<void>;
   isManager: boolean;
-  companies: any[];
+  companies: import("../../types").CompanyProfile[];
   courses: TrainingCourse[];
   fetchCourses: (compCode: string) => Promise<void>;
   loading: boolean;
@@ -90,7 +80,7 @@ export default function OrgChartTab({
   employees,
   fetchUsers,
   isManager,
-  companies,
+  companies: _companies,
   courses,
   fetchCourses,
   loading,
@@ -127,21 +117,27 @@ export default function OrgChartTab({
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedEmp, setSelectedEmp] = useState<EmployeeNode | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [activeDropdownCardId, setActiveDropdownCardId] = useState<string | null>(null);
+  
   const [listPage, setListPage] = useState<number>(1);
   const listLimit = 15;
 
-  useEffect(() => {
+  const [previousInputs11, setPreviousInputs11] = useState<unknown[] | null>(null);
+  if (previousInputs11 === null || !Object.is(previousInputs11[0], searchQuery)) {
+    setPreviousInputs11([searchQuery]);
     setListPage(1);
-  }, [searchQuery]);
+  
+  }
 
-  useEffect(() => {
+  const [previousInputs1, setPreviousInputs1] = useState<unknown[] | null>(null);
+  if (previousInputs1 === null || !Object.is(previousInputs1[0], selectedEmp?.id)) {
+    setPreviousInputs1([selectedEmp?.id]);
     if (selectedEmp) {
       setIsDetailModalOpen(true);
     } else {
       setIsDetailModalOpen(false);
     }
-  }, [selectedEmp?.id]);
+  
+  }
 
   const closeDetailModal = () => {
     setIsDetailModalOpen(false);
@@ -189,9 +185,12 @@ export default function OrgChartTab({
   const [isSaving, setIsSaving] = useState(false);
 
   // Reset editing state when selected employee changes
-  useEffect(() => {
+  const [previousInputs2, setPreviousInputs2] = useState<unknown[] | null>(null);
+  if (previousInputs2 === null || !Object.is(previousInputs2[0], selectedEmp?.id)) {
+    setPreviousInputs2([selectedEmp?.id]);
     setIsEditing(false);
-  }, [selectedEmp?.id]);
+  
+  }
 
   const startEditing = () => {
     if (!selectedEmp) return;
@@ -226,7 +225,7 @@ export default function OrgChartTab({
       );
       setEditPhotoURL(res.url);
       toast.success("Đã tải lên ảnh đại diện.");
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err?.message || "Không thể tải lên ảnh đại diện.");
     } finally {
       setUploadingAvatar(false);
@@ -248,7 +247,7 @@ export default function OrgChartTab({
       );
       setEditCoverImage(res.url);
       toast.success("Đã tải lên ảnh bìa thành công.");
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err?.message || "Không thể tải lên ảnh bìa.");
     } finally {
       setUploadingEditCover(false);
@@ -270,7 +269,7 @@ export default function OrgChartTab({
       );
       setAddPhotoURL(res.url);
       toast.success("Đã tải lên ảnh đại diện.");
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err?.message || "Không thể tải lên ảnh đại diện.");
     } finally {
       setUploadingAddAvatar(false);
@@ -292,7 +291,7 @@ export default function OrgChartTab({
       );
       setAddCoverImage(res.url);
       toast.success("Đã tải lên ảnh bìa thành công.");
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err?.message || "Không thể tải lên ảnh bìa.");
     } finally {
       setUploadingAddCover(false);
@@ -318,7 +317,7 @@ export default function OrgChartTab({
 
     setIsSaving(true);
     try {
-      const updateData: any = {
+      const updateData = {
         displayName: editName.trim(),
         companyName: editCompanyName.trim(),
         industry: editIndustry.trim(),
@@ -425,7 +424,9 @@ export default function OrgChartTab({
 
 
   // Set default parentId when add employee modal is opened
-  useEffect(() => {
+  const [previousInputs3, setPreviousInputs3] = useState<unknown[] | null>(null);
+  if (previousInputs3 === null || !Object.is(previousInputs3[0], isAddModalOpen) || !Object.is(previousInputs3[1], userProfile) || !Object.is(previousInputs3[2], selectedCompanyCode) || !Object.is(previousInputs3[3], usersList)) {
+    setPreviousInputs3([isAddModalOpen, userProfile, selectedCompanyCode, usersList]);
     if (isAddModalOpen) {
       setAddRole("user");
       if (userProfile?.role === "manager") {
@@ -441,10 +442,13 @@ export default function OrgChartTab({
         setAddParentId(firstCompanyManager?.uid || firstBranchOwner?.uid || "");
       }
     }
-  }, [isAddModalOpen, userProfile, selectedCompanyCode, usersList]);
+  
+  }
 
   // Handle parentId based on addRole automatically
-  useEffect(() => {
+  const [previousInputs4, setPreviousInputs4] = useState<unknown[] | null>(null);
+  if (previousInputs4 === null || !Object.is(previousInputs4[0], addRole) || !Object.is(previousInputs4[1], isAddModalOpen) || !Object.is(previousInputs4[2], selectedCompanyCode) || !Object.is(previousInputs4[3], userProfile) || !Object.is(previousInputs4[4], usersList)) {
+    setPreviousInputs4([addRole, isAddModalOpen, selectedCompanyCode, userProfile, usersList]);
     if (isAddModalOpen) {
       const compCode = selectedCompanyCode || userProfile?.companyCode || "SYSTEM";
       if (addRole === "admin") {
@@ -470,7 +474,8 @@ export default function OrgChartTab({
         }
       }
     }
-  }, [addRole, isAddModalOpen, selectedCompanyCode, userProfile, usersList]);
+  
+  }
 
 
 
@@ -567,7 +572,7 @@ export default function OrgChartTab({
     const compCode = selectedCompanyCode || userProfile?.companyCode || "SYSTEM";
     const compName = userProfile?.companyName || "";
 
-    const manager = addParentId ? employees.find(emp => emp.id === addParentId) : undefined;
+    
 
     const finalCompName = addCompanyName.trim() || compName;
     try {

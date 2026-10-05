@@ -6,7 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import { socketService } from "../../services/socketService";
 
 interface NotificationToastContainerProps {
-  onNavigate?: (tab: any, subTab?: string) => void;
+  onNavigate?: (tab: import("../../types").TabType, subTab?: string) => void;
 }
 
 export function NotificationToastContainer({ onNavigate }: NotificationToastContainerProps) {
@@ -113,12 +113,12 @@ export function NotificationToastContainer({ onNavigate }: NotificationToastCont
   useEffect(() => {
     if (!userProfile) return;
 
-    const handleNewChatMessage = (data: { roomId: string; message: any; roomUpdate: any }) => {
+    const handleNewChatMessage = (data: { roomId: string; message: import("../../services/internalChatService").ChatMessage; roomUpdate: import("../../services/internalChatService").ChatRoom }) => {
       if (!data || !data.message) return;
       const { message, roomId } = data;
 
       // 1. Kiểm tra xem tin nhắn có phải của người khác gửi không
-      const senderId = message.senderId?._id || message.senderId;
+      const senderId = typeof message.senderId === 'object' ? message.senderId._id : message.senderId;
       if (senderId === userProfile.uid) return;
 
       // 2. Không hiển thị popup nếu người dùng đang ở phòng chat đó và trình duyệt đang được focus
@@ -202,8 +202,8 @@ export function NotificationToastContainer({ onNavigate }: NotificationToastCont
 
       <div className="fixed bottom-6 right-6 z-100 flex flex-col gap-3 max-w-sm w-full pointer-events-none">
         {toasts.map((t) => {
-          let bgColor = "bg-white/95 dark:bg-slate-900/95";
-          let borderColor = "border-slate-200/80 dark:border-slate-800/80";
+          const bgColor = "bg-white/95 dark:bg-slate-900/95";
+          const borderColor = "border-slate-200/80 dark:border-slate-800/80";
           let iconBg = "bg-slate-100 text-slate-600";
           let Icon = Bell;
 

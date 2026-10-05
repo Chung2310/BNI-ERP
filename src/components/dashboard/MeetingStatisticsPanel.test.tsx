@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import React from 'react';
 import { expect, it, vi } from 'vitest';
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({}) }));
 import { extractLuckyWinners, drawSourceLabels } from './MeetingStatisticsPanel';

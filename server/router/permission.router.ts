@@ -61,45 +61,45 @@ const getPermissionsQuerySchema = {
 // 1. Tạo mới mã quyền (chỉ dành cho admin)
 permissionRouter.post(
   "/",
-  requireAuth as any,
-  requireRole(["admin"]) as any,
-  requirePermission("access:manage") as any,
+  requireAuth,
+  requireRole(["admin"]),
+  requirePermission("access:manage"),
   validateRequest(createPermissionSchema),
-  permissionController.create as any
+  permissionController.create
 );
 
 // 2. Lấy danh sách mã quyền (yêu cầu đã đăng nhập)
 permissionRouter.get(
   "/",
-  requireAuth as any,
+  requireAuth,
   validateRequest(getPermissionsQuerySchema),
-  permissionController.getList as any
+  permissionController.getList
 );
 
 // 3. Lấy chi tiết một mã quyền (yêu cầu đã đăng nhập)
 permissionRouter.get(
   "/:code",
-  requireAuth as any,
+  requireAuth,
   validateRequest(permissionCodeParamsSchema),
-  permissionController.getDetail as any
+  permissionController.getDetail
 );
 
 // 4. Cập nhật mã quyền (chỉ dành cho admin)
 permissionRouter.patch(
   "/:code",
-  requireAuth as any,
-  requireRole(["admin"]) as any,
-  requirePermission("access:manage") as any,
+  requireAuth,
+  requireRole(["admin"]),
+  requirePermission("access:manage"),
   validateRequest(updatePermissionSchema),
-  permissionController.update as any
+  permissionController.update
 );
 
 // 5. Xóa mã quyền (chỉ dành cho admin)
 permissionRouter.delete(
   "/:code",
-  requireAuth as any,
-  requireRole(["admin"]) as any,
-  requirePermission("access:manage") as any,
+  requireAuth,
+  requireRole(["admin"]),
+  requirePermission("access:manage"),
   validateRequest(permissionCodeParamsSchema),
-  permissionController.delete as any
+  permissionController.delete
 );

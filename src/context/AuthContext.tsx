@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import type { User } from "firebase/auth";
 import { authService } from "../services/authService";
 import { UserProfile } from "../types";
 import { toast } from "../pages/Toast";
@@ -14,7 +13,7 @@ export type ErpLoginOutcome = { status: "authenticated"; role?: string };
 type PersonalProfileDetails = Pick<UserProfile, "phone" | "birthDate" | "companyName" | "industry" | "coverImage"> & { coverUploadToken?: string };
 
 interface AuthContextType {
-  user: User | null;
+  user: UserProfile | null;
   userProfile: UserProfile | null;
   loading: boolean;
   loginWithIdentifier: (identifier: string, password: string, rememberMe?: boolean) => Promise<ErpLoginOutcome>;
@@ -33,7 +32,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -43,7 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const profile = await authService.getMe();
         if (profile) {
-          setUser(profile as any);
+          setUser(profile);
           setUserProfile(profile);
         } else {
           setUser(null);
@@ -80,7 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return socketService.on("company_modules_updated", (value: unknown) => {
       const event = normalizeCompanyModulesEvent(value);
       if (!event || event.companyCode !== companyCode) return;
-      setUser((current) => current ? ({ ...current, enabledModules: event.enabledModules } as any) : current);
+      setUser((current) => current ? ({ ...current, enabledModules: event.enabledModules }) : current);
       setUserProfile((current) => current ? ({ ...current, enabledModules: event.enabledModules }) : current);
       toast.success("Quyền truy cập module của doanh nghiệp vừa được cập nhật.");
     });
@@ -106,12 +105,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!connected) return;
       void authService.getMe().then((profile) => {
         if (!profile) return;
-        setUser(profile as any);
+        setUser(profile);
         setUserProfile(profile);
       });
     });
   }, [userProfile?.uid]);
-  const loginWithIdentifier = async (identifier: string, password: string, rememberMe: boolean = true): Promise<ErpLoginOutcome> => {
+  const loginWithIdentifier = async (identifier: string, password: string, _rememberMe: boolean = true): Promise<ErpLoginOutcome> => {
     setLoading(true);
     try {
       const result = await authService.loginWithIdentifier(identifier, password);
@@ -119,19 +118,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...result.user,
         uid: result.user._id,
       };
-      setUser(profile as any);
+      setUser(profile);
       setUserProfile(profile);
 
       // /login không tính enabledModules; gọi /auth/me để lấy đúng cấu hình module của công ty.
       const meProfile = await authService.getMe().catch(() => null);
       if (meProfile) {
-        setUser(meProfile as any);
+        setUser(meProfile);
         setUserProfile(meProfile);
       }
 
       toast.success("Đăng nhập tài khoản thành công!");
       return { status: "authenticated", role: meProfile?.role || profile.role };
-    } catch (error: any) {
+    } catch (error) {
       console.error("[loginWithIdentifier] Error:", error);
       const friendlyMsg = parseFirebaseError(error, "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
       toast.error(friendlyMsg);
@@ -148,7 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error("Không thể khởi tạo phiên ERP sau khi xác thực.");
     }
 
-    setUser(profile as any);
+    setUser(profile);
     setUserProfile(profile);
   };
 
@@ -158,7 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await authService.registerWithEmail(email, password, displayName);
       // Tự động đăng nhập sau khi đăng ký thành công
       await loginWithIdentifier(email, password, rememberMe);
-    } catch (error: any) {
+    } catch (error) {
       console.error("[registerWithEmail] Error:", error);
       const friendlyMsg = parseFirebaseError(error, "Đăng ký thất bại. Vui lòng thử lại.");
       toast.error(friendlyMsg);
@@ -168,10 +167,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithGoogle = async (rememberMe: boolean = true) => {
+  const loginWithGoogle = async (_rememberMe: boolean = true) => {
     try {
       await authService.loginWithGoogle();
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.message || "Đăng nhập bằng Google thất bại.");
       throw error;
     }
@@ -185,7 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile(null);
     toast.success("Đã xóa tài khoản của bạn.");
   };
-  const logout = async () => {
+  async function logout() {
     setLoading(true);
     try {
       await authService.logout();
@@ -198,17 +197,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const updateProfileInfo = async (displayName: string, photoURL: string, details?: PersonalProfileDetails) => {
     if (!userProfile) return;
     try {
       const result = await authService.updateProfile({ ...details, displayName, photoURL });
       const updatedProfile = { ...userProfile, ...result };
-      setUser(updatedProfile as any);
+      setUser(updatedProfile);
       setUserProfile(updatedProfile);
       toast.success("Cập nhật thông tin tài khoản thành công!");
-    } catch (error: any) {
+    } catch (error) {
       console.error("[updateProfileInfo] Error:", error);
       toast.error(error.message || "Cập nhật thông tin thất bại.");
       throw error;
@@ -220,11 +219,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const uploaded = await authService.uploadAvatar(userProfile.uid, file);
       const updatedProfile = await authService.updateProfile({ photoURL: uploaded.url, photoUploadToken: uploaded.uploadToken });
-      setUser(updatedProfile as any);
+      setUser(updatedProfile);
       setUserProfile(updatedProfile);
       toast.success("Tải lên ảnh đại diện thành công!");
       return uploaded.url;
-    } catch (error: any) {
+    } catch (error) {
       console.error("Lỗi upload avatar:", error);
       toast.error(error.message || "Tải lên ảnh đại diện thất bại.");
       throw error;
@@ -236,7 +235,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const profile = await authService.getMe();
       if (profile) {
-        setUser(profile as any);
+        setUser(profile);
         setUserProfile(profile);
       }
     } catch (error) {
@@ -257,7 +256,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (event.companyCode?.trim().toUpperCase() !== companyCode) return;
       void authService.getMe().then((profile) => {
         if (!profile) return;
-        setUser(profile as any);
+        setUser(profile);
         setUserProfile(profile);
       });
     });

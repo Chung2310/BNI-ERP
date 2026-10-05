@@ -103,7 +103,7 @@ export function RichTextEditor({
       execCmd("insertHTML", `<img src="${uploaded.url}" class="max-w-full my-2 rounded-lg" style="max-height: 250px; object-fit: contain;" />`);
       onUpload?.(uploaded.uploadToken);
       toast.success("Đã chèn hình ảnh.");
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err.message || "Tải hình ảnh thất bại");
     }
   };
@@ -209,7 +209,7 @@ export function RichTextEditor({
         onDrop={handleDrop}
         style={draggingOver ? { boxShadow: "inset 0 0 0 2px #06b6d4", backgroundColor: "#ecfeff" } : undefined}
         className="min-h-[220px] max-h-[380px] overflow-y-auto p-4 text-sm outline-none leading-relaxed prose prose-sm max-w-none bg-white"
-        {...({ placeholder: "Nhập nội dung thư chúc mừng..." } as any)}
+        {...({ placeholder: "Nhập nội dung thư chúc mừng..." })}
       />
     </div>
   );
@@ -236,8 +236,8 @@ export default function CelebrationEmailTab() {
   const currentVietnamYear = Number(new Intl.DateTimeFormat("en", { year: "numeric", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date()));
   const [holidayYear, setHolidayYear] = React.useState(currentVietnamYear);
   const automaticHolidays = React.useMemo(() => getVietnameseHolidays(holidayYear), [holidayYear]);
-  const [config, setConfig] = React.useState<any>(defaults);
-  const [history, setHistory] = React.useState<any[]>([]);
+  const [config, setConfig] = React.useState<import("../../services/companyEmailService").CelebrationConfig>(defaults);
+  const [history, setHistory] = React.useState<import("../../services/companyEmailService").CelebrationHistory[]>([]);
   const [savedConfig, setSavedConfig] = React.useState("");
   const [loadError, setLoadError] = React.useState("");
   const [historyFilter, setHistoryFilter] = React.useState("all");
@@ -248,10 +248,10 @@ export default function CelebrationEmailTab() {
   const [newHolidayError, setNewHolidayError] = React.useState("");
   const newHolidayDialogRef = React.useRef<HTMLElement>(null);
   const busyRef = React.useRef(busy);
-  busyRef.current = busy;
+  React.useLayoutEffect(() => { busyRef.current = busy; }, [busy]);
   const holidayDialogRef = React.useRef<HTMLElement>(null);
   const previewDialogRef = React.useRef<HTMLDivElement>(null);
-  const [preview, setPreview] = React.useState<any>(null);
+  const [preview, setPreview] = React.useState<import("../../services/companyEmailService").CelebrationPreview | null>(null);
   const [uploadTokens, setUploadTokens] = React.useState<string[]>([]);
 
   const hasChanges = loaded && (JSON.stringify(config) !== savedConfig || uploadTokens.length > 0);
@@ -314,7 +314,7 @@ export default function CelebrationEmailTab() {
   }, [holidaySettingsOpen, !!preview, !!newHoliday]);
 
   const template = (key: "birthdayTemplate" | "holidayTemplate", field: "subject" | "html", value: string) =>
-    setConfig((c: any) => ({ ...c, [key]: { ...c[key], [field]: value } }));
+    setConfig((c) => ({ ...c, [key]: { ...c[key], [field]: value } }));
 
 
   const addHoliday = (event: React.FormEvent) => {
@@ -329,11 +329,11 @@ export default function CelebrationEmailTab() {
       setNewHolidayError("Ngày gửi không hợp lệ.");
       return;
     }
-    if (config.holidayOverrides.some((holiday: any) => holiday.date === newHoliday.date)) {
+    if (config.holidayOverrides.some((holiday) => holiday.date === newHoliday.date)) {
       setNewHolidayError("Đã có ngày lễ bổ sung vào ngày này. Vui lòng sửa ngày lễ hiện có hoặc chọn ngày khác.");
       return;
     }
-    setConfig((current: any) => ({ ...current, holidayOverrides: [...current.holidayOverrides, { ...newHoliday, name: newHoliday.name.trim() }] }));
+    setConfig((current) => ({ ...current, holidayOverrides: [...current.holidayOverrides, { ...newHoliday, name: newHoliday.name.trim() }] }));
     setNewHoliday(null);
   };
 
@@ -351,7 +351,7 @@ export default function CelebrationEmailTab() {
       }
       dates.add(holiday.date);
     }
-    if (config.holidayEnabled && !resolveCelebrationHolidays(holidayYear, config).length && !holidays.some((holiday: any) => holiday.enabled)) {
+    if (config.holidayEnabled && !resolveCelebrationHolidays(holidayYear, config).length && !holidays.some((holiday) => holiday.enabled)) {
       toast.error("Hãy thêm và bật ít nhất một ngày lễ để tự động gửi.");
       return;
     }
@@ -362,17 +362,17 @@ export default function CelebrationEmailTab() {
       setUploadTokens([]);
       setHolidaySettingsOpen(false);
       toast.success("Đã lưu cấu hình email chúc mừng.");
-    } catch (e: any) {
+    } catch (e) {
       toast.error(e.message);
     } finally {
       setBusy(false);
     }
   };
 
-  const showPreview = async (value: any) => {
+  const showPreview = async (value: import("../../services/companyEmailService").CelebrationPreview) => {
     try {
       setPreview(await companyEmailApi.preview(value));
-    } catch (e: any) {
+    } catch (e) {
       toast.error(e.message);
     }
   };
@@ -416,12 +416,12 @@ export default function CelebrationEmailTab() {
         <fieldset disabled={!loaded || busy} className="grid min-w-0 gap-4 lg:grid-cols-3">
           <div className={"rounded-2xl border bg-white p-5 " + (config.birthdayEnabled ? "border-cyan-200" : "border-slate-200")}>
             <div className="mb-4 flex items-center justify-between"><Cake className="h-5 w-5 text-pink-500" /><span className={"rounded-full px-2 py-1 text-xs font-semibold " + (config.birthdayEnabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500")}>{config.birthdayEnabled ? "Đã bật" : "Đang tắt"}</span></div>
-            <Toggle label="Tự động sinh nhật" checked={config.birthdayEnabled} onChange={(value: boolean) => setConfig((current: any) => ({ ...current, birthdayEnabled: value }))} />
+            <Toggle label="Tự động sinh nhật" checked={config.birthdayEnabled} onChange={(value: boolean) => setConfig((current) => ({ ...current, birthdayEnabled: value }))} />
             <p className="mt-3 text-sm leading-relaxed text-slate-500">Gửi lời chúc vào ngày sinh nhật theo hồ sơ của từng thành viên.</p>
           </div>
           <div className={"rounded-2xl border bg-white p-5 " + (config.holidayEnabled ? "border-cyan-200" : "border-slate-200")}>
             <div className="mb-4 flex items-center justify-between"><CalendarDays className="h-5 w-5 text-cyan-600" /><span className={"rounded-full px-2 py-1 text-xs font-semibold " + (config.holidayEnabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500")}>{config.holidayEnabled ? "Đã bật" : "Đang tắt"}</span></div>
-            <Toggle label="Tự động lễ/Tết" checked={config.holidayEnabled} onChange={(value: boolean) => setConfig((current: any) => ({ ...current, holidayEnabled: value }))} />
+            <Toggle label="Tự động lễ/Tết" checked={config.holidayEnabled} onChange={(value: boolean) => setConfig((current) => ({ ...current, holidayEnabled: value }))} />
             <p className="mt-3 text-sm text-slate-500">{scheduledHolidays.length} ngày được chọn trong năm {currentVietnamYear}.</p>
             <button type="button" disabled={!loaded || busy} onClick={() => setHolidaySettingsOpen(true)}
               className="mt-4 inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-800 hover:bg-cyan-100 disabled:opacity-40">
@@ -431,7 +431,7 @@ export default function CelebrationEmailTab() {
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <Clock className="mb-4 h-5 w-5 text-amber-500" />
             <label className="block text-sm font-semibold text-slate-700">Giờ gửi tự động
-              <input type="time" value={config.sendTime} onChange={(event) => setConfig((current: any) => ({ ...current, sendTime: event.target.value }))}
+              <input type="time" value={config.sendTime} onChange={(event) => setConfig((current) => ({ ...current, sendTime: event.target.value }))}
                 className="mt-2 block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-base outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100" />
             </label>
             <p className="mt-2 text-xs text-slate-500">Giờ Việt Nam (UTC+7), áp dụng cho cả hai loại email.</p>
@@ -449,7 +449,7 @@ export default function CelebrationEmailTab() {
           title="Mẫu thư chúc mừng sinh nhật"
           value={config.birthdayTemplate}
           variables={HR_BIRTHDAY_TEMPLATE_VARIABLES}
-          onChange={(f: any, v: string) => template("birthdayTemplate", f, v)}
+          onChange={(f, v: string) => template("birthdayTemplate", f, v)}
           onPreview={() => showPreview(config.birthdayTemplate)}
           onUpload={(token: string) => setUploadTokens((current) => [...current, token])}
         />
@@ -457,7 +457,7 @@ export default function CelebrationEmailTab() {
           title="Mẫu thư chúc mừng lễ/Tết"
           value={config.holidayTemplate}
           variables={HR_HOLIDAY_TEMPLATE_VARIABLES}
-          onChange={(f: any, v: string) => template("holidayTemplate", f, v)}
+          onChange={(f, v: string) => template("holidayTemplate", f, v)}
           onPreview={() => showPreview({ ...config.holidayTemplate, holidayName: "Ngày lễ" })}
           onUpload={(token: string) => setUploadTokens((current) => [...current, token])}
         />
@@ -530,7 +530,7 @@ export default function CelebrationEmailTab() {
         <div className="space-y-3 rounded-xl border border-cyan-100 bg-cyan-50/40 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Toggle label="Tự động lấy ngày lễ Việt Nam" checked={config.vietnameseHolidaysEnabled}
-              onChange={(value: boolean) => setConfig((current: any) => ({ ...current, vietnameseHolidaysEnabled: value }))} />
+              onChange={(value: boolean) => setConfig((current) => ({ ...current, vietnameseHolidaysEnabled: value }))} />
             <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">Năm xem lịch
               <select value={holidayYear} onChange={(event) => setHolidayYear(Number(event.target.value))}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-2">
@@ -542,14 +542,14 @@ export default function CelebrationEmailTab() {
           <div className="grid gap-3 md:grid-cols-2">
             {automaticHolidays.map((holiday) => {
               const enabled = !config.disabledVietnameseHolidays.includes(holiday.id);
-              const custom = config.holidayOverrides.find((item: any) => item.date === holiday.date);
+              const custom = config.holidayOverrides.find((item) => item.date === holiday.date);
               return (
                 <div key={holiday.id} className="flex items-start justify-between gap-2 rounded-lg border border-slate-200 bg-white p-3">
                   <label className="flex min-w-0 items-start gap-2 text-sm">
                     <input type="checkbox" className="mt-1" checked={enabled} disabled={!loaded || busy || !config.vietnameseHolidaysEnabled}
                       onChange={(event) => {
                         const checked = event.target.checked;
-                        setConfig((current: any) => ({
+                        setConfig((current) => ({
                           ...current,
                           disabledVietnameseHolidays: checked
                             ? current.disabledVietnameseHolidays.filter((id: string) => id !== holiday.id)
@@ -574,9 +574,9 @@ export default function CelebrationEmailTab() {
         </div>
         <h4 className="text-sm font-semibold text-slate-700">Ngày lễ bổ sung</h4>
         {!config.holidayOverrides.length && <p className="text-sm text-slate-500">Chưa có ngày lễ bổ sung. Lịch Việt Nam ở trên vẫn được áp dụng khi bật.</p>}
-        {config.holidayOverrides.map((holiday: any, index: number) => {
-          const update = (field: string, value: string | boolean) => setConfig((current: any) => ({
-            ...current, holidayOverrides: current.holidayOverrides.map((item: any, i: number) => i === index ? { ...item, [field]: value } : item),
+        {config.holidayOverrides.map((holiday, index: number) => {
+          const update = (field: string, value: string | boolean) => setConfig((current) => ({
+            ...current, holidayOverrides: current.holidayOverrides.map((item, i: number) => i === index ? { ...item, [field]: value } : item),
           }));
           return (
             <fieldset key={index} disabled={busy} className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
@@ -593,7 +593,7 @@ export default function CelebrationEmailTab() {
               <button type="button" onClick={() => showPreview({ subject: holiday.subject || config.holidayTemplate.subject, html: holiday.html || config.holidayTemplate.html, holidayName: holiday.name || "Ngày lễ" })}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold">Xem trước ngày lễ</button>
               <button type="button" aria-label={"Xóa ngày lễ " + (index + 1)}
-                onClick={() => setConfig((current: any) => ({ ...current, holidayOverrides: current.holidayOverrides.filter((_: any, i: number) => i !== index) }))}
+                onClick={() => setConfig((current) => ({ ...current, holidayOverrides: current.holidayOverrides.filter((_, i: number) => i !== index) }))}
                 className="rounded-lg px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50">Xóa</button>
             </fieldset>
           );
@@ -697,7 +697,7 @@ export default function CelebrationEmailTab() {
   );
 }
 
-function Toggle({ label, checked, onChange }: any) {
+function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return (
     <label className="flex items-center gap-2 text-xs font-semibold text-slate-650 select-none cursor-pointer">
       <input

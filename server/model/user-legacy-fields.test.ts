@@ -16,7 +16,7 @@ it("strips retired credentials from existing hydrated documents", () => {
   expect(user.toJSON().permissions).toEqual(["chat:read"]);
 });
 it("strips retired fields from lean query responses too", async () => {
-  vi.spyOn(UserModel.collection, "findOne").mockResolvedValue({ email: "member@example.test", displayName: "Member", ...oldFields } as any);
+  vi.spyOn(UserModel.collection, "findOne").mockResolvedValue({ email: "member@example.test", displayName: "Member", ...oldFields });
   const user = await UserModel.findOne({ email: "member@example.test" }).lean();
   for (const field of LEGACY_USER_FIELDS) expect(user).not.toHaveProperty(field);
   expect(user?.displayName).toBe("Member");

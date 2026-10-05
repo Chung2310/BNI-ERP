@@ -112,6 +112,15 @@ const meeting = new Schema(
       default: 'scheduled',
     },
     speakers: { type: [speaker], default: [] },
+    presentation: {
+      type: new Schema({
+        view: { type: String, enum: ["checkin", "speaker", "luckyDraw", "activeMembers", "waiting"], default: "checkin" },
+        autoAdvance: { type: Boolean, default: false },
+        autoAdvanceDelay: { type: Number, default: 3, min: 0, max: 3600 },
+        drawWinnerId: String, drawStartedAt: Date, drawRevealsAt: Date,
+      }, { _id: false }),
+      default: () => ({}),
+    },
     currentIndex: { type: Number, default: -1 },
     speakerStartedAt: Date,
     speechesCompletedAt: Date,
@@ -136,6 +145,7 @@ const meeting = new Schema(
 meeting.index({ companyCode: 1, startsAt: -1 });
 meeting.index({ companyCode: 1, seriesId: 1 });
 meeting.index({ status: 1, reminderAt: 1 });
+meeting.index({ status: 1, "presentation.autoAdvance": 1 });
 
 export const MeetingModel = model('Meeting', meeting);
 

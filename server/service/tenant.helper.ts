@@ -6,9 +6,9 @@
  * @param user Thông tin người dùng hiện tại từ token
  */
 export function applyCompanyFilter(
-  filter: any = {},
+  filter: Record<string, unknown> = {},
   user?: { role: string; companyCode?: string }
-): any {
+) {
   if (!user) {
     return filter;
   }

@@ -1,3 +1,4 @@
+import { parseDateValue } from "../utils/dateValue";
 import React, { useState, lazy, Suspense } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -5,7 +6,6 @@ import {
   Calendar,
   Image as ImageIcon,
   Sliders,
-  Building2,
   Shield,
   ChevronLeft,
   ChevronRight
@@ -39,14 +39,17 @@ export default function SettingsTab() {
   }, [userProfile, isAdmin, activeSubTab, setActiveSubTab]);
 
   // Synchronize display name and photo url from context if it updates
-  React.useEffect(() => {
+  const [previousInputs1, setPreviousInputs1] = useState<unknown[] | null>(null);
+  if (previousInputs1 === null || !Object.is(previousInputs1[0], userProfile)) {
+    setPreviousInputs1([userProfile]);
     if (userProfile?.displayName) {
       setDisplayName(userProfile.displayName);
     }
     if (userProfile?.photoURL) {
       setPhotoURL(userProfile.photoURL);
     }
-  }, [userProfile]);
+  
+  }
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -80,15 +83,7 @@ export default function SettingsTab() {
   const getFormattedDate = () => {
     if (!userProfile?.createdAt) return "Chưa cập nhật";
 
-    let date: Date;
-    if (typeof userProfile.createdAt.toDate === "function") {
-      date = userProfile.createdAt.toDate();
-    } else if (userProfile.createdAt.seconds) {
-      date = new Date(userProfile.createdAt.seconds * 1000);
-    } else {
-      date = new Date(userProfile.createdAt);
-    }
-
+    const date = parseDateValue(userProfile.createdAt);
     if (isNaN(date.getTime())) {
       return "Chưa cập nhật";
     }

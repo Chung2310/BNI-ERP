@@ -8,7 +8,7 @@ type RankingMeeting = {
 };
 
 function timestamp(value: unknown) {
-  if (value && typeof (value as any).toDate === "function") value = (value as any).toDate();
+  if (value && typeof value === "object" && "toDate" in value && typeof value.toDate === "function") value = value.toDate();
   return value ? new Date(value as string).getTime() : NaN;
 }
 

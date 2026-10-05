@@ -2,11 +2,11 @@ import { io, Socket } from "socket.io-client";
 
 class SocketService {
   private socket: Socket | null = null;
-  private messageCallbacks: Array<(data: { message: any; conversation: any }) => void> = [];
-  private conversationCallbacks: Array<(conversation: any) => void> = [];
+  private messageCallbacks: Array<(data: { message: unknown; conversation: unknown }) => void> = [];
+  private conversationCallbacks: Array<(conversation: unknown) => void> = [];
   private statusCallbacks: Array<(connected: boolean) => void> = [];
-  private videoCallbacks: Array<(data: { videoId: string; status: string; updates: any[] }) => void> = [];
-  private customListeners: Map<string, Set<(data: any) => void>> = new Map();
+  private videoCallbacks: Array<(data: { videoId: string; status: string; updates: unknown[] }) => void> = [];
+  private customListeners: Map<string, Set<(data: unknown) => void>> = new Map();
 
   connect(token: string) {
     if (this.socket) {
@@ -42,6 +42,10 @@ class SocketService {
       });
     });
 
+    this.socket.io.on("reconnect_attempt", () => {
+      if (this.socket) this.socket.auth = { token: localStorage.getItem("accessToken") || token };
+    });
+
     this.socket.on("connect_error", (error) => {
       console.error("[SocketService] Connection error:", error.message);
     });
@@ -52,19 +56,19 @@ class SocketService {
     });
 
     // Listen to incoming messages
-    this.socket.on("new_message", (data: { message: any; conversation: any }) => {
+    this.socket.on("new_message", (data: { message: unknown; conversation: unknown }) => {
       console.log("[SocketService] Received 'new_message' event:", data);
       this.messageCallbacks.forEach((cb) => cb(data));
     });
 
     // Listen to conversation updates
-    this.socket.on("conversation_updated", (conversation: any) => {
+    this.socket.on("conversation_updated", (conversation) => {
       console.log("[SocketService] Received 'conversation_updated' event:", conversation);
       this.conversationCallbacks.forEach((cb) => cb(conversation));
     });
 
     // Listen to video status updates
-    this.socket.on("video_status_updated", (data: { videoId: string; status: string; updates: any[] }) => {
+    this.socket.on("video_status_updated", (data: { videoId: string; status: string; updates: unknown[] }) => {
       console.log("[SocketService] Received 'video_status_updated' event:", data);
       this.videoCallbacks.forEach((cb) => cb(data));
     });
@@ -80,25 +84,33 @@ class SocketService {
     }
   }
 
+  reconnect() {
+    if (!this.socket || this.socket.connected) return;
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+    this.socket.auth = { token };
+    this.socket.connect();
+  }
+
   isConnected() {
     return !!this.socket?.connected;
   }
 
-  onNewMessage(callback: (data: { message: any; conversation: any }) => void) {
+  onNewMessage(callback: (data: { message: unknown; conversation: unknown }) => void) {
     this.messageCallbacks.push(callback);
     return () => {
       this.messageCallbacks = this.messageCallbacks.filter((cb) => cb !== callback);
     };
   }
 
-  onConversationUpdated(callback: (conversation: any) => void) {
+  onConversationUpdated(callback: (conversation: unknown) => void) {
     this.conversationCallbacks.push(callback);
     return () => {
       this.conversationCallbacks = this.conversationCallbacks.filter((cb) => cb !== callback);
     };
   }
 
-  onVideoStatusUpdated(callback: (data: { videoId: string; status: string; updates: any[] }) => void) {
+  onVideoStatusUpdated(callback: (data: { videoId: string; status: string; updates: unknown[] }) => void) {
     this.videoCallbacks.push(callback);
     return () => {
       this.videoCallbacks = this.videoCallbacks.filter((cb) => cb !== callback);
@@ -113,7 +125,7 @@ class SocketService {
     };
   }
 
-  on(event: string, callback: (data: any) => void) {
+  on<T = unknown>(event: string, callback: (data: T) => void) {
     if (!this.customListeners.has(event)) {
       this.customListeners.set(event, new Set());
     }
@@ -138,7 +150,7 @@ class SocketService {
     };
   }
 
-  emit(event: string, data: any) {
+  emit(event: string, data: unknown) {
     if (this.socket && this.socket.connected) {
       this.socket.emit(event, data);
     } else {

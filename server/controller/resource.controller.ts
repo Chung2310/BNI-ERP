@@ -40,13 +40,13 @@ async function getAllLocalFiles(companyCode: string, folderId: string, access: R
   return files;
 }
 
-async function getGoogleDriveFilesRecursive(drive: any, folderId: string, relativePath: string = ""): Promise<any[]> {
+async function getGoogleDriveFilesRecursive(drive: import("googleapis").drive_v3.Drive, folderId: string, relativePath: string = "") {
   const response = await drive.files.list({
     q: `'${folderId}' in parents and trashed = false`,
     fields: "files(id, name, mimeType, size)",
   });
   const files = response.data.files || [];
-  let result: any[] = [];
+  let result: Array<Omit<import("googleapis").drive_v3.Schema$File, "size"> & { relativePath: string; size: number }> = [];
   for (const file of files) {
     if (file.mimeType === "application/vnd.google-apps.folder") {
       const childFiles = await getGoogleDriveFilesRecursive(drive, file.id, `${relativePath}${file.name}/`);
@@ -89,7 +89,7 @@ async function getResourceAccessContext(req: AuthenticatedRequest): Promise<Reso
  * Trả lỗi dạng JSON để client đọc được thông báo (app không có error middleware JSON,
  * nếu dùng next(error) sẽ rơi vào handler mặc định trả HTML 500).
  */
-function sendError(res: Response, error: any, context: string) {
+function sendError(res: Response, error: { message?: string; code?: string | number; status?: number }, context: string) {
   console.error(`[resourceController.${context}] Error:`, error);
   return res.status(400).json({
     status: "error",
@@ -116,7 +116,7 @@ export const resourceController = {
       const items = await resourceService.list(getCompanyCode(req), section, parentId, targetOwnerId, roomId, req.user?.id, access);
       return res.json({
         success: true,
-        items: items.map((item: any) => resourceFileAccessService.withReadableFileUrl(item)),
+        items: items.map((item) => resourceFileAccessService.withReadableFileUrl(item)),
       });
     } catch (error) {
       return sendError(res, error, "list");
@@ -406,7 +406,7 @@ export const resourceController = {
       const companyCode = getCompanyCode(req);
       const { id } = req.params; // MongoDB ObjectId or Google Drive folder ID
       const userId = req.user?.id;
-      const selectedSpace = req.query.space as string || "personal";
+      
 
       const AdmZip = (await import("adm-zip")).default;
       const zip = new AdmZip();
@@ -458,7 +458,7 @@ export const resourceController = {
                 { fileId: file.id, mimeType: exportMime },
                 { responseType: "arraybuffer" }
               );
-              buffer = Buffer.from(exportRes.data as any);
+              buffer = Buffer.from(exportRes.data as ArrayBuffer);
               // Add extension if not already present
               if (!filename.toLowerCase().endsWith(ext)) {
                 filename += ext;
@@ -468,7 +468,7 @@ export const resourceController = {
                 { fileId: file.id, alt: "media" },
                 { responseType: "arraybuffer" }
               );
-              buffer = Buffer.from(downloadRes.data as any);
+              buffer = Buffer.from(downloadRes.data as ArrayBuffer);
             }
             zip.addFile(filename, buffer);
           } catch (fileErr) {

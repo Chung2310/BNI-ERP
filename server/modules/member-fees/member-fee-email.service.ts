@@ -62,7 +62,7 @@ export async function sendFeeEmail(companyCode: string, id: string, day: string)
     await MemberFeeModel.updateOne({ _id: fee._id, companyCode, emailClaimToken: claimToken },
       { $set: { emailNotifiedDay: day, emailNotifiedAt: new Date() },
         $unset: { emailClaimToken: 1, emailClaimUntil: 1 }, $inc: { __v: 1 } });
-  } catch (error) {
+  } catch  {
     // Retain the lease after SMTP acceptance if persisting the result fails.
     if (!accepted) await MemberFeeModel.updateOne({ _id: fee._id, companyCode, emailClaimToken: claimToken },
       { $unset: { emailClaimToken: 1, emailClaimUntil: 1 }, $inc: { __v: 1 } });

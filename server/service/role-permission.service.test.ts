@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ findOne: vi.fn(), save: vi.fn() }));
 vi.mock("../model/role-permission.model", () => ({
-  RolePermissionModel: Object.assign(function RolePermissionModel(this: any, value: any) {
+  RolePermissionModel: Object.assign(function RolePermissionModel(this, value) {
     Object.assign(this, value);
     this.save = mocks.save;
   }, { findOne: mocks.findOne }),
@@ -15,7 +15,7 @@ describe("role permission persistence", () => {
 
   it("returns compact stored and expanded effective permissions", async () => {
     mocks.findOne.mockResolvedValue(null);
-    mocks.save.mockImplementation(async function (this: any) { return this; });
+    mocks.save.mockImplementation(async function (this) { return this; });
 
     const result = await rolePermissionService.saveRolePermission({
       companyCode: " acme ",

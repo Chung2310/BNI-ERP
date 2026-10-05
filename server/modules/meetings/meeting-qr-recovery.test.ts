@@ -15,7 +15,7 @@ test('concurrent first requests converge on the persisted company token', async 
     const snapshot = stored;
     return { select: async () => snapshot };
   });
-  t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', (query: any, update: any, options: any) => ({
+  t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', (query, update, options) => ({
     select: async (projection: string) => {
       assert.deepEqual(query, { companyCode: 'ACME', tokenHash: { $exists: false }, tokenEncrypted: { $exists: false } });
       assert.equal(options.upsert, true);
@@ -37,8 +37,8 @@ test('concurrent first requests converge on the persisted company token', async 
 
 test('different companies receive independent permanent tokens', async t => {
   const records = new Map<string, any>();
-  t.mock.method(MeetingCheckInQrModel, 'findOne', (query: any) => ({ select: async () => records.get(query.companyCode) || null }));
-  t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', (query: any, update: any) => ({ select: async () => {
+  t.mock.method(MeetingCheckInQrModel, 'findOne', (query) => ({ select: async () => records.get(query.companyCode) || null }));
+  t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', (query, update) => ({ select: async () => {
     const record = { companyCode: query.companyCode, ...update.$set };
     records.set(query.companyCode, record);
     return record;
@@ -52,9 +52,9 @@ test('different companies receive independent permanent tokens', async t => {
 });
 
 test('a previously revoked empty record is initialized once', async t => {
-  let record: any = { companyCode: 'ACME', revokedAt: new Date() };
+  let record = { companyCode: 'ACME', revokedAt: new Date() };
   const lookup = t.mock.method(MeetingCheckInQrModel, 'findOne', () => ({ select: async () => record }));
-  const initialize = t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', (_query: any, update: any) => ({ select: async () => {
+  const initialize = t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', (_query, update) => ({ select: async () => {
     record = { companyCode: 'ACME', ...update.$set };
     return record;
   } }));
@@ -66,7 +66,7 @@ test('a previously revoked empty record is initialized once', async t => {
 
 test('unreadable or mismatched encrypted tokens fail without silently replacing the QR', async t => {
   const token = 'A'.repeat(43);
-  const record: any = { companyCode: 'ACME', tokenHash: createHash('sha256').update(token).digest('hex'), tokenEncrypted: 'invalid', expiresAt: null };
+  const record = { companyCode: 'ACME', tokenHash: createHash('sha256').update(token).digest('hex'), tokenEncrypted: 'invalid', expiresAt: null };
   t.mock.method(MeetingCheckInQrModel, 'findOne', () => ({ select: async () => record }));
   const write = t.mock.method(MeetingCheckInQrModel, 'findOneAndUpdate', () => { throw new Error('Must not rotate'); });
   await assert.rejects(getCompanyCheckInQr('ACME'), { status: 409 });

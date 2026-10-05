@@ -9,7 +9,7 @@ describe("companyEmailApi.saveSmtp", () => {
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("localStorage", { getItem: vi.fn(() => "token") });
 
-    await companyEmailApi.saveSmtp({
+    await companyEmailApi.saveSmtp(({
       host: "smtp.gmail.com",
       port: 587,
       secure: false,
@@ -19,7 +19,7 @@ describe("companyEmailApi.saveSmtp", () => {
       fromName: "Example",
       hasPassword: true,
       data: { stale: true },
-    });
+    } as unknown as Parameters<typeof companyEmailApi.saveSmtp>[0]));
 
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     expect(JSON.parse(String(init.body))).toEqual({

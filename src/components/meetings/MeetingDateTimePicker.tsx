@@ -93,7 +93,9 @@ export function MeetingDateTimePicker({
   );
 
   // Keep internal state synced when value prop updates
-  useEffect(() => {
+  const [previousInputs1, setPreviousInputs1] = useState<unknown[] | null>(null);
+  if (previousInputs1 === null || !Object.is(previousInputs1[0], value)) {
+    setPreviousInputs1([value]);
     if (value) {
       const p = parseValue(value);
       if (p) {
@@ -109,7 +111,8 @@ export function MeetingDateTimePicker({
     } else {
       setInputValue("");
     }
-  }, [value]);
+  
+  }
 
   // Click outside to close
   useEffect(() => {
@@ -137,7 +140,7 @@ export function MeetingDateTimePicker({
     setInputValue(text);
 
     // Support formats: dd/mm/yyyy HH:mm or dd/mm/yyyy
-    const match = text.trim().match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})(?:\s+(\d{1,2}):(\d{1,2}))?$/);
+    const match = text.trim().match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})(?:\s+(\d{1,2}):(\d{1,2}))?$/);
     if (match) {
       const d = parseInt(match[1], 10);
       const m = parseInt(match[2], 10) - 1;

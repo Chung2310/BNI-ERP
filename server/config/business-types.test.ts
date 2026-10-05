@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterModulesForBusinessType, getRequiredBusinessModule, resolveBusinessType, BUSINESS_TYPES } from "./business-types";
+import { filterModulesForBusinessType, resolveBusinessType, BUSINESS_TYPES } from "./business-types";
 
 test("only exposes general business type", () => {
   assert.deepEqual(BUSINESS_TYPES, ["general"]);

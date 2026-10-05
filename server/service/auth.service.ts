@@ -70,7 +70,7 @@ export const authService = {
   /**
    * Đăng ký tài khoản người dùng mới
    */
-  async register(data: any): Promise<IUser> {
+  async register(data: Partial<IUser>): Promise<IUser> {
     const emailLower = data.email.toLowerCase().trim();
     const existingUser = await UserModel.findOne({ email: emailLower });
 
@@ -129,7 +129,8 @@ export const authService = {
    */
   async refresh(token: string) {
     try {
-      const decoded = jwt.verify(token, getJwtRefreshSecret()) as any;
+      const decoded = jwt.verify(token, getJwtRefreshSecret());
+      if (typeof decoded === "string") throw new Error("Invalid token payload");
       const user = await UserModel.findById(decoded.id);
 
       if (!user) {
@@ -148,7 +149,7 @@ export const authService = {
 
       const accessToken = jwt.sign(payload, getJwtAccessSecret(), { expiresIn: "15m" });
       return { accessToken };
-    } catch (error) {
+    } catch  {
       throw new Error("Mã làm mới (Refresh Token) đã hết hạn hoặc không hợp lệ.");
     }
   },
@@ -165,10 +166,10 @@ export const authService = {
    * Chỉ cho phép cập nhật các trường hồ sơ cá nhân, KHÔNG bao giờ cho phép
    * client tự đổi role/companyCode/parentId qua endpoint này (chặn leo thang đặc quyền).
    */
-  async updateProfile(id: string, updateData: any): Promise<IUser | null> {
+  async updateProfile(id: string, updateData: Partial<IUser>): Promise<IUser | null> {
     const safeUpdateData = pickSelfServiceProfileUpdate(updateData);
     if (safeUpdateData.birthDate !== undefined) {
-      safeUpdateData.birthDate = normalizeBirthDate(safeUpdateData.birthDate as any);
+      safeUpdateData.birthDate = normalizeBirthDate(safeUpdateData.birthDate);
     }
     safeUpdateData.updatedAt = new Date();
     return await UserModel.findByIdAndUpdate(id, { $set: safeUpdateData }, { returnDocument: 'after' }).select("-password");
@@ -185,7 +186,7 @@ export const authService = {
   /**
    * Đăng ký doanh nghiệp mới và tài khoản admin tương ứng
    */
-  async registerCompanyAndAdmin(data: any): Promise<any> {
+  async registerCompanyAndAdmin(data: { companyName: string; companyCode: string; ownerName: string; ownerEmail: string; ownerPassword: string; enabledModules?: string[]; businessType?: string; entityPreset?: string }) {
     const { companyName, companyCode, ownerName, ownerEmail, ownerPassword, enabledModules, businessType: businessTypeInput, entityPreset } = data;
     const normalizedCode = companyCode.toUpperCase().trim();
     const emailLower = ownerEmail.toLowerCase().trim();
@@ -274,7 +275,7 @@ export const authService = {
 
     // 2. Cập nhật cơ sở dữ liệu cascade nếu thay đổi mã hoặc tên doanh nghiệp
     if ((newCode && newCode !== oldCode) || (newName && newName !== oldName)) {
-      const codeToUse = newCode || oldCode;
+      
       const nameToUse = newName || oldName;
 
       // Cập nhật Users
@@ -307,7 +308,7 @@ export const authService = {
     return savedCompany;
   },
 
-  async getCompanyDriveConfig(companyCode: string): Promise<any> {
+  async getCompanyDriveConfig(companyCode: string) {
     const normalizedCode = String(companyCode || "").trim().toUpperCase();
     const company = await CompanyModel.findOne({ code: normalizedCode });
     if (!company) {
@@ -323,7 +324,7 @@ export const authService = {
   },
 
   /** Lưu OAuth Google Drive sau khi công ty kết nối thành công. */
-  async saveDriveOAuth(companyCode: string, data: { refreshToken: string; email: string }): Promise<any> {
+  async saveDriveOAuth(companyCode: string, data: { refreshToken: string; email: string }) {
     const normalizedCode = String(companyCode || "").trim().toUpperCase();
     const company = await CompanyModel.findOne({ code: normalizedCode });
     if (!company) {
@@ -342,7 +343,7 @@ export const authService = {
   },
 
   /** Ngắt kết nối Google Drive của doanh nghiệp. */
-  async disconnectDrive(companyCode: string): Promise<any> {
+  async disconnectDrive(companyCode: string) {
     const normalizedCode = String(companyCode || "").trim().toUpperCase();
     const company = await CompanyModel.findOne({ code: normalizedCode });
     if (!company) {
@@ -355,7 +356,7 @@ export const authService = {
     return this.getCompanyDriveConfig(normalizedCode);
   },
 
-  async registerUserForCompany(data: any, callerCompanyCode?: string, callerRole?: string): Promise<IUser> {
+  async registerUserForCompany(data: Omit<Partial<IUser>, "birthDate"> & { birthDate?: string | Date }, callerCompanyCode?: string, callerRole?: string): Promise<IUser> {
     const {
       displayName,
       email,
@@ -409,7 +410,7 @@ export const authService = {
       }
     }
 
-    const salaryValue = monthlySalary === undefined || monthlySalary === null || monthlySalary === "" ? undefined : Number(monthlySalary);
+    const salaryValue = monthlySalary === undefined || monthlySalary === null || String(monthlySalary) === "" ? undefined : Number(monthlySalary);
     if (salaryValue !== undefined && (!Number.isFinite(salaryValue) || salaryValue < 0)) {
       throw new Error("Lương tháng không hợp lệ.");
     }
@@ -443,7 +444,7 @@ export const authService = {
   /**
    * Cập nhật thông tin chi tiết một nhân sự (Admin)
    */
-  async updateUser(userId: string, updateData: any, callerCompanyCode: string, callerRole: string, callerId?: string): Promise<IUser | null> {
+  async updateUser(userId: string, updateData: Partial<IUser>, callerCompanyCode: string, callerRole: string, callerId?: string): Promise<IUser | null> {
     const user = await UserModel.findById(userId);
     if (!user) {
       throw new Error("Không tìm thấy người dùng");
@@ -529,7 +530,7 @@ export const authService = {
   /**
    * Cập nhật hàng loạt thông tin nhân sự (ví dụ: kéo thả thay đổi sơ đồ)
    */
-  async bulkUpdateUsers(updates: any[], callerCompanyCode: string, callerRole: string): Promise<void> {
+  async bulkUpdateUsers(updates: Array<Partial<IUser> & { id: string }>, callerCompanyCode: string, callerRole: string): Promise<void> {
     for (const update of updates) {
       const { id, ...data } = update;
       stripLegacyUserFields(data);
@@ -584,7 +585,7 @@ export const authService = {
   /**
    * Xóa nhân sự và điều chuyển cấp dưới trực thuộc
    */
-  async deleteUser(userId: string, callerCompanyCode: string, callerRole: string): Promise<void> {
+  async deleteUser(userId: string, callerCompanyCode: string, _callerRole: string): Promise<void> {
     const user = await UserModel.findById(userId);
     if (!user) {
       throw new Error("Không tìm thấy người dùng");

@@ -51,7 +51,7 @@ export default function UserDataDeletion() {
     }
   }, []);
 
-  const handleCheckStatus = async (checkCode: string) => {
+  async function handleCheckStatus(checkCode: string) {
     const activeCode = checkCode || code;
     if (!activeCode.trim()) {
       setError("Please enter a deletion request code.");
@@ -71,12 +71,12 @@ export default function UserDataDeletion() {
       }
 
       setStatusResult(result.data);
-    } catch (err: any) {
+    } catch (err) {
       setError(getApiErrorMessage(err, "Không thể kiểm tra trạng thái yêu cầu xóa dữ liệu."));
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6">

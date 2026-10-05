@@ -39,7 +39,7 @@ afterEach(cleanup);
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.setItem("accessToken", "token");
-  vi.mocked(authService.getMe).mockResolvedValue(profile as any);
+  vi.mocked(authService.getMe).mockResolvedValue((profile as unknown as Parameters<((value: Awaited<ReturnType<typeof authService.getMe>>) => void)>[0]));
   vi.mocked(socketService.on).mockReturnValue(() => undefined);
   vi.mocked(socketService.onStatusChange).mockImplementation((callback: (connected: boolean) => void) => {
     callback(false);
@@ -77,7 +77,7 @@ describe("AuthContext company module sync", () => {
     render(<AuthProvider><ProfileProbe /></AuthProvider>);
     await waitFor(() => expect(screen.getByLabelText("modules").textContent).toBe("hr,chat"));
 
-    vi.mocked(authService.getMe).mockResolvedValue({ ...profile, enabledModules: ["student"] } as any);
+    vi.mocked(authService.getMe).mockResolvedValue(({ ...profile, enabledModules: ["student"] } as unknown as Parameters<((value: Awaited<ReturnType<typeof authService.getMe>>) => void)>[0]));
     await waitFor(() => expect(statusListener).toBeTypeOf("function"));
     await act(async () => statusListener?.(true));
 

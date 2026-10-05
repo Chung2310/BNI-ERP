@@ -15,7 +15,7 @@ export interface FirestoreErrorInfo {
  * @param error The raw error object or message
  * @param fallbackMessage Fallback message if the error is unrecognized
  */
-export function parseFirebaseError(error: any, fallbackMessage: string = "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau."): string {
+export function parseFirebaseError(error: unknown, fallbackMessage: string = "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau."): string {
   if (!error) return fallbackMessage;
 
   let errorCode = "";
@@ -28,11 +28,12 @@ export function parseFirebaseError(error: any, fallbackMessage: string = "Đã x
     errorMessage = error.message || "";
     // Some custom firebase errors carry .code property
     if ("code" in error) {
-      errorCode = (error as any).code || "";
+      errorCode = String(error.code || "");
     }
   } else if (typeof error === "object") {
-    errorCode = error.code || error.errorCode || "";
-    errorMessage = error.message || error.error || "";
+    const details = error as Record<string, unknown>;
+    errorCode = String(details.code || details.errorCode || "");
+    errorMessage = String(details.message || details.error || "");
   }
 
   // 2. Handle stringified JSON error thrown by handleFirestoreError

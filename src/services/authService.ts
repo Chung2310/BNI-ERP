@@ -27,7 +27,7 @@ export const authService = {
       throw new Error(result.message || "Không thể xóa tài khoản.");
     }
   },
-  async getUserActivity(userId: string, filters: Record<string, string | number | undefined> = {}): Promise<any> {
+  async getUserActivity(userId: string, filters: Record<string, string | number | undefined> = {}) {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== "") query.set(key, String(value));
     const res = await fetch(`/api/v1/auth/users/${encodeURIComponent(userId)}/activity?${query}`, { headers: { Authorization: `Bearer ${getAccessToken()}` } });
@@ -36,7 +36,7 @@ export const authService = {
     return data;
   },
   // Đăng ký bằng Email & Mật khẩu
-  async registerWithEmail(email: string, password: string, displayName: string): Promise<any> {
+  async registerWithEmail(email: string, password: string, displayName: string) {
     const res = await fetch("/api/v1/auth/register", {
       method: "POST",
       headers: {
@@ -55,7 +55,7 @@ export const authService = {
   },
 
   // Đăng nhập bằng số điện thoại hoặc email và mật khẩu
-  async loginWithIdentifier(identifier: string, password: string): Promise<any> {
+  async loginWithIdentifier(identifier: string, password: string) {
     const res = await fetch("/api/v1/auth/login", {
       method: "POST",
       headers: {
@@ -79,7 +79,7 @@ export const authService = {
   },
 
   // Đăng nhập bằng Google (Chuyển sang JWT nên tạm thời báo không hỗ trợ)
-  async loginWithGoogle(): Promise<any> {
+  async loginWithGoogle() {
     throw new Error("Đăng nhập bằng Google hiện không khả dụng. Vui lòng sử dụng tài khoản Email.");
   },
 
@@ -187,7 +187,7 @@ export const authService = {
     }
 
     const result = await res.json();
-    return (result.data || []).map((u: any) => ({
+    return (result.data || []).map((u) => ({
       ...u,
       uid: u._id,
     }));
@@ -209,7 +209,7 @@ export const authService = {
     }
 
     const result = await res.json();
-    return (result.data || []).map((u: any) => ({
+    return (result.data || []).map((u) => ({
       ...u,
       uid: u._id,
     }));
@@ -229,7 +229,7 @@ export const authService = {
     }
 
     const result = await res.json();
-    return (result.data || []).filter((u: any) => u.isActive !== false).map((u: any) => ({
+    return (result.data || []).filter((u) => u.isActive !== false).map((u) => ({
       ...u,
       uid: u._id,
     }));
@@ -266,7 +266,7 @@ export const authService = {
     }
 
     const result = await res.json();
-    return (result.data || []).map((item: any) => ({
+    return (result.data || []).map((item) => ({
       ...item,
       id: item._id || item.id,
     }));
@@ -295,7 +295,7 @@ export const authService = {
   },
 
   // Cập nhật chi tiết thông tin một nhân sự
-  async updateUser(uid: string, updateData: any): Promise<void> {
+  async updateUser(uid: string, updateData: Partial<UserProfile> & { password?: string; photoUploadToken?: string; coverUploadToken?: string }): Promise<void> {
     const res = await fetch(`/api/v1/auth/users/${uid}`, {
       method: "PATCH",
       headers: {
@@ -312,7 +312,7 @@ export const authService = {
   },
 
   // Cập nhật hàng loạt thông tin cấu trúc sơ đồ tổ chức
-  async bulkUpdateUsers(updates: any[]): Promise<void> {
+  async bulkUpdateUsers(updates: Array<Partial<UserProfile> & { id: string }>): Promise<void> {
     const res = await fetch("/api/v1/auth/users/bulk", {
       method: "PATCH",
       headers: {
@@ -405,7 +405,7 @@ export const authService = {
   },
 
   // Cập nhật một hoặc nhiều trường trong hồ sơ qua REST API
-  async updateProfile(updateData: any): Promise<UserProfile> {
+  async updateProfile(updateData: Partial<UserProfile> & { password?: string; photoUploadToken?: string; coverUploadToken?: string }): Promise<UserProfile> {
     const res = await fetch("/api/v1/auth/profile", {
       method: "PATCH",
       headers: {

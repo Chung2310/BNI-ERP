@@ -7,10 +7,10 @@ import { SearchableSelect } from "../common/SearchableSelect";
 const empty = { bankId: "", accountNo: "", accountName: "" };
 
 export default function CompanyPaymentSettingsTab() {
-  const [form, setForm] = React.useState<any>(empty);
-  const [originalForm, setOriginalForm] = React.useState<any>(empty);
+  const [form, setForm] = React.useState(empty);
+  const [originalForm, setOriginalForm] = React.useState(empty);
   const [busy, setBusy] = React.useState("");
-  const [banks, setBanks] = React.useState<any[]>([]);
+  const [banks, setBanks] = React.useState<Array<{ bin: string; shortName: string; name: string; logo: string }>>([]);
 
   React.useEffect(() => {
     companyPaymentApi.getVietqr()
@@ -32,10 +32,10 @@ export default function CompanyPaymentSettingsTab() {
       .catch(console.error);
   }, []);
 
-  const update = (key: string, value: any) =>
-    setForm((current: any) => ({ ...current, [key]: value }));
+  const update = (key: keyof typeof empty, value: string) =>
+    setForm((current) => ({ ...current, [key]: value }));
 
-  const act = async (name: string, fn: () => Promise<any>, message: string) => {
+  const act = async (name: string, fn: () => Promise<unknown>, message: string) => {
     setBusy(name);
     try {
       await fn();
@@ -43,7 +43,7 @@ export default function CompanyPaymentSettingsTab() {
       if (name === "save") {
         setOriginalForm(form);
       }
-    } catch (e: any) {
+    } catch (e) {
       toast.error(e.message);
     } finally {
       setBusy("");
@@ -110,7 +110,7 @@ export default function CompanyPaymentSettingsTab() {
   );
 }
 
-function Field({ label, value, placeholder, onChange, type = "text" }: any) {
+function Field({ label, value, placeholder, onChange, type = "text" }: { label: string; value: string; placeholder?: string; onChange: (value: string) => void; type?: string }) {
   return (
     <label className="space-y-1 text-xs font-semibold text-slate-600">
       <span>{label}</span>
@@ -125,7 +125,7 @@ function Field({ label, value, placeholder, onChange, type = "text" }: any) {
   );
 }
 
-function Action({ icon: Icon, busy, label, onClick, secondary }: any) {
+function Action({ icon: Icon, busy, label, onClick, secondary }: { icon: import("lucide-react").LucideIcon; busy?: boolean; label: string; onClick: () => void; secondary?: boolean }) {
   return (
     <button
       type="button"

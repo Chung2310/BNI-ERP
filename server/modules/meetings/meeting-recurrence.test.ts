@@ -25,7 +25,7 @@ it("validates common meeting details and recurrence before creating the series",
  expect(recurringMeetingInput.validate({...details,recurrence:{...rule,months:13}}).error).toBeDefined();
 });
 it("creates separate scoped meetings with one series identifier and per-date reminders", async () => {
- const insert = vi.spyOn(MeetingModel,"insertMany").mockImplementation(async (rows:any) => rows as any);
+ const insert = vi.spyOn(MeetingModel,"insertMany").mockImplementation((async (rows) => rows as unknown as Parameters<((value: typeof MeetingModel.insertMany) => void)>[0]));
  const rows = await createRecurringMeetings("BNI","actor",{...details,recurrence:rule});
  expect(rows).toHaveLength(26);
  const values = insert.mock.calls[0][0] as any[];
@@ -34,7 +34,7 @@ it("creates separate scoped meetings with one series identifier and per-date rem
 });
 it("rejects past occurrences and rolls back a failed batch only within its own series", async () => {
  const insert = vi.spyOn(MeetingModel,"insertMany").mockRejectedValue(new Error("write failed"));
- const remove = vi.spyOn(MeetingModel,"deleteMany").mockResolvedValue({deletedCount:2} as any);
+ const remove = vi.spyOn(MeetingModel,"deleteMany").mockResolvedValue(({deletedCount:2} as unknown as Parameters<((value: Awaited<ReturnType<typeof MeetingModel.deleteMany>>) => void)>[0]));
  await expect(createRecurringMeetings("BNI","actor",{...details,recurrence:{...rule,startDate:"2000-01-01"}})).rejects.toThrow(/tương lai/);
  expect(insert).not.toHaveBeenCalled();
  await expect(createRecurringMeetings("BNI","actor",{...details,recurrence:rule})).rejects.toThrow("write failed");
@@ -42,14 +42,14 @@ it("rejects past occurrences and rolls back a failed batch only within its own s
 });
 function item() { return { _id:"one", companyCode:"BNI", seriesId:"series", startsAt:new Date("2030-01-02T00:00Z"), originalStartsAt:new Date("2030-01-02T00:00Z"), status:"scheduled", revision:1, __v:0, reminderDays:1, checkInQrTokenHash:"old", checkInQrTokenEncrypted:"old", checkInQrExpiresAt:new Date(), speakers:[], save:vi.fn().mockResolvedValue(undefined) }; }
 it("reschedules only the selected occurrence, invalidates old reminders and QR codes", async () => {
- const meeting=item();const find=vi.spyOn(MeetingModel,"findOne").mockResolvedValue(meeting as any);
+ const meeting=item();const find=vi.spyOn(MeetingModel,"findOne").mockResolvedValue((meeting as unknown as Parameters<((value: Awaited<ReturnType<typeof MeetingModel.findOne>>) => void)>[0]));
  await updateMeeting("BNI","one",{startsAt:new Date("2030-01-03T00:00Z"),version:0});
  expect(find).toHaveBeenCalledWith({_id:"one",companyCode:"BNI"});
  expect(meeting.revision).toBe(2);expect(meeting.checkInQrTokenHash).toBeUndefined();expect(meeting.originalStartsAt.toISOString()).toBe("2030-01-02T00:00:00.000Z");
  expect(meeting.save).toHaveBeenCalledOnce();
 });
 it("rejects stale edits and moving a started meeting or moving into the past", async () => {
- const meeting=item();vi.spyOn(MeetingModel,"findOne").mockResolvedValue(meeting as any);
+ const meeting=item();vi.spyOn(MeetingModel,"findOne").mockResolvedValue((meeting as unknown as Parameters<((value: Awaited<ReturnType<typeof MeetingModel.findOne>>) => void)>[0]));
  await expect(updateMeeting("BNI","one",{version:9,title:"edit"})).rejects.toThrow(/thay đổi/);
  await expect(updateMeeting("BNI","one",{startsAt:new Date("2000-01-01")})).rejects.toThrow(/tương lai/);
  meeting.status="live";
@@ -57,6 +57,6 @@ it("rejects stale edits and moving a started meeting or moving into the past", a
  expect(meeting.save).not.toHaveBeenCalled();
 });
 it("cancels the selected scheduled occurrence without deleting its history", async () => {
- const meeting=item(); await controlMeeting(meeting,"cancel");
+ const meeting=item(); await controlMeeting((meeting as unknown as Parameters<typeof controlMeeting>[0]),"cancel");
  expect(meeting.status).toBe("cancelled");expect(meeting.seriesId).toBe("series");expect(meeting.save).toHaveBeenCalledOnce();
 });

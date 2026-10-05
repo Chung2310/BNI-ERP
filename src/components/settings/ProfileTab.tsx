@@ -1,3 +1,4 @@
+import { parseDateValue } from "../../utils/dateValue";
 import React, { useRef, useState } from "react";
 import {
   User,
@@ -9,7 +10,6 @@ import {
   ImagePlus,
   Trash2,
   Camera,
-  Calendar,
   Shield,
   BadgeCheck,
   Sparkles,
@@ -66,16 +66,9 @@ function getRoleInfo(role?: string) {
   }
 }
 
-function formatJoinDate(createdAt: any) {
+function formatJoinDate(createdAt: unknown) {
   if (!createdAt) return "Chưa cập nhật";
-  let date: Date;
-  if (typeof createdAt.toDate === "function") {
-    date = createdAt.toDate();
-  } else if (createdAt.seconds) {
-    date = new Date(createdAt.seconds * 1000);
-  } else {
-    date = new Date(createdAt);
-  }
+  const date = parseDateValue(createdAt);
   if (isNaN(date.getTime())) return "Chưa cập nhật";
   return date.toLocaleDateString("vi-VN", {
     year: "numeric",

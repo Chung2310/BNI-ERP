@@ -17,8 +17,9 @@ export interface AuthenticatedRequest extends Request {
     sessionId?: string;
     authLevel?: string;
     displayName?: string;
+    companyName?: string;
   };
-  resource?: any; // Để đính kèm tài nguyên sau khi qua requireCompanyAccess
+  resource?: Record<string, unknown>; // Để đính kèm tài nguyên sau khi qua requireCompanyAccess
 }
 
 function shouldSkipRoutineAuthLog(method: string, url: string) {
@@ -87,7 +88,8 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
   }
 
   try {
-    const decoded = jwt.verify(token, getJwtAccessSecret()) as any;
+    const decoded = jwt.verify(token, getJwtAccessSecret());
+      if (typeof decoded === "string") throw new Error("Invalid token payload");
 
     const userDoc = await UserModel.findById(decoded.id).select("branchId displayName").lean();
     if (!userDoc) {
@@ -214,7 +216,7 @@ export function requirePermission(requiredPermission: string | string[]) {
         status: "error",
         message: "Bạn không có quyền thực hiện thao tác này.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[requirePermission] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -228,7 +230,7 @@ export function requirePermission(requiredPermission: string | string[]) {
 /**
  * Middleware bảo vệ tài nguyên theo doanh nghiệp (Tenant isolation ở cấp độ Object-level)
  */
-export function requireCompanyAccess(model: mongoose.Model<any>, idParamName: string = "id") {
+export function requireCompanyAccess<T>(model: mongoose.Model<T>, idParamName: string = "id") {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
@@ -251,7 +253,7 @@ export function requireCompanyAccess(model: mongoose.Model<any>, idParamName: st
         });
       }
 
-      const resource = await model.findById(resourceId).lean();
+      const resource = await model.findById(resourceId).lean<Record<string, unknown>>();
       if (!resource) {
         return res.status(404).json({
           status: "error",
@@ -270,7 +272,7 @@ export function requireCompanyAccess(model: mongoose.Model<any>, idParamName: st
       // Đính kèm tài nguyên vào request để sử dụng ở Controller mà không cần query lại
       req.resource = resource;
       return next();
-    } catch (error: any) {
+    } catch (error) {
       console.error("[requireCompanyAccess] Error:", error);
       return res.status(500).json({
         status: "error",
@@ -355,7 +357,7 @@ export function requireHierarchyAccess(idParamName: string = "id") {
         status: "error",
         message: "Bạn không có quyền thao tác trên hồ sơ nhân sự của người khác.",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("[requireHierarchyAccess] Error:", error);
       return res.status(500).json({
         status: "error",

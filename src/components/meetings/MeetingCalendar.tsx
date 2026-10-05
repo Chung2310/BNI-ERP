@@ -9,8 +9,13 @@ export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChang
 }) {
   const [items, setItems] = useState<T[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
   const [retry, setRetry] = useState(0); const [cancelling, setCancelling] = useState<T | null>(null); const [saving, setSaving] = useState(false);
+  const [requestInputs, setRequestInputs] = useState(() => [month, revision, retry, load]);
+  if (!Object.is(requestInputs[0], month) || !Object.is(requestInputs[1], revision) || !Object.is(requestInputs[2], retry) || !Object.is(requestInputs[3], load)) {
+    setRequestInputs([month, revision, retry, load]);
+    setLoading(true); setError("");
+  }
   useEffect(() => {
-    let active = true; setLoading(true); setError("");
+    let active = true;
     load("?month=" + month).then(data => { if (active) setItems(data); }).catch(error => { if (active) setError(error.message || "Không thể tải lịch."); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [month, revision, retry, load]);

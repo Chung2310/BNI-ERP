@@ -49,7 +49,7 @@ apiRouter.get("/health", (req, res) => {
 apiRouter.use("/integrations/google-drive", googleDriveRouter);
 
 // Quản lý tài nguyên — file explorer nội bộ + tài liệu Google Drive
-apiRouter.use("/resources", requireAuth as any, requireModule("resource"), resourceRouter);
+apiRouter.use("/resources", requireAuth, requireModule("resource"), resourceRouter);
 
 // Gắn kết router phụ của Xác thực JWT
 apiRouter.use("/auth", authRouter);
@@ -83,10 +83,10 @@ apiRouter.use("/push", pushRouter);
 apiRouter.use("/notifications", notificationRouter);
 
 // Gắn kết router chat nội bộ
-apiRouter.use("/chat", requireAuth as any, requireModule("chat"), chatRouter);
+apiRouter.use("/chat", requireAuth, requireModule("chat"), chatRouter);
 
 // Trợ lý ảo AI — chatbot ngữ cảnh dữ liệu doanh nghiệp
-apiRouter.use("/chatbot", expensiveApiRateLimiter, requireAuth as any, requireModule("chat"), chatbotRouter);
+apiRouter.use("/chatbot", expensiveApiRateLimiter, requireAuth, requireModule("chat"), chatbotRouter);
 
 // Quản lý cuộc họp & Quay thưởng (Meetings & Lucky Draw)
 apiRouter.use("/meetings", meetingRouter);

@@ -66,12 +66,14 @@ export default function AnalyticsTab() {
     ...(branchId ? { branchId } : {}),
   }), [branchId]);
 
+  const [requestInputs, setRequestInputs] = useState(() => [dateParams, preset.granularity, scopeParams]);
+  if (!Object.is(requestInputs[0], dateParams) || !Object.is(requestInputs[1], preset.granularity) || !Object.is(requestInputs[2], scopeParams)) {
+    setRequestInputs([dateParams, preset.granularity, scopeParams]);
+    setLoading(true); setError(null);
+  }
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
 
-    try {
-      const [metaData, revenueData, receivablesData, expensesData] = await Promise.all([
+    return Promise.all([
         analyticsService.getMeta(),
         analyticsService.getRevenue({
           ...dateParams,
@@ -80,7 +82,8 @@ export default function AnalyticsTab() {
         }),
         analyticsService.getReceivables(dateParams.to, scopeParams),
         analyticsService.getExpenses({ ...dateParams, ...scopeParams }),
-      ]);
+      ]).then(async ([metaData, revenueData, receivablesData, expensesData]) => {
+      setError(null);
       setMeta(metaData);
       setRevenue(revenueData);
       setReceivables(receivablesData);
@@ -99,11 +102,12 @@ export default function AnalyticsTab() {
         excludedCommissionRecords: expensesData.excludedCommissionRecords,
         currency: "VND",
       });
-    } catch (err) {
+    
+}).catch(err => {
       setError(getApiErrorMessage(err, "Không thể tải dữ liệu phân tích."));
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [dateParams, preset.granularity, scopeParams]);
 
   useEffect(() => {

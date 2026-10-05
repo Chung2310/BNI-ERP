@@ -5,21 +5,21 @@ import { CelebrationDeliveryModel } from "../model/celebration-delivery.model";
 import { companyEmailService } from "./company-email.service";
 import { isCompanySendTime, renderCelebrationTemplate, vietnamDateParts } from "./company-celebration";
 
-async function deliver(company: any, eventType: "birthday" | "holiday", eventDate: string, eventKey: string, user: any, template: any, holidayName = "") {
+async function deliver(company: Pick<import("../interface/company.interface").ICompany, "code" | "name">, eventType: "birthday" | "holiday", eventDate: string, eventKey: string, user: Pick<import("../interface/user.interface").IUser, "_id" | "displayName" | "email">, template: import("../interface/company.interface").ICelebrationTemplate, holidayName = "") {
   const variables = { employeeName: user.displayName || user.email, companyName: company.name, holidayName };
   const subject = renderCelebrationTemplate(template.subject, variables, false);
   const html = renderCelebrationTemplate(template.html, variables);
-  let row: any;
+  let row: InstanceType<typeof CelebrationDeliveryModel>;
   try {
     row = await CelebrationDeliveryModel.create({ companyCode: company.code, eventType, eventDate, eventKey, recipientUserId: String(user._id), recipientEmail: user.email, subject, status: "sending", attempts: 1 });
-  } catch (error: any) {
+  } catch (error) {
     if (error?.code === 11000) return false;
     throw error;
   }
   try {
     const result = await companyEmailService.send(company.code, { to: user.email, subject, html });
     await CelebrationDeliveryModel.updateOne({ _id: row._id }, { status: "sent", sentAt: new Date(), messageId: result.messageId });
-  } catch (error: any) {
+  } catch (error) {
     await CelebrationDeliveryModel.updateOne({ _id: row._id }, { status: "failed", error: String(error?.message || error).slice(0, 500) });
   }
   return true;
@@ -27,12 +27,12 @@ async function deliver(company: any, eventType: "birthday" | "holiday", eventDat
 
 export async function runCelebrationScan(now = new Date()) {
   const local = vietnamDateParts(now);
-  const companies: any[] = await CompanyModel.find({ lifecycleStatus: "active" }).lean();
+  const companies = await CompanyModel.find({ lifecycleStatus: "active" }).lean();
   let queued = 0;
   for (const company of companies) {
     const config = company.celebrationConfig;
     if (!config || !isCompanySendTime(now, config.sendTime || "08:00")) continue;
-    const users: any[] = await UserModel.find({ companyCode: company.code, isActive: { $ne: false }, disabledAt: { $in: [null, undefined] }, email: { $ne: "" } }).select("_id email displayName birthDate").lean();
+    const users = await UserModel.find({ companyCode: company.code, isActive: { $ne: false }, disabledAt: { $in: [null, undefined] }, email: { $ne: "" } }).select("_id email displayName birthDate").lean();
     if (config.birthdayEnabled) {
       for (const user of users) {
         if (!user.birthDate) continue;

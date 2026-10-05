@@ -1,3 +1,4 @@
+import { parseDateValue } from "../../utils/dateValue";
 import { Activity, Building2, Calendar, MoreVertical, Pencil, Phone, Shield, Trash2 } from "lucide-react";
 import { UserTableProps } from "./types";
 
@@ -13,10 +14,10 @@ export function UserListTable({
   onDeleteUser,
   onViewActivity,
 }: UserTableProps) {
-  const formatDate = (dateVal: any) => {
+  const formatDate = (dateVal: unknown) => {
     if (!dateVal) return "—";
     try {
-      const d = new Date(dateVal);
+      const d = parseDateValue(dateVal);
       if (isNaN(d.getTime())) return "—";
       return d.toLocaleDateString("vi-VN");
     } catch {

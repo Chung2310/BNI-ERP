@@ -41,7 +41,7 @@ afterEach(() => vi.restoreAllMocks());
 it("allows both devices to establish realtime connections regardless of the last login", async () => {
   for (const sid of ["first-device", "second-device", undefined]) {
     const token = jwt.sign({ id: "user-1", ...(sid ? { sid } : {}) }, getJwtAccessSecret(), { expiresIn: "15m" });
-    const socket = { handshake: { auth: { token } }, data: {} as any };
+    const socket = { handshake: { auth: { token } }, data: {} };
     const next = vi.fn();
     await mocks.middlewares[1](socket, next);
     expect(next).toHaveBeenCalledWith();
@@ -53,7 +53,7 @@ it.each(["missing", "invalid", "expired", "deleted"])("rejects %s socket credent
   const token = scenario === "missing" ? undefined : scenario === "invalid" ? "bad-token" :
     jwt.sign({ id: "user-1", sid: "device" }, getJwtAccessSecret(), { expiresIn: scenario === "expired" ? -1 : "15m" });
   if (scenario === "deleted") mocks.findUser.mockReturnValue({ lean: async () => null });
-  const socket = { handshake: { auth: { token } }, data: {} as any };
+  const socket = { handshake: { auth: { token } }, data: {} };
   const next = vi.fn();
   await mocks.middlewares[1](socket, next);
   expect(next).toHaveBeenCalledWith(expect.any(Error));

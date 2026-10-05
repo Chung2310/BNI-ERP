@@ -31,7 +31,7 @@ export default function SecurityTab() {
       toast.success("Thay đổi mật khẩu thành công!");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       toast.error(err.message || "Thay đổi mật khẩu thất bại. Vui lòng thử lại.");
     } finally {

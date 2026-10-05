@@ -1,3 +1,4 @@
+import { useNow } from "../../hooks/useNow";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronRight,
@@ -16,9 +17,7 @@ import {
   Info,
   ArrowRightLeft,
   Copy,
-  BellOff,
   MessageSquare,
-  Briefcase,
   Share2,
   X,
   Plus,
@@ -93,8 +92,8 @@ interface FileExplorerProps {
   ownerId?: string;
   roomId?: string;
   showTrash?: boolean;
-  users?: any[];
-  rooms?: any[];
+  users?: import("../../types").UserProfile[];
+  rooms?: import("../../services/internalChatService").ChatRoom[];
   showSharedOnly?: boolean; // Nếu true: chỉ hiển item được chia sẻ (tab "Được chia sẻ")
   filterStartDate?: string;
   filterEndDate?: string;
@@ -120,14 +119,15 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
   viewMode = "grid",
 }) => {
   const { userProfile } = useAuth();
-  const userProfileAny = userProfile as any;
+  const userProfileAny = userProfile;
   const userProfileId = userProfile?.uid || userProfileAny?.id || userProfileAny?._id || "";
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbEntry[]>([]);
   const isInsideFixedFolder = breadcrumb.some((b) => b.isFixed);
   const [items, setItems] = useState<ResourceItem[]>([]);
+  const now = useNow();
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const [, setUploading] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [infoItem, setInfoItem] = useState<ResourceItem | null>(null);
@@ -505,7 +505,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     }
   };
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  
 
   const load = useCallback(async (folderId: string | null) => {
     setLoading(true);
@@ -623,26 +623,34 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
           break;
         case "document":
           // Tài liệu Word, Epub, Txt (Loại trừ PDF vì có tab PDF riêng)
-          if (item.type !== "file") return false;
+          {
+if (item.type !== "file") return false;
           const isDoc = mime.startsWith("text/") || mime.includes("document") || mime.includes("word") || mime.includes("epub") || name.match(/\.(docx|doc|txt|odt)/);
           const isPdf = mime === "application/pdf" || name.endsWith(".pdf");
           if (!isDoc || isPdf) return false;
           break;
+}
         case "spreadsheet":
-          if (item.type !== "file") return false;
+          {
+if (item.type !== "file") return false;
           const isSheet = mime.includes("sheet") || mime.includes("excel") || mime.includes("csv") || name.match(/\.(xlsx|xls|csv)/);
           if (!isSheet) return false;
           break;
+}
         case "presentation":
-          if (item.type !== "file") return false;
+          {
+if (item.type !== "file") return false;
           const isPresentation = mime.includes("presentation") || mime.includes("powerpoint") || name.match(/\.(pptx|ppt)/);
           if (!isPresentation) return false;
           break;
+}
         case "link":
-          if (item.type !== "file") return false;
-          const isLink = mime.includes("shortcut") || mime.includes("link") || (item.fileUrl && !(item as any).driveFileId && !item.mimeType) || mime.includes("html") || name.match(/\.(html|htm)/);
+          {
+if (item.type !== "file") return false;
+          const isLink = mime.includes("shortcut") || mime.includes("link") || (item.fileUrl && !(item).driveFileId && !item.mimeType) || mime.includes("html") || name.match(/\.(html|htm)/);
           if (!isLink) return false;
           break;
+}
         default:
           break;
       }
@@ -730,10 +738,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     [currentFolder, load, isInsideFixedFolder, ownerId, roomId, showTrash]
   );
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) uploadFiles(e.target.files);
-    e.target.value = "";
-  };
+  
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -796,8 +801,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
   const files = showSharedOnly
     ? sharedItems.filter((i) => i.type === "file")
     : ownItems.filter((i) => i.type === "file");
-  const sharedFolders = sharedItems.filter((i) => i.type === "folder");
-  const sharedFiles = sharedItems.filter((i) => i.type === "file");
+  
+  
 
   // Pagination logic for list view
   const allListItems = [...folders, ...files];
@@ -2494,7 +2499,7 @@ const ResourceCard: React.FC<{
                   onClick={(e) => {
                     e.stopPropagation();
                     onToggleMenu(e); // Close menu
-                    const itemId = item._id || (item as any).id;
+                    const itemId = item._id || (item).id;
                     if (itemId) {
                       const url = `${window.location.origin}${window.location.pathname}?id=${itemId}`;
                       navigator.clipboard.writeText(url);
@@ -2628,7 +2633,7 @@ const ResourceCard: React.FC<{
               if (!item.deletedAt) return "Còn 15 ngày";
               const delDate = new Date(item.deletedAt);
               const expiry = delDate.getTime() + 15 * 24 * 60 * 60 * 1000;
-              const diff = expiry - Date.now();
+              const diff = expiry - now;
               const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
               return days > 0 ? `Còn ${days} ngày` : "Sắp xóa";
             })()

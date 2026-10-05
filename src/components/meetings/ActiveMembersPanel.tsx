@@ -91,7 +91,7 @@ export function ActiveMembersPanel({ meeting, meetings }: Props) {
 
     // 1. Khởi tạo danh sách thành viên trong Chapter
     chapterMembers.filter(member => member.role !== "admin" && member.isActive !== false).forEach((u) => {
-      const uid = String(u.uid || (u as any)._id || (u as any).id || "");
+      const uid = String(u.uid || (u)._id || (u).id || "");
       if (!uid) return;
       memberMap.set(uid, {
         id: uid,

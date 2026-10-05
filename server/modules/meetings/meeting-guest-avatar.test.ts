@@ -17,7 +17,7 @@ const buffer = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lE
 const avatar = { buffer, size: buffer.length, mimetype: "image/png" };
 const input = { name: "Khách An", email: "", phone: "0901234567", company: "ACME", latitude: 10, longitude: 106 };
 const asset = { publicId: "meetings/m/guests/avatar", secureUrl: "https://example.com/avatar.png", resourceType: "image", bytes: buffer.length };
-function meeting(): any {
+function meeting() {
   return { _id: "507f1f77bcf86cd799439011", companyCode: "ACME", __v: 0, status: "scheduled", checkInQrTokenHash: "hash",
     checkInQrExpiresAt: new Date(Date.now() + 60000), latitude: 10, longitude: 106, gpsRadiusMeters: 200,
     speakers: [], tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20, save: async () => {} };

@@ -12,7 +12,7 @@ export const rolePermissionService = {
   /**
    * Tạo mới hoặc cập nhật phân quyền của một vai trò tại doanh nghiệp
    */
-  async saveRolePermission(data: any): Promise<RolePermissionSaveResult> {
+  async saveRolePermission(data: Partial<import("../interface/role-permission.interface").IRolePermission>): Promise<RolePermissionSaveResult> {
     const { companyCode, role, permissions, level, displayName } = data;
     const normalizedCompany = String(companyCode ?? "").toUpperCase().trim();
     if (!normalizedCompany) {
@@ -50,7 +50,7 @@ export const rolePermissionService = {
    * Lấy danh sách cấu hình phân quyền vai trò (phân trang và bộ lọc)
    */
   async getRolePermissions(
-    filter: any = {},
+    filter: Record<string, unknown> = {},
     pagination: { page?: number; limit?: number } = {}
   ): Promise<{ data: IRolePermission[]; total: number; page: number; limit: number }> {
     const page = Math.max(1, pagination.page || 1);

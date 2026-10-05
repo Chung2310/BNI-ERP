@@ -101,15 +101,15 @@ async function attachRedisAdapter(server: SocketIOServer) {
     const pubClient = new Redis(redisOptions);
     const subClient = pubClient.duplicate();
 
-    pubClient.on("error", (e: any) => console.error("[Socket.IO Redis pub] error:", e?.message || e));
-    subClient.on("error", (e: any) => console.error("[Socket.IO Redis sub] error:", e?.message || e));
+    pubClient.on("error", (e) => console.error("[Socket.IO Redis pub] error:", e?.message || e));
+    subClient.on("error", (e) => console.error("[Socket.IO Redis sub] error:", e?.message || e));
     pubClient.once("ready", () =>
       console.log(`[Socket.IO] Redis adapter đã kết nối ${host}:${port} — scale ngang đã bật.`)
     );
 
     server.adapter(createAdapter(pubClient, subClient));
     console.log("[Socket.IO] Đã gắn Redis adapter (pub/sub).");
-  } catch (err: any) {
+  } catch (err) {
     tempClient.disconnect();
     console.warn(
       `[Socket.IO] Không kết nối được Redis tại ${host}:${port} (${err?.message || err}) → Chạy chế độ in-memory (chỉ 1 instance).`
@@ -181,7 +181,8 @@ export async function initSocketServer(httpServer: HTTPServer) {
         return next(new Error("Authentication error: Token missing"));
       }
 
-      const decoded = jwt.verify(token, getJwtAccessSecret()) as any;
+      const decoded = jwt.verify(token, getJwtAccessSecret());
+      if (typeof decoded === "string") throw new Error("Invalid token payload");
 
       const user = await UserModel.findById(decoded.id).lean();
       if (!user) {
@@ -348,7 +349,7 @@ export async function initSocketServer(httpServer: HTTPServer) {
   return io;
 }
 
-export function emitToPage(pageId: string, eventName: string, data: any) {
+export function emitToPage(pageId: string, eventName: string, data: unknown) {
   if (io) {
     const room = `page:${pageId}`;
     console.log(`[Socket.IO] Emitting event "${eventName}" to room: ${room}`);
@@ -358,13 +359,13 @@ export function emitToPage(pageId: string, eventName: string, data: any) {
   }
 }
 
-export let emitToUserMock: ((userId: string, eventName: string, data: any) => void) | null = null;
+export let emitToUserMock: ((userId: string, eventName: string, data: unknown) => void) | null = null;
 
 export function setEmitToUserMockForTesting(mock: typeof emitToUserMock) {
   emitToUserMock = mock;
 }
 
-export function emitToUser(userId: string, eventName: string, data: any) {
+export function emitToUser(userId: string, eventName: string, data: unknown) {
   if (emitToUserMock) {
     emitToUserMock(userId, eventName, data);
     return;
@@ -378,13 +379,13 @@ export function emitToUser(userId: string, eventName: string, data: any) {
   }
 }
 
-export let emitToUserSessionMock: ((sessionId: string, eventName: string, data: any) => void) | null = null;
+export let emitToUserSessionMock: ((sessionId: string, eventName: string, data: unknown) => void) | null = null;
 
 export function setEmitToUserSessionMockForTesting(mock: typeof emitToUserSessionMock) {
   emitToUserSessionMock = mock;
 }
 
-export function emitToUserSession(sessionId: string, eventName: string, data: any) {
+export function emitToUserSession(sessionId: string, eventName: string, data: unknown) {
   if (emitToUserSessionMock) {
     emitToUserSessionMock(sessionId, eventName, data);
     return;
@@ -413,7 +414,7 @@ export async function isUserOnline(userId: string): Promise<boolean> {
   }
 }
 
-export function emitToCompany(companyCode: string, eventName: string, data: any) {
+export function emitToCompany(companyCode: string, eventName: string, data: unknown) {
   if (io) {
     const room = `company:${companyCode}`;
     console.log(`[Socket.IO] Emitting event "${eventName}" to room: ${room}`);
@@ -423,7 +424,7 @@ export function emitToCompany(companyCode: string, eventName: string, data: any)
   }
 }
 
-export function broadcastEvent(eventName: string, data: any) {
+export function broadcastEvent(eventName: string, data: unknown) {
   if (io) {
     console.log(`[Socket.IO] Broadcasting event "${eventName}"`);
     io.emit(eventName, data);

@@ -18,14 +18,14 @@ describe("analytics exports", () => {
     expect(workbook.SheetNames).toEqual(["Doanh thu theo thời gian", "Nhóm sản phẩm", "Công nợ", "Chi phí", "Kết quả vận hành"]);
     expect(workbook.Sheets["Doanh thu theo thời gian"]["A1"].v).toBe("Kỳ");
     expect(workbook.Sheets["Doanh thu theo thời gian"]["D2"].v).toBe(1_500);
-    expect(workbook.Sheets["Kết quả vận hành"]["B7"].v).toBe(800);
+    expect(XLSX.utils.sheet_to_json(workbook.Sheets["Kết quả vận hành"])).toContainEqual({ "Chỉ tiêu": "Kết quả vận hành", "Số tiền": 800 });
   });
 
   it("ghi được buffer XLSX có thể đọc lại", () => {
     const buffer = analyticsWorkbookBuffer(buildAnalyticsWorkbook("expenses", data));
     const workbook = XLSX.read(buffer, { type: "buffer" });
     expect(workbook.SheetNames).toEqual(["Chi phí"]);
-    expect(workbook.Sheets["Chi phí"]["B4"].v).toBe(400);
+    expect(XLSX.utils.sheet_to_json(workbook.Sheets["Chi phí"])).toContainEqual({ "Loại chi phí": "Tổng chi phí", "Số tiền": 400, "Số khoản": 2 });
   });
 
   it("CSV có BOM UTF-8 và chỉ chứa báo cáo đã chọn", () => {
@@ -38,7 +38,8 @@ describe("analytics exports", () => {
 
   it("giữ trạng thái thiếu dữ liệu thay vì biến thành số 0", () => {
     const workbook = buildAnalyticsWorkbook("pnl", { pnl: { ...data.pnl, goodsGrossProfit: null, operatingResult: null } });
-    expect(workbook.Sheets["Kết quả vận hành"]["B4"].v).toBe("Chưa đủ dữ liệu");
-    expect(workbook.Sheets["Kết quả vận hành"]["B7"].v).toBe("Chưa đủ dữ liệu");
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets["Kết quả vận hành"]);
+    expect(rows).toContainEqual({ "Chỉ tiêu": "Lãi gộp hàng hóa", "Số tiền": "Chưa đủ dữ liệu" });
+    expect(rows).toContainEqual({ "Chỉ tiêu": "Kết quả vận hành", "Số tiền": "Chưa đủ dữ liệu" });
   });
 });

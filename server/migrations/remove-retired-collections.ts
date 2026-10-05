@@ -23,10 +23,10 @@ export async function removeRetiredPermissions(db: Pick<mongoose.mongo.Db, "coll
   const codes = [...RETIRED_PERMISSION_CODES];
   const results = [];
   for (const name of ["users", "rolepermissions"]) {
-    const collection = db.collection(name);
+    const collection = db.collection<{ permissions: string[] }>(name);
     const filter = { permissions: { $in: codes } };
     const matched = await collection.countDocuments(filter);
-    const modified = apply && matched ? (await collection.updateMany(filter, { $pull: { permissions: { $in: codes } } } as any)).modifiedCount : 0;
+    const modified = apply && matched ? (await collection.updateMany(filter, { $pull: { permissions: { $in: codes } } })).modifiedCount : 0;
     results.push({ name, matched, modified });
   }
   const catalog = db.collection("permissions");

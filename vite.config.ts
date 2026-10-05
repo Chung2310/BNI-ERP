@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {configDefaults, defineConfig} from 'vitest/config';
+import { nodeTestFiles } from './tools/test-files.mjs';
 
 export default defineConfig(() => {
   return {
@@ -18,6 +19,7 @@ export default defineConfig(() => {
       include: ['src/**/*.test.{ts,tsx}', 'server/**/*.test.ts'],
       exclude: [
         ...configDefaults.exclude,
+        ...nodeTestFiles,
         '**/.worktrees/**',
         '**/.claude/worktrees/**',
       ],
