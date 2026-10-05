@@ -35,6 +35,23 @@ const image = Joi.string().uri({ scheme: ['https', 'http'] }).max(2000).allow(''
 // Accept the retired check-in option from older clients without persisting it.
 export const meetingInput = Joi.object({ allowDirectCheckIn: Joi.boolean().strip(), title: Joi.string().trim().max(200).required(), description: Joi.string().max(4000).allow('').default(''), location: Joi.string().trim().max(500).allow('').default(''), latitude: Joi.number().min(-90).max(90), longitude: Joi.number().min(-180).max(180), gpsRadiusMeters: Joi.number().integer().min(50).max(5000).default(200), coverImage: image, startsAt: Joi.date().iso().required(), endsAt: Joi.date().iso().greater(Joi.ref('startsAt')), reminderDays: Joi.number().integer().min(0).max(365).default(1), tiers: speakingTimeSlots.required(), fallbackSeconds: Joi.number().integer().min(1).max(3600).required() });
 export const updateMeetingInput = Joi.object({ version: Joi.number().integer().min(0), allowDirectCheckIn: Joi.boolean().strip(), title: Joi.string().trim().max(200), description: Joi.string().max(4000).allow(''), location: Joi.string().trim().max(500).allow(''), latitude: Joi.number().min(-90).max(90).allow(null), longitude: Joi.number().min(-180).max(180).allow(null), gpsRadiusMeters: Joi.number().integer().min(50).max(5000), coverImage: image, startsAt: Joi.date().iso(), endsAt: Joi.date().iso(), reminderDays: Joi.number().integer().min(0).max(365), tiers: speakingTimeSlots, fallbackSeconds: Joi.number().integer().min(1).max(3600) });
+export const bulkUpdateMeetingSeriesInput = Joi.object({
+  dateFrom: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required(),
+  dateTo: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required(),
+  changes: Joi.object({
+    title: Joi.string().trim().max(200),
+    description: Joi.string().max(4000).allow(''),
+    location: Joi.string().trim().max(500).allow(''),
+    startsTime: Joi.string().pattern(/^([01]\d|2[0-3]):[0-5]\d$/),
+    latitude: Joi.number().min(-90).max(90).allow(null),
+    longitude: Joi.number().min(-180).max(180).allow(null),
+    gpsRadiusMeters: Joi.number().integer().min(50).max(5000),
+    coverImage: Joi.string().uri({ scheme: ['https', 'http'] }).max(2000).allow(''),
+    reminderDays: Joi.number().integer().min(0).max(365),
+    tiers: speakingTimeSlots,
+    fallbackSeconds: Joi.number().integer().min(1).max(3600),
+  }).and('latitude', 'longitude').min(1).required(),
+});
 export const checkinInput = Joi.object({ latitude: Joi.number().min(-90).max(90), longitude: Joi.number().min(-180).max(180), userId: Joi.string().hex().length(24), name: Joi.string().trim().max(150), email: Joi.string().email().max(254).allow('').default(''), photoURL: image, coverImage: image });
 export const controlInput = Joi.object({ action: Joi.string().valid('start', 'pause', 'resume', 'next', 'previous', 'finish', 'cancel', 'start_speaker', 'reset_speaker').required(), version: Joi.number().integer().min(0).required() });
 

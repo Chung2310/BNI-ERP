@@ -4,6 +4,7 @@ import { MeetingCalendar } from "../components/meetings/MeetingCalendar";
 import { MeetingScheduleActions } from "../components/meetings/MeetingScheduleActions";
 import { RescheduleMeetingDialog } from "../components/meetings/RescheduleMeetingDialog";
 import { MeetingRecurrenceFields } from "../components/meetings/MeetingRecurrenceFields";
+import { MeetingSeriesBulkEditDialog, type MeetingSeriesChanges } from "../components/meetings/MeetingSeriesBulkEditDialog";
 import { vietnamDateTime, type MeetingRecurrence } from "../utils/meetingRecurrence";
 import { meetingElapsedLabel } from "../components/meetings/meetingElapsedLabel";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -290,6 +291,8 @@ export default function MeetingTab() {
 
   // Edit Meeting Modal state
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
+  const [bulkEditingMeeting, setBulkEditingMeeting] = useState<Meeting | null>(null);
+  const [bulkEditingSaving, setBulkEditingSaving] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editStartsAt, setEditStartsAt] = useState("");
   const [editEndsAt, setEditEndsAt] = useState("");
@@ -532,6 +535,19 @@ export default function MeetingTab() {
       setEditingMeeting(null);
       toast.success("Cập nhật cuộc họp thành công!");
     });
+  };
+
+  const applyBulkMeetingChanges = async (dateFrom: string, dateTo: string, changes: MeetingSeriesChanges) => {
+    if (!bulkEditingMeeting) return;
+    setBulkEditingSaving(true);
+    try {
+      const result: { updatedCount: number } = await api(`/${bulkEditingMeeting._id}/series`, "PUT", { dateFrom, dateTo, changes });
+      setBulkEditingMeeting(null);
+      await refresh();
+      toast.success(`Đã cập nhật ${result.updatedCount} buổi họp.`);
+    } finally {
+      setBulkEditingSaving(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -1967,7 +1983,10 @@ export default function MeetingTab() {
             </div>
 
             <form onSubmit={update} className="space-y-4 pt-4 text-xs">
-              {editingMeeting.seriesId && <p className="rounded-lg bg-cyan-50 p-3">Chỉ sửa hoặc dời buổi này. Các buổi còn lại trong chu kỳ giữ nguyên.</p>}
+              {editingMeeting.seriesId && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-cyan-50 p-3">
+                <p>Chỉnh riêng buổi này hoặc áp dụng các trường đã chọn cho nhiều buổi trong chu kỳ.</p>
+                <button type="button" onClick={() => { setBulkEditingMeeting(editingMeeting); setEditingMeeting(null); }} className="shrink-0 rounded-lg border border-cyan-200 bg-white px-3 py-2 text-xs font-bold text-cyan-800 hover:bg-cyan-100">Chỉnh sửa hàng loạt</button>
+              </div>}
 
 
               <div>
@@ -2078,6 +2097,7 @@ export default function MeetingTab() {
       )}
 
       {canManage && completionKey && dismissedCompletion !== completionKey && <SpeechesCompleteDialog onClose={dismissCompletion} />}
+      {bulkEditingMeeting && <MeetingSeriesBulkEditDialog key={bulkEditingMeeting._id} meeting={bulkEditingMeeting} saving={bulkEditingSaving} onClose={() => setBulkEditingMeeting(null)} onApply={applyBulkMeetingChanges} />}
       <ConfirmDialog isOpen={finishRequested} title="Kết thúc buổi họp?" description="Sau khi kết thúc, buổi họp ngừng nhận check-in và điều hành phát biểu." confirmLabel="Kết thúc buổi họp" isSubmitting={saving} onClose={() => setFinishRequested(false)} onConfirm={async () => { await control("finish"); setFinishRequested(false); }} />
       {/* POPUP XÁC NHẬN BẮT ĐẦU CUỘC HỌP */}
       <ConfirmDialog

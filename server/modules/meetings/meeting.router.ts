@@ -15,6 +15,7 @@ import {
   createMeeting,
   createRecurringMeetings,
   updateMeeting,
+  bulkUpdateMeetingSeries,
   deleteMeeting,
   getMeeting,
   saveMeeting,
@@ -29,7 +30,7 @@ import {
   getManagedCheckInQr,
   autoStartDueMeetings,
 } from './meeting.service';
-import { recurringMeetingInput, checkinInput, controlInput, meetingInput, updateMeetingInput, slideProfileInput, gameWinnerInput } from './meeting.validation';
+import { recurringMeetingInput, checkinInput, controlInput, meetingInput, updateMeetingInput, bulkUpdateMeetingSeriesInput, slideProfileInput, gameWinnerInput } from './meeting.validation';
 import { getMeetingSlides, updateMeetingSlide } from './meeting-slides.service';
 
 
@@ -125,6 +126,14 @@ meetingRouter.put('/:id', manage, async (req: any, res) => {
   } catch (e) {
     sendError(res, e);
   }
+});
+
+meetingRouter.put('/:id/series', manage, async (req: any, res) => {
+  const { error, value } = bulkUpdateMeetingSeriesInput.validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
+  try {
+    res.json({ data: await bulkUpdateMeetingSeries(company(req), req.params.id, value) });
+  } catch (e) { sendError(res, e); }
 });
 
 meetingRouter.delete('/:id', manage, async (req: any, res) => {

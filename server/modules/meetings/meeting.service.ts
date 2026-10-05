@@ -158,6 +158,69 @@ export async function updateMeeting(companyCode: string, id: string, input: any)
   return saveMeeting(item);
 }
 
+export async function bulkUpdateMeetingSeries(companyCode: string, id: string, input: any) {
+  const anchor = await getMeeting(companyCode, id);
+  if (!anchor.seriesId) throw new MeetingError(400, 'Cuộc họp này không thuộc chu kỳ định kỳ.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(input.dateTo)) {
+    throw new MeetingError(400, 'Khoảng ngày không hợp lệ.');
+  }
+  const fromDay = new Date(input.dateFrom + 'T00:00:00Z');
+  const toDay = new Date(input.dateTo + 'T00:00:00Z');
+  if (fromDay.toISOString().slice(0, 10) !== input.dateFrom || toDay.toISOString().slice(0, 10) !== input.dateTo || toDay < fromDay) {
+    throw new MeetingError(400, 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.');
+  }
+  const from = new Date(input.dateFrom + 'T00:00:00+07:00');
+  const until = new Date(toDay.getTime() + 86400000 - 7 * 3600000);
+  const selected = await MeetingModel.find({ companyCode, seriesId: anchor.seriesId, status: 'scheduled', startsAt: { $gte: from, $lt: until, $gt: new Date() } }).lean();
+  if (!selected.length) throw new MeetingError(404, 'Không có buổi họp định kỳ nào trong khoảng ngày đã chọn.');
+
+  const changes = input.changes;
+  const updates = selected.map((item: any) => {
+    const set: Record<string, unknown> = {};
+    for (const key of ['title', 'description', 'location', 'latitude', 'longitude', 'gpsRadiusMeters', 'coverImage', 'reminderDays', 'tiers', 'fallbackSeconds'] as const) {
+      if (changes[key] !== undefined) set[key] = changes[key];
+    }
+    if (item.status === 'scheduled' && (changes.tiers !== undefined || changes.fallbackSeconds !== undefined)) {
+      set.speakers = allocateSpeakers(
+        (item.speakers || []).map((person: any) => typeof person.toObject === 'function' ? person.toObject() : person),
+        changes.tiers ?? item.tiers,
+        changes.fallbackSeconds ?? item.fallbackSeconds ?? 20,
+      );
+    }
+    if (changes.startsTime !== undefined) {
+      const date = new Date(new Date(item.startsAt).getTime() + 7 * 3600000).toISOString().slice(0, 10);
+      const startsAt = new Date(`${date}T${changes.startsTime}:00+07:00`);
+      if (startsAt <= new Date()) throw new MeetingError(400, 'Giờ mới khiến một hoặc nhiều buổi họp không còn ở tương lai.');
+      const duration = item.endsAt ? new Date(item.endsAt).getTime() - new Date(item.startsAt).getTime() : DEFAULT_MEETING_DURATION_MS;
+      set.startsAt = startsAt;
+      set.endsAt = new Date(startsAt.getTime() + duration);
+      set.reminderAt = reminderDueAt(startsAt, changes.reminderDays ?? item.reminderDays ?? 1);
+    } else if (changes.reminderDays !== undefined) {
+      set.reminderAt = reminderDueAt(item.startsAt, changes.reminderDays);
+    }
+
+    const qrChanged = changes.startsTime !== undefined
+      || changes.latitude !== undefined || changes.longitude !== undefined || changes.gpsRadiusMeters !== undefined;
+    return {
+      updateOne: {
+        filter: { _id: item._id, companyCode, seriesId: anchor.seriesId, status: 'scheduled', __v: item.__v },
+        update: {
+          ...(Object.keys(set).length ? { $set: set } : {}),
+          $inc: { __v: 1, ...(changes.startsTime !== undefined || changes.reminderDays !== undefined ? { revision: 1 } : {}) },
+          ...(qrChanged ? { $unset: { checkInQrTokenHash: 1, checkInQrTokenEncrypted: 1, checkInQrExpiresAt: 1 } } : {}),
+        },
+      },
+    };
+  });
+  const result = await MeetingModel.bulkWrite(updates as any, { ordered: true });
+  if (result.matchedCount !== selected.length) {
+    emitToCompany(companyCode, 'meeting_updated', { seriesId: anchor.seriesId });
+    throw new MeetingError(409, 'Một buổi họp vừa thay đổi hoặc bắt đầu. Hãy tải lại lịch rồi thử lại.');
+  }
+  emitToCompany(companyCode, 'meeting_updated', { seriesId: anchor.seriesId });
+  return { updatedCount: result.modifiedCount, seriesId: anchor.seriesId };
+}
+
 export async function deleteMeeting(companyCode: string, id: string) {
   const item = await getMeeting(companyCode, id);
   assertMeetingEditable(item);
