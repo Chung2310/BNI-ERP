@@ -499,6 +499,9 @@ export async function controlMeeting(item: MeetingDocument, action: string, now 
   } else {
     throw new MeetingError(409, 'Thao tác không phù hợp với trạng thái cuộc họp hoặc chưa có người check-in.');
   }
+  if (action === 'next' || action === 'previous') {
+    item.set('presentation', { ...item.toObject().presentation, view: 'speaker' });
+  }
   await saveMeeting(item);
   await notifyNextSpeaker(item);
   return item;
