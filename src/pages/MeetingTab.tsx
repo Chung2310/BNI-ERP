@@ -45,7 +45,7 @@ import {
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
 import { LuckyDrawTab } from "../components/meetings/LuckyDrawTab";
-import { MeetingFlowStepper, loadMeetingFlowOrder, saveMeetingFlowOrder, type MeetingFlowStep } from "../components/meetings/MeetingFlowStepper";
+import { MeetingFlowStepper, MEETING_FLOW_META, loadMeetingFlowOrder, saveMeetingFlowOrder, type MeetingFlowStep } from "../components/meetings/MeetingFlowStepper";
 import { ActiveMembersPanel } from "../components/meetings/ActiveMembersPanel";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { toast } from "./Toast";
@@ -185,15 +185,17 @@ export default function MeetingTab() {
     setSlidesOpen(false);
   }, []);
   const meetingFlowSteps = useRef(new Map<string, MeetingFlowStep>());
+  const getMeetingFlowStep = (meetingId: string): MeetingFlowStep => {
+    const inMemory = meetingFlowSteps.current.get(meetingId);
+    if (inMemory && flowOrder.includes(inMemory)) return inMemory;
+    try {
+      const saved = localStorage.getItem("bni_meeting_flow_step:" + meetingId);
+      if (flowOrder.includes(saved as MeetingFlowStep)) return saved as MeetingFlowStep;
+    } catch { /* Fall back to the initial step when browser storage is unavailable. */ }
+    return "checkin";
+  };
   const openMeetingFlow = (meeting: Meeting) => {
-    let step = meetingFlowSteps.current.get(meeting._id);
-    if (!step) {
-      try {
-        const saved = localStorage.getItem("bni_meeting_flow_step:" + meeting._id);
-        if (flowOrder.includes(saved as MeetingFlowStep)) step = saved as MeetingFlowStep;
-      } catch { /* Keep navigation available when browser storage is unavailable. */ }
-    }
-    goToFlowStep(step || "checkin");
+    goToFlowStep(getMeetingFlowStep(meeting._id));
   };
   useEffect(() => {
     if (!detailMeetingId || !canManage) return;
@@ -937,6 +939,8 @@ export default function MeetingTab() {
             const prizeCount = m.luckyDraw?.prizes?.length || 0;
             const winnerCount = m.luckyDraw?.winners?.length || 0;
             const isLive = m.status === "live" || m.status === "paused";
+            const currentMeetingStep = isLive ? MEETING_FLOW_META[detailMeetingId === m._id ? flowStep : getMeetingFlowStep(m._id)] : null;
+            const CurrentStepIcon = currentMeetingStep?.icon;
 
             return (
               <div
@@ -970,7 +974,7 @@ export default function MeetingTab() {
                   )}
 
                   {/* Status Badge */}
-                  <div className="absolute top-2 left-2">
+                  <div className="absolute top-2 left-2 flex flex-col items-start gap-1">
                     {m.status === "live" || m.status === "paused" ? (
                       <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border border-green-300 bg-green-50/95 text-green-700 shadow-xs backdrop-blur-xs">
                         <span className="relative flex h-2 w-2 shrink-0">
@@ -995,6 +999,9 @@ export default function MeetingTab() {
                         {s.label}
                       </span>
                     )}
+                    {currentMeetingStep && CurrentStepIcon && <span title={`Bước hiện tại: ${currentMeetingStep.label}`} className="inline-flex items-center gap-1 rounded-full border border-white/80 bg-white/95 px-2 py-0.5 text-[10px] font-bold text-cyan-800 shadow-xs backdrop-blur-xs">
+                      <CurrentStepIcon className="h-3 w-3" />Bước hiện tại: {currentMeetingStep.label}
+                    </span>}
                   </div>
 
                   {/* Edit meeting */}
