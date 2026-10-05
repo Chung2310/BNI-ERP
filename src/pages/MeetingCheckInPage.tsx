@@ -1,5 +1,6 @@
 import { locate } from "../components/meetings/locateForCheckIn";
 import React, { useEffect, useState } from "react";
+import { toast } from "./Toast";
 import { CheckCircle2, MapPin, CalendarDays, ArrowRight } from "lucide-react";
 
 type MeetingInfo = { title: string; startsAt: string; location?: string; expiresAt: string | null };
@@ -61,7 +62,11 @@ function MeetingCheckInContent({ token }: { token: string }) {
         method: "POST", headers, body
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Không thể check-in. Vui lòng thử lại.");
+      if (!response.ok) {
+        const message = data.message || "Không thể check-in. Vui lòng thử lại.";
+        if (response.status === 401) toast.error(message);
+        throw new Error(message);
+      }
       setAvatar(null);
       setCheckedInMeeting(data.data?.meetingTitle || meeting?.title || "");
       setSuccess(data.data?.name || (mode === "guest" ? form.name : "Bạn"));

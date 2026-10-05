@@ -95,10 +95,10 @@ function MeetingRoom({ meetingId, mode }: Props) {
 
   return createPortal(<div ref={root} className="fixed inset-0 z-[200] overflow-y-auto bg-slate-100 text-slate-900">
     <header className={(readOnly && fullscreen ? "absolute inset-x-0 top-0 z-20 opacity-0 transition-opacity hover:opacity-100 focus-within:opacity-100 " : "sticky top-0 z-20 ") + "flex flex-wrap items-center justify-between gap-2 border-b bg-white/95 p-3"}>
-      <div><h1 className="font-bold">{readOnly ? "Màn hình trình chiếu" : "Điều khiển cuộc họp"}</h1><p className="text-xs text-slate-500">{meeting?.title}</p></div>
+      <div><h1 className="font-bold">{readOnly ? "Màn hình trình chiếu" : "Bảng điều khiển cuộc họp"}</h1><p className="text-xs text-slate-500">{meeting?.title}</p></div>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         {readOnly ? <><button className={button} onClick={() => void enterFullscreen()}>Toàn màn hình</button>
-          <button className={button} onClick={() => setShare(true)}>Điều khiển từ điện thoại</button></>
+          <button className={button} onClick={() => setShare(true)}>Mở bảng điều khiển cuộc họp</button></>
           : <a className={button} href={meetingRoomUrl(meetingId, "display")} target="_blank" rel="noreferrer">Mở màn hình trình chiếu</a>}
         <a className={button} href={tabToPath("CUỘC HỌP")}>Về cuộc họp</a>
       </div>
@@ -166,7 +166,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
         </section>
       </main>}
     {share && <div className="fixed inset-0 z-40 grid place-items-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Mở điều khiển trên điện thoại">
-      <div className="max-w-sm space-y-4 rounded-2xl bg-white p-6 text-center"><h2 className="text-lg font-bold">Điều khiển từ điện thoại</h2>
+      <div className="max-w-sm space-y-4 rounded-2xl bg-white p-6 text-center"><h2 className="text-lg font-bold">Bảng điều khiển cuộc họp</h2>
         <p className="text-sm">Quét mã và đăng nhập tài khoản có quyền điều hành cuộc họp.</p>
         {shareQr && <img src={shareQr} alt="QR mở bảng điều khiển" className="mx-auto w-64" />}
         <a href={controlUrl} className="block text-cyan-700 underline">Mở bảng điều khiển</a>

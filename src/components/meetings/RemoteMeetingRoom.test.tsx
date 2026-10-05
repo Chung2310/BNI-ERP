@@ -54,7 +54,7 @@ it("opens the display without starting a timer and shares the same meeting with 
   await screen.findByText("Đang chiếu: speaker");
   expect(screen.queryByRole("button", { name: "Người tiếp theo" })).toBeNull();
   expect(vi.mocked(fetch).mock.calls.every(([, options]) => options?.method === "GET")).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "Điều khiển từ điện thoại" }));
+  fireEvent.click(screen.getByRole("button", { name: "Mở bảng điều khiển cuộc họp" }));
   await screen.findByAltText("QR mở bảng điều khiển");
   expect(screen.getByRole("link", { name: "Mở bảng điều khiển" }).getAttribute("href")).toContain("meeting=m&mode=control");
 });

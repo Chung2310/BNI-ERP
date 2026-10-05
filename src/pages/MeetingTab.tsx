@@ -1193,7 +1193,7 @@ function MeetingWorkspace() {
             </div>
 
             {canManage && <div className="flex flex-wrap gap-2 border-b bg-cyan-50/50 px-4 py-3">
-              <a href={meetingRoomUrl(activeMeeting._id, "control")} className="rounded-xl bg-cyan-700 px-4 py-2 text-sm font-semibold text-white">Điều khiển từ điện thoại</a>
+              <a href={meetingRoomUrl(activeMeeting._id, "control")} className="rounded-xl bg-cyan-700 px-4 py-2 text-sm font-semibold text-white">Bảng điều khiển cuộc họp</a>
               <a href={meetingRoomUrl(activeMeeting._id, "display")} target="_blank" rel="noreferrer" className="rounded-xl border border-cyan-200 bg-white px-4 py-2 text-sm font-semibold text-cyan-800">Màn hình trình chiếu</a>
             </div>}
             {/* Modal Body Content (Scrollable) */}
