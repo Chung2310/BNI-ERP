@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { matchesFilterCategory } from "./WheelOfNamesPage";
+import { buildMeetingParticipants, matchesFilterCategory } from "./WheelOfNamesPage";
+import type { Speaker } from "../services/meetingService";
+import type { UserProfile } from "../types";
 
 describe("WheelOfNamesPage participant filtering logic", () => {
   const memberPresent = {
@@ -45,6 +47,40 @@ describe("WheelOfNamesPage participant filtering logic", () => {
     expect(matchesFilterCategory(memberPresent, "guests")).toBe(false);
     expect(matchesFilterCategory(memberAbsent, "guests")).toBe(false);
     expect(matchesFilterCategory(guestAttendee, "guests")).toBe(true);
+  });
+});
+
+describe("meeting attendee classification", () => {
+  it("uses only supplied meeting attendees and classifies by member identity", () => {
+    const users = [{
+      uid: "firebase-1", _id: "member-1", email: "member@example.com", displayName: "Nguyễn Thành Viên",
+      role: "user", createdAt: "2026-01-01",
+    }] as UserProfile[];
+    const speakers = [
+      { id: "speaker-member", userId: "member-1", name: "Tên hiển thị khác", email: "member@example.com", checkedInAt: "2026-01-01", seconds: 30 },
+      { id: "speaker-unlisted-member", userId: "member-2", name: "Thành viên chưa tải hồ sơ", checkedInAt: "2026-01-01", seconds: 30 },
+      { id: "speaker-guest", name: "Khách của buổi này", checkedInAt: "2026-01-01", seconds: 30 },
+    ] as Speaker[];
+
+    const participants = buildMeetingParticipants(users, speakers);
+
+    expect(participants.find(item => item.id === "speaker-member")?.type).toBe("member_present");
+    expect(participants.find(item => item.id === "speaker-unlisted-member")?.type).toBe("member_present");
+    expect(participants.find(item => item.id === "speaker-guest")?.type).toBe("guest");
+    expect(participants.some(item => item.name === "Khách từ cuộc họp khác")).toBe(false);
+  });
+
+  it("does not classify a guest as a member from a partial name match", () => {
+    const users = [{
+      uid: "member-an", email: "an@example.com", displayName: "An", role: "user", createdAt: "2026-01-01",
+    }] as UserProfile[];
+    const speakers = [{
+      id: "guest-an-nguyen", name: "An Nguyễn", checkedInAt: "2026-01-01", seconds: 30,
+    }] as Speaker[];
+
+    const participants = buildMeetingParticipants(users, speakers);
+    expect(participants.find(item => item.id === "member-an")?.type).toBe("member_absent");
+    expect(participants.find(item => item.id === "guest-an-nguyen")?.type).toBe("guest");
   });
 });
 
