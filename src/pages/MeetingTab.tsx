@@ -43,6 +43,7 @@ import {
   Minimize2,
   SlidersHorizontal,
   UserPlus,
+  Trash2,
 } from "lucide-react";
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
@@ -801,7 +802,6 @@ function MeetingWorkspace() {
                 {canManage ? "Quản lý buổi họp" : "Cuộc họp"}
               </h1>
               <p className="hidden lg:block text-[11px] text-slate-500 font-normal mt-0.5">
-                {canManage ? "Lên lịch → Đón tiếp & check-in → Điều hành phát biểu → Quay thưởng" : "Theo dõi lịch họp và thông tin tham dự của bạn"}
               </p>
             </div>
           </div>
@@ -1219,14 +1219,38 @@ function MeetingWorkspace() {
                 )}
 
                 {canModifyActiveMeeting && (
-                  <button
-                    type="button"
-                    title="Sửa cuộc họp"
-                    onClick={(e) => openEditModal(activeMeeting, e)}
-                    className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer shrink-0"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1.5" role="group" aria-label="Quản lý lịch cuộc họp">
+                    <button
+                      type="button"
+                      title="Sửa cuộc họp"
+                      onClick={(e) => openEditModal(activeMeeting, e)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      <span className="hidden lg:inline">Sửa</span>
+                    </button>
+                    {activeMeeting.status === "scheduled" && (
+                      <button
+                        type="button"
+                        title="Chọn ngày mới cho cuộc họp"
+                        onClick={() => setReschedulingMeeting(activeMeeting)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-cyan-700 transition hover:bg-cyan-50"
+                      >
+                        <CalendarDays className="h-3.5 w-3.5" />
+                        <span className="hidden lg:inline">Dời lịch</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      title="Xóa cuộc họp"
+                      aria-label="Xóa cuộc họp"
+                      onClick={() => setDeletingMeeting(activeMeeting)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span className="hidden lg:inline">Xóa</span>
+                    </button>
+                  </div>
                 )}
 
                 {isModalFullscreen ? (
@@ -1426,7 +1450,7 @@ function MeetingWorkspace() {
               {/* SUBTAB 1: CHECK-IN STEP */}
               {flowStep === "checkin" && (
                 <div className="space-y-4">
-                  <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canModifyActiveMeeting} api={api} companyCode={userProfile?.companyCode} onConfigure={() => openEditModal(activeMeeting)} />
+                  <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canModifyActiveMeeting} onConfigure={() => openEditModal(activeMeeting)} />
 
                   {/* Guest Checkin Form (MC / Admin) */}
                   {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
