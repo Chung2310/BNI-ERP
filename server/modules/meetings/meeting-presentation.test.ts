@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 vi.mock("../../socket", () => ({ emitToCompany: vi.fn() }));
 vi.mock("../../service/notification.service", () => ({ notificationService: { createNotification: vi.fn() } }));
 import { MeetingModel } from "./meeting.model";
-import { AUTO_ADVANCE_SLIDE_LEAD_MS, advanceDuePresentations, isAutoAdvanceDue, updatePresentationState } from "./meeting-presentation.service";
+import { advanceDuePresentations, isAutoAdvanceDue, updatePresentationState } from "./meeting-presentation.service";
 import { startMeetingPresentation, spinLuckyDraw } from "./meeting.service";
 import { presentationStateInput } from "./meeting.validation";
 
@@ -17,13 +17,13 @@ function meeting() {
   item.save = vi.fn(async () => item) as unknown as typeof item.save;
   return item;
 }
-it.each([0, 3, 150])("advances only after the speech and %s seconds of server-managed delay", async delay => {
+it.each([0, 3, 150])("ignores legacy delay %s and advances immediately when speech time ends", async delay => {
   const item = meeting(); item.presentation.autoAdvanceDelay = delay;
   vi.spyOn(MeetingModel, "find").mockResolvedValue([item]);
-  expect(await advanceDuePresentations(new Date(+origin + (30 + delay) * 1000 - 1))).toBe(0);
-  expect(await advanceDuePresentations(new Date(+origin + (30 + delay) * 1000))).toBe(1);
+  expect(await advanceDuePresentations(new Date(+origin + 30_000 - 1))).toBe(0);
+  expect(await advanceDuePresentations(new Date(+origin + 30_000))).toBe(1);
   expect(item.currentIndex).toBe(1);
-  expect(+item.speakerStartedAt).toBe(+origin + (30 + delay) * 1000 + AUTO_ADVANCE_SLIDE_LEAD_MS);
+  expect(+item.speakerStartedAt).toBe(+origin + 30_000);
 });
 it("preserves pause, manual mode and an unstarted clock", () => {
   const late = new Date(+origin + 100000);
