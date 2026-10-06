@@ -31,11 +31,14 @@ import {
 } from './meeting.service';
 import { recurringMeetingInput, checkinInput, controlInput, meetingInput, updateMeetingInput, bulkUpdateMeetingSeriesInput, slideProfileInput, gameWinnerInput } from './meeting.validation';
 import { updatePresentationState } from './meeting-presentation.service';
-import { presentationStateInput, presentationStartInput, presentationDrawInput, meetingInteractionInput, meetingInteractionStatusInput, meetingInteractionModerationInput } from './meeting.validation';
+import { presentationStateInput, presentationStartInput, presentationDrawInput, meetingInteractionInput, meetingInteractionQuestionInput, meetingInteractionStatusInput, meetingInteractionModerationInput } from './meeting.validation';
 import { buildMeetingSlides, getMeetingSlides, updateMeetingSlide } from './meeting-slides.service';
 import {
   getManagedMeetingInteraction,
   saveMeetingInteraction,
+  addMeetingInteractionQuestion,
+  selectMeetingInteractionQuestion,
+  deleteMeetingInteractionQuestion,
   setMeetingInteractionStatus,
   moderateMeetingInteractionResponse,
 } from './meeting-interaction.service';
@@ -149,6 +152,22 @@ meetingRouter.put('/:id/interaction', manage, async (req, res) => {
   catch (saveError) { sendError(res, saveError); }
 });
 
+meetingRouter.post('/:id/interaction/questions', manage, async (req, res) => {
+  const { error, value } = meetingInteractionQuestionInput.validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
+  try { res.status(201).json({ data: await addMeetingInteractionQuestion(company(req), req.params.id, value) }); }
+  catch (questionError) { sendError(res, questionError); }
+});
+
+meetingRouter.post('/:id/interaction/questions/:questionId/select', manage, async (req, res) => {
+  try { res.json({ data: await selectMeetingInteractionQuestion(company(req), req.params.id, req.params.questionId) }); }
+  catch (selectError) { sendError(res, selectError); }
+});
+
+meetingRouter.delete('/:id/interaction/questions/:questionId', manage, async (req, res) => {
+  try { res.json({ data: await deleteMeetingInteractionQuestion(company(req), req.params.id, req.params.questionId) }); }
+  catch (deleteError) { sendError(res, deleteError); }
+});
 meetingRouter.post('/:id/interaction/status', manage, async (req, res) => {
   const { error, value } = meetingInteractionStatusInput.validate(req.body);
   if (error) return res.status(400).json({ message: error.message });
@@ -208,7 +227,7 @@ meetingRouter.put('/:id', manage, async (req, res) => {
   }
 });
 
-meetingRouter.put('/:id/series', manage, async (req: any, res) => {
+meetingRouter.put('/:id/series', manage, async (req, res) => {
   const { error, value } = bulkUpdateMeetingSeriesInput.validate(req.body);
   if (error) return res.status(400).json({ message: error.message });
   try {
@@ -216,7 +235,7 @@ meetingRouter.put('/:id/series', manage, async (req: any, res) => {
   } catch (e) { sendError(res, e); }
 });
 
-meetingRouter.delete('/:id', manage, async (req: any, res) => {
+meetingRouter.delete('/:id', manage, async (req, res) => {
   try {
     res.json({ data: await deleteMeeting(company(req), req.params.id) });
   } catch (e) {
