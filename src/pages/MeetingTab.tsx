@@ -357,6 +357,35 @@ function MeetingWorkspace() {
   const activeMeeting = items.find((m) => m._id === detailMeetingId) || null;
   const canModifyActiveMeeting = canManage && !!activeMeeting && activeMeeting.status !== "ended";
 
+  // Socket.IO remains the fast path, but the in-page fullscreen presentation also
+  // needs a polling fallback. A dropped/misrouted socket must not leave it stuck on
+  // the previous speaker after the server scheduler has advanced the meeting.
+  useEffect(() => {
+    const meetingId = activeMeeting?._id;
+    if (!meetingId || flowStep !== "presentation" || !slidesOpen || !["live", "paused"].includes(activeMeeting.status)) return;
+    let mounted = true;
+    let polling = false;
+    const refreshPresentation = () => {
+      if (polling) return;
+      polling = true;
+      void api("/" + meetingId)
+        .then((updated: Meeting) => {
+          if (mounted) {
+            setItems(previous => previous.map(item =>
+              item._id === updated._id && updated.__v >= item.__v ? updated : item
+            ));
+          }
+        })
+        .catch(() => { /* Socket updates may still succeed; retry on the next tick. */ })
+        .finally(() => { polling = false; });
+    };
+    const timer = window.setInterval(refreshPresentation, 1000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, [activeMeeting?._id, activeMeeting?.status, flowStep, slidesOpen]);
+
   useEffect(() => {
     if (editingMeeting && items.some(item => item._id === editingMeeting._id && item.status === "ended")) setEditingMeeting(null);
   }, [items, editingMeeting]);
