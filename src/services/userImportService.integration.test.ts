@@ -9,7 +9,7 @@ import { RolePermissionModel } from "../../server/model/role-permission.model";
 import { importUsers } from "../../server/service/user-import.service";
 let db: MongoMemoryServer;
 const actor = { companyCode: "A", role: "admin" };
-const row = (email="an@import.test", rowNumber=2) => ({rowNumber, displayName:"Nguyễn An", email, phone:"0901234567", companyName:"Doanh nghiệp riêng",industry:"Công nghệ",birthDate:"1990-08-15"});
+const row = (email="an@import.test", rowNumber=2) => ({rowNumber, displayName:"Nguyễn An", email, phone: rowNumber === 2 ? "0901234567" : "09" + String(rowNumber).padStart(8, "0"), companyName:"Doanh nghiệp riêng",industry:"Công nghệ",birthDate:"1990-08-15"});
 beforeAll(async () => {
   db = await MongoMemoryServer.create(); await mongoose.connect(db.getUri(),{dbName:"user_import_isolated_tests"});
   await Promise.all([UserModel.init(),CompanyModel.init(),BranchModel.init(),RolePermissionModel.init()]);
@@ -37,13 +37,14 @@ describe("Excel account import persistence",()=>{
     expect(await bcrypt.compare("123456",users[1].password!)).toBe(true);
     expect(users[0].password).not.toBe(users[1].password);
   });
-  it("preserves imported images and business fields and rejects missing email or unsafe image URLs", async () => {
+  it("preserves imported fields, accepts phone-only accounts and rejects unsafe image URLs", async () => {
     const profile = { ...row(), photoURL: "https://example.com/avatar.jpg", coverImage: "https://example.com/banner.jpg" };
     expect((await importUsers({ dryRun: false, rows: [profile] }, actor)).created).toBe(1);
     expect(await UserModel.findOne({ email: profile.email }).lean()).toMatchObject({ photoURL: profile.photoURL, coverImage: profile.coverImage, companyName: profile.companyName, industry: profile.industry });
-    const result = await importUsers({ dryRun: true, rows: [{ ...row("", 3) }, { ...row("bad@import.test", 4), photoURL: "javascript:alert(1)" }] }, actor);
-    expect(result.errors).toBe(2);
-    expect(result.rows[0].message).toContain("Email");
+    const result = await importUsers({ dryRun: true, rows: [{ ...row("", 3), phone: "0912345678" }, { ...row("bad@import.test", 4), photoURL: "javascript:alert(1)" }] }, actor);
+    expect(result.errors).toBe(1);
+    expect(result.rows[0]).toMatchObject({ email: "", status: "valid" });
+    expect(result.rows[0].message).toContain("Điện thoại");
     expect(result.rows[1].message).toContain("Ảnh đại diện");
   });
   it("retries skip existing emails without overwriting profile or resetting passwords",async()=>{
