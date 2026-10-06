@@ -44,7 +44,7 @@ async function loadChapterUsers(companyCode?: string): Promise<UserProfile[]> {
 export type ParticipantType = "member_present" | "member_absent" | "guest";
 export type ParticipantFilterCategory = "all" | "all_members" | "present_members" | "guests";
 
-interface Participant {
+export interface Participant {
   id: string;
   name: string;
   avatar?: string;
@@ -58,6 +58,55 @@ interface Participant {
   email?: string;
   industry?: string;
   bio?: string;
+}
+
+const normalizedIdentity = (value?: string) => (value || "").trim().toLocaleLowerCase("vi");
+
+export function buildMeetingParticipants(users: UserProfile[], speakers: Speaker[]): Participant[] {
+  const matchedSpeakerIds = new Set<string>();
+  const loadedMembers: Participant[] = users.map(user => {
+    const memberIds = [user.uid, user.id, user._id].filter(Boolean).map(String);
+    const memberName = (user.displayName || user.email?.split("@")[0] || "Thành viên").trim();
+    const memberEmail = normalizedIdentity(user.email);
+    const matchedSpeaker = speakers.find(speaker => {
+      const speakerUserId = String(speaker.userId || "").trim();
+      if (speakerUserId && memberIds.includes(speakerUserId)) return true;
+      if (memberEmail && normalizedIdentity(speaker.email) === memberEmail) return true;
+      return normalizedIdentity(speaker.name) === normalizedIdentity(memberName);
+    });
+
+    if (matchedSpeaker) matchedSpeakerIds.add(matchedSpeaker.id);
+    return {
+      id: matchedSpeaker?.id || memberIds[0] || user.email,
+      name: memberName,
+      avatar: user.photoURL || matchedSpeaker?.photoURL || matchedSpeaker?.coverImage,
+      companyName: user.companyName || user.branchName || "",
+      role: user.role === "admin" ? "Chủ tịch / Admin" : user.role || "Thành viên",
+      selected: true,
+      type: matchedSpeaker ? "member_present" : "member_absent",
+      checkedInAt: matchedSpeaker?.checkedInAt,
+      email: user.email,
+    };
+  });
+
+  const unmatchedAttendees: Participant[] = speakers
+    .filter(speaker => !matchedSpeakerIds.has(speaker.id))
+    .map(speaker => {
+      const isMember = Boolean(speaker.userId);
+      return {
+        id: speaker.id,
+        name: speaker.name.trim(),
+        avatar: speaker.photoURL || speaker.coverImage,
+        companyName: speaker.company || speaker.slideProfile?.company || (isMember ? "Thành viên" : "Khách tham dự"),
+        role: isMember ? "Thành viên" : "Khách mời",
+        selected: true,
+        type: isMember ? "member_present" as const : "guest" as const,
+        checkedInAt: speaker.checkedInAt,
+        email: speaker.email,
+      };
+    });
+
+  return [...loadedMembers, ...unmatchedAttendees];
 }
 
 interface WinnerRecord {
@@ -359,22 +408,29 @@ export default function WheelOfNamesPage() {
 
       if (urlMeetingId) {
         targetMeeting = meetings.find((m) => String(m._id) === String(urlMeetingId));
+        if (!targetMeeting) {
+          try {
+            targetMeeting = await meetingService.getMeeting(urlMeetingId);
+          } catch (error) {
+            console.warn("Không thể tải đúng cuộc họp cho vòng quay:", error);
+          }
+        }
       }
 
-      if (!targetMeeting) {
+      if (!urlMeetingId && !targetMeeting) {
         targetMeeting = meetings.find(
           (m) => (m.status === "live" || m.status === "paused") && m.speakers && m.speakers.length > 0
         );
       }
 
-      if (!targetMeeting) {
+      if (!urlMeetingId && !targetMeeting) {
         targetMeeting = meetings.find((m) => {
           if (!m.startsAt || !m.speakers || m.speakers.length === 0) return false;
           return isSameDate(new Date(m.startsAt), now);
         });
       }
 
-      if (!targetMeeting) {
+      if (!urlMeetingId && !targetMeeting) {
         const sortedWithSpeakers = meetings
           .filter((m) => m.speakers && m.speakers.length > 0)
           .sort((a, b) => new Date(b.startsAt || 0).getTime() - new Date(a.startsAt || 0).getTime());
@@ -383,7 +439,7 @@ export default function WheelOfNamesPage() {
         }
       }
 
-      if (!targetMeeting && meetings.length > 0) {
+      if (!urlMeetingId && !targetMeeting && meetings.length > 0) {
         targetMeeting = meetings.find((m) => m.status === "live" || m.status === "paused") || meetings[0];
       }
 
@@ -401,88 +457,9 @@ export default function WheelOfNamesPage() {
         }
       }
 
-      // Collect speakers from target meeting, or fallback merge all speakers from recent meetings if target has none
+      // Only use attendees from the selected meeting. Never mix check-ins from other meetings.
       const speakers: Speaker[] = [...(targetMeeting?.speakers || [])];
-      if (speakers.length === 0) {
-        const seenSpeakerIds = new Set<string>();
-        for (const m of meetings) {
-          for (const s of m.speakers || []) {
-            if (!seenSpeakerIds.has(s.id)) {
-              seenSpeakerIds.add(s.id);
-              speakers.push(s);
-            }
-          }
-        }
-      }
-
-      // Build chapter members roster from DB users
-      const userMap = new Map<string, { id: string; name: string; avatar?: string; companyName?: string; role?: string }>();
-
-      // Add DB users
-      for (const u of users) {
-        const uid = String(u.uid || (u).id || (u)._id || u.email || "").trim();
-        const uName = (u.displayName || u.email?.split("@")[0] || "Thành viên").trim();
-        userMap.set(uName.toLowerCase(), {
-          id: uid || `user-${Math.random()}`,
-          name: uName,
-          avatar: u.photoURL,
-          companyName: u.companyName || u.branchName || "",
-          role: u.role === "admin" ? "Chủ tịch / Admin" : u.role || "Thành viên",
-        });
-      }
-
-
-      // Match speakers to members
-      const matchedSpeakerIds = new Set<string>();
-
-      const isSpeakerMatch = (s: Speaker, mName: string, mId: string): boolean => {
-        const sUserId = String(s.userId || "").trim();
-        const sName = (s.name || "").trim().toLowerCase();
-        const nameToMatch = mName.trim().toLowerCase();
-
-        if (sUserId && mId && sUserId === mId) return true;
-        if (sName && nameToMatch && (sName === nameToMatch || sName.includes(nameToMatch) || nameToMatch.includes(sName))) {
-          return true;
-        }
-        return false;
-      };
-
-      // 1. Map all registered chapter members (present or absent)
-      const loadedMembers: Participant[] = Array.from(userMap.values()).map((m) => {
-        const matchedSpeaker = speakers.find((s) => isSpeakerMatch(s, m.name, m.id));
-        const isPresent = Boolean(matchedSpeaker);
-
-        if (matchedSpeaker) {
-          matchedSpeakerIds.add(matchedSpeaker.id);
-        }
-
-        return {
-          id: m.id,
-          name: m.name,
-          avatar: m.avatar || (matchedSpeaker ? matchedSpeaker.photoURL || matchedSpeaker.coverImage : undefined),
-          companyName: m.companyName,
-          role: m.role,
-          selected: true,
-          type: isPresent ? "member_present" : "member_absent",
-          checkedInAt: matchedSpeaker?.checkedInAt,
-        };
-      });
-
-      // 2. Identify guests / attendees from the meeting (speakers not matching chapter members)
-      const guestSpeakers: Participant[] = speakers
-        .filter((s) => !matchedSpeakerIds.has(s.id))
-        .map((s) => ({
-          id: `guest-speaker-${s.id}`,
-          name: s.name.trim(),
-          avatar: s.photoURL || s.coverImage,
-          companyName: (s).company || (s).slideProfile?.company || "Khách tham dự",
-          role: "Khách mời",
-          selected: true,
-          type: "guest" as const,
-          checkedInAt: s.checkedInAt,
-        }));
-
-      setParticipants([...loadedMembers, ...guestSpeakers]);
+      setParticipants(buildMeetingParticipants(users, speakers));
     
 }).catch(err => {
       console.error("Lỗi khi tải danh sách người dùng cho vòng quay:", err);
