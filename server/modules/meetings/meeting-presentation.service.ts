@@ -9,8 +9,6 @@ type AutoAdvanceMeeting = {
   presentation?: { view?: MeetingPresentationState["view"]; autoAdvance?: boolean; autoAdvanceDelay?: number };
 };
 
-export const AUTO_ADVANCE_SLIDE_LEAD_MS = 5000;
-
 export async function updatePresentationState(item: MeetingDocument, input: Partial<Pick<MeetingPresentationState, "view" | "autoAdvance" | "autoAdvanceDelay">>, now = new Date()) {
   if (input.view) setMeetingPresentationView(item, input.view, now);
   const current = item.toObject().presentation || {};
@@ -24,7 +22,7 @@ export function isAutoAdvanceDue(item: AutoAdvanceMeeting, now = new Date()) {
   const speaker = item.speakers[item.currentIndex];
   if (!speaker) return false;
   const elapsed = (item.elapsedSeconds || 0) + (now.getTime() - new Date(item.speakerStartedAt).getTime()) / 1000;
-  return Number.isFinite(elapsed) && elapsed >= speaker.seconds + (item.presentation.autoAdvanceDelay ?? 3);
+  return Number.isFinite(elapsed) && elapsed >= speaker.seconds;
 }
 
 // Optimistic concurrency ensures that only one worker can advance each version.
@@ -36,7 +34,7 @@ export async function advanceDuePresentations(now = new Date()) {
   for (const meeting of meetings) {
     if (!isAutoAdvanceDue(meeting, now)) continue;
     try {
-      await controlMeeting(meeting, "next", now, { nextSpeakerStartsAt: new Date(now.getTime() + AUTO_ADVANCE_SLIDE_LEAD_MS) });
+      await controlMeeting(meeting, "next", now);
       advanced++;
     }
     catch (error) { if (!(error instanceof MeetingError && error.status === 409)) throw error; }

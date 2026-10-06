@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Play, Pause, RotateCcw, Pencil, ArrowDownToLine } from "lucide-react";
 import { renderProfileSlide, loadSlideImage, SLIDE_WIDTH, SLIDE_HEIGHT } from "./profileSlideRenderer";
 import { getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
-import { SlideTransitionDelayInput } from "./SlideTransitionDelayInput";
 import { SpeechesCompleteMessage } from "./SpeechesCompleteDialog";
 import { SpeakerPresentationFrame } from "./SpeakerPresentationFrame";
 import type { ProfileSlide, SlideDeck } from "./slideTypes";
@@ -19,9 +18,7 @@ type Props = {
   onMoveSpeaker?: (direction: number) => Promise<void>;
   controlBusy?: boolean;
   onStartPresentation?: (speakerId: string, version: number) => Promise<void>;
-  autoAdvanceDelay?: number;
   onAutoAdvanceChange?: (enabled: boolean) => void;
-  onAutoAdvanceDelayChange?: (seconds: number) => void;
   fullscreenRequest?: Promise<boolean> | null;
   onPresentationStarted?: () => void;
   onPresentationClosed?: () => void;
@@ -97,7 +94,7 @@ function NextSpeakersOverlay({ speakers, large = false }: { speakers: ProfileSli
   );
 }
 
-export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, onReloadData, autoAdvance = false, autoAdvanceDelay = 3, onAutoAdvanceChange, onAutoAdvanceDelayChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker, onTogglePause }: Props) {
+export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, onReloadData, autoAdvance = false, onAutoAdvanceChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker, onTogglePause }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -390,13 +387,6 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
           </svg>
         </div>
       </label>
-      {mode === "auto" && (
-        <label className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
-          Thời gian chuyển slide
-          <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={value => onAutoAdvanceDelayChange?.(value)} disabled={!canManage} />
-          <span className="text-slate-400 font-normal">giây</span>
-        </label>
-      )}
       <div className="hidden sm:block w-px h-5 bg-slate-200" />
       <button
         type="button"

@@ -77,17 +77,15 @@ export default function RemoteMeetingRoom(props: Props) {
 
 function AutoAdvanceSettings({ state, disabled, onSave }: {
   state: MeetingPresentationState; disabled: boolean;
-  onSave: (value: { autoAdvance: boolean; autoAdvanceDelay: number }) => Promise<boolean>;
+  onSave: (value: { autoAdvance: boolean }) => Promise<boolean>;
 }) {
   const [enabled, setEnabled] = useState(state.autoAdvance);
-  const [delay, setDelay] = useState(String(state.autoAdvanceDelay));
   return (
     <form
       className="space-y-3.5 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs"
       onSubmit={event => {
         event.preventDefault();
-        const seconds = Number(delay);
-        if (delay !== "" && Number.isInteger(seconds) && seconds >= 0 && seconds <= 3600) void onSave({ autoAdvance: enabled, autoAdvanceDelay: seconds });
+        void onSave({ autoAdvance: enabled });
       }}
     >
       <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
@@ -104,21 +102,8 @@ function AutoAdvanceSettings({ state, disabled, onSave }: {
           />
           <span>Tự chuyển người khi hết giờ</span>
         </label>
-        <label className="flex items-center justify-between gap-3 text-xs text-slate-600 font-medium">
-          <span>Thời gian chờ chuyển lượt (giây)</span>
-          <input
-            required
-            type="number"
-            min={0}
-            max={3600}
-            step={1}
-            value={delay}
-            onChange={event => setDelay(event.target.value)}
-            className="w-24 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-center text-xs font-bold text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none"
-          />
-        </label>
         <p className="text-[11px] text-slate-400 leading-relaxed">
-          Cuộc họp tiếp tục tự chuyển lượt khi điện thoại khóa màn hình.
+          Hết thời gian phát biểu, cuộc họp chuyển ngay sang người tiếp theo, kể cả khi điện thoại khóa màn hình.
         </p>
         <button
           type="submit"
@@ -467,7 +452,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
 
             {/* Auto Advance Settings */}
             <AutoAdvanceSettings
-              key={String(state.autoAdvance) + ":" + state.autoAdvanceDelay}
+              key={String(state.autoAdvance)}
               state={state}
               disabled={Boolean(disabled)}
               onSave={value => command("/presentation-state", value, "PATCH")}

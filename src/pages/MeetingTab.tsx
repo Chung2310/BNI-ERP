@@ -13,7 +13,6 @@ import { meetingElapsedLabel } from "../components/meetings/meetingElapsedLabel"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MemberMeetingDetail, { memberAttendance, memberAttendanceLabel } from "../components/meetings/MemberMeetingDetail";
 import { SpeechesCompleteDialog } from "../components/meetings/SpeechesCompleteDialog";
-import { SlideTransitionDelayInput } from "../components/meetings/SlideTransitionDelayInput";
 import { MeetingSlides } from "../components/meetings/MeetingSlides";
 import { MeetingCheckInPanel } from "../components/meetings/MeetingCheckInPanel";
 import { CompanyCheckInQrDialog } from "../components/meetings/CompanyCheckInQrDialog";
@@ -442,13 +441,11 @@ function MeetingWorkspace() {
 
   const sharedPresentation = presentationState(activeMeeting?.presentation);
   const autoAdvance = sharedPresentation.autoAdvance;
-  const autoAdvanceDelay = sharedPresentation.autoAdvanceDelay;
   const updatePresentationSettings = (value: Partial<MeetingPresentationState>) => {
     if (!activeMeeting || saving) return;
     void run(() => api('/' + activeMeeting._id + '/presentation-state', 'PATCH', { ...value, version: activeMeeting.__v }));
   };
   const updateAutoAdvance = (enabled: boolean) => updatePresentationSettings({ autoAdvance: enabled });
-  const updateAutoAdvanceDelay = (seconds: number) => updatePresentationSettings({ autoAdvanceDelay: seconds });
 
   const openCreateModal = (mode: "single" | "recurring") => {
     setTitle("");
@@ -1413,7 +1410,7 @@ function MeetingWorkspace() {
                           {autoAdvance && (
                             <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-cyan-50 border border-cyan-200/80 text-[11px] font-medium text-cyan-700">
                               <Sparkles className="h-3 w-3 text-cyan-600" />
-                              Hết giờ → chờ {autoAdvanceDelay}s → chuyển người & slide
+                              Hết giờ → chuyển ngay người & slide
                             </span>
                           )}
 
@@ -1473,9 +1470,7 @@ function MeetingWorkspace() {
                   onTogglePause={() => control(activeMeeting.status === "paused" ? "resume" : "pause")}
                   controlBusy={saving}
                   autoAdvance={autoAdvance}
-                  autoAdvanceDelay={autoAdvanceDelay}
                   onAutoAdvanceChange={updateAutoAdvance}
-                  onAutoAdvanceDelayChange={updateAutoAdvanceDelay}
                   fullscreenRequest={presentationFullscreen}
                 />
               )}
@@ -1806,11 +1801,6 @@ function MeetingWorkspace() {
                                       {remaining <= 0 ? "Thời lượng phát biểu" : !activeMeeting.speakerStartedAt && !activeMeeting.elapsedSeconds ? "Sẵn sàng" : activeMeeting.status === "paused" ? "Tạm dừng" : "Thời gian còn lại"}
                                     </span>
                                   </div>
-                                  {autoAdvance && remaining <= 0 && (
-                                    <p className="text-xs font-medium text-amber-800">
-                                      {upcoming ? "Chuyển người tiếp theo" : "Hoàn tất phát biểu"} sau {Math.max(0, Math.ceil(autoAdvanceDelay - Math.abs(remaining)))}s
-                                    </p>
-                                  )}
                                 </div>
                                 <span className={`font-mono text-3xl sm:text-4xl font-black tracking-tight ${remaining <= 0 ? "text-rose-600 animate-pulse" : "text-slate-900"}`}>
                                   {remaining <= 0 ? "Hết giờ" : fmt(remaining)}
@@ -1864,17 +1854,10 @@ function MeetingWorkspace() {
                                     </select>
                                   </label>
 
-                                  {autoAdvance && (
-                                    <div className="flex items-center gap-1.5 ml-auto">
-                                      <span className="text-slate-600 font-medium">Thời gian chuyển slide:</span>
-                                      <SlideTransitionDelayInput value={autoAdvanceDelay} onChange={updateAutoAdvanceDelay} />
-                                      <span className="text-slate-600 font-medium">giây</span>
-                                    </div>
-                                  )}
                                 </div>
                                 {autoAdvance && (
                                   <p className="text-[11px] text-slate-500 leading-relaxed">
-                                    Khi hết thời gian phát biểu, chờ {autoAdvanceDelay} giây rồi chuyển người và slide. Đây là thời gian chờ chuyển lượt, không phải thời lượng phát biểu.
+                                    Khi hết thời gian phát biểu, hệ thống chuyển ngay sang người và slide tiếp theo.
                                   </p>
                                 )}
                               </div>
