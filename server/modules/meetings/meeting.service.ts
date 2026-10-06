@@ -275,8 +275,7 @@ export async function bulkUpdateMeetingSeries(companyCode: string, id: string, i
 
 export async function deleteMeeting(companyCode: string, id: string) {
   const item = await getMeeting(companyCode, id);
-  assertMeetingEditable(item);
-  const result = await MeetingModel.deleteOne({ _id: item._id, companyCode, status: { $ne: 'ended' } });
+  const result = await MeetingModel.deleteOne({ _id: item._id, companyCode });
   if (!result.deletedCount) throw new MeetingError(409, 'Cuộc họp đã thay đổi. Vui lòng tải lại trước khi thao tác.');
   emitToCompany(companyCode, 'meeting_updated', {
     id: String(item._id),

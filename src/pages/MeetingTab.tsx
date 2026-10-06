@@ -1116,7 +1116,7 @@ function MeetingWorkspace() {
                   </div>}
                 </div>
 
-                {canManage && m.status !== "ended" && (
+                {canManage && (
                   <div className="px-3 pb-3" onClick={(event) => event.stopPropagation()}>
                     <MeetingScheduleActions
                       status={m.status}
@@ -1263,9 +1263,9 @@ function MeetingWorkspace() {
                   </div>
                 )}
 
-                {canModifyActiveMeeting && (
+                {canManage && (
                   <div className="flex items-center gap-1.5" role="group" aria-label="Quản lý lịch cuộc họp">
-                    <button
+                    {canModifyActiveMeeting && <button
                       type="button"
                       title="Sửa cuộc họp"
                       onClick={(e) => openEditModal(activeMeeting, e)}
@@ -1273,7 +1273,7 @@ function MeetingWorkspace() {
                     >
                       <Pencil className="h-3.5 w-3.5" />
                       <span className="hidden lg:inline">Sửa</span>
-                    </button>
+                    </button>}
                     {activeMeeting.status === "scheduled" && (
                       <button
                         type="button"

@@ -30,15 +30,15 @@ it.each([
   expect(item.save).not.toHaveBeenCalled();
 });
 
-it("blocks editing, deleting and changing slides while preserving read access", async () => {
+it("blocks editing and changing slides while preserving read and delete access", async () => {
   const item = endedMeeting();
   vi.spyOn(MeetingModel, "findOne").mockResolvedValue(item as any);
-  const remove = vi.spyOn(MeetingModel, "deleteOne");
+  const remove = vi.spyOn(MeetingModel, "deleteOne").mockResolvedValue({ deletedCount: 1 } as any);
   await expect(service.updateMeeting("BNI", "ended", { title: "Changed", version: 2 })).rejects.toMatchObject({ status: 409 });
-  await expect(service.deleteMeeting("BNI", "ended")).rejects.toMatchObject({ status: 409 });
+  await expect(service.deleteMeeting("BNI", "ended")).resolves.toEqual({ success: true });
   await expect(updateMeetingSlide("BNI", "ended", "speaker", { version: 2, profile: null })).rejects.toMatchObject({ status: 409 });
   expect(await service.getMeeting("BNI", "ended")).toBe(item);
   expect(item.title).toBe("Kết quả cũ");
   expect(item.save).not.toHaveBeenCalled();
-  expect(remove).not.toHaveBeenCalled();
+  expect(remove).toHaveBeenCalledWith({ _id: "ended", companyCode: "BNI" });
 });
