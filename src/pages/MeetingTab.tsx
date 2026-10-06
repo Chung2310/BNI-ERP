@@ -49,8 +49,9 @@ import {
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
 import { LuckyDrawTab } from "../components/meetings/LuckyDrawTab";
-import { MeetingFlowStepper, MEETING_FLOW_META, loadMeetingFlowOrder, saveMeetingFlowOrder, type MeetingFlowStep } from "../components/meetings/MeetingFlowStepper";
+import { DEFAULT_MEETING_FLOW, MeetingFlowStepper, MEETING_FLOW_META, type MeetingFlowStep } from "../components/meetings/MeetingFlowStepper";
 import { ActiveMembersPanel } from "../components/meetings/ActiveMembersPanel";
+import { MeetingInteractionTab } from "../components/meetings/MeetingInteractionTab";
 import { SpeakerAvatar } from "../components/meetings/SpeakerAvatar";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { SearchableSelect } from "../components/common/SearchableSelect";
@@ -164,14 +165,9 @@ function MeetingWorkspace() {
   const [detailMeetingId, setDetailMeetingId] = useState<string | null>(null);
   const detailMeetingIdRef = useRef<string | null>(null);
   useEffect(() => { detailMeetingIdRef.current = detailMeetingId; }, [detailMeetingId]);
-  // Quy trình điều hành: các bước theo thứ tự do MC sắp xếp (lưu localStorage)
-  const [flowOrder, setFlowOrder] = useState<MeetingFlowStep[]>(loadMeetingFlowOrder);
+  // Mỗi nội dung trong popup là một lựa chọn độc lập; người dùng có thể mở trực tiếp.
   const [flowStep, setFlowStep] = useState<MeetingFlowStep>("checkin");
   const [slidesOpen, setSlidesOpen] = useState(false);
-  const updateFlowOrder = useCallback((order: MeetingFlowStep[]) => {
-    setFlowOrder(order);
-    saveMeetingFlowOrder(order);
-  }, []);
   const goToFlowStep = useCallback((step: MeetingFlowStep) => {
     setFlowStep(step);
     setSlidesOpen(false);
@@ -179,10 +175,10 @@ function MeetingWorkspace() {
   const meetingFlowSteps = useRef(new Map<string, MeetingFlowStep>());
   const getMeetingFlowStep = (meetingId: string): MeetingFlowStep => {
     const inMemory = meetingFlowSteps.current.get(meetingId);
-    if (inMemory && flowOrder.includes(inMemory)) return inMemory;
+    if (inMemory && DEFAULT_MEETING_FLOW.includes(inMemory)) return inMemory;
     try {
       const saved = localStorage.getItem("bni_meeting_flow_step:" + meetingId);
-      if (flowOrder.includes(saved as MeetingFlowStep)) return saved as MeetingFlowStep;
+      if (DEFAULT_MEETING_FLOW.includes(saved as MeetingFlowStep)) return saved as MeetingFlowStep;
     } catch { /* Fall back to the initial step when browser storage is unavailable. */ }
     return "checkin";
   };
@@ -1350,12 +1346,9 @@ function MeetingWorkspace() {
             </div>
 
             <MeetingFlowStepper
-              order={flowOrder}
               current={flowStep}
-              canReorder={canModifyActiveMeeting}
               badges={{ checkin: activeMeeting.speakers.length, luckyDraw: activeMeeting.luckyDraw?.prizes.reduce((total, prize) => total + prize.winners.length, 0) || 0 }}
               onSelect={goToFlowStep}
-              onReorder={updateFlowOrder}
               onFinish={canManage && ["live", "paused"].includes(activeMeeting.status) ? () => setFinishRequested(true) : undefined}
             />
 
@@ -2189,6 +2182,8 @@ function MeetingWorkspace() {
                   </div>
                 </div>
               )}
+
+              {flowStep === "interaction" && <MeetingInteractionTab meeting={activeMeeting} canManage={canModifyActiveMeeting} onRefreshMeeting={refresh} />}
 
               {/* SUBTAB 2: VÒNG QUAY MAY MẮN (RANDOM.ORG) */}
               {flowStep === "luckyDraw" && (

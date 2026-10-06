@@ -2,7 +2,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({}) }));
-import { extractLuckyWinners, drawSourceLabels, LuckyWinnersTable } from './MeetingStatisticsPanel';
+import { extractLuckyWinners, drawSourceLabels, LuckyWinnersTable, meetingAbsentCount, meetingCountsAbsences } from './MeetingStatisticsPanel';
 import type { Meeting } from '../../services/meetingService';
 
 it('aggregates all draw sources including legacy results with meeting and prize details', () => {
@@ -46,4 +46,23 @@ it('paginates winners and keeps row numbers continuous across pages', () => {
   expect(screen.getByText('Winner 11')).toBeTruthy();
   expect(screen.getByText('11')).toBeTruthy();
   expect(screen.getByText('Trang 2/2')).toBeTruthy();
+});
+
+it.each([
+  ['scheduled', false, 0],
+  ['cancelled', false, 0],
+  ['live', true, 8],
+  ['paused', true, 8],
+  ['ended', true, 8],
+] as const)('counts absences only after a meeting has started: %s', (status, eligible, absent) => {
+  const meeting = {
+    status,
+    speakers: [
+      { id: 'member-a', userId: 'member-a', name: 'Member A' },
+      { id: 'guest', name: 'Guest' },
+    ],
+  } as unknown as Meeting;
+
+  expect(meetingCountsAbsences(meeting)).toBe(eligible);
+  expect(meetingAbsentCount(meeting, 9)).toBe(absent);
 });

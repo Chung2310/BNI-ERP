@@ -8,6 +8,7 @@ import { renderProfileSlide, loadSlideImage, SLIDE_WIDTH, SLIDE_HEIGHT } from ".
 import { SpeakerPresentationFrame } from "./SpeakerPresentationFrame";
 import type { ProfileSlide } from "./slideTypes";
 import { ActiveMembersPanel } from "./ActiveMembersPanel";
+import { AudienceResponsesStage } from "./AudienceResponsesStage";
 
 export function SpeakerStage({ meeting, slide, now }: { meeting: Meeting; slide?: ProfileSlide; now: number }) {
   if (!slide) return <StageMessage text={meeting.speechesCompletedAt ? "Đã hoàn tất phần phát biểu" : "Chờ người phát biểu"} />;
@@ -121,6 +122,7 @@ export function MeetingStage({ snapshot, now, fill = false }: { snapshot: Meetin
 
   if (view === "checkin") activeStage = <CheckInStage meeting={meeting} />;
   else if (view === "activeMembers") activeStage = <RankingStage meeting={meeting} />;
+  else if (view === "audienceResponses") activeStage = <AudienceResponsesStage meeting={meeting} />;
   else if (view === "waiting") activeStage = <StageMessage title={meeting.title} text="Vui lòng chờ" />;
   else activeStage = <SpeakerPresentationFrame meeting={meeting} slides={slides} speakerId={speaker?.id} now={now} fill={fill}>
     <SpeakerStage meeting={meeting} slide={slides.find(item => item.id === speaker?.id)} now={now} />

@@ -20,6 +20,7 @@ import { companyPaymentRouter } from "./company-payment.router";
 import { webhookRouter } from "./webhook.router";
 import { meetingRouter } from "../modules/meetings/meeting.router";
 import { meetingCheckInRouter } from "../modules/meetings/meeting-checkin.router";
+import { meetingInteractionPublicRouter } from "../modules/meetings/meeting-interaction.router";
 
 import { memberFeeRouter } from "../modules/member-fees/member-fee.router";
 
@@ -65,6 +66,7 @@ apiRouter.use("/crud", crudRouter);
 
 apiRouter.use("/meetings", meetingRouter);
 apiRouter.use("/meeting-checkin", meetingCheckInRouter);
+apiRouter.use("/meeting-interaction", meetingInteractionPublicRouter);
 
 apiRouter.use("/company-email", companyEmailRouter);
 apiRouter.use("/company-payment", companyPaymentRouter);

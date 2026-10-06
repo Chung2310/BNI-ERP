@@ -202,8 +202,8 @@ export const matchesFilterCategory = (p: Participant, category: ParticipantFilte
       // Tất cả thành viên chapter (cả có mặt và vắng mặt)
       return pType === "member_present" || pType === "member_absent";
     case "present_members":
-      // Chỉ thành viên có mặt
-      return pType === "member_present";
+      // Tất cả người đã check-in cuộc họp, gồm thành viên và khách mời.
+      return pType === "member_present" || pType === "guest";
     case "guests":
       // Chỉ khách mời
       return pType === "guest";
@@ -322,7 +322,7 @@ export default function WheelOfNamesPage() {
   const countAllMembers = participants.filter(
     (p) => p.type === "member_present" || p.type === "member_absent"
   ).length;
-  const countPresent = participants.filter((p) => p.type === "member_present").length;
+  const countPresent = participants.filter((p) => p.type === "member_present" || p.type === "guest").length;
   const countGuests = participants.filter((p) => p.type === "guest").length;
 
   // 1. Fetch Users & Today's Meeting Check-in status directly from system
@@ -2169,7 +2169,7 @@ export default function WheelOfNamesPage() {
                 type="button"
                 onClick={() => setFilterCategory("present_members")}
                 disabled={isSpinning}
-                title="Chỉ thành viên Chapter có mặt (đã check-in)"
+                title="Thành viên và khách mời có mặt (đã check-in)"
                 className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-lg text-center transition cursor-pointer disabled:opacity-50 ${
                   filterCategory === "present_members"
                     ? "bg-[#cf142b] text-white font-bold shadow-xs"

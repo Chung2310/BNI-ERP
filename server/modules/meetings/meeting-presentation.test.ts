@@ -31,7 +31,7 @@ it("preserves pause, manual mode and an unstarted clock", () => {
     expect(isAutoAdvanceDue({ ...meeting().toObject(), ...patch }, late)).toBe(false);
   }
 });
-it.each(["checkin", "luckyDraw", "activeMembers", "waiting"] as const)("does not auto-advance while the shared view is %s", view => {
+it.each(["checkin", "luckyDraw", "activeMembers", "audienceResponses", "waiting"] as const)("does not auto-advance while the shared view is %s", view => {
   const item = meeting();
   item.presentation.view = view;
   expect(isAutoAdvanceDue(item.toObject(), new Date(+origin + 100000))).toBe(false);
@@ -109,4 +109,5 @@ it("rejects malformed states and prevents clients from setting draw results", ()
     expect(presentationStateInput.validate(body).error).toBeDefined();
   }
   expect(presentationStateInput.validate({ version: 0, view: "speaker", autoAdvance: true, autoAdvanceDelay: 0 }).error).toBeUndefined();
+  expect(presentationStateInput.validate({ version: 0, view: "audienceResponses" }).error).toBeUndefined();
 });
