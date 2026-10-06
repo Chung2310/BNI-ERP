@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { AudienceResponsesStage } from "./AudienceResponsesStage";
 import { buildResponseCloud, layoutResponseCloud } from "./audienceResponseCloud";
@@ -26,7 +26,7 @@ it("shows only approved answers and combines duplicates on the shared screen", a
   expect(screen.getByTitle("Kết nối: 2 câu trả lời")).toBeTruthy();
   expect(screen.queryByText("An")).toBeNull();
   expect(screen.queryByText("Chưa duyệt")).toBeNull();
-  expect(observe).toHaveBeenCalled();
+  await waitFor(() => expect(observe).toHaveBeenCalled());
 });
 
 it("groups equivalent approved answers and orders them by frequency", () => {
