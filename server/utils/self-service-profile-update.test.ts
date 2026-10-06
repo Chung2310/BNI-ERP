@@ -16,12 +16,13 @@ test("discards privilege-sensitive and unknown fields", () => {
   assert.deepEqual(
     pickSelfServiceProfileUpdate({
       displayName: "Safe Name",
+      email: "member@example.com",
       role: "admin",
       companyCode: "OTHER",
       level: 1,
       parentId: "admin-1",
       unknownField: "ignored",
     }),
-    { displayName: "Safe Name" },
+    { displayName: "Safe Name", email: "member@example.com" },
   );
 });

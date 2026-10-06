@@ -53,12 +53,15 @@ export const bulkUpdateMeetingSeriesInput = Joi.object({
   meetingIds: Joi.array().items(Joi.string().hex().length(24)).min(1).unique().required(),
   changes: Joi.object({
     location: Joi.string().trim().max(500).allow(''),
+    latitude: Joi.number().min(-90).max(90).allow(null),
+    longitude: Joi.number().min(-180).max(180).allow(null),
+    gpsRadiusMeters: Joi.number().integer().min(50).max(5000),
     startsTime: Joi.string().pattern(/^([01]\d|2[0-3]):[0-5]\d$/),
     durationMinutes: Joi.number().integer().min(1).max(1440),
     coverImage: Joi.string().uri({ scheme: ['https', 'http'] }).max(2000).allow(''),
     tiers: speakingTimeSlots,
     fallbackSeconds: Joi.number().integer().min(1).max(3600),
-  }).min(1).required(),
+  }).and('latitude', 'longitude').min(1).required(),
 });
 export const checkinInput = Joi.object({ latitude: Joi.number().min(-90).max(90), longitude: Joi.number().min(-180).max(180), userId: Joi.string().hex().length(24), name: Joi.string().trim().max(150), email: Joi.string().email().max(254).allow('').default(''), photoURL: image, coverImage: image });
 export const controlInput = Joi.object({ action: Joi.string().valid('start', 'pause', 'resume', 'next', 'previous', 'finish', 'cancel', 'start_speaker', 'reset_speaker').required(), version: Joi.number().integer().min(0).required() });

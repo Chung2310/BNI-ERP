@@ -49,6 +49,7 @@ const isUrl = (str?: string): boolean => {
 
 type MemberGalleryImage = { url: string; uploadToken?: string };
 const MAX_MEMBER_GALLERY_IMAGES = 5;
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 const renderAvatar = (avatar: string, sizeClasses: string = "w-8 h-8", textClass: string = "text-base", nameFallback?: string) => {
   if (isUrl(avatar)) {
@@ -123,7 +124,7 @@ export default function OrgChartTab({
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedEmp, setSelectedEmp] = useState<EmployeeNode | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  
+
   const [listPage, setListPage] = useState<number>(1);
   const listLimit = 15;
 
@@ -131,7 +132,7 @@ export default function OrgChartTab({
   if (previousInputs11 === null || !Object.is(previousInputs11[0], searchQuery)) {
     setPreviousInputs11([searchQuery]);
     setListPage(1);
-  
+
   }
 
   const [previousInputs1, setPreviousInputs1] = useState<unknown[] | null>(null);
@@ -142,7 +143,7 @@ export default function OrgChartTab({
     } else {
       setIsDetailModalOpen(false);
     }
-  
+
   }
 
   const closeDetailModal = () => {
@@ -207,7 +208,7 @@ export default function OrgChartTab({
   if (previousInputs2 === null || !Object.is(previousInputs2[0], selectedEmp?.id)) {
     setPreviousInputs2([selectedEmp?.id]);
     setIsEditing(false);
-  
+
   }
 
   const startEditing = () => {
@@ -303,8 +304,8 @@ export default function OrgChartTab({
             compCode === "SYSTEM" ? undefined : compCode,
           );
           uploaded.push({ url: result.url, uploadToken: result.uploadToken });
-        } catch (err: any) {
-          toast.error(err?.message || `Không thể tải ảnh ${file.name}.`);
+        } catch (err: unknown) {
+          toast.error(getApiErrorMessage(err, `Không thể tải ảnh ${file.name}.`));
           break;
         }
       }
@@ -378,6 +379,20 @@ export default function OrgChartTab({
       return;
     }
 
+    const normalizedEmail = editEmail.trim().toLowerCase();
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      toast.warning("Địa chỉ email không đúng định dạng!");
+      return;
+    }
+
+    const duplicateEmail = usersList.find(
+      user => user.uid !== selectedEmp.id && user.email?.trim().toLowerCase() === normalizedEmail,
+    );
+    if (duplicateEmail) {
+      toast.error(`Email "${normalizedEmail}" đã được sử dụng bởi thành viên khác!`);
+      return;
+    }
+
     if (editPhone.trim()) {
       const phoneNormalized = editPhone.trim().replace(/\s+/g, "");
       const duplicatePhone = usersList.find(u => u.uid !== selectedEmp.id && u.phone && u.phone.replace(/\s+/g, "") === phoneNormalized);
@@ -391,6 +406,7 @@ export default function OrgChartTab({
     try {
       const updateData = {
         displayName: editName.trim(),
+        email: normalizedEmail,
         companyName: editCompanyName.trim(),
         industry: editIndustry.trim(),
         phone: editPhone.trim() || "",
@@ -413,6 +429,7 @@ export default function OrgChartTab({
       setSelectedEmp((prev) => prev ? {
         ...prev,
         name: updateData.displayName,
+        email: updateData.email,
         role: selectedEmp.role,
         companyName: updateData.companyName,
         industry: updateData.industry,
@@ -523,7 +540,7 @@ export default function OrgChartTab({
         setAddParentId(firstCompanyManager?.uid || firstBranchOwner?.uid || "");
       }
     }
-  
+
   }
 
   // Handle parentId based on addRole automatically
@@ -555,7 +572,7 @@ export default function OrgChartTab({
         }
       }
     }
-  
+
   }
 
 
@@ -617,8 +634,7 @@ export default function OrgChartTab({
     }
 
     // Kiểm tra định dạng Email
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!emailRegex.test(addEmail.trim())) {
+    if (!EMAIL_REGEX.test(addEmail.trim())) {
       toast.warning("Địa chỉ email không đúng định dạng!");
       return;
     }
@@ -653,33 +669,33 @@ export default function OrgChartTab({
     const compCode = selectedCompanyCode || userProfile?.companyCode || "SYSTEM";
     const compName = userProfile?.companyName || "";
 
-    
+
 
     const finalCompName = addCompanyName.trim() || compName;
     try {
       setIsAddingEmployee(true);
       const newUid = await authService.registerUserForCompany({
-          displayName: addName.trim(),
-          email: addEmail.trim(),
-          password: addPassword,
-          role: addRole,
-          companyCode: compCode,
-          companyName: finalCompName,
-          parentId: addParentId || undefined,
-          phone: addPhone.trim(),
-          branchId: activeBranchId || undefined,
-          birthDate: addBirthDate ? addBirthDate : undefined,
-          gender: addGender || undefined,
-          address: addAddress.trim(),
-          targetMarket: addTargetMarket.trim(),
-          ...{
+        displayName: addName.trim(),
+        email: addEmail.trim(),
+        password: addPassword,
+        role: addRole,
+        companyCode: compCode,
+        companyName: finalCompName,
+        parentId: addParentId || undefined,
+        phone: addPhone.trim(),
+        branchId: activeBranchId || undefined,
+        birthDate: addBirthDate ? addBirthDate : undefined,
+        gender: addGender || undefined,
+        address: addAddress.trim(),
+        targetMarket: addTargetMarket.trim(),
+        ...{
           industry: addIndustry.trim() || undefined,
           photoURL: addPhotoURL.trim() || undefined,
           coverImage: addCoverImage.trim() || undefined,
           galleryImages: addGalleryImages.map(image => image.url),
           galleryUploadTokens: addGalleryImages.flatMap((image, index) => image.uploadToken ? [{ index, uploadToken: image.uploadToken }] : []),
         }
-        });
+      });
 
       toast.success(`Đã thêm thành viên "${addName}" thành công!`);
 
@@ -760,176 +776,175 @@ export default function OrgChartTab({
 
           <div className="col-span-1 flex min-w-0 flex-col gap-4">
 
-              <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-                <h3 className="text-sm font-bold text-slate-800">Danh sách thành viên</h3>
-                <p className="text-xs text-slate-500">{visibleEmployees.length} thành viên · Bấm vào thẻ để xem hồ sơ</p>
-              </div>
-              {loading ? (
-                <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500"><RefreshCw className="h-4 w-4 animate-spin" />Đang tải thành viên...</div>
-              ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 min-[1200px]:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5">
-                  {paginatedEmployees.map((employee) => {
-                    const manager = getManagerForEmployee(employee, employees);
-                    return (
-                      <button
-                        key={employee.id}
-                        type="button"
-                        aria-label={"Xem hồ sơ " + employee.name}
-                        onClick={() => setSelectedEmp(employee)}
-                        className="group flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3.5 text-left shadow-xs transition hover:border-cyan-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 cursor-pointer"
-                      >
-                        {/* Top: Avatar + Name + Role + Status */}
-                        <div className="flex items-start gap-3">
-                          <div className="relative shrink-0">
-                            {renderAvatar(employee.avatar, "w-11 h-11", "text-sm", employee.name)}
-                            <span
-                              className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${
-                                employee.status === "online" ? "bg-emerald-500" : "bg-slate-300"
-                              }`}
-                              title={employee.status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
-                            />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-1.5">
-                              <span className="truncate text-sm font-bold text-slate-900 group-hover:text-cyan-700 transition-colors">
-                                {employee.name || missingValue}
-                              </span>
-                              <span
-                                className={
-                                  "shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold " +
-                                  (employee.status === "online"
-                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                                    : "bg-slate-100 text-slate-500")
-                                }
-                              >
-                                {employee.status === "online" ? "Online" : "Offline"}
-                              </span>
-                            </div>
-                            <p className="truncate text-xs font-medium text-cyan-700 mt-0.5">
-                              {employee.role && employee.role.trim().toLowerCase() !== "nhân viên"
-                                ? employee.role
-                                : "Thành viên"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Middle: Compact metadata */}
-                        <div className="mt-2.5 flex flex-1 flex-col gap-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2">
-                          {(() => {
-                            const companyOrDept = employee.companyName;
-                            if (!companyOrDept) return null;
-                            return (
-                              <div className="flex items-center gap-1.5 min-w-0 text-slate-600">
-                                <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                                <span className="truncate text-[11px]">{companyOrDept}</span>
-                              </div>
-                            );
-                          })()}
-                          {employee.email && (
-                            <div className="flex items-center gap-1.5 min-w-0 text-slate-500">
-                              <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                              <span className="truncate text-[11px]">{employee.email}</span>
-                            </div>
-                          )}
-                          {employee.phone && employee.phone !== "Chưa cập nhật" && (
-                            <div className="flex items-center gap-1.5 min-w-0 text-slate-500">
-                              <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                              <span className="truncate text-[11px]">{employee.phone}</span>
-                            </div>
-                          )}
-                          {manager && (
-                            <div className="flex items-center gap-1.5 min-w-0 text-slate-500">
-                              <Users className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                              <span className="truncate text-[11px]">Quản lý: {manager.name}</span>
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                  {!visibleEmployees.length && <div className="col-span-full rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-16 text-center text-sm text-slate-500">{employees.length ? "Không tìm thấy thành viên phù hợp." : "Chưa có thành viên."}</div>}
-                </div>
-              )}
-
-              {/* Pagination Controls */}
-              {visibleEmployees.length > listLimit && (
-                <div className="flex items-center justify-between border-t border-slate-100 bg-white px-4 py-3 sm:px-6">
-                  <div className="flex flex-1 justify-between sm:hidden">
-                    <button
-                      disabled={listPage === 1}
-                      onClick={() => setListPage((p) => Math.max(p - 1, 1))}
-                      className="relative inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      Trước
-                    </button>
-                    <button
-                      disabled={listPage * listLimit >= visibleEmployees.length}
-                      onClick={() => setListPage((p) => p + 1)}
-                      className="relative ml-3 inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      Sau
-                    </button>
-                  </div>
-                  <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-xs text-slate-700">
-                        Hiển thị từ <span className="font-medium">{(listPage - 1) * listLimit + 1}</span> đến{" "}
-                        <span className="font-medium">{Math.min(listPage * listLimit, visibleEmployees.length)}</span> trong tổng số{" "}
-                        <span className="font-medium">{visibleEmployees.length}</span> thành viên
-                      </p>
-                    </div>
-                    <div>
-                      <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                        <button
-                          disabled={listPage === 1}
-                          onClick={() => setListPage(1)}
-                          className="relative inline-flex items-center rounded-l-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-30 text-xs font-semibold"
-                        >
-                          «
-                        </button>
-                        <button
-                          disabled={listPage === 1}
-                          onClick={() => setListPage((p) => Math.max(p - 1, 1))}
-                          className="relative inline-flex items-center px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-30 text-xs font-semibold"
-                        >
-                          ‹
-                        </button>
-                        {Array.from({ length: Math.ceil(visibleEmployees.length / listLimit) }).map((_, idx) => {
-                          const pageNum = idx + 1;
-                          if (Math.abs(listPage - pageNum) > 2) return null;
-                          return (
-                            <button
-                              key={pageNum}
-                              onClick={() => setListPage(pageNum)}
-                              className={`relative inline-flex items-center px-4 py-2 text-xs font-semibold focus:z-20 ${listPage === pageNum
-                                  ? "z-10 bg-indigo-650 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-650"
-                                  : "text-slate-900 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:outline-offset-0"
-                                }`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        })}
-                        <button
-                          disabled={listPage * listLimit >= visibleEmployees.length}
-                          onClick={() => setListPage((p) => p + 1)}
-                          className="relative inline-flex items-center px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-30 text-xs font-semibold"
-                        >
-                          ›
-                        </button>
-                        <button
-                          disabled={listPage * listLimit >= visibleEmployees.length}
-                          onClick={() => setListPage(Math.ceil(visibleEmployees.length / listLimit))}
-                          className="relative inline-flex items-center rounded-r-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-30 text-xs font-semibold"
-                        >
-                          »
-                        </button>
-                      </nav>
-                    </div>
-                  </div>
-                </div>
-              )}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+              <h3 className="text-sm font-bold text-slate-800">Danh sách thành viên</h3>
+              <p className="text-xs text-slate-500">{visibleEmployees.length} thành viên · Bấm vào thẻ để xem hồ sơ</p>
             </div>
+            {loading ? (
+              <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500"><RefreshCw className="h-4 w-4 animate-spin" />Đang tải thành viên...</div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 min-[1200px]:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5">
+                {paginatedEmployees.map((employee) => {
+                  const manager = getManagerForEmployee(employee, employees);
+                  return (
+                    <button
+                      key={employee.id}
+                      type="button"
+                      aria-label={"Xem hồ sơ " + employee.name}
+                      onClick={() => setSelectedEmp(employee)}
+                      className="group flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3.5 text-left shadow-xs transition hover:border-cyan-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 cursor-pointer"
+                    >
+                      {/* Top: Avatar + Name + Role + Status */}
+                      <div className="flex items-start gap-3">
+                        <div className="relative shrink-0">
+                          {renderAvatar(employee.avatar, "w-11 h-11", "text-sm", employee.name)}
+                          <span
+                            className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${employee.status === "online" ? "bg-emerald-500" : "bg-slate-300"
+                              }`}
+                            title={employee.status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="truncate text-sm font-bold text-slate-900 group-hover:text-cyan-700 transition-colors">
+                              {employee.name || missingValue}
+                            </span>
+                            <span
+                              className={
+                                "shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold " +
+                                (employee.status === "online"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                  : "bg-slate-100 text-slate-500")
+                              }
+                            >
+                              {employee.status === "online" ? "Online" : "Offline"}
+                            </span>
+                          </div>
+                          <p className="truncate text-xs font-medium text-cyan-700 mt-0.5">
+                            {employee.role && employee.role.trim().toLowerCase() !== "nhân viên"
+                              ? employee.role
+                              : "Thành viên"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Middle: Compact metadata */}
+                      <div className="mt-2.5 flex flex-1 flex-col gap-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2">
+                        {(() => {
+                          const companyOrDept = employee.companyName;
+                          if (!companyOrDept) return null;
+                          return (
+                            <div className="flex items-center gap-1.5 min-w-0 text-slate-600">
+                              <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                              <span className="truncate text-[11px]">{companyOrDept}</span>
+                            </div>
+                          );
+                        })()}
+                        {employee.email && (
+                          <div className="flex items-center gap-1.5 min-w-0 text-slate-500">
+                            <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                            <span className="truncate text-[11px]">{employee.email}</span>
+                          </div>
+                        )}
+                        {employee.phone && employee.phone !== "Chưa cập nhật" && (
+                          <div className="flex items-center gap-1.5 min-w-0 text-slate-500">
+                            <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                            <span className="truncate text-[11px]">{employee.phone}</span>
+                          </div>
+                        )}
+                        {manager && (
+                          <div className="flex items-center gap-1.5 min-w-0 text-slate-500">
+                            <Users className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                            <span className="truncate text-[11px]">Quản lý: {manager.name}</span>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+                {!visibleEmployees.length && <div className="col-span-full rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-16 text-center text-sm text-slate-500">{employees.length ? "Không tìm thấy thành viên phù hợp." : "Chưa có thành viên."}</div>}
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {visibleEmployees.length > listLimit && (
+              <div className="flex items-center justify-between border-t border-slate-100 bg-white px-4 py-3 sm:px-6">
+                <div className="flex flex-1 justify-between sm:hidden">
+                  <button
+                    disabled={listPage === 1}
+                    onClick={() => setListPage((p) => Math.max(p - 1, 1))}
+                    className="relative inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Trước
+                  </button>
+                  <button
+                    disabled={listPage * listLimit >= visibleEmployees.length}
+                    onClick={() => setListPage((p) => p + 1)}
+                    className="relative ml-3 inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Sau
+                  </button>
+                </div>
+                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs text-slate-700">
+                      Hiển thị từ <span className="font-medium">{(listPage - 1) * listLimit + 1}</span> đến{" "}
+                      <span className="font-medium">{Math.min(listPage * listLimit, visibleEmployees.length)}</span> trong tổng số{" "}
+                      <span className="font-medium">{visibleEmployees.length}</span> thành viên
+                    </p>
+                  </div>
+                  <div>
+                    <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                      <button
+                        disabled={listPage === 1}
+                        onClick={() => setListPage(1)}
+                        className="relative inline-flex items-center rounded-l-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-30 text-xs font-semibold"
+                      >
+                        «
+                      </button>
+                      <button
+                        disabled={listPage === 1}
+                        onClick={() => setListPage((p) => Math.max(p - 1, 1))}
+                        className="relative inline-flex items-center px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-30 text-xs font-semibold"
+                      >
+                        ‹
+                      </button>
+                      {Array.from({ length: Math.ceil(visibleEmployees.length / listLimit) }).map((_, idx) => {
+                        const pageNum = idx + 1;
+                        if (Math.abs(listPage - pageNum) > 2) return null;
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setListPage(pageNum)}
+                            className={`relative inline-flex items-center px-4 py-2 text-xs font-semibold focus:z-20 ${listPage === pageNum
+                              ? "z-10 bg-indigo-650 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-650"
+                              : "text-slate-900 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:outline-offset-0"
+                              }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                      <button
+                        disabled={listPage * listLimit >= visibleEmployees.length}
+                        onClick={() => setListPage((p) => p + 1)}
+                        className="relative inline-flex items-center px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-30 text-xs font-semibold"
+                      >
+                        ›
+                      </button>
+                      <button
+                        disabled={listPage * listLimit >= visibleEmployees.length}
+                        onClick={() => setListPage(Math.ceil(visibleEmployees.length / listLimit))}
+                        className="relative inline-flex items-center rounded-r-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-30 text-xs font-semibold"
+                      >
+                        »
+                      </button>
+                    </nav>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1211,17 +1226,19 @@ export default function OrgChartTab({
                     </div>
                   </div>
 
-                  {/* Email (fixed) */}
+                  {/* Login email */}
                   <div>
-                    <label className="block font-bold text-gray-500 mb-1">Email liên lạc (Cố định)</label>
+                    <label htmlFor="member-edit-email" className="block font-bold text-gray-500 mb-1">Email đăng nhập *</label>
                     <input
+                      id="member-edit-email"
                       type="email"
                       value={editEmail}
-                      disabled
-                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none bg-gray-100 text-gray-400 cursor-not-allowed select-none"
+                      onChange={(event) => setEditEmail(event.target.value)}
+                      autoComplete="email"
+                      required
+                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white"
                     />
                   </div>
-
                 </div>
 
                 <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 text-xs font-bold">

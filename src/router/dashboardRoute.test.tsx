@@ -57,3 +57,19 @@ it("lets a member open overview from the menu and load meeting statistics withou
   expect(authService.getColleagues).toHaveBeenCalled();
   expect(screen.queryByText("Bạn không có quyền truy cập khu vực này.")).toBeNull();
 });
+
+it("lets a member with meeting read access open the rankings from the menu", async () => {
+  const navigate = vi.fn();
+  render(<>
+    <Sidebar activeTab="BẢNG XẾP HẠNG" setActiveTab={navigate} mobileOpen={false} onMobileClose={() => {}} />
+    <AppRouterView activeTab="BẢNG XẾP HẠNG" userProfile={member as UserProfile} />
+  </>);
+  const rankingsButton = screen.getByRole("button", { name: "Bảng xếp hạng" });
+  expect(rankingsButton.getAttribute("aria-disabled")).toBe("false");
+  fireEvent.click(rankingsButton);
+  expect(navigate).toHaveBeenCalledWith("BẢNG XẾP HẠNG");
+  expect(await screen.findByRole("heading", { name: "Bảng xếp hạng" })).toBeTruthy();
+  await waitFor(() => expect(meetingService.listMeetings).toHaveBeenCalledWith({ all: true }));
+  expect(authService.getColleagues).toHaveBeenCalled();
+  expect(screen.queryByText("Bạn không có quyền truy cập khu vực này.")).toBeNull();
+});

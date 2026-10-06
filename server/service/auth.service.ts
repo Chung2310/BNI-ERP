@@ -17,6 +17,7 @@ import { filterModulesForBusinessType, resolveBusinessType } from "../config/bus
 import { resolveCompanyModuleUpdate } from "./auth-company-modules";
 import { clearModuleCache } from "../middleware/require-module";
 import { createCompanyAdminUser } from "../utils/company-admin-user";
+import { ConflictError } from "../errors/app-error";
 
 import { getJwtAccessSecret, getJwtRefreshSecret } from "../config/env";
 /**
@@ -168,6 +169,14 @@ export const authService = {
    */
   async updateProfile(id: string, updateData: Partial<IUser>): Promise<IUser | null> {
     const safeUpdateData = pickSelfServiceProfileUpdate(updateData);
+    if (typeof safeUpdateData.email === "string") {
+      const normalizedEmail = safeUpdateData.email.trim().toLowerCase();
+      const existingUser = await UserModel.exists({ email: normalizedEmail, _id: { $ne: id } });
+      if (existingUser) {
+        throw new ConflictError("CONFLICT", "Địa chỉ email này đã được sử dụng cho một tài khoản khác.");
+      }
+      safeUpdateData.email = normalizedEmail;
+    }
     if (safeUpdateData.birthDate !== undefined) {
       safeUpdateData.birthDate = normalizeBirthDate(safeUpdateData.birthDate);
     }

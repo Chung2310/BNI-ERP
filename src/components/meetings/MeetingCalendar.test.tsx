@@ -15,19 +15,20 @@ it("loads the chosen month and uses Vietnam dates and times", async () => {
  expect(await screen.findByText("00:30 · Họp tuần")).toBeTruthy();
  expect(p.load).toHaveBeenCalledWith("?month=2030-01");
  fireEvent.click(screen.getByRole("button",{name:"Tháng sau"}));expect(p.onMonthChange).toHaveBeenCalledWith("2030-02");
+ fireEvent.click(document.querySelector('[data-calendar-day="2030-01-02"]')!);
+ expect(p.onOpen).toHaveBeenCalledWith(meeting);
+ expect(screen.queryByRole("dialog",{name:"Lịch ngày 02/01/2030"})).toBeNull();
+ p.onOpen.mockClear();
  fireEvent.click(screen.getByRole("button",{name:"Xem lịch ngày 02/01/2030"}));
- fireEvent.click(screen.getByRole("button",{name:"Dời lịch"}));expect(p.onReschedule).toHaveBeenCalledWith(meeting);
- fireEvent.click(screen.getByRole("button",{name:"Xem lịch ngày 02/01/2030"}));
- fireEvent.click(screen.getByRole("button",{name:"Hủy"}));expect(p.onCancel).toHaveBeenCalledWith(meeting);
- fireEvent.click(screen.getByRole("button",{name:"Xem lịch ngày 02/01/2030"}));
- fireEvent.click(screen.getByRole("button",{name:"Xóa cuộc họp"}));expect(p.onDelete).toHaveBeenCalledWith(meeting);
+ expect(p.onOpen).toHaveBeenCalledWith(meeting);
 });
 it("shows cancelled occurrences and hides management actions from members", async () => {
  const p=props();p.load.mockResolvedValue([{...meeting,status:"cancelled"}]);
  render(<MeetingCalendar {...p} canManage={false}/>);
  await screen.findByText("Đã hủy · 00:30 · Họp tuần");
  fireEvent.click(screen.getByRole("button",{name:"Xem lịch ngày 02/01/2030"}));
- expect(within(screen.getByRole("dialog")).getByText(/Đã hủy/)).toBeTruthy();expect(screen.queryByRole("button",{name:"Hủy"})).toBeNull();
+ expect(p.onOpen).toHaveBeenCalledWith({...meeting,status:"cancelled"});
+ expect(screen.queryByRole("dialog")).toBeNull();expect(screen.queryByRole("button",{name:"Hủy"})).toBeNull();
  expect(screen.queryByRole("button",{name:"Dời lịch"})).toBeNull();
  expect(screen.queryByRole("button",{name:"Xóa cuộc họp"})).toBeNull();
 });
@@ -40,7 +41,7 @@ it("keeps all 31 days in a six-week month and exposes every meeting through the 
  await screen.findByText("07:00 · Buổi 1");
  expect(screen.getAllByRole("button",{name:/^Xem lịch ngày/})).toHaveLength(31);
  expect(screen.queryByRole("button",{name:"11:00 · Buổi 5"})).toBeNull();
- fireEvent.click(screen.getByRole("button",{name:"Xem 5 buổi họp ngày 31/08/2026"}));
+ fireEvent.click(document.querySelector('[data-calendar-day="2026-08-31"]')!);
  const dialog=screen.getByRole("dialog",{name:"Lịch ngày 31/08/2026"});
  expect(within(dialog).getAllByRole("button",{name:/Buổi \d/})).toHaveLength(5);
  fireEvent.click(within(dialog).getByRole("button",{name:/11:00 · Buổi 5/}));

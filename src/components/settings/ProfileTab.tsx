@@ -28,6 +28,7 @@ const labelClass =
 function profileValues(profile: UserProfile) {
   return {
     displayName: profile.displayName || "",
+    email: profile.email || "",
     phone: profile.phone || "",
     birthDate: profile.birthDate?.slice(0, 10) || "",
     companyName: profile.companyName || "",
@@ -171,6 +172,11 @@ function ProfileForm({
       toast.error("Họ và tên không được để trống!");
       return;
     }
+    const normalizedEmail = form.email.trim().toLowerCase();
+    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(normalizedEmail)) {
+      toast.error("Địa chỉ email không đúng định dạng!");
+      return;
+    }
     const today = new Date();
     const todayValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
       today.getDate()
@@ -181,6 +187,7 @@ function ProfileForm({
     }
     const values = {
       displayName: form.displayName.trim(),
+      email: normalizedEmail,
       phone: form.phone.trim(),
       birthDate: form.birthDate,
       companyName: form.companyName.trim(),
@@ -539,19 +546,21 @@ function ProfileForm({
                 </div>
               </div>
 
-              {/* Địa chỉ Email (Không được đổi) */}
+              {/* Địa chỉ email đăng nhập */}
               <div className="space-y-1.5 text-left">
                 <label htmlFor="profile-email" className={labelClass}>
-                  Địa chỉ Email (Không được đổi)
+                  Địa chỉ Email *
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
                   <input
                     id="profile-email"
                     type="email"
-                    disabled
-                    value={profile.email || ""}
-                    className="w-full pl-11 pr-4 py-3 bg-slate-100/90 border border-slate-200 rounded-xl text-xs text-slate-500 outline-none cursor-not-allowed font-medium"
+                    autoComplete="email"
+                    required
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className={inputClass}
                   />
                 </div>
               </div>

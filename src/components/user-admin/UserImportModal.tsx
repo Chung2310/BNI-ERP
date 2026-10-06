@@ -153,8 +153,8 @@ export default function UserImportModal({
           <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 flex gap-3">
             <Info className="h-4 w-4 text-indigo-500 shrink-0 mt-0.5" />
             <div className="space-y-1 text-sm text-indigo-800">
-              <p>Tài khoản mới có vai trò <strong>Member</strong>, mật khẩu mặc định <strong>123456</strong>. Đăng nhập bằng Email. Dữ liệu nhập vào đơn vị và chi nhánh đang chọn.</p>
-              <p className="text-indigo-600 text-xs">Tối đa 200 dòng · 5 MB · Đọc sheet đầu tiên · Bắt buộc: Họ tên, Email · Thay dòng ví dụ bằng dữ liệu thực tế.</p>
+              <p>Tài khoản mới có vai trò <strong>Member</strong>, mật khẩu mặc định <strong>123456</strong>. Đăng nhập bằng Email hoặc số điện thoại. Dữ liệu nhập vào đơn vị và chi nhánh đang chọn.</p>
+              <p className="text-indigo-600 text-xs">Tối đa 200 dòng · 5 MB · Đọc sheet đầu tiên · Bắt buộc: Họ tên và ít nhất Email hoặc Điện thoại · Thay dòng ví dụ bằng dữ liệu thực tế.</p>
             </div>
           </div>
 
@@ -251,7 +251,7 @@ export default function UserImportModal({
                           <tr key={result.rowNumber} className="hover:bg-slate-50/60 transition-colors">
                             <td className="px-4 py-3 text-xs font-mono text-slate-400">{result.rowNumber}</td>
                             <td className="px-4 py-3 font-semibold text-slate-800">{row?.displayName}</td>
-                            <td className="px-4 py-3 font-mono text-xs text-slate-600">{result.email}</td>
+                            <td className="px-4 py-3 font-mono text-xs text-slate-600">{result.email || <span className="text-slate-300">—</span>}</td>
                             <td className="px-4 py-3 text-slate-500">{row?.phone || <span className="text-slate-300">—</span>}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-start gap-2">

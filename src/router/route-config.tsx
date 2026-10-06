@@ -29,7 +29,7 @@ export const APP_ROUTES: AppRoute[] = [
       userProfile.role === "admin" ||
       Boolean(
         userProfile.permissions?.includes("*") ||
-        userProfile.permissions?.includes("dashboard:read")
+        MODULE_READ_PERMISSIONS["BẢNG XẾP HẠNG"]?.some(permission => userProfile.permissions?.includes(permission))
       ),
   },
   {
