@@ -44,6 +44,7 @@ import {
   SlidersHorizontal,
   UserPlus,
   Trash2,
+  Plus,
 } from "lucide-react";
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
@@ -821,6 +822,16 @@ function MeetingWorkspace() {
                 >
                   <QrCode className="h-4 w-4" />
                   <span>Check-in</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Tạo lịch đơn"
+                  onClick={() => openCreateModal("single")}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 text-xs font-medium shadow-sm shadow-cyan-600/20 transition disabled:opacity-50 cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Tạo lịch đơn</span>
                 </button>
                 <button
                   type="button"

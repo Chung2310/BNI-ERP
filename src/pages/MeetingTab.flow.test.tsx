@@ -691,6 +691,15 @@ it("does not show one minute elapsed before a future meeting without an actual s
   fireEvent.click(screen.getByRole("button", { name: /^Bước \d+: Thuyết trình$/ }));
   expect(screen.getAllByText("Chưa đến giờ họp")).toHaveLength(2);
 });
+it("opens the single-meeting form from the meeting toolbar", () => {
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Tạo lịch đơn" }));
+  const dialog = within(screen.getByRole("dialog", { name: "Tạo cuộc họp BNI mới" }));
+  expect(dialog.getByPlaceholderText("Ví dụ: Buổi họp định kỳ Chapter Tuần 40")).toBeTruthy();
+  expect(dialog.getByLabelText("Giờ kết thúc cuộc họp")).toBeTruthy();
+  expect(dialog.queryByRole("button", { name: "Ngày bắt đầu chu kỳ" })).toBeNull();
+});
+
 it("creates a weekly series from its own popup and returns to the calendar", async () => {
   const instance = { ...meeting, startsAt: "2030-01-02T00:00:00Z", seriesId: "series" };
   const fetchMock = vi.fn(async (_url, _options) => ({ ok: true, json: async () => ({ data: [instance] }) }));

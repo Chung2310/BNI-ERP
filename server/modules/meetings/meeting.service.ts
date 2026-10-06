@@ -13,6 +13,7 @@ import { allocateSpeakers, elapsedSeconds, reminderDueAt, speakingSeconds } from
 import { UserModel } from '../../model/user.model';
 import { notificationService } from '../../service/notification.service';
 import { emitToCompany } from '../../socket';
+import type { MeetingPresentationState, PresentationView } from '../../../src/utils/meetingPresentation';
 
 export type MeetingDocument = ReturnType<typeof MeetingModel.hydrate>;
 export type CheckInInput = {
@@ -463,14 +464,36 @@ export async function startMeetingPresentation(item: MeetingDocument, speakerId:
   }
   item.status = 'live';
   item.speakers[index].deferred = false;
-  item.set('presentation', { ...item.toObject().presentation, view: 'speaker' });
+  item.set('presentation', { ...item.toObject().presentation, view: 'speaker', speakerTimerPausedByView: false });
   item.speechesCompletedAt = undefined;
   await saveMeeting(item);
   await notifyNextSpeaker(item);
   return item;
 }
 
-export async function controlMeeting(item: MeetingDocument, action: string, now = new Date()) {
+export function setMeetingPresentationView(item: MeetingDocument, view: PresentationView, now = new Date()) {
+  const state = (item.toObject().presentation || {}) as Partial<MeetingPresentationState>;
+  const previousView = state.view || 'checkin';
+  let speakerTimerPausedByView = Boolean(state.speakerTimerPausedByView);
+
+  if (previousView === 'speaker' && view !== 'speaker') {
+    speakerTimerPausedByView = item.status === 'live' && Boolean(item.speakerStartedAt);
+    if (speakerTimerPausedByView) {
+      item.elapsedSeconds = elapsedSeconds(item, now);
+      item.speakerStartedAt = undefined;
+    }
+  } else if (previousView !== 'speaker' && view === 'speaker') {
+    const hasCurrentSpeaker = Boolean(item.speakers[item.currentIndex]) && !item.speechesCompletedAt;
+    if (speakerTimerPausedByView && item.status === 'live' && hasCurrentSpeaker && !item.speakerStartedAt) {
+      item.speakerStartedAt = now;
+    }
+    speakerTimerPausedByView = false;
+  }
+
+  item.set('presentation', { ...state, view, speakerTimerPausedByView });
+}
+
+export async function controlMeeting(item: MeetingDocument, action: string, now = new Date(), options: { nextSpeakerStartsAt?: Date } = {}) {
   assertMeetingEditable(item);
   const status = item.status;
   if (['start_speaker', 'reset_speaker', 'next', 'previous'].includes(action) && !item.speakers[item.currentIndex]) {
@@ -539,7 +562,7 @@ export async function controlMeeting(item: MeetingDocument, action: string, now 
       item.currentIndex++;
       item.speakers[item.currentIndex].deferred = false;
       item.elapsedSeconds = 0;
-      item.speakerStartedAt = status === 'live' ? now : undefined;
+      item.speakerStartedAt = status === 'live' ? options.nextSpeakerStartsAt || now : undefined;
     }
   } else if (action === 'cancel' && status === 'scheduled') {
     item.status = 'cancelled';
@@ -547,7 +570,7 @@ export async function controlMeeting(item: MeetingDocument, action: string, now 
     throw new MeetingError(409, 'Thao tác không phù hợp với trạng thái cuộc họp hoặc chưa có người check-in.');
   }
   if (action === 'next' || action === 'previous') {
-    item.set('presentation', { ...item.toObject().presentation, view: 'speaker' });
+    item.set('presentation', { ...item.toObject().presentation, view: 'speaker', speakerTimerPausedByView: false });
   }
   await saveMeeting(item);
   await notifyNextSpeaker(item);
@@ -761,6 +784,7 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
 
   prize.winners.push(winnerRecord);
   if (broadcast) {
+    setMeetingPresentationView(item, 'luckyDraw', now);
     const state = item.toObject().presentation || {};
     item.set('presentation', { ...state, view: 'luckyDraw', drawWinnerId: winnerRecord.id,
       drawStartedAt: now, drawRevealsAt: new Date(now.getTime() + 5000) });

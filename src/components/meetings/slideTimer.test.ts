@@ -13,6 +13,11 @@ it("freezes on pause and restores the allocation when the speaker timer resets",
   expect(getSlideTimer({ ...meeting, status: "paused", elapsedSeconds: 25 }, "early", now + 90000)?.time).toBe("00:35");
   expect(getSlideTimer({ ...meeting, speakerStartedAt: undefined, elapsedSeconds: 0 }, "early", now)).toMatchObject({ time: "01:00", label: "Chờ bắt đầu" });
 });
+it("keeps the full allocation while an automatically advanced slide is preparing", () => {
+  const timer = getSlideTimer({ ...meeting, elapsedSeconds: 0, speakerStartedAt: new Date(now + 5000).toISOString() }, "early", now);
+  expect(timer).toMatchObject({ time: "01:00", urgent: false });
+  expect(timer?.label).toBeTruthy();
+});
 it("shows expiration text and preserves completed speaker time", () => {
   expect(getSlideTimer(meeting, "early", now + 40000)).toMatchObject({ time: "Hết giờ", overtime: true, urgent: true });
   expect(getSlideTimer({ ...meeting, currentIndex: 1, speakers: [{ id: "early", seconds: 60, spokenSeconds: 45 }, { id: "late", seconds: 20 }] }, "early", now)).toMatchObject({ time: "00:15", label: "Đã phát biểu" });

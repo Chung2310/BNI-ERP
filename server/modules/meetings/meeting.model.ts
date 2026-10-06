@@ -119,6 +119,7 @@ const meeting = new Schema(
         view: { type: String, enum: ["checkin", "speaker", "luckyDraw", "activeMembers", "waiting"], default: "checkin" },
         autoAdvance: { type: Boolean, default: false },
         autoAdvanceDelay: { type: Number, default: 3, min: 0, max: 3600 },
+        speakerTimerPausedByView: { type: Boolean, default: false },
         drawWinnerId: String, drawStartedAt: Date, drawRevealsAt: Date,
       }, { _id: false }),
       default: () => ({}),

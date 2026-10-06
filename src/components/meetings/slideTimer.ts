@@ -20,7 +20,7 @@ export function getSlideTimer(meeting: SlideTimerMeeting, speakerId: string | un
     .findIndex(person => person.id === speakerId) + 1;
   const current = ["live", "paused"].includes(meeting.status) && meeting.speakers[meeting.currentIndex]?.id === speakerId;
   const start = meeting.speakerStartedAt ? Date.parse(meeting.speakerStartedAt) : NaN;
-  const running = current && meeting.status === "live" && Number.isFinite(start);
+  const running = current && meeting.status === "live" && Number.isFinite(start) && now >= start;
   const elapsed = current
     ? Math.max(0, meeting.elapsedSeconds || 0) + (running ? Math.max(0, (now - start) / 1000) : 0)
     : Math.max(0, speaker.spokenSeconds || 0);
