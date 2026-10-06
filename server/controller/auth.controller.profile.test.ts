@@ -13,6 +13,7 @@ vi.mock("../service/employee-document-resource.service", () => ({ employeeDocume
 vi.mock("../service/resource-indexing.service", () => ({ resourceIndexingService: {} }));
 import { authController } from "./auth.controller";
 import { PERMISSION_CODES } from "../config/permission-catalog";
+import { ConflictError } from "../errors/app-error";
 
 let storedUser: Record<string, unknown>;
 function response() {
@@ -57,6 +58,14 @@ it("keeps a legitimately empty effective permission set empty", async () => {
   const res = response();
   await authController.updateProfile(({ user: { id: "member-1" }, body: {} } as unknown as Parameters<typeof authController.updateProfile>[0]), ((res) as unknown as Parameters<typeof authController.updateProfile>[1]));
   expect(res.json.mock.calls[0][0].user.permissions).toEqual([]);
+});
+
+it("returns a conflict when the requested email already belongs to another account", async () => {
+  deps.updateProfile.mockRejectedValueOnce(new ConflictError("CONFLICT", "Địa chỉ email này đã được sử dụng cho một tài khoản khác."));
+  const res = response();
+  await authController.updateProfile(({ user: { id: "member-1" }, body: { email: "used@example.com" } } as unknown as Parameters<typeof authController.updateProfile>[0]), ((res) as unknown as Parameters<typeof authController.updateProfile>[1]));
+  expect(res.status).toHaveBeenCalledWith(409);
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: "error", message: "Địa chỉ email này đã được sử dụng cho một tài khoản khác." }));
 });
 
 it("finalizes cover uploads for the authenticated member without losing access rights", async () => {

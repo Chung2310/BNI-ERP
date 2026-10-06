@@ -2,9 +2,9 @@
 import React from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-const mocks = vi.hoisted(() => ({ updateUser: vi.fn().mockResolvedValue({}), success: vi.fn(), error: vi.fn() }));
+const mocks = vi.hoisted(() => ({ updateUser: vi.fn().mockResolvedValue({}), success: vi.fn(), error: vi.fn(), warning: vi.fn() }));
 vi.mock("../../services/authService", () => ({ authService: { updateUser: mocks.updateUser }, getAccessToken: () => "test-token" }));
-vi.mock("../../pages/Toast", () => ({ toast: { success: mocks.success, error: mocks.error } }));
+vi.mock("../../pages/Toast", () => ({ toast: { success: mocks.success, error: mocks.error, warning: mocks.warning } }));
 vi.mock("./MemberMessageButton", () => ({ default: () => null }));
 import OrgChartTab from "./OrgChartTab";
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
@@ -16,9 +16,10 @@ it("keeps viewing and editing member profile fields after removing ERP fields", 
   fireEvent.click(screen.getByRole("button", { name: "Xem hồ sơ Nguyễn An" }));
   fireEvent.click(await screen.findByRole("button", { name: "Chỉnh sửa thông tin" }));
   fireEvent.change(screen.getByDisplayValue("Nguyễn An"), { target: { value: "Nguyễn An mới" } });
+  fireEvent.change(screen.getByRole("textbox", { name: /Email/ }), { target: { value: "  AN.MOI@EXAMPLE.TEST  " } });
   fireEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
   await waitFor(() => expect(mocks.updateUser).toHaveBeenCalledOnce());
-  expect(mocks.updateUser.mock.calls[0][1]).toMatchObject({ displayName: "Nguyễn An mới", companyName: "Công ty An", industry: "Công nghệ", phone: "0901234567" });
+  expect(mocks.updateUser.mock.calls[0][1]).toMatchObject({ displayName: "Nguyễn An mới", email: "an.moi@example.test", companyName: "Công ty An", industry: "Công nghệ", phone: "0901234567" });
   for (const key of ["jobTitle", "department", "division", "level", "qualification", "isLeader"]) expect(mocks.updateUser.mock.calls[0][1]).not.toHaveProperty(key);
   await waitFor(() => expect(mocks.success).toHaveBeenCalled());
 });

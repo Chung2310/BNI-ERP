@@ -95,6 +95,10 @@ export const loginSchema = {
 
 const updateProfileSchema = {
   body: Joi.object({
+    email: Joi.string().trim().lowercase().pattern(emailRegex).max(254).optional().messages({
+      "string.pattern.base": "Địa chỉ email không đúng định dạng.",
+      "string.max": "Địa chỉ email không được vượt quá 254 ký tự.",
+    }),
     displayName: Joi.string().optional().messages({
       "string.empty": "Tên hiển thị không được để trống.",
     }),

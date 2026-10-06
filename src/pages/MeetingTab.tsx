@@ -540,6 +540,8 @@ function MeetingWorkspace() {
     const startsTime = formStart.slice(11, 16) || originalStart.slice(11, 16);
     const seed: MeetingSeriesBulkEditSeed = {
       location: editLocation,
+      gpsPoint: editGpsPoint,
+      gpsRadiusMeters: editGpsRadiusMeters,
       coverImage: editCoverImage,
       startsTime,
       durationMinutes,

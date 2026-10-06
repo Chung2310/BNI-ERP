@@ -1,5 +1,6 @@
 const SELF_SERVICE_PROFILE_FIELDS = [
   "displayName",
+  "email",
   "photoURL",
   "coverImage",
   "industry",

@@ -36,7 +36,7 @@ export const MODULE_OPTIONS = [
  */
 export const MODULE_READ_PERMISSIONS: Partial<Record<TabType, string[]>> = {
   "TỔNG QUAN": ["dashboard:read", "meetings:read", "meetings:manage"],
-  "BẢNG XẾP HẠNG": ["dashboard:read"],
+  "BẢNG XẾP HẠNG": ["dashboard:read", "meetings:read", "meetings:manage"],
   "CUỘC HỌP": ["meetings:read", "meetings:manage"],
   "NHÂN SỰ": ["hr:read", "access:read", "work:read"],
   "QUẢN LÝ TÀI NGUYÊN": ["resource:read"],

@@ -229,7 +229,7 @@ export async function bulkUpdateMeetingSeries(companyCode: string, id: string, i
   const changes = input.changes;
   const updates = selected.map((item: any) => {
     const set: Record<string, unknown> = {};
-    for (const key of ['location', 'coverImage', 'tiers', 'fallbackSeconds'] as const) {
+    for (const key of ['location', 'latitude', 'longitude', 'gpsRadiusMeters', 'coverImage', 'tiers', 'fallbackSeconds'] as const) {
       if (changes[key] !== undefined) set[key] = changes[key];
     }
     if (item.status === 'scheduled' && (changes.tiers !== undefined || changes.fallbackSeconds !== undefined)) {
@@ -250,7 +250,8 @@ export async function bulkUpdateMeetingSeries(companyCode: string, id: string, i
       if (changes.durationMinutes !== undefined) set.endsAt = new Date(new Date(item.startsAt).getTime() + changes.durationMinutes * 60000);
     }
 
-    const qrChanged = changes.startsTime !== undefined || changes.durationMinutes !== undefined;
+    const qrChanged = changes.startsTime !== undefined || changes.durationMinutes !== undefined
+      || changes.latitude !== undefined || changes.longitude !== undefined || changes.gpsRadiusMeters !== undefined;
     return {
       updateOne: {
         filter: { _id: item._id, companyCode, seriesId: anchor.seriesId, status: 'scheduled', __v: item.__v },
