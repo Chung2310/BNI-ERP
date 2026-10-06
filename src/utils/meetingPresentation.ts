@@ -1,4 +1,4 @@
-export const PRESENTATION_VIEWS = ["checkin", "speaker", "luckyDraw", "activeMembers", "waiting"] as const;
+export const PRESENTATION_VIEWS = ["checkin", "speaker", "luckyDraw", "activeMembers", "audienceResponses", "waiting"] as const;
 export type PresentationView = typeof PRESENTATION_VIEWS[number];
 export type MeetingPresentationState = {
   view: PresentationView;

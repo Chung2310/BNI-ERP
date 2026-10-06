@@ -86,6 +86,18 @@ export const extractLuckyWinners = (meeting: Meeting): LuckyDrawWinnerRecord[] =
   return result;
 };
 
+export const meetingCountsAbsences = (meeting: Pick<Meeting, "status">) =>
+  ["live", "paused", "ended"].includes(meeting.status);
+
+export const meetingAbsentCount = (
+  meeting: Pick<Meeting, "status" | "speakers">,
+  totalChapterMembers: number,
+) => {
+  if (!meetingCountsAbsences(meeting)) return 0;
+  const membersPresent = (meeting.speakers || []).filter(speaker => Boolean(speaker.userId)).length;
+  return Math.max(0, totalChapterMembers - membersPresent);
+};
+
 export function LuckyWinnersTable({
   winners,
   showMeetingInfo = false,
@@ -420,19 +432,15 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
 
     filteredMeetings.forEach((m) => {
       const speakers = m.speakers || [];
-      let meetingMembersCount = 0;
       speakers.forEach((s) => {
         totalAttendees += 1;
         if (s.userId) {
           totalMembersPresent += 1;
-          meetingMembersCount += 1;
         } else {
           totalGuests += 1;
         }
       });
-      // Absent count for this meeting
-      const meetingAbsent = Math.max(0, totalChapterMembersCount - meetingMembersCount);
-      totalMembersAbsent += meetingAbsent;
+      totalMembersAbsent += meetingAbsentCount(m, totalChapterMembersCount);
     });
 
     // Lucky draw winners across filtered meetings
@@ -527,7 +535,7 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
 
   // Absent members list for active single meeting
   const singleMeetingAbsentMembers = useMemo(() => {
-    if (!activeSingleMeeting) return [];
+    if (!activeSingleMeeting || !meetingCountsAbsences(activeSingleMeeting)) return [];
     const presentUserIds = new Set<string>();
     const presentNames = new Set<string>();
 
@@ -604,7 +612,7 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
       const speakers = m.speakers || [];
       const membersPresent = speakers.filter((s) => Boolean(s.userId)).length;
       const guests = speakers.length - membersPresent;
-      const membersAbsent = Math.max(0, totalChapterMembersCount - membersPresent);
+      const membersAbsent = meetingAbsentCount(m, totalChapterMembersCount);
       const dateStr = new Date(m.startsAt).toLocaleDateString("vi-VN", {
         day: "2-digit",
         month: "2-digit",
@@ -1367,7 +1375,7 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
                     const speakers = m.speakers || [];
                     const memberCount = speakers.filter((s) => Boolean(s.userId)).length;
                     const guestCount = speakers.length - memberCount;
-                    const absentCount = Math.max(0, totalChapterMembersCount - memberCount);
+                    const absentCount = meetingAbsentCount(m, totalChapterMembersCount);
                     const guestRatio = speakers.length > 0 ? Math.round((guestCount / speakers.length) * 100) : 0;
                     const luckyCount = extractLuckyWinners(m).length;
 
