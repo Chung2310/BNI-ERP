@@ -28,6 +28,7 @@ import { getEffectivePermissions } from "../middleware/auth";
 import { profileResourceService } from "../service/profile-resource.service";
 import { employeeDocumentResourceService } from "../service/employee-document-resource.service";
 import { resourceIndexingService } from "../service/resource-indexing.service";
+import { normalizeError } from "../errors/normalize-error";
 
 /** Redirect URI cho OAuth Google Drive (khớp Google Cloud Console). */
 function buildDriveRedirectUri(req: Request): string {
@@ -345,10 +346,11 @@ export const authController = {
       });
     } catch (error) {
       console.error("[Auth updateProfile] Error:", error);
-      return res.status(500).json({
+      const normalizedError = normalizeError(error);
+      return res.status(normalizedError.status).json({
         status: "error",
-        message: "Không thể cập nhật hồ sơ người dùng",
-        details: error.message,
+        message: normalizedError.expose ? normalizedError.message : "Không thể cập nhật hồ sơ người dùng",
+        ...(normalizedError.details ? { details: normalizedError.details } : {}),
       });
     }
   },

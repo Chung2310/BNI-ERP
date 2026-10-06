@@ -10,7 +10,7 @@ import { normalizeCompanyModulesEvent, normalizeCompanyStatusEvent } from "./com
 
 export type ErpLoginOutcome = { status: "authenticated"; role?: string };
 
-type PersonalProfileDetails = Pick<UserProfile, "phone" | "birthDate" | "companyName" | "industry" | "coverImage"> & { coverUploadToken?: string };
+type PersonalProfileDetails = Pick<UserProfile, "email" | "phone" | "birthDate" | "companyName" | "industry" | "coverImage"> & { coverUploadToken?: string };
 
 interface AuthContextType {
   user: UserProfile | null;

@@ -3,11 +3,15 @@ import { ArrowLeft, ArrowRight, Check, X } from "lucide-react";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { MeetingCoverImageField } from "./MeetingCoverImageField";
 import { MeetingSpeakingTimeFields } from "./MeetingSpeakingTimeFields";
+import { MeetingLocationFields } from "./MeetingLocationFields";
 import { vietnamDateTime } from "../../utils/meetingRecurrence";
 import { speakingTimeSlotsForEdit, validateSpeakingTimeSlots, type SpeakingTimeSlot, type SpeakingTier } from "../../utils/meetingSpeakingTime";
 
 export type MeetingSeriesChanges = {
   location?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  gpsRadiusMeters?: number;
   startsTime?: string;
   durationMinutes?: number;
   coverImage?: string;
@@ -15,7 +19,7 @@ export type MeetingSeriesChanges = {
   fallbackSeconds?: number;
 };
 
-export type MeetingSeriesBulkEditField = "location" | "coverImage" | "startsTime" | "durationMinutes" | "speakingTime";
+export type MeetingSeriesBulkEditField = "location" | "gps" | "coverImage" | "startsTime" | "durationMinutes" | "speakingTime";
 
 type MeetingForBulkEdit = {
   _id: string;
@@ -23,6 +27,9 @@ type MeetingForBulkEdit = {
   startsAt: string;
   endsAt?: string;
   location?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  gpsRadiusMeters?: number;
   coverImage?: string;
   tiers?: SpeakingTier[];
   fallbackSeconds?: number;
@@ -30,6 +37,8 @@ type MeetingForBulkEdit = {
 
 export type MeetingSeriesBulkEditSeed = {
   location: string;
+  gpsPoint: { latitude: number; longitude: number } | null;
+  gpsRadiusMeters: number;
   startsTime: string;
   durationMinutes: number;
   coverImage: string;
@@ -50,6 +59,9 @@ type MeetingSeriesBulkEditDialogProps = {
 
 const changeLabels: Record<keyof MeetingSeriesChanges, string> = {
   location: "\u0110\u1ecba \u0111i\u1ec3m",
+  latitude: "Tọa độ GPS",
+  longitude: "Tọa độ GPS",
+  gpsRadiusMeters: "Bán kính GPS",
   startsTime: "Gi\u1edd b\u1eaft \u0111\u1ea7u",
   durationMinutes: "Th\u1eddi l\u01b0\u1ee3ng bu\u1ed5i h\u1ecdp",
   coverImage: "\u1ea2nh b\u00eca",
@@ -87,14 +99,24 @@ export function MeetingSeriesBulkEditDialog({ meeting, meetings, seed, loading, 
       ? Math.max(1, Math.round((new Date(meeting.endsAt).getTime() - new Date(meeting.startsAt).getTime()) / 60000))
       : 120;
     const originalTiers = speakingTimeSlotsForEdit(meeting.tiers);
+    const originalGpsPoint = typeof meeting.latitude === "number" && typeof meeting.longitude === "number"
+      ? { latitude: meeting.latitude, longitude: meeting.longitude }
+      : null;
 
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(values.startsTime)) { setError("Vui l\u00f2ng nh\u1eadp gi\u1edd b\u1eaft \u0111\u1ea7u h\u1ee3p l\u1ec7."); return; }
     if (!Number.isInteger(values.durationMinutes) || values.durationMinutes < 1 || values.durationMinutes > 1440) { setError("Th\u1eddi l\u01b0\u1ee3ng ph\u1ea3i t\u1eeb 1 ph\u00fat \u0111\u1ebfn 1440 ph\u00fat."); return; }
+    if (values.gpsPoint && (!Number.isFinite(values.gpsPoint.latitude) || Math.abs(values.gpsPoint.latitude) > 90 || !Number.isFinite(values.gpsPoint.longitude) || Math.abs(values.gpsPoint.longitude) > 180)) { setError("Tọa độ GPS không hợp lệ."); return; }
+    if (!Number.isInteger(values.gpsRadiusMeters) || values.gpsRadiusMeters < 50 || values.gpsRadiusMeters > 5000) { setError("Bán kính GPS phải từ 50 đến 5000 mét."); return; }
     const slotError = validateSpeakingTimeSlots(values.tiers);
     if (slotError) { setError(slotError); return; }
     if (!Number.isInteger(values.fallbackSeconds) || values.fallbackSeconds < 1 || values.fallbackSeconds > 3600) { setError("Th\u1eddi l\u01b0\u1ee3ng ph\u00e1t bi\u1ec3u ngo\u00e0i khung ph\u1ea3i t\u1eeb 1 \u0111\u1ebfn 3600 gi\u00e2y."); return; }
 
     if (values.location !== (meeting.location || "")) next.location = values.location;
+    if (values.gpsPoint?.latitude !== originalGpsPoint?.latitude || values.gpsPoint?.longitude !== originalGpsPoint?.longitude) {
+      next.latitude = values.gpsPoint?.latitude ?? null;
+      next.longitude = values.gpsPoint?.longitude ?? null;
+    }
+    if (values.gpsRadiusMeters !== (meeting.gpsRadiusMeters || 200)) next.gpsRadiusMeters = values.gpsRadiusMeters;
     if (values.coverImage !== (meeting.coverImage || "")) next.coverImage = values.coverImage;
     if (values.startsTime !== originalStart.slice(11, 16)) next.startsTime = values.startsTime;
     if (values.durationMinutes !== originalDuration) next.durationMinutes = values.durationMinutes;
@@ -131,6 +153,10 @@ export function MeetingSeriesBulkEditDialog({ meeting, meetings, seed, loading, 
             &#272;&#7883;a &#273;i&#7875;m / Link h&#7885;p
             <input value={values.location} disabled={saving} onChange={event => updateValue("location", event.target.value)} maxLength={500} className="mt-2 w-full rounded-lg border border-slate-200 bg-white p-2 font-normal disabled:bg-slate-50 disabled:text-slate-400" />
           </label>
+          <div className="sm:col-span-2">
+            <MeetingLocationFields value={values.gpsPoint} onChange={value => updateValue("gpsPoint", value)} radius={values.gpsRadiusMeters} onRadiusChange={value => updateValue("gpsRadiusMeters", value)} />
+            <p className="mt-1 text-[10px] text-slate-500">Để trống cả vĩ độ và kinh độ nếu muốn xóa GPS khỏi các buổi đã chọn.</p>
+          </div>
           <div className="rounded-xl border border-slate-200 p-3"><MeetingCoverImageField value={values.coverImage} disabled={saving} onChange={value => updateValue("coverImage", value)} /></div>
           <label className="rounded-xl border border-slate-200 p-3 text-xs font-bold text-slate-800">
             Gi&#7901; b&#7855;t &#273;&#7847;u

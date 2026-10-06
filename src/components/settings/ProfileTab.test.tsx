@@ -24,13 +24,13 @@ afterEach(cleanup);
 it("saves personal and business fields with a date-only birthday and no account privileges", async () => {
   render(<ProfileTab />);
   fireEvent.change(screen.getByLabelText("Họ và Tên *"), { target: { value: "  Nguyễn Bình  " } });
+  fireEvent.change(screen.getByLabelText("Địa chỉ Email *"), { target: { value: "  BINH@EXAMPLE.COM  " } });
   fireEvent.change(screen.getByLabelText("Số điện thoại"), { target: { value: "0912345678" } });
   fireEvent.change(screen.getByLabelText("Tên doanh nghiệp"), { target: { value: "  Công ty Bình  " } });
   fireEvent.change(screen.getByLabelText("Ngành nghề"), { target: { value: "  Dịch vụ  " } });
-  expect((screen.getByLabelText("Địa chỉ Email (Không được đổi)") as HTMLInputElement).disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
   await waitFor(() => expect(auth.updateProfileInfo).toHaveBeenCalledWith("Nguyễn Bình", "/avatar.png", {
-    phone: "0912345678", companyName: "Công ty Bình", industry: "Dịch vụ", birthDate: "1990-05-20", coverImage: "",
+    email: "binh@example.com", phone: "0912345678", companyName: "Công ty Bình", industry: "Dịch vụ", birthDate: "1990-05-20", coverImage: "",
   }));
 });
 
@@ -45,7 +45,7 @@ it("allows clearing optional information and restoring the saved profile", async
   fireEvent.click(screen.getByRole("button", { name: "Xóa ngày đã chọn" }));
   fireEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
   await waitFor(() => expect(auth.updateProfileInfo).toHaveBeenCalledWith("Nguyễn An", "/avatar.png", {
-    phone: "", companyName: "", industry: "", birthDate: "", coverImage: "",
+    email: "an@example.com", phone: "", companyName: "", industry: "", birthDate: "", coverImage: "",
   }));
 });
 
@@ -81,6 +81,13 @@ it("rejects blank names and future birthdays before saving", () => {
   expect(auth.updateProfileInfo).not.toHaveBeenCalled();
   auth.userProfile = { ...auth.userProfile, uid: "member-future", birthDate: "2999-01-01" };
   view.rerender(<ProfileTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
+  expect(auth.updateProfileInfo).not.toHaveBeenCalled();
+});
+
+it("rejects an invalid email before saving", () => {
+  render(<ProfileTab />);
+  fireEvent.change(screen.getByLabelText("Địa chỉ Email *"), { target: { value: "email-khong-hop-le" } });
   fireEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
   expect(auth.updateProfileInfo).not.toHaveBeenCalled();
 });
