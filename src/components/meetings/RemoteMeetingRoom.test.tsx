@@ -58,6 +58,12 @@ it("publishes view selection and keeps the phone outside fullscreen", async () =
   expect(full).not.toHaveBeenCalled();
   Reflect.deleteProperty(HTMLElement.prototype, "requestFullscreen");
 });
+it("offers immediate automatic advancement without a delay setting", async () => {
+  render(<RemoteMeetingRoom meetingId="m" mode="control" />);
+  await screen.findByText("Đang chiếu: speaker");
+  expect(screen.queryByText(/Thời gian chờ chuyển lượt/)).toBeNull();
+  expect(screen.getByText(/chuyển ngay sang người tiếp theo/)).toBeTruthy();
+});
 it("selects the next available prize automatically so the organizer can start with one tap", async () => {
   snapshot.meeting.luckyDraw = {
     enabled: true, allowRepeatWinners: false, drawMode: "attendees", numberMin: 1, numberMax: 100,

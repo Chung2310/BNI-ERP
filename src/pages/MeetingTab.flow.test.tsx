@@ -367,7 +367,7 @@ it("shows server-completed speeches without sending another automatic control co
 });
 
 
-it("launches the current profile from MC controls and explains the post-speech delay", async () => {
+it("launches the current profile from MC controls without a post-speech delay", async () => {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as unknown as Parameters<((value: ReturnType<typeof HTMLCanvasElement.prototype.getContext>) => void)>[0]));
   const people = [
     { id: "first", kind: "member", name: "Người đầu tiên", company: "", seconds: 30 },
@@ -380,7 +380,8 @@ it("launches the current profile from MC controls and explains the post-speech d
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
   fireEvent.click(screen.getByRole("tab", { name: "Thuyết trình" }));
-  expect((screen.getByLabelText("Số giây chờ chuyển slide sau khi hết giờ") as HTMLInputElement).value).toBe("3");
+  expect(screen.queryByLabelText("Số giây chờ chuyển slide sau khi hết giờ")).toBeNull();
+  expect(screen.getByText("Hết giờ → chuyển ngay người & slide")).toBeTruthy();
   const requestFullscreen = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(document.documentElement, "requestFullscreen", { configurable: true, value: requestFullscreen });
   fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
@@ -496,37 +497,27 @@ it.each(["live", "paused"])("shows the check-in list and explains unavailable pr
 });
 
 
-it.each([0, 3, 150])("persists slide delay %s without a second browser auto-advance timer", async delay => {
+it("does not expose a slide delay or create a second browser auto-advance timer", async () => {
   vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
   let item = { ...meeting, status: "live", currentIndex: 0, speakerStartedAt: new Date().toISOString(),
     presentation: { view: "speaker", autoAdvance: true, autoAdvanceDelay: 3 },
     speakers: [{ id: "first", name: "First", seconds: 30 }, { id: "second", name: "Second", seconds: 20 }] };
-  const fetchMock = vi.fn(async (url, options) => {
-    if (String(url).endsWith("/presentation-state")) {
-      const { version, ...state } = JSON.parse(options.body);
-      expect(version).toBe(item.__v);
-      item = { ...item, presentation: { ...item.presentation, ...state }, __v: item.__v + 1 };
-      return { ok: true, json: async () => ({ data: item }) };
-    }
-    return { ok: true, json: async () => ({ data: [item] }) };
-  });
+  const fetchMock = vi.fn(async (url) => ({ ok: true, json: async () => ({
+    data: String(url).endsWith("/slides")
+      ? { slides: item.speakers, version: item.__v }
+      : String(url).endsWith("/a")
+        ? item
+        : [item],
+  }) }));
   vi.stubGlobal("fetch", fetchMock);
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(), fillText: vi.fn() } as any);
-  render(<MeetingTab />);
-  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
-  fireEvent.click(screen.getByRole("tab", { name: "Thuyết trình" }));
-  fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
-  await screen.findByText("Đầu tiên");
-
   try {
     render(<MeetingTab />);
     fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
     fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
-    const field = screen.getByLabelText("Số giây chờ chuyển slide sau khi hết giờ");
-    fireEvent.change(field, { target: { value: String(delay) } });
-    await waitFor(() => expect(item.presentation.autoAdvanceDelay).toBe(delay));
-    await act(async () => { vi.advanceTimersByTime((31 + delay) * 1000); });
+    fireEvent.click(screen.getByRole("tab", { name: "Thuyết trình" }));
+    expect(screen.queryByLabelText("Số giây chờ chuyển slide sau khi hết giờ")).toBeNull();
+    await act(async () => { vi.advanceTimersByTime(31_000); });
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/control"))).toHaveLength(0);
     expect(item.currentIndex).toBe(0);
   } finally { vi.useRealTimers(); }
