@@ -9,7 +9,7 @@ export const presentationStateInput = Joi.object({
 }).or("view", "autoAdvance", "autoAdvanceDelay");
 export const meetingInteractionInput = Joi.object({
   question: Joi.string().trim().min(1).max(300).required(),
-  durationSeconds: Joi.number().integer().min(10).max(3600).default(60),
+  durationSeconds: Joi.number().integer().min(1).max(3600).default(60),
   requireName: Joi.boolean().default(true),
   showNames: Joi.boolean().default(true),
   moderationEnabled: Joi.boolean().default(true),
