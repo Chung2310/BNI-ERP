@@ -8,7 +8,7 @@ import { meetingInteractionService, type MeetingInteractionQuestion, type Meetin
 import { socketService } from "../../services/socketService";
 
 const emptyState: MeetingInteractionState = { session: null, responses: [] };
-type InteractionSettings = { durationSeconds: number; requireName: boolean; showNames: boolean; moderationEnabled: boolean; allowMultipleResponses: boolean };
+type InteractionSettings = { durationSeconds: number | ""; requireName: boolean; showNames: boolean; moderationEnabled: boolean; allowMultipleResponses: boolean };
 
 const statusLabel: Record<MeetingInteractionResponseStatus, string> = { pending: "Chờ duyệt", approved: "Đang hiển thị", hidden: "Đã ẩn", rejected: "Đã từ chối" };
 
@@ -79,7 +79,12 @@ export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: 
     setSettingsOpen(true);
   };
   const applySettings = async () => {
-    setDurationSeconds(settingsDraft.durationSeconds);
+    const parsedDuration = Number(settingsDraft.durationSeconds);
+    if (!Number.isInteger(parsedDuration) || parsedDuration <= 0 || parsedDuration > 3600) {
+      setSettingsError("Vui lòng nhập thời gian hợp lệ từ 1 đến 3600 giây.");
+      return;
+    }
+    setDurationSeconds(parsedDuration);
     setRequireName(settingsDraft.requireName);
     setShowNames(settingsDraft.showNames);
     setModerationEnabled(settingsDraft.moderationEnabled);
@@ -89,7 +94,7 @@ export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: 
     if (changesQuestion && !window.confirm("Đổi câu hỏi sẽ xóa các câu trả lời hiện tại. Bạn có muốn tiếp tục?")) return;
     setBusy("settings"); setSettingsError("");
     try {
-      apply(await meetingInteractionService.save(meeting._id, { question: question.trim(), ...settingsDraft }));
+      apply(await meetingInteractionService.save(meeting._id, { question: question.trim(), ...settingsDraft, durationSeconds: parsedDuration }));
       setSettingsOpen(false);
     } catch (err) { setSettingsError(err instanceof Error ? err.message : "Không thể lưu cấu hình."); }
     finally { setBusy(""); }
@@ -207,7 +212,7 @@ export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: 
           <div><h4 id="interaction-settings-title" className="text-lg font-bold text-slate-900">Cấu hình bài tương tác</h4><p className="mt-1 text-sm text-slate-500">Cấu hình này áp dụng chung cho tất cả câu hỏi trong bài.</p></div>
           <button type="button" aria-label="Đóng cấu hình" onClick={() => setSettingsOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button>
         </div>
-        <div className="mt-5 rounded-xl border border-slate-200 p-3"><label htmlFor="interaction-duration" className="flex items-center justify-between gap-4 text-sm font-semibold text-slate-800"><span><span className="block">Thời gian trả lời</span><span className="mt-0.5 block text-xs font-normal text-slate-500">Áp dụng chung cho toàn bộ câu hỏi, tính từ lúc mở nhận.</span></span><span className="flex items-center gap-2"><input id="interaction-duration" type="number" min={10} max={3600} value={settingsDraft.durationSeconds} onChange={event => setSettingsDraft(current => ({ ...current, durationSeconds: Math.max(10, Math.min(3600, Number(event.target.value) || 10)) }))} className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-right" /><span className="text-xs text-slate-500">giây</span></span></label></div>
+        <div className="mt-5 rounded-xl border border-slate-200 p-3"><label htmlFor="interaction-duration" className="flex items-center justify-between gap-4 text-sm font-semibold text-slate-800"><span><span className="block">Thời gian trả lời</span><span className="mt-0.5 block text-xs font-normal text-slate-500">Áp dụng chung cho toàn bộ câu hỏi, tính từ lúc mở nhận.</span></span><span className="flex items-center gap-2"><input id="interaction-duration" type="number" max={3600} value={settingsDraft.durationSeconds} onChange={event => setSettingsDraft(current => ({ ...current, durationSeconds: event.target.value === "" ? "" : Number(event.target.value) }))} className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-right" /><span className="text-xs text-slate-500">giây</span></span></label></div>
         <div className="mt-3 space-y-3">
           <Option checked={settingsDraft.requireName} disabled={editingLocked} onChange={value => setSettingsDraft(current => ({ ...current, requireName: value }))} label="Yêu cầu người tham dự nhập tên" description="Tên được lưu cùng câu trả lời để người điều hành nhận biết." />
           <Option checked={settingsDraft.showNames} disabled={editingLocked} onChange={value => setSettingsDraft(current => ({ ...current, showNames: value }))} label="Cho phép hiển thị tên" description="Dùng khi chuyển sang kiểu trình chiếu có kèm tên người gửi." />
