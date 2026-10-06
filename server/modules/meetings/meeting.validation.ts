@@ -9,10 +9,14 @@ export const presentationStateInput = Joi.object({
 }).or("view", "autoAdvance", "autoAdvanceDelay");
 export const meetingInteractionInput = Joi.object({
   question: Joi.string().trim().min(1).max(300).required(),
+  durationSeconds: Joi.number().integer().min(10).max(3600).default(60),
   requireName: Joi.boolean().default(true),
   showNames: Joi.boolean().default(true),
   moderationEnabled: Joi.boolean().default(true),
   allowMultipleResponses: Joi.boolean().default(false),
+});
+export const meetingInteractionQuestionInput = Joi.object({
+  question: Joi.string().trim().min(1).max(300).required(),
 });
 export const meetingInteractionStatusInput = Joi.object({ status: Joi.string().valid("open", "closed").required() });
 export const meetingInteractionModerationInput = Joi.object({ status: Joi.string().valid("approved", "hidden", "rejected").required() });
