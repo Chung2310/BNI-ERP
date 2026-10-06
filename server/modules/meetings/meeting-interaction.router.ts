@@ -7,7 +7,10 @@ import { getPublicMeetingInteraction, submitMeetingInteractionResponse } from ".
 const responseInput = Joi.object({
   participantId: Joi.string().trim().min(8).max(100).required(),
   name: Joi.string().trim().max(150).allow(""),
-  answer: Joi.string().trim().min(1).max(200).required(),
+  answers: Joi.array().items(Joi.object({
+    questionId: Joi.string().trim().min(1).max(100).required(),
+    answer: Joi.string().trim().min(1).max(200).required(),
+  })).min(1).max(20).unique("questionId").required(),
 });
 
 export const meetingInteractionPublicRouter = Router();
