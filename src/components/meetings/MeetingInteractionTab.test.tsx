@@ -41,10 +41,13 @@ it("opens settings in a popup and saves duration and options inside it", async (
   expect(await screen.findByRole("button", { name: "Cấu hình" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Lưu cấu hình" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Cấu hình" }));
-  fireEvent.change(screen.getByRole("spinbutton", { name: /Thời gian trả lời/ }), { target: { value: "90" } });
+  const durationInput = screen.getByRole("spinbutton", { name: /Thời gian trả lời/ }) as HTMLInputElement;
+  fireEvent.change(durationInput, { target: { value: "" } });
+  expect(durationInput.value).toBe("");
+  fireEvent.change(durationInput, { target: { value: "5" } });
   fireEvent.click(screen.getByRole("checkbox", { name: /Cho phép gửi nhiều lần/ }));
   fireEvent.click(screen.getByRole("button", { name: "Lưu cấu hình" }));
-  await waitFor(() => expect(meetingInteractionService.save).toHaveBeenCalledWith("m", expect.objectContaining({ durationSeconds: 90, allowMultipleResponses: true })));
+  await waitFor(() => expect(meetingInteractionService.save).toHaveBeenCalledWith("m", expect.objectContaining({ durationSeconds: 5, allowMultipleResponses: true })));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Cấu hình bài tương tác" })).toBeNull());
 });
 

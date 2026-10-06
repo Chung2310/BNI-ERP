@@ -13,7 +13,7 @@ const meetingInteraction = new Schema({
   question: { type: String, required: true, maxlength: 300 },
   questions: { type: [interactionQuestion], default: [] },
   activeQuestionId: String,
-  durationSeconds: { type: Number, required: true, min: 10, max: 3600, default: 60 },
+  durationSeconds: { type: Number, required: true, min: 1, max: 3600, default: 60 },
   status: { type: String, enum: ["draft", "open", "closed"], default: "draft", index: true },
   tokenHash: { type: String, required: true, unique: true, select: false },
   tokenEncrypted: { type: String, required: true, select: false },

@@ -18,7 +18,7 @@ it("validates interaction configuration and management actions", () => {
   });
   expect(meetingInteractionInput.validate({ question: "" }).error).toBeDefined();
   expect(meetingInteractionInput.validate({ question: "x".repeat(301) }).error).toBeDefined();
-  expect(meetingInteractionInput.validate({ question: "Câu hỏi", durationSeconds: 9 }).error).toBeDefined();
+  expect(meetingInteractionInput.validate({ question: "Câu hỏi", durationSeconds: 0 }).error).toBeDefined();
   expect(meetingInteractionQuestionInput.validate({ question: "Câu tiếp theo" }).value).toEqual({ question: "Câu tiếp theo" });
   expect(meetingInteractionQuestionInput.validate({ question: "Câu tiếp theo", durationSeconds: 60 }).error).toBeDefined();
   expect(meetingInteractionStatusInput.validate({ status: "open" }).error).toBeUndefined();
