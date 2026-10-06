@@ -16,7 +16,7 @@ it("keeps viewing and editing member profile fields after removing ERP fields", 
   fireEvent.click(screen.getByRole("button", { name: "Xem hồ sơ Nguyễn An" }));
   fireEvent.click(await screen.findByRole("button", { name: "Chỉnh sửa thông tin" }));
   fireEvent.change(screen.getByDisplayValue("Nguyễn An"), { target: { value: "Nguyễn An mới" } });
-  fireEvent.change(screen.getByRole("textbox", { name: "Email" }), { target: { value: "  AN.MOI@EXAMPLE.TEST  " } });
+  fireEvent.change(screen.getByRole("textbox", { name: /Email/ }), { target: { value: "  AN.MOI@EXAMPLE.TEST  " } });
   fireEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
   await waitFor(() => expect(mocks.updateUser).toHaveBeenCalledOnce());
   expect(mocks.updateUser.mock.calls[0][1]).toMatchObject({ displayName: "Nguyễn An mới", email: "an.moi@example.test", companyName: "Công ty An", industry: "Công nghệ", phone: "0901234567" });
