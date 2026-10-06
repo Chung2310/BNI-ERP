@@ -7,6 +7,11 @@ export const presentationStateInput = Joi.object({
   autoAdvance: Joi.boolean(),
   autoAdvanceDelay: Joi.number().integer().min(0).max(3600),
 }).or("view", "autoAdvance", "autoAdvanceDelay");
+export const presentationStartInput = Joi.object({
+  version: Joi.number().integer().min(0).required(),
+  speakerId: Joi.string().trim().max(150).required(),
+  autoAdvance: Joi.boolean(),
+});
 export const presentationDrawInput = Joi.object({
   version: Joi.number().integer().min(0).required(),
   prizeId: Joi.string().max(100).required(),

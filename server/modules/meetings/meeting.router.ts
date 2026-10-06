@@ -31,7 +31,7 @@ import {
 } from './meeting.service';
 import { recurringMeetingInput, checkinInput, controlInput, meetingInput, updateMeetingInput, bulkUpdateMeetingSeriesInput, slideProfileInput, gameWinnerInput } from './meeting.validation';
 import { updatePresentationState } from './meeting-presentation.service';
-import { presentationStateInput, presentationDrawInput } from './meeting.validation';
+import { presentationStateInput, presentationStartInput, presentationDrawInput } from './meeting.validation';
 import { buildMeetingSlides, getMeetingSlides, updateMeetingSlide } from './meeting-slides.service';
 
 
@@ -209,11 +209,12 @@ meetingRouter.post('/:id/checkin', requirePermission(['meetings:read', 'meetings
 });
 
 meetingRouter.post('/:id/presentation', manage, async (req, res) => {
-  if (typeof req.body?.speakerId !== 'string' || !req.body.speakerId) return res.status(400).json({ message: 'Chọn người thuyết trình.' });
+  const { error, value } = presentationStartInput.validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
   try {
     const item = await getMeeting(company(req), req.params.id);
-    assertVersion(item, req.body.version);
-    res.json({ data: await startMeetingPresentation(item, req.body.speakerId) });
+    assertVersion(item, value.version);
+    res.json({ data: await startMeetingPresentation(item, value.speakerId, undefined, { autoAdvance: value.autoAdvance }) });
   } catch (e) { sendError(res, e); }
 });
 

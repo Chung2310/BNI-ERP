@@ -201,6 +201,12 @@ test("presentation starts the selected guest with their allocated time", async (
   assert.equal(item.currentIndex, 2); assert.equal(item.speakerStartedAt, now); assert.equal(item.elapsedSeconds, 0);
   assert.equal(item.speakers[2].seconds, 20); assert.equal(item.speakers[0].spokenSeconds, 30);
 });
+test("presentation can atomically enable automatic speaker advancement", async () => {
+  const item = meeting(); item.presentation.autoAdvance = false;
+  await startMeetingPresentation((item as unknown as Parameters<typeof startMeetingPresentation>[0]), "chair", now, { autoAdvance: true });
+  assert.equal(item.presentation.autoAdvance, true);
+  assert.equal(item.presentation.view, "speaker");
+});
 test("scheduled presentation starts selected person and rejects invalid or ended selections", async () => {
   const item = meeting(); item.status = "scheduled"; item.currentIndex = -1;
   await startMeetingPresentation((item as unknown as Parameters<typeof startMeetingPresentation>[0]), "chair", now);

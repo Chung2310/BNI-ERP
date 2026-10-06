@@ -78,8 +78,10 @@ export const extractLuckyWinners = (meeting: Meeting): LuckyDrawWinnerRecord[] =
     });
   });
   for (const w of meeting.gameWinners || []) {
-    result.push({ ...w, source: w.source || "draw", meetingId: meeting._id,
-      meetingTitle: meeting.title, meetingDate: meeting.startsAt ? new Date(meeting.startsAt).toISOString() : "" });
+    result.push({
+      ...w, source: w.source || "draw", meetingId: meeting._id,
+      meetingTitle: meeting.title, meetingDate: meeting.startsAt ? new Date(meeting.startsAt).toISOString() : ""
+    });
   }
   return result;
 };
@@ -120,129 +122,129 @@ export function LuckyWinnersTable({
     <div className="space-y-3">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
-        <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
-          <tr>
-            <th className="py-2.5 px-3 w-10">STT</th>
-            <th className="py-2.5 px-3">Người trúng thưởng</th>
-            {showMeetingInfo && <th className="py-2.5 px-3">Cuộc họp</th>}
-            <th className="py-2.5 px-3">Loại hình</th>
-            <th className="py-2.5 px-3">Giải thưởng</th>
-            <th className="py-2.5 px-3">Phần quà / Giá trị</th>
-            <th className="py-2.5 px-3 text-center">Số vé</th>
-            <th className="py-2.5 px-3">Thời gian</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {paginatedWinners.map((w, idx) => {
-            const initial = (w.name || "?").trim().charAt(0).toUpperCase();
-            return (
-              <tr key={`${w.meetingId}-${w.source}-${w.id || idx}`} className="hover:bg-slate-50/70 transition-colors">
-                <td className="py-2.5 px-3 text-slate-400">{pageStart + idx + 1}</td>
-                <td className="py-2.5 px-3">
-                  <div className="flex items-center gap-2.5">
-                    {w.photoURL ? (
-                      <img
-                        src={w.photoURL}
-                        alt={w.name}
-                        className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = "none";
-                        }}
-                      />
-                    ) : (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 font-semibold text-amber-700 text-xs">
-                        {initial}
-                      </div>
-                    )}
-                    <div>
-                      <span className="font-semibold text-slate-800 block">{w.name}</span>
-                      {w.email && <span className="text-[11px] text-slate-400 block">{w.email}</span>}
-                    </div>
-                  </div>
-                </td>
-                {showMeetingInfo && (
+          <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+            <tr>
+              <th className="py-2.5 px-3 w-10">STT</th>
+              <th className="py-2.5 px-3">Người trúng thưởng</th>
+              {showMeetingInfo && <th className="py-2.5 px-3">Cuộc họp</th>}
+              <th className="py-2.5 px-3">Loại hình</th>
+              <th className="py-2.5 px-3">Giải thưởng</th>
+              <th className="py-2.5 px-3">Phần quà / Giá trị</th>
+              <th className="py-2.5 px-3 text-center">Số vé</th>
+              <th className="py-2.5 px-3">Thời gian</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {paginatedWinners.map((w, idx) => {
+              const initial = (w.name || "?").trim().charAt(0).toUpperCase();
+              return (
+                <tr key={`${w.meetingId}-${w.source}-${w.id || idx}`} className="hover:bg-slate-50/70 transition-colors">
+                  <td className="py-2.5 px-3 text-slate-400">{pageStart + idx + 1}</td>
                   <td className="py-2.5 px-3">
-                    {onSelectMeeting ? (
-                      <button
-                        onClick={() => onSelectMeeting(w.meetingId)}
-                        className="text-left font-medium text-rose-600 hover:underline max-w-[200px] truncate block cursor-pointer"
-                        title={w.meetingTitle}
-                      >
-                        {w.meetingTitle}
-                      </button>
+                    <div className="flex items-center gap-2.5">
+                      {w.photoURL ? (
+                        <img
+                          src={w.photoURL}
+                          alt={w.name}
+                          className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 font-semibold text-amber-700 text-xs">
+                          {initial}
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-semibold text-slate-800 block">{w.name}</span>
+                        {w.email && <span className="text-[11px] text-slate-400 block">{w.email}</span>}
+                      </div>
+                    </div>
+                  </td>
+                  {showMeetingInfo && (
+                    <td className="py-2.5 px-3">
+                      {onSelectMeeting ? (
+                        <button
+                          onClick={() => onSelectMeeting(w.meetingId)}
+                          className="text-left font-medium text-rose-600 hover:underline max-w-[200px] truncate block cursor-pointer"
+                          title={w.meetingTitle}
+                        >
+                          {w.meetingTitle}
+                        </button>
+                      ) : (
+                        <span className="font-medium text-slate-700 max-w-[200px] truncate block" title={w.meetingTitle}>
+                          {w.meetingTitle}
+                        </span>
+                      )}
+                      {w.meetingDate && (
+                        <span className="text-[11px] text-slate-400">
+                          {new Date(w.meetingDate).toLocaleDateString("vi-VN", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                          })}
+                        </span>
+                      )}
+                    </td>
+                  )}
+                  <td className="py-2.5 px-3 whitespace-nowrap">{drawSourceLabels[w.source]}</td>
+                  <td className="py-2.5 px-3 whitespace-nowrap">
+                    <span
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold border shadow-2xs"
+                      style={{
+                        backgroundColor: w.color ? `${w.color}15` : "#fef3c7",
+                        borderColor: w.color ? `${w.color}40` : "#fde68a",
+                        color: w.color || "#b45309",
+                      }}
+                    >
+                      <Award className="h-3 w-3" />
+                      {w.prizeName}
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-3 font-medium text-slate-700">
+                    {w.reward ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Gift className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                        <span>{w.reward}</span>
+                      </span>
                     ) : (
-                      <span className="font-medium text-slate-700 max-w-[200px] truncate block" title={w.meetingTitle}>
-                        {w.meetingTitle}
-                      </span>
-                    )}
-                    {w.meetingDate && (
-                      <span className="text-[11px] text-slate-400">
-                        {new Date(w.meetingDate).toLocaleDateString("vi-VN", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })}
-                      </span>
+                      <span className="text-slate-400 italic">Theo quy định BTC</span>
                     )}
                   </td>
-                )}
-                <td className="py-2.5 px-3 whitespace-nowrap">{drawSourceLabels[w.source]}</td>
-                <td className="py-2.5 px-3 whitespace-nowrap">
-                  <span
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold border shadow-2xs"
-                    style={{
-                      backgroundColor: w.color ? `${w.color}15` : "#fef3c7",
-                      borderColor: w.color ? `${w.color}40` : "#fde68a",
-                      color: w.color || "#b45309",
-                    }}
-                  >
-                    <Award className="h-3 w-3" />
-                    {w.prizeName}
-                  </span>
-                </td>
-                <td className="py-2.5 px-3 font-medium text-slate-700">
-                  {w.reward ? (
-                    <span className="inline-flex items-center gap-1">
-                      <Gift className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                      <span>{w.reward}</span>
-                    </span>
-                  ) : (
-                    <span className="text-slate-400 italic">Theo quy định BTC</span>
-                  )}
-                </td>
-                <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                  {w.ticketNumber !== undefined ? (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-700">
-                      <Ticket className="h-3 w-3 text-slate-400" />#{w.ticketNumber}
-                    </span>
-                  ) : (
-                    <span className="text-slate-400">-</span>
-                  )}
-                </td>
-                <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
-                  {w.wonAt ? (
-                    <div>
-                      <span className="block font-medium text-slate-700">
-                        {new Date(w.wonAt).toLocaleTimeString("vi-VN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                  <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                    {w.ticketNumber !== undefined ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-700">
+                        <Ticket className="h-3 w-3 text-slate-400" />#{w.ticketNumber}
                       </span>
-                      <span className="text-[10px] text-slate-400">
-                        {new Date(w.wonAt).toLocaleDateString("vi-VN", {
-                          day: "2-digit",
-                          month: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-slate-400">-</span>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
+                    ) : (
+                      <span className="text-slate-400">-</span>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
+                    {w.wonAt ? (
+                      <div>
+                        <span className="block font-medium text-slate-700">
+                          {new Date(w.wonAt).toLocaleTimeString("vi-VN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(w.wonAt).toLocaleDateString("vi-VN", {
+                            day: "2-digit",
+                            month: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400">-</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
         </table>
       </div>
       <div className="space-y-3 border-t border-slate-100 pt-3">
@@ -286,7 +288,7 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
   if (previousInputs1 === null || !Object.is(previousInputs1[0], searchQuery) || !Object.is(previousInputs1[1], quickFilter) || !Object.is(previousInputs1[2], selectedMeetingId) || !Object.is(previousInputs1[3], meetingsPerPage) || !Object.is(previousInputs1[4], userProfile?.companyCode)) {
     setPreviousInputs1([searchQuery, quickFilter, selectedMeetingId, meetingsPerPage, userProfile?.companyCode]);
     setMeetingPage(1);
-  
+
   }
 
   // Tab switch in "all meetings" mode: "meetings" list or "winners" list
@@ -307,7 +309,7 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
     setRequestInputs([userProfile?.companyCode]);
     setIsLoading(true); setError(null);
   }
-  
+
   const fetchData = async () => {
     return meetingService.listMeetings({ all: true }).then(async (meetingsData) => {
       setError(null);
@@ -333,8 +335,8 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
         }
       }
       setChapterMembers(members || []);
-    
-}).catch(err => {
+
+    }).catch(err => {
       console.error("Lỗi tải dữ liệu thống kê cuộc họp:", err);
       setError(err instanceof Error ? err.message : "Không thể tải dữ liệu.");
     }).finally(() => {
@@ -684,11 +686,10 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
                 onClick={() => {
                   setQuickFilter(item.key);
                 }}
-                className={`rounded-lg px-2.5 py-1 text-xs transition-colors cursor-pointer ${
-                  quickFilter === item.key
-                    ? "bg-white font-medium text-slate-800 shadow-2xs"
-                    : "font-normal text-slate-500 hover:text-slate-800"
-                }`}
+                className={`rounded-lg px-2.5 py-1 text-xs transition-colors cursor-pointer ${quickFilter === item.key
+                  ? "bg-white font-medium text-slate-800 shadow-2xs"
+                  : "font-normal text-slate-500 hover:text-slate-800"
+                  }`}
               >
                 {item.label}
               </button>
@@ -774,10 +775,10 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
           </div>
         </div>
 
-        {/* Thành viên vắng mặt — xanh nhạt */}
+        {/*  — xanh nhạt */}
         <div className="rounded-2xl border border-cyan-100 bg-white p-3.5 shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
           <div className="flex items-center justify-between text-cyan-700 text-xs">
-            <span>Thành viên vắng mặt</span>
+            <span>Lượt vắng mặt</span>
             <span className="h-2 w-2 rounded-full bg-cyan-100 ring-1 ring-inset ring-cyan-200" />
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
@@ -883,18 +884,16 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
                         onMouseEnter={() => setHoveredBarId(item.id)}
                         onMouseLeave={() => setHoveredBarId(null)}
                         onClick={() => setSelectedMeetingId(item.id)}
-                        className={`flex flex-1 flex-col items-center gap-1.5 h-full justify-end group cursor-pointer transition-all duration-300 ${
-                          isOtherHovered ? "opacity-45 scale-95" : isHovered ? "scale-105" : "opacity-100"
-                        }`}
+                        className={`flex flex-1 flex-col items-center gap-1.5 h-full justify-end group cursor-pointer transition-all duration-300 ${isOtherHovered ? "opacity-45 scale-95" : isHovered ? "scale-105" : "opacity-100"
+                          }`}
                         title={`${item.title} (${item.dateStr}):\n• Thành viên có mặt: ${item.membersPresent}\n• Khách mời: ${item.guests}\n• Thành viên vắng: ${item.membersAbsent}\n• Tổng check-in: ${item.totalCheckedIn}`}
                       >
                         {/* Tooltip / Badge số nổi lên khi hover */}
                         <div
-                          className={`flex items-center gap-1 text-[11px] font-medium transition-all duration-300 rounded-full px-1.5 py-0.5 ${
-                            isHovered
-                              ? "bg-slate-900 text-white shadow-md -translate-y-1 scale-110"
-                              : "text-slate-600 group-hover:text-cyan-700"
-                          }`}
+                          className={`flex items-center gap-1 text-[11px] font-medium transition-all duration-300 rounded-full px-1.5 py-0.5 ${isHovered
+                            ? "bg-slate-900 text-white shadow-md -translate-y-1 scale-110"
+                            : "text-slate-600 group-hover:text-cyan-700"
+                            }`}
                         >
                           <span className={isHovered ? "font-bold text-white" : "text-slate-800"}>
                             {item.totalCheckedIn}
@@ -935,9 +934,8 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
                         </div>
 
                         <span
-                          className={`text-[11px] font-normal transition-all duration-200 truncate max-w-full ${
-                            isHovered ? "font-bold text-cyan-700 scale-105" : "text-slate-500 group-hover:text-cyan-700"
-                          }`}
+                          className={`text-[11px] font-normal transition-all duration-200 truncate max-w-full ${isHovered ? "font-bold text-cyan-700 scale-105" : "text-slate-500 group-hover:text-cyan-700"
+                            }`}
                         >
                           {item.dateStr}
                         </span>
@@ -1070,9 +1068,8 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
                 <div
                   onMouseEnter={() => setHoveredSegment("present")}
                   onMouseLeave={() => setHoveredSegment(null)}
-                  className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${
-                    hoveredSegment === "present" ? "bg-cyan-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
-                  }`}
+                  className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${hoveredSegment === "present" ? "bg-cyan-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
+                    }`}
                 >
                   <span className="flex items-center gap-1.5 text-slate-600">
                     <span className="h-2 w-2 rounded-full bg-cyan-500" />
@@ -1086,9 +1083,8 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
                 <div
                   onMouseEnter={() => setHoveredSegment("guest")}
                   onMouseLeave={() => setHoveredSegment(null)}
-                  className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${
-                    hoveredSegment === "guest" ? "bg-cyan-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
-                  }`}
+                  className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${hoveredSegment === "guest" ? "bg-cyan-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
+                    }`}
                 >
                   <span className="flex items-center gap-1.5 text-slate-600">
                     <span className="h-2 w-2 rounded-full bg-cyan-400" />
@@ -1102,13 +1098,12 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
                 <div
                   onMouseEnter={() => setHoveredSegment("absent")}
                   onMouseLeave={() => setHoveredSegment(null)}
-                  className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${
-                    hoveredSegment === "absent" ? "bg-cyan-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
-                  }`}
+                  className={`flex items-center justify-between text-xs p-1.5 rounded-xl transition-all duration-200 cursor-pointer ${hoveredSegment === "absent" ? "bg-cyan-50/80 shadow-2xs scale-[1.02]" : "hover:bg-slate-50"
+                    }`}
                 >
                   <span className="flex items-center gap-1.5 text-slate-600">
                     <span className="h-2 w-2 rounded-full bg-cyan-100 ring-1 ring-inset ring-cyan-200" />
-                    Thành viên vắng mặt
+                    Lượt vắng mặt
                   </span>
                   <span className={`font-semibold ${hoveredSegment === "absent" ? "text-cyan-700" : "text-slate-800"}`}>
                     {metrics.totalMembersAbsent} ({metrics.absentRate}%)
@@ -1172,41 +1167,36 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
               <div className="flex bg-slate-100 p-0.5 rounded-lg text-xs">
                 <button
                   onClick={() => setAttendeeRoleFilter("all")}
-                  className={`px-2.5 py-1 rounded-md transition-colors ${
-                    attendeeRoleFilter === "all" ? "bg-white text-slate-800 font-medium shadow-2xs" : "text-slate-500"
-                  }`}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${attendeeRoleFilter === "all" ? "bg-white text-slate-800 font-medium shadow-2xs" : "text-slate-500"
+                    }`}
                 >
                   Tất cả ({activeSingleMeeting.speakers?.length || 0 + singleMeetingAbsentMembers.length})
                 </button>
                 <button
                   onClick={() => setAttendeeRoleFilter("present")}
-                  className={`px-2.5 py-1 rounded-md transition-colors ${
-                    attendeeRoleFilter === "present" ? "bg-white text-cyan-600 font-medium shadow-2xs" : "text-slate-500"
-                  }`}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${attendeeRoleFilter === "present" ? "bg-white text-cyan-600 font-medium shadow-2xs" : "text-slate-500"
+                    }`}
                 >
                   Có mặt ({(activeSingleMeeting.speakers || []).filter((s) => Boolean(s.userId)).length})
                 </button>
                 <button
                   onClick={() => setAttendeeRoleFilter("guest")}
-                  className={`px-2.5 py-1 rounded-md transition-colors ${
-                    attendeeRoleFilter === "guest" ? "bg-white text-cyan-600 font-medium shadow-2xs" : "text-slate-500"
-                  }`}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${attendeeRoleFilter === "guest" ? "bg-white text-cyan-600 font-medium shadow-2xs" : "text-slate-500"
+                    }`}
                 >
                   Khách mời ({(activeSingleMeeting.speakers || []).filter((s) => !s.userId).length})
                 </button>
                 <button
                   onClick={() => setAttendeeRoleFilter("absent")}
-                  className={`px-2.5 py-1 rounded-md transition-colors ${
-                    attendeeRoleFilter === "absent" ? "bg-white text-cyan-600 font-medium shadow-2xs" : "text-slate-500"
-                  }`}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${attendeeRoleFilter === "absent" ? "bg-white text-cyan-600 font-medium shadow-2xs" : "text-slate-500"
+                    }`}
                 >
                   Vắng mặt ({singleMeetingAbsentMembers.length})
                 </button>
                 <button
                   onClick={() => setAttendeeRoleFilter("lucky")}
-                  className={`px-2.5 py-1 rounded-md transition-colors flex items-center gap-1 ${
-                    attendeeRoleFilter === "lucky" ? "bg-white text-amber-700 font-medium shadow-2xs" : "text-slate-500"
-                  }`}
+                  className={`px-2.5 py-1 rounded-md transition-colors flex items-center gap-1 ${attendeeRoleFilter === "lucky" ? "bg-white text-amber-700 font-medium shadow-2xs" : "text-slate-500"
+                    }`}
                 >
                   <Gift className="h-3 w-3 text-amber-500" />
                   Trúng giải ({singleMeetingWinners.length})
@@ -1287,12 +1277,12 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
                       <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
                         {att.checkedInAt
                           ? new Date(att.checkedInAt).toLocaleTimeString("vi-VN", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
                           : att.isAbsent
-                          ? "Chưa check-in"
-                          : "-"}
+                            ? "Chưa check-in"
+                            : "-"}
                       </td>
                     </tr>
                   ))}
@@ -1308,21 +1298,19 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
               <div className="flex bg-slate-100 p-0.5 rounded-lg text-xs">
                 <button
                   onClick={() => setAllMeetingsTab("meetings")}
-                  className={`px-3 py-1 rounded-md transition-colors font-medium cursor-pointer ${
-                    allMeetingsTab === "meetings"
-                      ? "bg-white text-slate-800 shadow-2xs"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
+                  className={`px-3 py-1 rounded-md transition-colors font-medium cursor-pointer ${allMeetingsTab === "meetings"
+                    ? "bg-white text-slate-800 shadow-2xs"
+                    : "text-slate-500 hover:text-slate-800"
+                    }`}
                 >
                   Danh sách cuộc họp ({filteredMeetings.length})
                 </button>
                 <button
                   onClick={() => setAllMeetingsTab("winners")}
-                  className={`px-3 py-1 rounded-md transition-colors font-medium flex items-center gap-1.5 cursor-pointer ${
-                    allMeetingsTab === "winners"
-                      ? "bg-white text-amber-700 shadow-2xs"
-                      : "text-slate-500 hover:text-amber-700"
-                  }`}
+                  className={`px-3 py-1 rounded-md transition-colors font-medium flex items-center gap-1.5 cursor-pointer ${allMeetingsTab === "winners"
+                    ? "bg-white text-amber-700 shadow-2xs"
+                    : "text-slate-500 hover:text-amber-700"
+                    }`}
                 >
                   <Gift className="h-3.5 w-3.5 text-amber-500" />
                   Người trúng giải ({allFilteredLuckyWinners.length})
@@ -1410,11 +1398,10 @@ export function MeetingStatisticsPanel({ beforeDetails }: { beforeDetails?: Reac
                             </span>
                           ) : (
                             <span
-                              className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-medium ${
-                                m.status === "ended"
-                                  ? "bg-slate-100 text-slate-600"
-                                  : "bg-cyan-50 text-cyan-600"
-                              }`}
+                              className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-medium ${m.status === "ended"
+                                ? "bg-slate-100 text-slate-600"
+                                : "bg-cyan-50 text-cyan-600"
+                                }`}
                             >
                               {m.status === "ended" ? "Đã kết thúc" : "Đã lên lịch"}
                             </span>
