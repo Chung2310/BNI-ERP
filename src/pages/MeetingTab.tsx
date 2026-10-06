@@ -209,6 +209,7 @@ function MeetingWorkspace() {
   const [presentationSpeakerId, setPresentationSpeakerId] = useState("");
   const [checkedSpeakerIds, setCheckedSpeakerIds] = useState<string[]>([]);
   const [presentationFullscreen, setPresentationFullscreen] = useState<Promise<boolean> | null>(null);
+  const autoStartPresentation = useRef(false);
   const presentationStarted = useCallback(() => setStartPresentation(false), []);
   const presentationClosed = useCallback(() => {
     setStartPresentation(false);
@@ -719,15 +720,24 @@ function MeetingWorkspace() {
     try {
       let updated: Meeting;
       try {
-        updated = await api('/' + meetingId + '/presentation', 'POST', { speakerId, version });
+        updated = await api('/' + meetingId + '/presentation', 'POST', {
+          speakerId,
+          version,
+          ...(autoStartPresentation.current ? { autoAdvance: true } : {}),
+        });
       } catch (error) {
         if ((error as { status?: number }).status !== 409) throw error;
         const latest: Meeting = await api('/' + meetingId);
-        updated = await api('/' + meetingId + '/presentation', 'POST', { speakerId, version: latest.__v });
+        updated = await api('/' + meetingId + '/presentation', 'POST', {
+          speakerId,
+          version: latest.__v,
+          ...(autoStartPresentation.current ? { autoAdvance: true } : {}),
+        });
       }
       setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
     } finally {
       meetingControlPending.current = false;
+      autoStartPresentation.current = false;
       setSaving(false);
     }
   }, [activeMeeting?._id, canManage]);
@@ -1336,6 +1346,7 @@ function MeetingWorkspace() {
                         onClick={() => {
                           const targetSpeakerId = (checkedSpeakerIds.length > 0 ? checkedSpeakerIds[checkedSpeakerIds.length - 1] : presentationSpeakerId) || "";
                           if (targetSpeakerId) setPresentationSpeakerId(targetSpeakerId);
+                          autoStartPresentation.current = true;
                           setPresentationFullscreen(document.documentElement.requestFullscreen && !document.fullscreenElement
                             ? document.documentElement.requestFullscreen().then(() => true).catch(() => false)
                             : null);

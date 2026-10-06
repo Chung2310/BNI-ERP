@@ -443,7 +443,12 @@ export async function deferMeetingSpeakers(item: MeetingDocument, speakerIds: un
   return item;
 }
 
-export async function startMeetingPresentation(item: MeetingDocument, speakerId: string, now = new Date()) {
+export async function startMeetingPresentation(
+  item: MeetingDocument,
+  speakerId: string,
+  now = new Date(),
+  options: { autoAdvance?: boolean } = {},
+) {
   assertMeetingEditable(item);
   if (!['scheduled', 'live', 'paused'].includes(item.status)) throw new MeetingError(409, 'Cuộc họp hiện không thể bắt đầu thuyết trình.');
   const index = item.speakers.findIndex((speaker) => speaker.id === speakerId);
@@ -464,7 +469,12 @@ export async function startMeetingPresentation(item: MeetingDocument, speakerId:
   }
   item.status = 'live';
   item.speakers[index].deferred = false;
-  item.set('presentation', { ...item.toObject().presentation, view: 'speaker', speakerTimerPausedByView: false });
+  item.set('presentation', {
+    ...item.toObject().presentation,
+    view: 'speaker',
+    speakerTimerPausedByView: false,
+    ...(options.autoAdvance === undefined ? {} : { autoAdvance: options.autoAdvance }),
+  });
   item.speechesCompletedAt = undefined;
   await saveMeeting(item);
   await notifyNextSpeaker(item);

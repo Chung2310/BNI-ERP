@@ -108,7 +108,7 @@ it("defers from the operation list and starts fullscreen from the selected atten
       return { ok: true, json: async () => ({ data: item }) };
     }
     if (String(url).endsWith("/presentation")) {
-      expect(JSON.parse(options.body)).toEqual({ speakerId: "third", version: 1 });
+      expect(JSON.parse(options.body)).toEqual({ speakerId: "third", version: 1, autoAdvance: true });
       item = { ...item, __v: 2, currentIndex: 1 };
       return { ok: true, json: async () => ({ data: item }) };
     }
