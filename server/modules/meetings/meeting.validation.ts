@@ -3,10 +3,25 @@ import { validateSpeakingTimeSlots } from "../../../src/utils/meetingSpeakingTim
 import { normalizeLoginIdentifier } from "../../../src/utils/loginIdentifier";
 export const presentationStateInput = Joi.object({
   version: Joi.number().integer().min(0).required(),
-  view: Joi.string().valid("checkin", "speaker", "luckyDraw", "activeMembers", "waiting"),
+  view: Joi.string().valid("checkin", "speaker", "luckyDraw", "activeMembers", "audienceResponses", "waiting"),
   autoAdvance: Joi.boolean(),
   autoAdvanceDelay: Joi.number().integer().min(0).max(3600),
 }).or("view", "autoAdvance", "autoAdvanceDelay");
+export const meetingInteractionInput = Joi.object({
+  question: Joi.string().trim().min(1).max(300).required(),
+  requireName: Joi.boolean().default(true),
+  showNames: Joi.boolean().default(true),
+  moderationEnabled: Joi.boolean().default(true),
+  allowMultipleResponses: Joi.boolean().default(false),
+});
+export const meetingInteractionStatusInput = Joi.object({ status: Joi.string().valid("open", "closed").required() });
+export const meetingInteractionModerationInput = Joi.object({ status: Joi.string().valid("approved", "hidden", "rejected").required() });
+
+export const presentationStartInput = Joi.object({
+  version: Joi.number().integer().min(0).required(),
+  speakerId: Joi.string().trim().max(150).required(),
+  autoAdvance: Joi.boolean(),
+});
 export const presentationDrawInput = Joi.object({
   version: Joi.number().integer().min(0).required(),
   prizeId: Joi.string().max(100).required(),

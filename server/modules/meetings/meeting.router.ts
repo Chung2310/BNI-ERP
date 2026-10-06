@@ -31,8 +31,14 @@ import {
 } from './meeting.service';
 import { recurringMeetingInput, checkinInput, controlInput, meetingInput, updateMeetingInput, bulkUpdateMeetingSeriesInput, slideProfileInput, gameWinnerInput } from './meeting.validation';
 import { updatePresentationState } from './meeting-presentation.service';
-import { presentationStateInput, presentationDrawInput } from './meeting.validation';
+import { presentationStateInput, presentationStartInput, presentationDrawInput, meetingInteractionInput, meetingInteractionStatusInput, meetingInteractionModerationInput } from './meeting.validation';
 import { buildMeetingSlides, getMeetingSlides, updateMeetingSlide } from './meeting-slides.service';
+import {
+  getManagedMeetingInteraction,
+  saveMeetingInteraction,
+  setMeetingInteractionStatus,
+  moderateMeetingInteractionResponse,
+} from './meeting-interaction.service';
 
 
 export const meetingRouter = Router();
@@ -131,6 +137,32 @@ meetingRouter.post('/:id/presentation-draw', manage, async (req: import("express
   } catch (error) { sendError(res, error); }
 });
 
+meetingRouter.get('/:id/interaction', read, async (req, res) => {
+  try { res.json({ data: await getManagedMeetingInteraction(company(req), req.params.id) }); }
+  catch (error) { sendError(res, error); }
+});
+
+meetingRouter.put('/:id/interaction', manage, async (req, res) => {
+  const { error, value } = meetingInteractionInput.validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
+  try { res.json({ data: await saveMeetingInteraction(company(req), req.params.id, req.user.id, value) }); }
+  catch (saveError) { sendError(res, saveError); }
+});
+
+meetingRouter.post('/:id/interaction/status', manage, async (req, res) => {
+  const { error, value } = meetingInteractionStatusInput.validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
+  try { res.json({ data: await setMeetingInteractionStatus(company(req), req.params.id, value.status) }); }
+  catch (statusError) { sendError(res, statusError); }
+});
+
+meetingRouter.patch('/:id/interaction/responses/:responseId', manage, async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.responseId)) return res.status(400).json({ message: 'Câu trả lời không hợp lệ.' });
+  const { error, value } = meetingInteractionModerationInput.validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
+  try { res.json({ data: await moderateMeetingInteractionResponse(company(req), req.params.id, req.params.responseId, value.status) }); }
+  catch (moderationError) { sendError(res, moderationError); }
+});
 meetingRouter.get('/:id/slides', read, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
@@ -209,11 +241,12 @@ meetingRouter.post('/:id/checkin', requirePermission(['meetings:read', 'meetings
 });
 
 meetingRouter.post('/:id/presentation', manage, async (req, res) => {
-  if (typeof req.body?.speakerId !== 'string' || !req.body.speakerId) return res.status(400).json({ message: 'Chọn người thuyết trình.' });
+  const { error, value } = presentationStartInput.validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
   try {
     const item = await getMeeting(company(req), req.params.id);
-    assertVersion(item, req.body.version);
-    res.json({ data: await startMeetingPresentation(item, req.body.speakerId) });
+    assertVersion(item, value.version);
+    res.json({ data: await startMeetingPresentation(item, value.speakerId, undefined, { autoAdvance: value.autoAdvance }) });
   } catch (e) { sendError(res, e); }
 });
 

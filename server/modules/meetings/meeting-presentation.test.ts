@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 vi.mock("../../socket", () => ({ emitToCompany: vi.fn() }));
 vi.mock("../../service/notification.service", () => ({ notificationService: { createNotification: vi.fn() } }));
 import { MeetingModel } from "./meeting.model";
-import { advanceDuePresentations, isAutoAdvanceDue, updatePresentationState } from "./meeting-presentation.service";
+import { AUTO_ADVANCE_SLIDE_LEAD_MS, advanceDuePresentations, isAutoAdvanceDue, updatePresentationState } from "./meeting-presentation.service";
 import { startMeetingPresentation, spinLuckyDraw } from "./meeting.service";
 import { presentationStateInput } from "./meeting.validation";
 
@@ -23,13 +23,36 @@ it.each([0, 3, 150])("advances only after the speech and %s seconds of server-ma
   expect(await advanceDuePresentations(new Date(+origin + (30 + delay) * 1000 - 1))).toBe(0);
   expect(await advanceDuePresentations(new Date(+origin + (30 + delay) * 1000))).toBe(1);
   expect(item.currentIndex).toBe(1);
-  expect(+item.speakerStartedAt).toBe(+origin + (30 + delay) * 1000);
+  expect(+item.speakerStartedAt).toBe(+origin + (30 + delay) * 1000 + AUTO_ADVANCE_SLIDE_LEAD_MS);
 });
 it("preserves pause, manual mode and an unstarted clock", () => {
   const late = new Date(+origin + 100000);
   for (const patch of [{ status: "paused" }, { status: "scheduled" }, { status: "ended" }, { speakerStartedAt: undefined }, { presentation: { autoAdvance: false } }, { currentIndex: 2 }]) {
     expect(isAutoAdvanceDue({ ...meeting().toObject(), ...patch }, late)).toBe(false);
   }
+});
+it.each(["checkin", "luckyDraw", "activeMembers", "audienceResponses", "waiting"] as const)("does not auto-advance while the shared view is %s", view => {
+  const item = meeting();
+  item.presentation.view = view;
+  expect(isAutoAdvanceDue(item.toObject(), new Date(+origin + 100000))).toBe(false);
+});
+it("pauses the speaker clock outside speaker view and resumes without charging hidden time", async () => {
+  const item = meeting();
+  await updatePresentationState(item, { view: "waiting" }, new Date(+origin + 10000));
+  expect(item.elapsedSeconds).toBe(10);
+  expect(item.speakerStartedAt).toBeUndefined();
+  expect(item.presentation.speakerTimerPausedByView).toBe(true);
+
+  await updatePresentationState(item, { view: "speaker" }, new Date(+origin + 100000));
+  expect(item.elapsedSeconds).toBe(10);
+  expect(+item.speakerStartedAt).toBe(+origin + 100000);
+  expect(item.presentation.speakerTimerPausedByView).toBe(false);
+});
+it("does not start a clock that was already stopped before changing views", async () => {
+  const item = meeting(); item.speakerStartedAt = undefined;
+  await updatePresentationState(item, { view: "checkin" }, new Date(+origin + 10000));
+  await updatePresentationState(item, { view: "speaker" }, new Date(+origin + 100000));
+  expect(item.speakerStartedAt).toBeUndefined();
 });
 it("counts elapsed time before a pause and completes speeches without ending the meeting", async () => {
   const item = meeting(); item.currentIndex = 1; item.elapsedSeconds = 15;
@@ -75,6 +98,8 @@ it("saves one shared draw result and reveal timestamp in the same write", async 
   const result = await spinLuckyDraw(item, "prize", "organizer", true);
   expect(item.save).toHaveBeenCalledTimes(1);
   expect(item.presentation.view).toBe("luckyDraw");
+  expect(item.speakerStartedAt).toBeUndefined();
+  expect(item.presentation.speakerTimerPausedByView).toBe(true);
   expect(item.presentation.drawWinnerId).toBe(result.winner.id);
   expect(+item.presentation.drawRevealsAt - +item.presentation.drawStartedAt).toBe(5000);
   expect(item.luckyDraw.prizes[0].winners).toHaveLength(1);
@@ -84,4 +109,5 @@ it("rejects malformed states and prevents clients from setting draw results", ()
     expect(presentationStateInput.validate(body).error).toBeDefined();
   }
   expect(presentationStateInput.validate({ version: 0, view: "speaker", autoAdvance: true, autoAdvanceDelay: 0 }).error).toBeUndefined();
+  expect(presentationStateInput.validate({ version: 0, view: "audienceResponses" }).error).toBeUndefined();
 });

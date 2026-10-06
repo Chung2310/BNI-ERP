@@ -28,6 +28,7 @@ const SubmitProofPage = lazy(() => import("./pages/SubmitProofPage"));
 const PublicRegisterPage = lazy(() => import("./pages/PublicRegisterPage"));
 const WheelOfNamesPage = lazy(() => import("./pages/WheelOfNamesPage"));
 const MeetingCheckInPage = lazy(() => import("./pages/MeetingCheckInPage"));
+const MeetingInteractionPage = lazy(() => import("./pages/MeetingInteractionPage"));
 
 function AppContent() {
   const { user, userProfile, loading } = useAuth();
@@ -39,6 +40,7 @@ function AppContent() {
   const isSubmitProofPage = currentPath.startsWith("/public/submit-proof");
   const isPublicRegisterPage = currentPath.startsWith("/public/dang-ky");
   const isMeetingCheckInPage = currentPath.startsWith("/meeting-checkin/");
+  const isMeetingInteractionPage = currentPath.startsWith("/meeting-interaction/");
   const isWheelPage =
     currentPath === "/wheel-of-names" ||
     currentPath === "/wheel-of-names.html" ||
@@ -53,6 +55,7 @@ function AppContent() {
     isSubmitProofPage ||
     isPublicRegisterPage ||
     isMeetingCheckInPage ||
+    isMeetingInteractionPage ||
     isWheelPage;
 
   const { activeTab, setActiveTab } = useTabRouter({
@@ -149,6 +152,10 @@ function AppContent() {
 
   if (isMeetingCheckInPage) {
     return (<Suspense fallback={<AuthLoader />}><MeetingCheckInPage /></Suspense>);
+  }
+
+  if (isMeetingInteractionPage) {
+    return (<Suspense fallback={<AuthLoader />}><MeetingInteractionPage /></Suspense>);
   }
 
   if (isPublicRegisterPage) {

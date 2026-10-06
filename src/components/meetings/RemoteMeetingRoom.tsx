@@ -24,6 +24,7 @@ import {
   QrCode as QrIcon,
   Monitor,
   Megaphone,
+  MessageSquareText,
   Plus,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -40,6 +41,7 @@ const views: { value: PresentationView; label: string; icon: typeof Tv }[] = [
   { value: "checkin", label: "QR check-in", icon: QrIcon },
   { value: "speaker", label: "Người phát biểu", icon: Users },
   { value: "luckyDraw", label: "Quay thưởng", icon: Gift },
+  { value: "audienceResponses", label: "Câu trả lời", icon: MessageSquareText },
   { value: "activeMembers", label: "Xếp hạng", icon: Trophy },
   { value: "waiting", label: "Màn hình chờ", icon: Monitor },
 ];

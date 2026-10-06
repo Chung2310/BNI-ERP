@@ -44,12 +44,14 @@ import {
   SlidersHorizontal,
   UserPlus,
   Trash2,
+  Plus,
 } from "lucide-react";
 import { socketService } from "../services/socketService";
 import { useAuth } from "../context/AuthContext";
 import { LuckyDrawTab } from "../components/meetings/LuckyDrawTab";
-import { MeetingFlowStepper, MEETING_FLOW_META, loadMeetingFlowOrder, saveMeetingFlowOrder, type MeetingFlowStep } from "../components/meetings/MeetingFlowStepper";
+import { DEFAULT_MEETING_FLOW, MeetingFlowStepper, MEETING_FLOW_META, type MeetingFlowStep } from "../components/meetings/MeetingFlowStepper";
 import { ActiveMembersPanel } from "../components/meetings/ActiveMembersPanel";
+import { MeetingInteractionTab } from "../components/meetings/MeetingInteractionTab";
 import { SpeakerAvatar } from "../components/meetings/SpeakerAvatar";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { SearchableSelect } from "../components/common/SearchableSelect";
@@ -163,14 +165,9 @@ function MeetingWorkspace() {
   const [detailMeetingId, setDetailMeetingId] = useState<string | null>(null);
   const detailMeetingIdRef = useRef<string | null>(null);
   useEffect(() => { detailMeetingIdRef.current = detailMeetingId; }, [detailMeetingId]);
-  // Quy trình điều hành: các bước theo thứ tự do MC sắp xếp (lưu localStorage)
-  const [flowOrder, setFlowOrder] = useState<MeetingFlowStep[]>(loadMeetingFlowOrder);
+  // Mỗi nội dung trong popup là một lựa chọn độc lập; người dùng có thể mở trực tiếp.
   const [flowStep, setFlowStep] = useState<MeetingFlowStep>("checkin");
   const [slidesOpen, setSlidesOpen] = useState(false);
-  const updateFlowOrder = useCallback((order: MeetingFlowStep[]) => {
-    setFlowOrder(order);
-    saveMeetingFlowOrder(order);
-  }, []);
   const goToFlowStep = useCallback((step: MeetingFlowStep) => {
     setFlowStep(step);
     setSlidesOpen(false);
@@ -178,10 +175,10 @@ function MeetingWorkspace() {
   const meetingFlowSteps = useRef(new Map<string, MeetingFlowStep>());
   const getMeetingFlowStep = (meetingId: string): MeetingFlowStep => {
     const inMemory = meetingFlowSteps.current.get(meetingId);
-    if (inMemory && flowOrder.includes(inMemory)) return inMemory;
+    if (inMemory && DEFAULT_MEETING_FLOW.includes(inMemory)) return inMemory;
     try {
       const saved = localStorage.getItem("bni_meeting_flow_step:" + meetingId);
-      if (flowOrder.includes(saved as MeetingFlowStep)) return saved as MeetingFlowStep;
+      if (DEFAULT_MEETING_FLOW.includes(saved as MeetingFlowStep)) return saved as MeetingFlowStep;
     } catch { /* Fall back to the initial step when browser storage is unavailable. */ }
     return "checkin";
   };
@@ -208,6 +205,7 @@ function MeetingWorkspace() {
   const [presentationSpeakerId, setPresentationSpeakerId] = useState("");
   const [checkedSpeakerIds, setCheckedSpeakerIds] = useState<string[]>([]);
   const [presentationFullscreen, setPresentationFullscreen] = useState<Promise<boolean> | null>(null);
+  const autoStartPresentation = useRef(false);
   const presentationStarted = useCallback(() => setStartPresentation(false), []);
   const presentationClosed = useCallback(() => {
     setStartPresentation(false);
@@ -354,6 +352,35 @@ function MeetingWorkspace() {
 
   const activeMeeting = items.find((m) => m._id === detailMeetingId) || null;
   const canModifyActiveMeeting = canManage && !!activeMeeting && activeMeeting.status !== "ended";
+
+  // Socket.IO remains the fast path, but the in-page fullscreen presentation also
+  // needs a polling fallback. A dropped/misrouted socket must not leave it stuck on
+  // the previous speaker after the server scheduler has advanced the meeting.
+  useEffect(() => {
+    const meetingId = activeMeeting?._id;
+    if (!meetingId || flowStep !== "presentation" || !slidesOpen || !["live", "paused"].includes(activeMeeting.status)) return;
+    let mounted = true;
+    let polling = false;
+    const refreshPresentation = () => {
+      if (polling) return;
+      polling = true;
+      void api("/" + meetingId)
+        .then((updated: Meeting) => {
+          if (mounted) {
+            setItems(previous => previous.map(item =>
+              item._id === updated._id && updated.__v >= item.__v ? updated : item
+            ));
+          }
+        })
+        .catch(() => { /* Socket updates may still succeed; retry on the next tick. */ })
+        .finally(() => { polling = false; });
+    };
+    const timer = window.setInterval(refreshPresentation, 1000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, [activeMeeting?._id, activeMeeting?.status, flowStep, slidesOpen]);
 
   useEffect(() => {
     if (editingMeeting && items.some(item => item._id === editingMeeting._id && item.status === "ended")) setEditingMeeting(null);
@@ -718,15 +745,24 @@ function MeetingWorkspace() {
     try {
       let updated: Meeting;
       try {
-        updated = await api('/' + meetingId + '/presentation', 'POST', { speakerId, version });
+        updated = await api('/' + meetingId + '/presentation', 'POST', {
+          speakerId,
+          version,
+          ...(autoStartPresentation.current ? { autoAdvance: true } : {}),
+        });
       } catch (error) {
         if ((error as { status?: number }).status !== 409) throw error;
         const latest: Meeting = await api('/' + meetingId);
-        updated = await api('/' + meetingId + '/presentation', 'POST', { speakerId, version: latest.__v });
+        updated = await api('/' + meetingId + '/presentation', 'POST', {
+          speakerId,
+          version: latest.__v,
+          ...(autoStartPresentation.current ? { autoAdvance: true } : {}),
+        });
       }
       setItems(previous => previous.map(item => item._id === updated._id ? updated : item));
     } finally {
       meetingControlPending.current = false;
+      autoStartPresentation.current = false;
       setSaving(false);
     }
   }, [activeMeeting?._id, canManage]);
@@ -821,6 +857,16 @@ function MeetingWorkspace() {
                 >
                   <QrCode className="h-4 w-4" />
                   <span>Check-in</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Tạo lịch đơn"
+                  onClick={() => openCreateModal("single")}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 text-xs font-medium shadow-sm shadow-cyan-600/20 transition disabled:opacity-50 cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Tạo lịch đơn</span>
                 </button>
                 <button
                   type="button"
@@ -1300,12 +1346,9 @@ function MeetingWorkspace() {
             </div>
 
             <MeetingFlowStepper
-              order={flowOrder}
               current={flowStep}
-              canReorder={canModifyActiveMeeting}
               badges={{ checkin: activeMeeting.speakers.length, luckyDraw: activeMeeting.luckyDraw?.prizes.reduce((total, prize) => total + prize.winners.length, 0) || 0 }}
               onSelect={goToFlowStep}
-              onReorder={updateFlowOrder}
               onFinish={canManage && ["live", "paused"].includes(activeMeeting.status) ? () => setFinishRequested(true) : undefined}
             />
 
@@ -1325,6 +1368,7 @@ function MeetingWorkspace() {
                         onClick={() => {
                           const targetSpeakerId = (checkedSpeakerIds.length > 0 ? checkedSpeakerIds[checkedSpeakerIds.length - 1] : presentationSpeakerId) || "";
                           if (targetSpeakerId) setPresentationSpeakerId(targetSpeakerId);
+                          autoStartPresentation.current = true;
                           setPresentationFullscreen(document.documentElement.requestFullscreen && !document.fullscreenElement
                             ? document.documentElement.requestFullscreen().then(() => true).catch(() => false)
                             : null);
@@ -2138,6 +2182,8 @@ function MeetingWorkspace() {
                   </div>
                 </div>
               )}
+
+              {flowStep === "interaction" && <MeetingInteractionTab meeting={activeMeeting} canManage={canModifyActiveMeeting} onRefreshMeeting={refresh} />}
 
               {/* SUBTAB 2: VÒNG QUAY MAY MẮN (RANDOM.ORG) */}
               {flowStep === "luckyDraw" && (

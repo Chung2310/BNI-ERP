@@ -1,4 +1,4 @@
-import React, {  useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Gift,
   Trophy,
@@ -94,6 +94,10 @@ export function LuckyDrawTab({
   const containerRef = useRef<HTMLDivElement>(null);
   const tickerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  useEffect(() => () => {
+    if (tickerIntervalRef.current) clearInterval(tickerIntervalRef.current);
+  }, []);
+
   // Kiểm tra điều kiện: CUỘC HỌP ĐÃ BẮT ĐẦU CHƯA?
   const isMeetingStarted =
     meeting.status === "live" || meeting.status === "paused" || meeting.status === "ended";
@@ -111,6 +115,38 @@ export function LuckyDrawTab({
   }
 
   const selectedPrize = luckyConfig.prizes?.find((p) => p.id === selectedPrizeId);
+
+  const applySpinResult = (prize: LuckyDrawPrize) => {
+    setLuckyConfig((current) => ({
+      ...current,
+      prizes: (current.prizes || []).map((item) => item.id === prize.id ? prize : item),
+    }));
+  };
+
+  const winnerRows: Array<{ prize: LuckyDrawPrize; winner: LuckyDrawWinner; canRedraw: boolean }> = [];
+  const displayedWinnerIds = new Set<string>();
+  for (const prize of luckyConfig.prizes || []) {
+    for (const winner of prize.winners || []) {
+      displayedWinnerIds.add(winner.id);
+      winnerRows.push({ prize, winner, canRedraw: true });
+    }
+  }
+  for (const winner of meeting.gameWinners || []) {
+    if (displayedWinnerIds.has(winner.id)) continue;
+    winnerRows.push({
+      winner,
+      canRedraw: false,
+      prize: {
+        id: `game-${winner.id}`,
+        name: winner.prizeName || "Giải thưởng may mắn",
+        reward: winner.reward || "",
+        quantity: 1,
+        order: winnerRows.length + 1,
+        color: winner.source === "bingo" ? "#f59e0b" : "#cf142b",
+        winners: [winner],
+      },
+    });
+  }
 
 
 
@@ -318,6 +354,7 @@ export function LuckyDrawTab({
 
           setTimeout(() => {
             setIsSpinning(false);
+            applySpinResult(result.prize);
             if (soundEnabled) playWinFanfare();
             launchConfetti(5000);
 
@@ -328,7 +365,11 @@ export function LuckyDrawTab({
               seed: result.seed,
             });
 
-            onRefreshMeeting();
+            void onRefreshMeeting().finally(() => {
+              // The spin response is authoritative for this draw. Keep it visible even
+              // when a concurrent meeting refresh briefly returns the pre-spin snapshot.
+              applySpinResult(result.prize);
+            });
           }, 350);
         }, 300);
       }, duration);
@@ -376,16 +417,14 @@ export function LuckyDrawTab({
   // Export Results
   const handleExportCSV = () => {
     const allWinners: Array<{ prize: string; name: string; email: string; wonAt: string; hash: string }> = [];
-    for (const p of luckyConfig.prizes || []) {
-      for (const w of p.winners || []) {
-        allWinners.push({
-          prize: p.name,
-          name: w.name,
-          email: w.email || "",
-          wonAt: new Date(w.wonAt).toLocaleString("vi-VN"),
-          hash: w.verificationHash || "",
-        });
-      }
+    for (const { prize, winner } of winnerRows) {
+      allWinners.push({
+        prize: prize.name,
+        name: winner.name,
+        email: winner.email || "",
+        wonAt: new Date(winner.wonAt).toLocaleString("vi-VN"),
+        hash: winner.verificationHash || "",
+      });
     }
 
     if (!allWinners.length) {
@@ -859,12 +898,8 @@ export function LuckyDrawTab({
 
         {/* Winners List Table */}
         {(() => {
-          const allWinners: Array<{ prize: LuckyDrawPrize; winner: LuckyDrawWinner }> = [];
-          for (const p of luckyConfig.prizes || []) {
-            for (const w of p.winners || []) {
-              allWinners.push({ prize: p, winner: w });
-            }
-          }
+          const allWinners = winnerRows;
+
 
           if (!allWinners.length) {
             return (
@@ -887,7 +922,7 @@ export function LuckyDrawTab({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {allWinners.map(({ prize, winner }) => (
+                  {allWinners.map(({ prize, winner, canRedraw }) => (
                     <tr key={winner.id} className="hover:bg-slate-50/60 transition">
                       <td className="p-3 pl-4">
                         <span
@@ -933,14 +968,16 @@ export function LuckyDrawTab({
 
                       {canManage && (
                         <td className="p-3 pr-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleRedraw(winner)}
-                            className="px-2.5 py-1 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] transition cursor-pointer"
-                            title="Hủy lượt trúng này để quay lại"
-                          >
-                            Quay lại
-                          </button>
+                          {canRedraw ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRedraw(winner)}
+                              className="px-2.5 py-1 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] transition cursor-pointer"
+                              title="Hủy lượt trúng này để quay lại"
+                            >
+                              Quay lại
+                            </button>
+                          ) : <span className="text-slate-300">—</span>}
                         </td>
                       )}
                     </tr>
