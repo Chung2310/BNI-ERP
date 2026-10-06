@@ -5,6 +5,7 @@ export function MeetingLocationFields({ value, onChange, radius, onRadiusChange 
   value: Point | null; onChange: (point: Point | null) => void; radius: number; onRadiusChange: (radius: number) => void;
 }) {
   const [draft, setDraft] = useState({ latitude: value?.latitude.toString() ?? "", longitude: value?.longitude.toString() ?? "" });
+  const [radiusDraft, setRadiusDraft] = useState(radius.toString());
   const updatePoint = (field: "latitude" | "longitude", text: string) => {
     const next = { ...draft, [field]: text }; setDraft(next);
     onChange(next.latitude !== "" && next.longitude !== "" ? { latitude: +next.latitude, longitude: +next.longitude } : null);
@@ -45,7 +46,7 @@ export function MeetingLocationFields({ value, onChange, radius, onRadiusChange 
       <label className="text-xs">Vĩ độ<input type="number" step="any" min="-90" max="90" value={draft.latitude} required={draft.longitude !== ""} onChange={e => updatePoint("latitude", e.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2" /></label>
       <label className="text-xs">Kinh độ<input type="number" step="any" min="-180" max="180" value={draft.longitude} required={draft.latitude !== ""} onChange={e => updatePoint("longitude", e.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2" /></label>
     </div>
-    <label className="block text-xs">Bán kính cho phép (m)<input required type="number" min="50" max="5000" value={radius} onChange={e => onRadiusChange(+e.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2" /></label>
+    <label className="block text-xs">Bán kính cho phép (m)<input required type="text" inputMode="numeric" pattern="(?:[5-9][0-9]|[1-9][0-9]{2}|[1-4][0-9]{3}|5000)" title="Nhập bán kính từ 50 đến 5000 mét" value={radiusDraft} onChange={e => { const text = e.target.value; if (!/^[0-9]*$/.test(text)) return; setRadiusDraft(text); if (text !== "") onRadiusChange(Number(text)); }} onBlur={() => { if (radiusDraft === "") setRadiusDraft(radius.toString()); }} className="mt-1 w-full rounded-lg border bg-white p-2" /></label>
     {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
   </fieldset>;
 }

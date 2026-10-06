@@ -7,7 +7,12 @@ export function MeetingScheduleActions({ status, onCancel, onReschedule, onDelet
   onReschedule: () => void;
   onDelete: () => void;
 }) {
-  if (status === "ended") return null;
+  if (status === "ended" || status === "cancelled") {
+    const statusLabel = status === "ended" ? "đã kết thúc" : "đã hủy";
+    return <div className="flex items-center justify-end text-xs font-normal">
+      <button type="button" aria-label="Xóa cuộc họp" title={`Xóa cuộc họp ${statusLabel}`} onClick={onDelete} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer"><Trash2 className="h-3.5 w-3.5" aria-hidden="true" />Xóa cuộc họp</button>
+    </div>;
+  }
   const canChangeSchedule = status === "scheduled";
   const unavailable = "Chỉ áp dụng với cuộc họp chưa bắt đầu";
   return <div className="flex items-center gap-2 text-xs font-normal">

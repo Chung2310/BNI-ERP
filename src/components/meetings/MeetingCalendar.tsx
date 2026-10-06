@@ -112,7 +112,7 @@ export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChang
             <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500"><span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${statusDots[item.status] || "bg-slate-400"}`} />{live ? meetingElapsedLabel(item, tick) : labels[item.status] || item.status}</span>{inProgress && <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-cyan-800">Đang {flowStepLabel(item._id)}</span>}{item.seriesId && <span>Định kỳ</span>}</span>
           </button>
           {item.originalStartsAt && new Date(item.originalStartsAt).getTime() !== new Date(item.startsAt).getTime() && <p className="mt-1 text-[11px] text-slate-500">Dời từ {vietnamDateTime(item.originalStartsAt).replace("T", " ")}</p>}
-          {canManage && item.status !== "ended" && <div className="mt-2 border-t border-cyan-100 pt-2"><MeetingScheduleActions status={item.status} onCancel={() => { closeDay(); onCancel(item); }} onReschedule={() => { closeDay(); onReschedule(item); }} onDelete={() => { closeDay(); onDelete(item); }} /></div>}
+          {canManage && <div className="mt-2 border-t border-cyan-100 pt-2"><MeetingScheduleActions status={item.status} onCancel={() => { closeDay(); onCancel(item); }} onReschedule={() => { closeDay(); onReschedule(item); }} onDelete={() => { closeDay(); onDelete(item); }} /></div>}
         </article>;
         })}</div>}
       </div>}

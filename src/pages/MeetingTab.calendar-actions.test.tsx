@@ -138,12 +138,12 @@ it("keeps scheduling actions outside the meeting operations modal", async () => 
   expect(screen.queryByRole("button", { name: "Xóa cuộc họp" })).toBeNull();
 });
 
-it("makes ended meetings read-only in the calendar, list and detail views", async () => {
+it("keeps ended meetings read-only but exposes deletion in calendar, list and detail views", async () => {
   const request = mockApi("ended");
   const day = await openDay();
   expect(day.queryByRole("button", { name: "Hủy" })).toBeNull();
   expect(day.queryByRole("button", { name: "Dời lịch" })).toBeNull();
-  expect(day.queryByRole("button", { name: "Xóa cuộc họp" })).toBeNull();
+  expect(day.getByRole("button", { name: "Xóa cuộc họp" })).toBeTruthy();
   fireEvent.click(day.getByRole("button", { name: /07:00 · Họp tuần/ }));
   expect(screen.queryByTitle("Sửa cuộc họp")).toBeNull();
   expect(screen.getByText("Cuộc họp đã kết thúc. Bạn chỉ có thể xem thông tin và kết quả.")).toBeTruthy();
@@ -157,6 +157,6 @@ it("makes ended meetings read-only in the calendar, list and detail views", asyn
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   expect(screen.getByText("Họp tuần")).toBeTruthy();
   expect(screen.queryByTitle("Sửa cuộc họp")).toBeNull();
-  expect(screen.queryByTitle("Xóa cuộc họp")).toBeNull();
+  expect(screen.getByTitle("Xóa cuộc họp")).toBeTruthy();
   expect(request.mock.calls.some(([, options]) => options?.method && options.method !== "GET")).toBe(false);
 });
