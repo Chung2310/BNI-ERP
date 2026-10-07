@@ -102,6 +102,27 @@ it("opens the display without starting a timer and shares the same meeting with 
   await screen.findByAltText("QR mở bảng điều khiển");
   expect(screen.getByRole("link", { name: "Mở bảng điều khiển" }).getAttribute("href")).toContain("meeting=m&mode=control");
 });
+it("removes the display header in fullscreen so it cannot cover the next speakers", async () => {
+  let fullscreenElement: Element | null = null;
+  Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => fullscreenElement });
+  Object.defineProperty(HTMLElement.prototype, "requestFullscreen", { configurable: true, value: function () {
+    fullscreenElement = this;
+    document.dispatchEvent(new Event("fullscreenchange"));
+    return Promise.resolve();
+  } });
+  try {
+    render(<RemoteMeetingRoom meetingId="m" mode="display" />);
+    await screen.findByText("Đang chiếu: speaker");
+    fireEvent.click(screen.getByRole("button", { name: "Toàn màn hình" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Màn hình trình chiếu" })).toBeNull());
+    expect(screen.queryByRole("button", { name: "Mở bảng điều khiển cuộc họp" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Về cuộc họp" })).toBeNull();
+    expect(screen.getByRole("main").style.height).toBe("100dvh");
+  } finally {
+    Reflect.deleteProperty(document, "fullscreenElement");
+    Reflect.deleteProperty(HTMLElement.prototype, "requestFullscreen");
+  }
+});
 it("blocks viewers without organizer permission before requesting a snapshot", () => {
   mocks.manage = false;
   render(<RemoteMeetingRoom meetingId="m" mode="control" />);

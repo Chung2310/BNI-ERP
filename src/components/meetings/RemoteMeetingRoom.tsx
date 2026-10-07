@@ -208,7 +208,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
   return createPortal(
     <div ref={root} className="fixed inset-0 z-[200] overflow-y-auto bg-slate-50 text-slate-900 font-sans">
       {/* Top Header Bar */}
-      <header className={(readOnly && fullscreen ? "absolute inset-x-0 top-0 z-20 opacity-0 transition-opacity hover:opacity-100 focus-within:opacity-100 " : "sticky top-0 z-20 ") + "flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-white/95 backdrop-blur-md px-4 py-3 sm:px-6 shadow-xs"}>
+      {!(readOnly && fullscreen) && <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-white/95 backdrop-blur-md px-4 py-3 sm:px-6 shadow-xs">
         <div className="flex items-center gap-3 min-w-0">
           <div className="p-2.5 rounded-2xl bg-cyan-600 text-white shadow-xs shrink-0">
             {readOnly ? <Tv className="h-5 w-5" /> : <SlidersHorizontal className="h-5 w-5" />}
@@ -271,7 +271,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
             <span>Về cuộc họp</span>
           </a>
         </div>
-      </header>
+      </header>}
 
       {/* Sync Error / Screen Notice Banner */}
       {(syncError || screenError) && (
