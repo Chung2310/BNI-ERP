@@ -65,3 +65,24 @@ Mục thiếu dữ liệu được ẩn cả nhãn và khung; ảnh thiếu ho�
 
 Thiết kế tham chiếu: `public/slide-for-member.png`, `public/slide-for-guest.png`.
 Logo dùng khi dựng slide: `public/bni-logo.png`.
+
+### API trình chiếu cho mobile
+
+Gửi access token qua header `Authorization: Bearer <token>`. Mọi API đều giới hạn trong công ty của tài khoản và trả `Cache-Control: no-store`.
+
+| Phương thức | Đường dẫn | Quyền | Mục đích |
+| --- | --- | --- | --- |
+| `POST` | `/api/v1/meetings/:id/presentation-display/heartbeat` | `meetings:manage` hoặc `access:manage` | Tab màn hình trình chiếu tự gửi mỗi 10 giây; không cần body. |
+| `GET` | `/api/v1/meetings/:id/presentation-display` | `meetings:read`, `meetings:manage`, `access:read` hoặc `access:manage` | Mobile đọc trạng thái và dữ liệu slide. |
+
+Response của `GET` có dạng `{ "data": { "meetingId", "isOpen", "lastSeenAt", "expiresAt", "serverNow", "meeting", "slides", "version" } }`. `meeting` gồm tiêu đề, trạng thái, view trình chiếu, người đang phát biểu, bộ đếm giờ và danh sách người phát biểu. `slides` là dữ liệu hồ sơ để dựng slide. `isOpen` tự chuyển về `false` khi backend không nhận heartbeat trong 30 giây; mobile có thể poll endpoint này để cập nhật. `version` là version của dữ liệu cuộc họp, không thay đổi theo heartbeat.
+
+### API tự xóa tài khoản cho mobile
+
+`DELETE /api/v1/auth/me` dùng access token của chính tài khoản cần xóa; không truyền user ID. Gửi `Content-Type: application/json` và body:
+
+```json
+{ "password": "mật khẩu hiện tại", "confirmation": "XÓA TÀI KHOẢN" }
+```
+
+Thành công trả HTTP `200` với `{ "status": "success", "message": "Đã xóa tài khoản của bạn." }`. Sau đó mobile cần xóa access token và refresh token lưu trên thiết bị. Thiếu hoặc sai token trả `401`; sai mật khẩu, sai chuỗi xác nhận hoặc tài khoản quản trị viên tự xóa trả `400`; vượt giới hạn yêu cầu trả `429`. Tài khoản chưa có mật khẩu phải thiết lập mật khẩu trước khi gọi API này.

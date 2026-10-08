@@ -28,6 +28,9 @@ beforeEach(() => {
       };
       return { ok: true, json: async () => ({ data: snapshot.meeting.luckyDraw }) };
     }
+    if (String(url).endsWith("/presentation-display/heartbeat")) {
+      return { ok: true, json: async () => ({ data: { isOpen: true } }) };
+    }
     if (options.method !== "GET") {
       const body = JSON.parse(options.body);
       snapshot.meeting.__v++;
@@ -97,7 +100,8 @@ it("opens the display without starting a timer and shares the same meeting with 
   render(<RemoteMeetingRoom meetingId="m" mode="display" />);
   await screen.findByText("Đang chiếu: speaker");
   expect(screen.queryByRole("button", { name: "Người tiếp theo" })).toBeNull();
-  expect(vi.mocked(fetch).mock.calls.every(([, options]) => options?.method === "GET")).toBe(true);
+  expect(vi.mocked(fetch).mock.calls.some(([url, options]) => String(url).endsWith("/presentation-display/heartbeat") && options?.method === "POST")).toBe(true);
+  expect(vi.mocked(fetch).mock.calls.every(([url, options]) => options?.method === "GET" || (String(url).endsWith("/presentation-display/heartbeat") && options?.method === "POST"))).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Mở bảng điều khiển cuộc họp" }));
   await screen.findByAltText("QR mở bảng điều khiển");
   expect(screen.getByRole("link", { name: "Mở bảng điều khiển" }).getAttribute("href")).toContain("meeting=m&mode=control");
@@ -106,6 +110,8 @@ it("removes the display header in fullscreen so it cannot cover the next speaker
   let fullscreenElement: Element | null = null;
   Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => fullscreenElement });
   Object.defineProperty(HTMLElement.prototype, "requestFullscreen", { configurable: true, value: function () {
+    // The browser binds requestFullscreen to the element entering fullscreen.
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     fullscreenElement = this;
     document.dispatchEvent(new Event("fullscreenchange"));
     return Promise.resolve();

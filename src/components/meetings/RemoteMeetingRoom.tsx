@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { tabToPath } from "../../seo/seo-config";
-import { meetingRoomUrl } from "../../services/meetingLiveService";
+import { meetingLiveApi, meetingRoomUrl } from "../../services/meetingLiveService";
 import { meetingService } from "../../services/meetingService";
 import { presentationState, type MeetingPresentationState, type PresentationView } from "../../utils/meetingPresentation";
 import { ConfirmDialog } from "../common/ConfirmDialog";
@@ -133,6 +133,21 @@ function MeetingRoom({ meetingId, mode }: Props) {
   const [share, setShare] = useState(false);
   const [shareQr, setShareQr] = useState("");
   const controlUrl = meetingRoomUrl(meetingId, "control");
+
+  useEffect(() => {
+    if (!readOnly) return;
+    const heartbeat = () => { void meetingLiveApi("/" + meetingId + "/presentation-display/heartbeat", "POST").catch(() => {}); };
+    heartbeat();
+    const interval = window.setInterval(heartbeat, 10_000);
+    window.addEventListener("pageshow", heartbeat);
+    const onVisible = () => { if (document.visibilityState === "visible") heartbeat(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("pageshow", heartbeat);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [meetingId, readOnly]);
 
   useEffect(() => {
     const onFullscreen = () => setFullscreen(document.fullscreenElement === root.current);
