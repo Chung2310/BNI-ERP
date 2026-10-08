@@ -175,6 +175,33 @@ export const authSwagger = {
           },
         },
       },
+      delete: {
+        summary: "Xóa tài khoản đang đăng nhập",
+        description: "Yêu cầu mật khẩu hiện tại và chuỗi xác nhận chính xác. Tài khoản quản trị viên không thể tự xóa.",
+        tags: ["Xác thực (Auth)"],
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  password: { type: "string", example: "current-password" },
+                  confirmation: { type: "string", enum: ["XÓA TÀI KHOẢN"] },
+                },
+                required: ["password", "confirmation"],
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Đã xóa tài khoản và cookie refresh token" },
+          400: { description: "Mật khẩu hoặc xác nhận không hợp lệ; hoặc tài khoản không được tự xóa" },
+          401: { description: "Chưa đăng nhập hoặc access token không hợp lệ" },
+          429: { description: "Vượt giới hạn số lần yêu cầu" },
+        },
+      },
     },
     "/api/v1/auth/register-company": {
       post: {

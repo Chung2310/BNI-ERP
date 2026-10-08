@@ -124,6 +124,7 @@ const meeting = new Schema(
       }, { _id: false }),
       default: () => ({}),
     },
+    presentationDisplayHeartbeatAt: Date,
     currentIndex: { type: Number, default: -1 },
     speakerStartedAt: Date,
     speechesCompletedAt: Date,
