@@ -31,6 +31,7 @@ import {
 } from './meeting.service';
 import { recurringMeetingInput, checkinInput, controlInput, meetingInput, updateMeetingInput, bulkUpdateMeetingSeriesInput, slideProfileInput, gameWinnerInput } from './meeting.validation';
 import { updatePresentationState } from './meeting-presentation.service';
+import { getMemberPresentation, heartbeatMeetingDisplay } from './meeting-display.service';
 import { presentationStateInput, presentationStartInput, presentationDrawInput, meetingInteractionInput, meetingInteractionQuestionInput, meetingInteractionStatusInput, meetingInteractionModerationInput } from './meeting.validation';
 import { buildMeetingSlides, getMeetingSlides, updateMeetingSlide } from './meeting-slides.service';
 import {
@@ -111,6 +112,24 @@ meetingRouter.get('/:id/live', manage, async (req: import("express").Request, re
     const deck = await buildMeetingSlides(meeting);
     res.set('Cache-Control', 'no-store');
     res.json({ data: { meeting, slides: deck.slides, serverReceivedAt, serverNow: Date.now() } });
+  } catch (error) { sendError(res, error); }
+});
+
+// The display tab renews a short lease; this does not change the meeting version.
+meetingRouter.post('/:id/presentation-display/heartbeat', manage, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
+    res.set('Cache-Control', 'no-store');
+    res.json({ data: await heartbeatMeetingDisplay(company(req), req.params.id) });
+  } catch (error) { sendError(res, error); }
+});
+
+// Member-facing read only snapshot, scoped to the authenticated company.
+meetingRouter.get('/:id/presentation-display', read, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
+    res.set('Cache-Control', 'no-store');
+    res.json({ data: await getMemberPresentation(company(req), req.params.id) });
   } catch (error) { sendError(res, error); }
 });
 

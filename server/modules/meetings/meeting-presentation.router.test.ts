@@ -4,7 +4,8 @@ import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 vi.mock("../../socket", () => ({ emitToCompany: vi.fn() }));
 vi.mock("../../middleware/auth", () => ({
   requireAuth: (req: import('express').Request, _res: import('express').Response, next: import('express').NextFunction) => { req.user = { id: "organizer", email: "organizer@test.invalid", companyCode: String(req.headers["x-company"] || "BNI"), role: String(req.headers["x-role"] || "admin") }; next(); },
-  requirePermission: () => (req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => req.user.role === "admin" ? next() : res.sendStatus(403),
+  requirePermission: (permissions: string[]) => (req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) =>
+    req.user.role === "admin" || (req.user.role === "member" && permissions.includes("meetings:read")) ? next() : res.sendStatus(403),
   getEffectivePermissions: vi.fn(), hasAnyPermission: vi.fn(),
 }));
 import { MeetingModel } from "./meeting.model";
@@ -44,6 +45,38 @@ it("returns a lightweight live state without rebuilding profile slides", async (
   expect(data.data).toMatchObject({ meeting: { _id: id, __v: 2 } });
   expect(data.data).not.toHaveProperty("slides");
   expect(find).toHaveBeenCalledWith({ _id: id, companyCode: "BNI" });
+});
+it("lets a member read presentation data and expires an abandoned display", async () => {
+  const { item, find } = seed();
+  const now = Date.now();
+  item.set("presentationDisplayHeartbeatAt", new Date(now - 31_000));
+  const stale = await fetch(base + "/presentation-display", { headers: { "x-role": "member" } });
+  expect(stale.status).toBe(200);
+  expect(stale.headers.get("cache-control")).toBe("no-store");
+  expect((await stale.json()).data).toMatchObject({ meetingId: id, isOpen: false, slides: [], version: 2 });
+  item.set("presentationDisplayHeartbeatAt", new Date());
+  const active = await (await fetch(base + "/presentation-display", { headers: { "x-role": "member" } })).json();
+  expect(active.data.isOpen).toBe(true);
+  const otherCompany = await fetch(base + "/presentation-display", { headers: { "x-role": "member", "x-company": "OTHER" } });
+  expect(otherCompany.status).toBe(404);
+  expect(find).toHaveBeenCalledWith({ _id: id, companyCode: "OTHER" });
+  expect(item.save).not.toHaveBeenCalled();
+});
+it("accepts display heartbeats only from organizers in the same company", async () => {
+  const { item } = seed();
+  const update = vi.spyOn(MeetingModel, "findOneAndUpdate").mockImplementation((query, change) => {
+    if ((query as { companyCode?: string }).companyCode !== "BNI") return Promise.resolve(null) as ReturnType<typeof MeetingModel.findOneAndUpdate>;
+    item.set("presentationDisplayHeartbeatAt", (change as { $set: { presentationDisplayHeartbeatAt: Date } }).$set.presentationDisplayHeartbeatAt);
+    return Promise.resolve(item) as ReturnType<typeof MeetingModel.findOneAndUpdate>;
+  });
+  expect((await fetch(base + "/presentation-display/heartbeat", { method: "POST", headers: { "x-role": "member" } })).status).toBe(403);
+  expect((await fetch(base + "/presentation-display/heartbeat", { method: "POST", headers: { "x-company": "OTHER" } })).status).toBe(404);
+  const response = await fetch(base + "/presentation-display/heartbeat", { method: "POST" });
+  expect(response.status).toBe(200);
+  expect((await response.json()).data.isOpen).toBe(true);
+  expect(update).toHaveBeenCalledWith({ _id: id, companyCode: "BNI" }, expect.objectContaining({ $set: { presentationDisplayHeartbeatAt: expect.any(Date) } }), expect.any(Object));
+  expect(item.__v).toBe(2);
+  expect(item.save).not.toHaveBeenCalled();
 });
 it("scopes both reads and control changes to the authenticated company", async () => {
   const { item } = seed();
