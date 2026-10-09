@@ -2,6 +2,7 @@ import { findLoginAccount } from "../utils/login-account";
 import { stripLegacyUserFields } from "../utils/legacy-user-fields";
 import { verifySelfAccountDeletion } from "./self-account-deletion";
 import { PushSubscriptionModel } from "../model/push-subscription.model";
+import { MobilePushTokenModel } from "../model/mobile-push-token.model";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
@@ -45,6 +46,7 @@ export const authService = {
     try { disconnectUserSockets(userId); } catch (error) { console.error("[deleteOwnAccount] Socket cleanup failed", error); }
     const cleanup = await Promise.allSettled([
       PushSubscriptionModel.deleteMany({ uid: userId }),
+      MobilePushTokenModel.deleteMany({ uid: userId }),
     ]);
     if (cleanup.some((result) => result.status === "rejected")) {
       console.error("[deleteOwnAccount] Some account notification records could not be removed", userId);

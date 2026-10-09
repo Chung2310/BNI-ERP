@@ -3,6 +3,7 @@ import { NotificationModel } from "../model/notification.model";
 import { INotification, NotifType } from "../interface/notification.interface";
 import { UserModel } from "../model/user.model";
 import { emitToUser } from "../socket";
+import { mobilePushService } from "./mobile-push.service";
 
 export const notificationService = {
   /**
@@ -61,11 +62,20 @@ export const notificationService = {
 
     // Phát socket thời gian thực cho người nhận
     if (notification.recipientUid) {
+      const recipientUid = notification.recipientUid.toString();
       emitToUser(
-        notification.recipientUid.toString(),
+        recipientUid,
         "new_notification",
         notification.toObject()
       );
+      void mobilePushService.sendToUser(recipientUid, {
+        title: notification.title,
+        body: notification.body,
+        notificationId: notification._id.toString(),
+        type: notification.type,
+      }).catch((error) => {
+        console.error("[notificationService.createNotification] Mobile push failed:", error);
+      });
     }
 
     return notification;

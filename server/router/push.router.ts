@@ -36,6 +36,20 @@ const unsubscribeSchema = {
   }),
 };
 
+const mobileSubscribeSchema = {
+  body: Joi.object({
+    token: Joi.string().pattern(/^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$/).required(),
+    platform: Joi.string().valid("android", "ios").required(),
+    deviceName: Joi.string().max(160).optional().allow(""),
+  }),
+};
+
+const mobileUnsubscribeSchema = {
+  body: Joi.object({
+    token: Joi.string().pattern(/^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$/).required(),
+  }),
+};
+
 // Lấy VAPID public key để frontend đăng ký push
 pushRouter.get("/public-key", requireAuth, pushController.getPublicKey);
 
@@ -55,4 +69,19 @@ pushRouter.post(
   requirePermission("people:manage"),
   validateRequest(unsubscribeSchema),
   pushController.unsubscribe
+);
+
+// Mobile push là đăng ký cá nhân, mọi tài khoản đã xác thực đều được quản lý thiết bị của chính mình.
+pushRouter.post(
+  "/mobile/subscribe",
+  requireAuth,
+  validateRequest(mobileSubscribeSchema),
+  pushController.subscribeMobile,
+);
+
+pushRouter.post(
+  "/mobile/unsubscribe",
+  requireAuth,
+  validateRequest(mobileUnsubscribeSchema),
+  pushController.unsubscribeMobile,
 );
