@@ -265,8 +265,9 @@ export async function submitMeetingInteractionResponse(token: string, input: { p
   if (session.requireName && name === "Ẩn danh") throw new MeetingError(400, "Vui lòng nhập tên của bạn.");
 
   const answerMap = new Map(input.answers.map(item => [item.questionId, item.answer.trim()]));
-  if (answerMap.size !== session.questions.length || session.questions.some(item => !answerMap.get(item.id))) {
-    throw new MeetingError(400, "Vui lòng trả lời đầy đủ tất cả câu hỏi.");
+  const answeredQuestions = session.questions.filter(item => answerMap.has(item.id));
+  if (!answeredQuestions.length || answeredQuestions.length !== input.answers.length || answeredQuestions.some(item => !answerMap.get(item.id))) {
+    throw new MeetingError(400, "Vui lòng trả lời ít nhất một câu hỏi hợp lệ.");
   }
   if (!session.allowMultipleResponses) {
     const exists = await MeetingInteractionResponseModel.exists({ interactionId: session._id, participantId: input.participantId });
@@ -274,7 +275,7 @@ export async function submitMeetingInteractionResponse(token: string, input: { p
   }
 
   try {
-    const responses = await MeetingInteractionResponseModel.insertMany(session.questions.map(item => ({
+    const responses = await MeetingInteractionResponseModel.insertMany(answeredQuestions.map(item => ({
       interactionId: session._id, meetingId: session.meetingId, questionId: item.id, participantId: input.participantId,
       dedupeKey: session.allowMultipleResponses ? undefined : `${session._id}:${item.id}:${input.participantId}`,
       name, answer: answerMap.get(item.id), status: session.moderationEnabled ? "pending" : "approved",
