@@ -93,6 +93,7 @@ const sharesSchema = {
 
 // Google Drive dùng chung — đặt trước các route "/:id" để tránh trùng khớp
 resourceRouter.get("/drive/files", requireAuth, requirePermission("resource:read"), resourceController.driveList);
+resourceRouter.get("/drive/files/:fileId/download", requireAuth, requirePermission("resource:read"), resourceController.driveDownload);
 resourceRouter.post("/drive/upload", expensiveApiRateLimiter, requireAuth, requirePermission("resource:manage"), validateRequest(driveUploadSchema), resourceController.driveUpload);
 resourceRouter.delete("/drive/files/:fileId", requireAuth, requirePermission("resource:manage"), resourceController.driveDelete);
 
