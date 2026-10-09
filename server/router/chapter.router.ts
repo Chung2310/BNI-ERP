@@ -19,6 +19,10 @@ function fail(res: import("express").Response, error: unknown) {
 }
 
 function chapterAdmin(req: import("express").Request, res: import("express").Response): string | null {
+  if (req.user?.role === "superadmin") {
+    const code = (req.query.chapterCode || req.body?.chapterCode || req.user.companyCode) as string;
+    if (code) return String(code).toUpperCase();
+  }
   if (req.user?.role !== "admin" || !req.user.companyCode) {
     res.status(403).json({ status: "error", message: "Chỉ admin chapter được xử lý yêu cầu này." });
     return null;
@@ -195,7 +199,8 @@ chapterRouter.post("/admin/applications/:id/decision", async (req, res) => {
   if (!objectId(req.params.id)) return res.status(400).json({ message: "Mã đơn không hợp lệ." });
   const { error } = Joi.object({
     decision: Joi.string().valid("approved").required(),
-  }).unknown(false).validate(req.body);
+    chapterCode: Joi.string().trim().uppercase().optional(),
+  }).unknown(true).validate(req.body);
   if (error) return res.status(400).json({ message: error.message });
   try {
     const approved = await runInTransaction(async session => {
@@ -270,7 +275,8 @@ chapterRouter.post("/admin/leave-requests/:id/decision", async (req, res) => {
   if (!objectId(req.params.id)) return res.status(400).json({ message: "Mã yêu cầu không hợp lệ." });
   const { error } = Joi.object({
     decision: Joi.string().valid("approved").required(),
-  }).unknown(false).validate(req.body);
+    chapterCode: Joi.string().trim().uppercase().optional(),
+  }).unknown(true).validate(req.body);
   if (error) return res.status(400).json({ message: error.message });
   try {
     const approved = await runInTransaction(async session => {

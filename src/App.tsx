@@ -35,7 +35,16 @@ const ChapterPortal = lazy(() => import("./pages/ChapterPortal"));
 function AppContent() {
   const { user, userProfile, loading } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
-  const currentPath = normalizePublicPath(window.location.pathname);
+  const [currentPath, setCurrentPath] = React.useState(() => normalizePublicPath(window.location.pathname));
+
+  React.useEffect(() => {
+    const handleLocationChange = () => {
+      setCurrentPath(normalizePublicPath(window.location.pathname));
+    };
+    window.addEventListener("popstate", handleLocationChange);
+    return () => window.removeEventListener("popstate", handleLocationChange);
+  }, []);
+
   const isPrivacyPage = currentPath === "/privacy-policy" || currentPath === "/privacy-policy.html";
   const isTermsPage = currentPath === "/terms-of-service" || currentPath === "/terms-of-service.html";
   const isDeletionPage = currentPath === "/user-data-deletion" || currentPath === "/user-data-deletion.html";
@@ -61,11 +70,10 @@ function AppContent() {
     isMeetingCheckInPage ||
     isMeetingInteractionPage ||
     isChapterRegistrationPage ||
-    isChapterPage ||
     isWheelPage;
 
   const { activeTab, setActiveTab } = useTabRouter({
-    enabled: !isPublicPage && !loading && Boolean(user && userProfile),
+    enabled: !isPublicPage && !isChapterPage && !loading && Boolean(user && userProfile),
   });
 
   const resolvedActiveTab = resolveEnabledTab(activeTab, userProfile?.enabledModules, userProfile?.businessType);
@@ -238,10 +246,6 @@ function AppContent() {
     );
   }
 
-  if (isChapterPage || !userProfile.companyCode || userProfile.role === "superadmin") {
-    return (<Suspense fallback={<AuthLoader />}><ChapterPortal /></Suspense>);
-  }
-
   const handleSearchNavigation = (tab: TabType, subTab?: string, feeId?: string) => {
     // Cập nhật URL (path của tab đích + ?sub=) TRƯỚC khi phát popstate — nếu phát
     // popstate khi pathname còn là tab cũ, useTabRouter sẽ resolve ngược về tab cũ.
@@ -264,9 +268,18 @@ function AppContent() {
     console.log(`Global Navigation search redirected to Tab: ${tab}, Section: ${subTab || "None"}`);
   };
 
+  const chapterSeo = {
+    title: "Chapter & Tư cách thành viên",
+    description: "Cổng thông tin và quản lý tư cách thành viên Chapter BNI",
+    keywords: "chapter, bni, thanh vien, ho so",
+    path: "/chapter",
+    robots: "noindex, nofollow",
+    type: "website" as const,
+  };
+
   return (
     <div className="flex h-dvh w-full min-w-0 overflow-hidden bg-background font-sans text-on-surface" id="app_root_layout">
-      <SEOHead meta={getSeoForTab(resolvedActiveTab)} />
+      <SEOHead meta={isChapterPage ? chapterSeo : getSeoForTab(resolvedActiveTab)} />
       <Sidebar
         activeTab={resolvedActiveTab}
         setActiveTab={setActiveTab}
@@ -287,7 +300,13 @@ function AppContent() {
           }`}
           id="primary_page_container"
         >
-          <AppRouterView activeTab={resolvedActiveTab} userProfile={userProfile} />
+          {isChapterPage || !userProfile.companyCode || userProfile.role === "superadmin" ? (
+            <Suspense fallback={<AuthLoader />}>
+              <ChapterPortal />
+            </Suspense>
+          ) : (
+            <AppRouterView activeTab={resolvedActiveTab} userProfile={userProfile} />
+          )}
         </main>
       </div>
 

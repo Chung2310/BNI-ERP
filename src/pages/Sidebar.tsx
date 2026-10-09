@@ -21,8 +21,9 @@ import {
 } from "../config/brand";
 import type { TabType } from "../types";
 import { useAuth } from "../context/AuthContext";
-import { useIsMobile } from "../hooks/useMediaQuery";
 import { filterEnabledTabs, MODULE_READ_PERMISSIONS } from "../config/modules";
+import { tabToPath } from "../seo/seo-config";
+import { useIsMobile } from "../hooks/useMediaQuery";
 
 interface SidebarProps {
   activeTab: TabType;
@@ -93,6 +94,20 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, onMobileC
   const isMobile = useIsMobile();
   const isCollapsed = isCollapsedState && !isMobile;
 
+  const [currentPath, setCurrentPath] = useState(() =>
+    typeof window !== "undefined" ? window.location.pathname : ""
+  );
+
+  useEffect(() => {
+    const handlePop = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener("popstate", handlePop);
+    return () => window.removeEventListener("popstate", handlePop);
+  }, []);
+
+  const isChapterActive = currentPath === "/chapter";
+
   useEffect(() => {
     if (!isMobile || !mobileOpen) return;
     const previousOverflow = document.body.style.overflow;
@@ -153,7 +168,13 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, onMobileC
           <img
             src="/igen-connect-transparent.png"
             alt={BRAND_NAME}
-            onClick={() => setActiveTab("TỔNG QUAN")}
+            onClick={() => {
+              if (window.location.pathname === "/chapter") {
+                window.history.pushState(null, "", tabToPath("TỔNG QUAN"));
+                window.dispatchEvent(new Event("popstate"));
+              }
+              setActiveTab("TỔNG QUAN");
+            }}
             title="Về trang Tổng quan"
             className={`cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98] ${
               isCollapsed
@@ -165,7 +186,35 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, onMobileC
 
         {/* Navigation Menu */}
         <nav className={`flex-1 select-none space-y-5 overflow-y-auto ${isCollapsed ? "px-2 py-4" : "px-3 py-4"}`} id="sidebar_nav">
-          <a href="/chapter" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sky-700 hover:bg-sky-50" title="Chapter và tư cách thành viên"><Users className="h-5 w-5" />{!isCollapsed && <span>Chapter của tôi</span>}</a>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.location.pathname !== "/chapter") {
+                window.history.pushState(null, "", "/chapter");
+                window.dispatchEvent(new Event("popstate"));
+              }
+              onMobileClose();
+            }}
+            className={`group flex w-full items-center rounded-xl px-3 py-2.5 text-left font-sans text-sm font-medium transition-all active:scale-[0.98] ${
+              isChapterActive
+                ? "bg-sky-50 text-sky-700 font-semibold shadow-xs"
+                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+            } ${isCollapsed ? "justify-center" : "justify-between"}`}
+            id="sidebar_menu_chapter"
+            title={isCollapsed ? "Chapter của tôi" : undefined}
+          >
+            <div className={`flex min-w-0 items-center ${isCollapsed ? "justify-center" : "gap-3"}`}>
+              <Users
+                className={`h-5 w-5 shrink-0 transition-colors ${
+                  isChapterActive ? "text-sky-600" : "text-slate-400 group-hover:text-slate-600"
+                }`}
+              />
+              {!isCollapsed ? <span className="truncate">Chapter của tôi</span> : null}
+            </div>
+            {!isCollapsed && isChapterActive ? (
+              <span className="h-2 w-2 shrink-0 rounded-full bg-sky-500 ring-2 ring-sky-200" />
+            ) : null}
+          </button>
           {groups.map((groupKey) => {
             const itemsInGroup = menuItems.filter((item) => item.group === groupKey);
             if (itemsInGroup.length === 0) return null;
@@ -179,7 +228,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, onMobileC
                 ) : null}
 
                 {itemsInGroup.map((item) => {
-                  const isActive = activeTab === item.label;
+                  const isActive = !isChapterActive && activeTab === item.label;
                   const Icon = item.icon;
 
                   return (
@@ -187,6 +236,10 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, onMobileC
                       key={item.label}
                       onClick={() => {
                         if (item.locked) return;
+                        if (window.location.pathname === "/chapter") {
+                          window.history.pushState(null, "", tabToPath(item.label));
+                          window.dispatchEvent(new Event("popstate"));
+                        }
                         setActiveTab(item.label);
                         onMobileClose();
                       }}

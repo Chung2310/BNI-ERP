@@ -166,10 +166,10 @@ function MeetingWorkspace() {
   useEffect(() => { detailMeetingIdRef.current = detailMeetingId; }, [detailMeetingId]);
   // Mỗi nội dung trong popup là một lựa chọn độc lập; người dùng có thể mở trực tiếp.
   const [flowStep, setFlowStep] = useState<MeetingFlowStep>("checkin");
-  const [slidesOpen, setSlidesOpen] = useState(false);
+  const [slidesOpen, setSlidesOpen] = useState(true);
   const goToFlowStep = useCallback((step: MeetingFlowStep) => {
     setFlowStep(step);
-    setSlidesOpen(false);
+    setSlidesOpen(true);
   }, []);
   const meetingFlowSteps = useRef(new Map<string, MeetingFlowStep>());
   const getMeetingFlowStep = (meetingId: string): MeetingFlowStep => {
@@ -1355,100 +1355,21 @@ function MeetingWorkspace() {
               {flowStep === "presentation" && (
                 <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
                   <div role="group" aria-label="Chế độ xem thuyết trình" className="inline-flex rounded-xl bg-slate-100 p-1 shrink-0">
-                    <button type="button" aria-pressed={!slidesOpen} onClick={() => setSlidesOpen(false)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 transition aria-pressed:bg-white aria-pressed:font-semibold aria-pressed:text-cyan-700 aria-pressed:shadow-2xs cursor-pointer"><Users className="h-3.5 w-3.5" /> Bảng điều hành</button>
-                    <button type="button" aria-pressed={slidesOpen} onClick={() => setSlidesOpen(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 transition aria-pressed:bg-white aria-pressed:font-semibold aria-pressed:text-cyan-700 aria-pressed:shadow-2xs cursor-pointer"><Megaphone className="h-3.5 w-3.5" /> Slide trình chiếu</button>
+                    <button type="button" aria-pressed={true} onClick={() => setSlidesOpen(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-cyan-700 bg-white shadow-2xs transition cursor-pointer">
+                      <Megaphone className="h-3.5 w-3.5" /> Slide trình chiếu
+                    </button>
                   </div>
 
-                  {!slidesOpen && !["ended", "cancelled"].includes(activeMeeting.status) && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button type="button" disabled={saving || !activeMeeting.speakers.length}
-                        onClick={() => {
-                          const targetSpeakerId = (checkedSpeakerIds.length > 0 ? checkedSpeakerIds[checkedSpeakerIds.length - 1] : presentationSpeakerId) || "";
-                          if (targetSpeakerId) setPresentationSpeakerId(targetSpeakerId);
-                          autoStartPresentation.current = true;
-                          setPresentationFullscreen(document.documentElement.requestFullscreen && !document.fullscreenElement
-                            ? document.documentElement.requestFullscreen().then(() => true).catch(() => false)
-                            : null);
-                          setStartPresentation(true); setFlowStep("presentation"); setSlidesOpen(true);
-                        }}
-                        className="flex items-center gap-1.5 rounded-xl bg-cyan-600 px-4 py-2 text-xs font-bold text-white shadow-sm shadow-cyan-600/20 disabled:opacity-40 hover:bg-cyan-700 transition cursor-pointer">
-                        <Play className="h-3.5 w-3.5" /> Bắt đầu thuyết trình
-                      </button>
-                      {canManage && activeMeeting.status === "scheduled" && (
-                        <button
-                          type="button"
-                          onClick={() => setStartingMeeting(activeMeeting)}
-                          disabled={saving}
-                          className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-medium shadow-sm shadow-emerald-600/20 transition cursor-pointer"
-                        >
-                          <Play className="h-3.5 w-3.5" fill="currentColor" />
-                          Bắt đầu cuộc họp
-                        </button>
-                      )}
-
-                      {canManage && activeMeeting.status === "live" && (
-                        <>
-                          <button
-                            type="button"
-                            disabled={saving}
-                            onClick={() => control("pause")}
-                            className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 px-3.5 py-2 text-xs font-medium transition cursor-pointer"
-                          >
-                            <Pause className="h-3.5 w-3.5" />
-                            Tạm dừng
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={saving || !current}
-                            onClick={() => control("next")}
-                            className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3.5 py-2 text-xs font-medium shadow-sm shadow-cyan-600/20 transition cursor-pointer"
-                          >
-                            {upcoming ? "Người tiếp theo ❯" : "Hoàn tất phát biểu"}
-                          </button>
-
-                          {autoAdvance && (
-                            <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-cyan-50 border border-cyan-200/80 text-[11px] font-medium text-cyan-700">
-                              <Sparkles className="h-3 w-3 text-cyan-600" />
-                              Hết giờ → chuyển ngay người & slide
-                            </span>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => setFinishRequested(true)}
-                            className="flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 text-xs font-medium transition cursor-pointer"
-                          >
-                            <Square className="h-3 w-3" fill="currentColor" />
-                            Kết thúc
-                          </button>
-                        </>
-                      )}
-
-                      {canManage && activeMeeting.status === "paused" && (
-                        <>
-                          <button
-                            type="button"
-                            disabled={saving}
-                            onClick={() => control("resume")}
-                            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 text-xs font-medium shadow-sm transition cursor-pointer"
-                          >
-                            <Play className="h-3.5 w-3.5" fill="currentColor" />
-                            Tiếp tục
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={saving || !current}
-                            onClick={() => control("next")}
-                            className="flex items-center gap-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-3.5 py-2 text-xs font-medium transition cursor-pointer"
-                          >
-                            {upcoming ? "Người tiếp theo ❯" : "Hoàn tất phát biểu"}
-                          </button>
-                          <button type="button" disabled={saving} onClick={() => setFinishRequested(true)} className="rounded-xl bg-slate-800 hover:bg-slate-900 px-4 py-2 text-xs font-medium text-white transition cursor-pointer">Kết thúc</button>
-                        </>
-                      )}
-                    </div>
+                  {canManage && activeMeeting.status === "scheduled" && (
+                    <button
+                      type="button"
+                      onClick={() => setStartingMeeting(activeMeeting)}
+                      disabled={saving}
+                      className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-medium shadow-sm shadow-emerald-600/20 transition cursor-pointer"
+                    >
+                      <Play className="h-3.5 w-3.5" fill="currentColor" />
+                      Bắt đầu cuộc họp
+                    </button>
                   )}
                 </div>
               )}
