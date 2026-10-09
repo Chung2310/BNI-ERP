@@ -11,6 +11,7 @@ import {
   File
 } from "lucide-react";
 import { toast } from "./Toast";
+import { downloadMediaFile } from "../utils/mediaDownload";
 
 
 interface IAttachment {
@@ -326,9 +327,11 @@ export default function SubmitProofPage() {
                   {assignment.attachments.map((file, idx) => (
                     <a
                       key={idx}
-                      href={file.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href="#"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        void downloadMediaFile(file.url, file.name).catch((error) => toast.error(error.message));
+                      }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 rounded-xl transition text-slate-600"
                     >
                       <Paperclip className="h-3.5 w-3.5" />
@@ -403,9 +406,12 @@ export default function SubmitProofPage() {
                       className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 bg-slate-50/50 text-xs min-w-0"
                     >
                       <a
-                        href={file.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href="#"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          void downloadMediaFile(file.url, file.name).catch((error) => toast.error(error.message));
+                        }}
                         className="flex items-center gap-2 min-w-0 flex-1 hover:text-indigo-600 transition"
                       >
                         <File className="h-4 w-4 text-slate-450 shrink-0" />
