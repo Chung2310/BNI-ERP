@@ -1,6 +1,7 @@
 import { Router } from "express";
 import mongoose from "mongoose";
 import { authRouter } from "./auth.router";
+import { chapterRouter } from "./chapter.router";
 import { permissionRouter } from "./permission.router";
 import { rolePermissionRouter } from "./role-permission.router";
 import { crudRouter } from "./crud.router";
@@ -54,6 +55,7 @@ apiRouter.use("/resources", requireAuth, requireModule("resource"), resourceRout
 
 // Gắn kết router phụ của Xác thực JWT
 apiRouter.use("/auth", authRouter);
+apiRouter.use("/chapters", chapterRouter);
 
 // Gắn kết router phụ của Quản lý mã quyền hệ thống
 apiRouter.use("/permissions", permissionRouter);

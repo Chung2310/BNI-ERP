@@ -45,6 +45,7 @@ function shouldSkipRoutineAuthLog(method: string, url: string) {
  * Danh sách mã quyền mặc định của hệ thống cho từng vai trò
  */
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
+  superadmin: [],
   admin: ["dashboard:manage", "people:manage", "relationship:manage", "hr:manage", "meetings:manage", "resource:manage", "chat:manage", "settings:manage", "access:manage"],
   manager: [
     "dashboard:read", "access:read",
@@ -60,6 +61,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
  * Cấp bậc mặc định của các vai trò hệ thống (Số nhỏ hơn = cấp cao hơn)
  */
 export const DEFAULT_ROLE_LEVELS: Record<string, number> = {
+  superadmin: 0,
   admin: 1,
   manager: 2,
   user: 3,
@@ -91,23 +93,37 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     const decoded = jwt.verify(token, getJwtAccessSecret());
       if (typeof decoded === "string") throw new Error("Invalid token payload");
 
-    const userDoc = await UserModel.findById(decoded.id).select("branchId displayName").lean();
+    const userDoc = await UserModel.findById(decoded.id).select("branchId displayName role companyCode email disabledAt").lean();
     if (!userDoc) {
       return res.status(401).json({ status: "error", message: "Mã xác thực không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại." });
+    }
+    if (userDoc.disabledAt) return res.status(401).json({ status: "error", message: "Tài khoản đã bị vô hiệu hóa." });
+
+    const currentRole = String(userDoc.role || "user");
+    const currentCompanyCode = userDoc.companyCode ? String(userDoc.companyCode) : undefined;
+    const path = req.originalUrl.split("?")[0];
+    const accountOnlyPaths = new Set([
+      "/api/v1/auth/me", "/api/v1/auth/profile", "/api/v1/auth/logout",
+      "/api/v1/auth/change-password",
+      "/api/v1/auth/profile/avatar",
+    ]);
+    const superadminCompanyCreation = currentRole === "superadmin" && path === "/api/v1/auth/register-company";
+    if (!currentCompanyCode && !accountOnlyPaths.has(path) && !path.startsWith("/api/v1/chapters") && !superadminCompanyCreation) {
+      return res.status(403).json({ status: "error", message: "Tài khoản chưa là thành viên chapter. Vui lòng nộp đơn và chờ duyệt." });
     }
 
     let branchId = userDoc?.branchId ? String(userDoc.branchId) : undefined;
     const requestedBranchId = typeof req.headers["x-branch-id"] === "string" ? req.headers["x-branch-id"] : "";
-    if (decoded.role === "admin" && requestedBranchId && decoded.companyCode) {
-      const selectedBranch = await BranchModel.findOne({ _id: requestedBranchId, companyCode: String(decoded.companyCode).toUpperCase(), isActive: true }).select("_id").lean();
+    if (currentRole === "admin" && requestedBranchId && currentCompanyCode) {
+      const selectedBranch = await BranchModel.findOne({ _id: requestedBranchId, companyCode: currentCompanyCode.toUpperCase(), isActive: true }).select("_id").lean();
       if (!selectedBranch) return res.status(403).json({ status: "error", message: "Chi nhánh không thuộc công ty hoặc đã ngừng hoạt động." });
       branchId = String(selectedBranch._id);
     }
     req.user = {
       id: decoded.id,
-      email: decoded.email,
-      role: decoded.role,
-      companyCode: decoded.companyCode,
+      email: String(userDoc.email || decoded.email),
+      role: currentRole,
+      companyCode: currentCompanyCode,
       branchId,
       sessionId: decoded.sid,
       authLevel: decoded.authLevel,

@@ -37,6 +37,7 @@ const UserSchema = new Schema<IUser>({
   status: { type: String, enum: ["online", "offline"], default: "offline" },
   companyCode: { type: String, index: true },
   companyName: { type: String },
+  membershipStatus: { type: String, enum: ["none", "active"], default: "none" },
   branchId: { type: String, index: true },
   activeSessionId: { type: String, default: "" },
   activeSessionIssuedAt: { type: Date },

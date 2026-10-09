@@ -39,17 +39,10 @@ export default function SettingsTab() {
   }, [userProfile, isAdmin, activeSubTab, setActiveSubTab]);
 
   // Synchronize display name and photo url from context if it updates
-  const [previousInputs1, setPreviousInputs1] = useState<unknown[] | null>(null);
-  if (previousInputs1 === null || !Object.is(previousInputs1[0], userProfile)) {
-    setPreviousInputs1([userProfile]);
-    if (userProfile?.displayName) {
-      setDisplayName(userProfile.displayName);
-    }
-    if (userProfile?.photoURL) {
-      setPhotoURL(userProfile.photoURL);
-    }
-
-  }
+  React.useEffect(() => {
+    if (userProfile?.displayName) setDisplayName(userProfile.displayName);
+    if (userProfile?.photoURL) setPhotoURL(userProfile.photoURL);
+  }, [userProfile?.displayName, userProfile?.photoURL]);
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();

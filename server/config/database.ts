@@ -48,12 +48,13 @@ async function seedAdminUser() {
         businessType: "general",
         enabledModules: DEFAULT_MODULE_KEYS,
         lifecycleStatus: "active",
+        isBniChapter: true,
         createdAt: new Date(),
       });
       await company.save();
       console.log(`[Backend Database] Khởi tạo doanh nghiệp mặc định: ${seedCompanyCode} - ${seedCompanyName}`);
-    } else if (company.lifecycleStatus !== "active") {
-      company.lifecycleStatus = "active";
+    } else if (!company.isBniChapter) {
+      company.isBniChapter = true;
       await company.save();
     }
 
@@ -82,6 +83,7 @@ async function seedAdminUser() {
         password: hashedPassword,
         displayName: seedName,
         role: "admin",
+        membershipStatus: "active",
         companyCode: seedCompanyCode,
         companyName: seedCompanyName,
         phone: seedPhone,
@@ -123,6 +125,29 @@ async function seedAdminUser() {
   } catch (error) {
     console.error("[Backend Database] Lỗi khi tự động khởi tạo tài khoản Admin:", error);
   }
+}
+
+async function seedSuperadminUser() {
+  const email = process.env.SEED_SUPERADMIN_EMAIL?.toLowerCase().trim();
+  const password = process.env.SEED_SUPERADMIN_PASSWORD;
+  if (!email && !password) return;
+  if (!email || !password || password.length < 12) {
+    throw new Error("SEED_SUPERADMIN_EMAIL và SEED_SUPERADMIN_PASSWORD (ít nhất 12 ký tự) phải được cấu hình cùng nhau.");
+  }
+  if (email === (process.env.SEED_ADMIN_EMAIL || "admin@bni.vn").toLowerCase().trim()) {
+    throw new Error("Email superadmin phải khác tài khoản admin chapter mặc định.");
+  }
+  const existing = await UserModel.findOne({ email });
+  if (existing) {
+    if (existing.role !== "superadmin" || existing.companyCode) throw new Error("Email superadmin đã thuộc tài khoản khác.");
+    return;
+  }
+  await UserModel.create({
+    email, password: await bcrypt.hash(password, 12),
+    displayName: process.env.SEED_SUPERADMIN_NAME?.trim() || "Quản trị hệ thống BNI",
+    role: "superadmin", membershipStatus: "none", isActive: true, permissions: [],
+  });
+  console.log(`[Backend Database] Đã tạo superadmin: ${email}`);
 }
 
 /**
@@ -171,6 +196,7 @@ export async function connectDB() {
       console.warn(`[Backend Database] Permission registry clean-break reset applied: ${permissionReset.rolesReset} role(s), ${permissionReset.usersReset} user(s). Administrators must configure permissions again.`);
     }
     await seedAdminUser();
+    await seedSuperadminUser();
   } catch (error) {
     console.error("[Backend Database] Lỗi kết nối MongoDB:", error);
     process.exit(1);

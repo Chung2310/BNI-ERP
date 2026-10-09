@@ -165,6 +165,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, onMobileC
 
         {/* Navigation Menu */}
         <nav className={`flex-1 select-none space-y-5 overflow-y-auto ${isCollapsed ? "px-2 py-4" : "px-3 py-4"}`} id="sidebar_nav">
+          <a href="/chapter" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sky-700 hover:bg-sky-50" title="Chapter và tư cách thành viên"><Users className="h-5 w-5" />{!isCollapsed && <span>Chapter của tôi</span>}</a>
           {groups.map((groupKey) => {
             const itemsInGroup = menuItems.filter((item) => item.group === groupKey);
             if (itemsInGroup.length === 0) return null;

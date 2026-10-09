@@ -29,6 +29,8 @@ const PublicRegisterPage = lazy(() => import("./pages/PublicRegisterPage"));
 const WheelOfNamesPage = lazy(() => import("./pages/WheelOfNamesPage"));
 const MeetingCheckInPage = lazy(() => import("./pages/MeetingCheckInPage"));
 const MeetingInteractionPage = lazy(() => import("./pages/MeetingInteractionPage"));
+const ChapterRegistrationPage = lazy(() => import("./pages/ChapterRegistrationPage"));
+const ChapterPortal = lazy(() => import("./pages/ChapterPortal"));
 
 function AppContent() {
   const { user, userProfile, loading } = useAuth();
@@ -41,6 +43,8 @@ function AppContent() {
   const isPublicRegisterPage = currentPath.startsWith("/public/dang-ky");
   const isMeetingCheckInPage = currentPath.startsWith("/meeting-checkin/");
   const isMeetingInteractionPage = currentPath.startsWith("/meeting-interaction/");
+  const isChapterRegistrationPage = currentPath === "/dang-ky-thanh-vien";
+  const isChapterPage = currentPath === "/chapter";
   const isWheelPage =
     currentPath === "/wheel-of-names" ||
     currentPath === "/wheel-of-names.html" ||
@@ -56,6 +60,8 @@ function AppContent() {
     isPublicRegisterPage ||
     isMeetingCheckInPage ||
     isMeetingInteractionPage ||
+    isChapterRegistrationPage ||
+    isChapterPage ||
     isWheelPage;
 
   const { activeTab, setActiveTab } = useTabRouter({
@@ -158,6 +164,10 @@ function AppContent() {
     return (<Suspense fallback={<AuthLoader />}><MeetingInteractionPage /></Suspense>);
   }
 
+  if (isChapterRegistrationPage) {
+    return (<Suspense fallback={<AuthLoader />}><ChapterRegistrationPage /></Suspense>);
+  }
+
   if (isPublicRegisterPage) {
     return (
       <Suspense fallback={<AuthLoader />}>
@@ -226,6 +236,10 @@ function AppContent() {
         </Suspense>
       </>
     );
+  }
+
+  if (isChapterPage || !userProfile.companyCode || userProfile.role === "superadmin") {
+    return (<Suspense fallback={<AuthLoader />}><ChapterPortal /></Suspense>);
   }
 
   const handleSearchNavigation = (tab: TabType, subTab?: string, feeId?: string) => {

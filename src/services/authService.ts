@@ -36,13 +36,13 @@ export const authService = {
     return data;
   },
   // Đăng ký bằng Email & Mật khẩu
-  async registerWithEmail(email: string, password: string, displayName: string) {
+  async registerWithEmail(email: string, password: string, displayName: string, details?: { phone?: string; companyName?: string; industry?: string }) {
     const res = await fetch("/api/v1/auth/register", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email, password, displayName }),
+      body: JSON.stringify({ email, password, displayName, ...details }),
     });
 
     if (!res.ok) {
