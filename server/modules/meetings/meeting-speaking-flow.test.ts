@@ -53,7 +53,7 @@ test("previous speaker resets the target timer and preserves live or paused stat
     assert.equal(item.status, status);
     assert.equal(item.elapsedSeconds, 0);
     assert.equal(item.speakerStartedAt, status === "live" ? now : undefined);
-    assert.equal(item.speakers[1].spokenSeconds, status === "live" ? 30 : 12);
+    assert.equal(item.speakers[1].spokenSeconds, status === "live" ? 20 : 12);
     await assert.rejects(controlMeeting((item as unknown as Parameters<typeof controlMeeting>[0]), "previous", now), { status: 409 });
   }
 });
@@ -64,6 +64,21 @@ test("next switches the shared display to speaker view", async () => {
   await controlMeeting((item as unknown as Parameters<typeof controlMeeting>[0]), "next", now);
   assert.equal(item.currentIndex, 1);
   assert.equal(item.presentation?.view, "speaker");
+});
+test("manual next records no more than the allocated speaking time after a long delay", async () => {
+  const item = meeting();
+  item.currentIndex = 1;
+  item.speakerStartedAt = new Date(+now - 6_083_000);
+  await controlMeeting((item as unknown as Parameters<typeof controlMeeting>[0]), "next", now);
+  assert.equal(item.speakers[1].seconds, 20);
+  assert.equal(item.speakers[1].spokenSeconds, 20);
+});
+test("changing the presenter also caps the completed speaker's recorded time", async () => {
+  const item = meeting();
+  item.currentIndex = 1;
+  item.speakerStartedAt = new Date(+now - 6_083_000);
+  await startMeetingPresentation((item as unknown as Parameters<typeof startMeetingPresentation>[0]), "chair", now);
+  assert.equal(item.speakers[1].spokenSeconds, 20);
 });
 test("deferring the current speaker moves them to the end and starts the next allocated turn", async () => {
   const item = meeting();

@@ -9,7 +9,7 @@ const { meetingInput, updateMeetingInput, recurringMeetingInput } = await import
 
 function setup(t: import("node:test").TestContext) {
   const queries: Array<{ _id?: string; companyCode?: string; isActive?: { $ne?: boolean } }> = [];
-  const item = { _id: "meeting", companyCode: "ACME", status: "scheduled", latitude: 10, longitude: 106, gpsRadiusMeters: 200, allowDirectCheckIn: undefined as boolean | undefined,
+  const item = { _id: "meeting", companyCode: "ACME", status: "scheduled", startsAt: new Date(), endsAt: new Date(Date.now() + 2 * 60 * 60 * 1000), latitude: 10, longitude: 106, gpsRadiusMeters: 200, allowDirectCheckIn: undefined as boolean | undefined,
     speakers: [], tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20, save: async () => {} };
   t.mock.method(UserModel, "findOne", (query) => {
     queries.push(query);
@@ -45,6 +45,24 @@ test("scheduled legacy meetings allow direct GPS attendance regardless of the ol
     assert.equal(item.speakers[0].userId, "member");
   }
   assert.equal(queries.length, 3);
+});
+test("direct GPS check-in follows the two-hour meeting window", async t => {
+  const { item } = setup(t);
+  const now = Date.now();
+  item.startsAt = new Date(now + 2 * 60 * 60 * 1000 + 60_000);
+  item.endsAt = new Date(now + 4 * 60 * 60 * 1000);
+  await assert.rejects(checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { latitude: 10, longitude: 106 }, "member", false), { status: 409 });
+  assert.equal(item.speakers.length, 0);
+
+  item.startsAt = new Date(now + 60 * 60 * 1000);
+  await checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { latitude: 10, longitude: 106 }, "member", false);
+  assert.equal(item.speakers.length, 1);
+
+  item.speakers = [];
+  item.startsAt = new Date(now - 4 * 60 * 60 * 1000);
+  item.endsAt = new Date(now - 60_000);
+  await assert.rejects(checkInFromModule((item as unknown as Parameters<typeof checkInFromModule>[0]), { latitude: 10, longitude: 106 }, "member", false), { status: 409 });
+  assert.equal(item.speakers.length, 0);
 });
 test("members check themselves in once without QR after GPS verification in open meeting states", async t => {
   const { item, queries } = setup(t);

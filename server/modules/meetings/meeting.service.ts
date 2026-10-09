@@ -295,6 +295,13 @@ export async function checkIn(item: MeetingDocument, input: CheckInInput, actorI
   if (!['scheduled', 'live', 'paused'].includes(item.status)) {
     throw new MeetingError(409, 'Cuộc họp đã dừng check-in.');
   }
+  const now = new Date();
+  if (new Date(item.startsAt).getTime() > now.getTime() + DEFAULT_MEETING_DURATION_MS) {
+    throw new MeetingError(409, 'Chưa đến giờ check-in. Vui lòng quay lại từ 2 giờ trước khi cuộc họp bắt đầu.');
+  }
+  if (item.status === 'scheduled' && meetingEndsAt(item.startsAt, item.endsAt) <= now) {
+    throw new MeetingError(409, 'Cuộc họp đã đóng điểm danh.');
+  }
   if (!canManage && (input.name || (input.userId && input.userId !== actorId))) {
     throw new MeetingError(403, 'Bạn chỉ có thể tự check-in.');
   }
@@ -458,7 +465,7 @@ export async function startMeetingPresentation(
     item.set('speakers', allocateSpeakers(item.speakers.map((person) => person.toObject()), item.tiers.map(tier => ({ ...tier.toObject(), seconds: tier.seconds ?? item.fallbackSeconds })), item.fallbackSeconds));
   }
   if (!sameSpeaker) {
-    if (item.status !== 'scheduled' && item.speakers[item.currentIndex]) item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
+    if (item.status !== 'scheduled' && item.speakers[item.currentIndex]) item.speakers[item.currentIndex].spokenSeconds = completedSpeakingSeconds(item, now);
     item.currentIndex = index;
     item.elapsedSeconds = 0;
     item.speakers[index].spokenSeconds = undefined;
@@ -502,6 +509,11 @@ export function setMeetingPresentationView(item: MeetingDocument, view: Presenta
   item.set('presentation', { ...state, view, speakerTimerPausedByView });
 }
 
+function completedSpeakingSeconds(item: MeetingDocument, now: Date) {
+  const speaker = item.speakers[item.currentIndex];
+  return Math.min(speaker.seconds, Math.max(0, elapsedSeconds(item, now)));
+}
+
 export async function controlMeeting(item: MeetingDocument, action: string, now = new Date(), options: { nextSpeakerStartsAt?: Date } = {}) {
   assertMeetingEditable(item);
   const status = item.status;
@@ -543,7 +555,7 @@ export async function controlMeeting(item: MeetingDocument, action: string, now 
     item.speakerStartedAt = item.speakers[item.currentIndex] && item.elapsedSeconds > 0 ? now : undefined;
   } else if (action === 'finish' && ['live', 'paused'].includes(status)) {
     if (item.speakers[item.currentIndex]) {
-      item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
+      item.speakers[item.currentIndex].spokenSeconds = completedSpeakingSeconds(item, now);
     }
     item.status = 'ended';
     item.endedAt = now;
@@ -552,7 +564,7 @@ export async function controlMeeting(item: MeetingDocument, action: string, now 
     throw new MeetingError(409, 'Cuộc họp phải đang diễn ra mới có thể kết thúc.');
   } else if (action === 'previous' && ['live', 'paused'].includes(status)) {
     if (item.currentIndex <= 0) throw new MeetingError(409, 'Đang ở người phát biểu đầu tiên.');
-    item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
+    item.speakers[item.currentIndex].spokenSeconds = completedSpeakingSeconds(item, now);
     item.currentIndex--;
     item.speakers[item.currentIndex].deferred = false;
     item.elapsedSeconds = 0;
@@ -560,7 +572,7 @@ export async function controlMeeting(item: MeetingDocument, action: string, now 
     item.speakerStartedAt = status === 'live' ? now : undefined;
   } else if (action === 'next' && ['live', 'paused'].includes(status)) {
     if (item.speakers[item.currentIndex]) {
-      item.speakers[item.currentIndex].spokenSeconds = elapsedSeconds(item, now);
+      item.speakers[item.currentIndex].spokenSeconds = completedSpeakingSeconds(item, now);
     }
     if (item.currentIndex + 1 >= item.speakers.length) {
       item.currentIndex = item.speakers.length;
