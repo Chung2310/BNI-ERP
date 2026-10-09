@@ -106,6 +106,11 @@ const updateProfileSchema = {
       "string.uri": "Ảnh đại diện phải là một đường dẫn URL hợp lệ.",
     }),
     coverImage: Joi.string().optional().allow(""),
+    galleryImages: Joi.array().items(Joi.string().uri()).max(5).optional(),
+    galleryUploadTokens: Joi.array().items(Joi.object({
+      index: Joi.number().integer().min(0).max(4).required(),
+      uploadToken: Joi.string().trim().required(),
+    }).unknown(false)).max(5).optional(),
     industry: Joi.string().optional().allow(""),
     phone: Joi.string().pattern(vnPhoneRegex).optional().allow(""),
     birthDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow("", null),

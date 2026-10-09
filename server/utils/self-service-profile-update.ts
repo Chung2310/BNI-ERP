@@ -3,6 +3,7 @@ const SELF_SERVICE_PROFILE_FIELDS = [
   "email",
   "photoURL",
   "coverImage",
+  "galleryImages",
   "industry",
   "phone",
   "birthDate",
