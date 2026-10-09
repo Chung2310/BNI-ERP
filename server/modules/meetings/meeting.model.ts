@@ -149,6 +149,7 @@ const meeting = new Schema(
 meeting.index({ companyCode: 1, startsAt: -1 });
 meeting.index({ companyCode: 1, seriesId: 1 });
 meeting.index({ status: 1, reminderAt: 1 });
+meeting.index({ status: 1, endsAt: 1 });
 meeting.index({ status: 1, "presentation.autoAdvance": 1 });
 
 export const MeetingModel = model('Meeting', meeting);

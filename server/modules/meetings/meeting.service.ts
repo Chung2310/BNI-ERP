@@ -378,6 +378,37 @@ export async function autoStartDueMeetings(now = new Date()) {
   return dueMeetings.length;
 }
 
+const AUTO_END_GRACE_MS = 3 * 60 * 60 * 1000;
+
+export async function autoEndDueMeetings(now = new Date()) {
+  const cutoff = new Date(now.getTime() - AUTO_END_GRACE_MS);
+  const dueMeetings = await MeetingModel.find({
+    status: { $in: ['scheduled', 'live', 'paused'] },
+    $or: [
+      { endsAt: { $lte: cutoff } },
+      { endsAt: null, startsAt: { $lte: new Date(cutoff.getTime() - DEFAULT_MEETING_DURATION_MS) } },
+    ],
+  });
+  let ended = 0;
+  for (const item of dueMeetings) {
+    const deadline = new Date(meetingEndsAt(item.startsAt, item.endsAt).getTime() + AUTO_END_GRACE_MS);
+    if (deadline > now) continue;
+    try {
+      if (item.status === 'scheduled') {
+        item.status = 'ended';
+        item.endedAt = deadline;
+        await saveMeeting(item);
+      } else {
+        await controlMeeting(item, 'finish', deadline);
+      }
+      ended++;
+    } catch (error) {
+      if (!(error instanceof MeetingError && error.status === 409)) throw error;
+    }
+  }
+  return ended;
+}
+
 export async function notifyNextSpeaker(item: MeetingDocument) {
   const next = item.speakers[item.currentIndex + 1];
   if (!next?.userId || !['live', 'paused'].includes(item.status)) return;
