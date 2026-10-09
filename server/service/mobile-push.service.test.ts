@@ -109,4 +109,18 @@ describe("mobilePushService", () => {
       token: { $in: ["fcm_registration_token_stale_456"] },
     });
   });
+
+  it("surfaces Firebase credential failures instead of silently dropping every push", async () => {
+    dependencies.lean.mockResolvedValue([{ token: "fcm_registration_token_123456789" }]);
+    dependencies.sendEachForMulticast.mockResolvedValue({
+      responses: [{ success: false, error: { code: "messaging/mismatched-credential" } }],
+    });
+
+    await expect(mobilePushService.sendToUser("member", {
+      title: "Thong bao",
+      body: "Noi dung",
+      notificationId: "notification-id",
+      type: "he-thong",
+    })).rejects.toThrow("messaging/mismatched-credential");
+  });
 });
