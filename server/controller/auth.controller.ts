@@ -322,6 +322,14 @@ export const authController = {
           actorName: userObj.displayName || userObj.email,
         }, userObj, req.body.coverUploadToken);
       }
+      if (Array.isArray(req.body.galleryUploadTokens) && req.body.galleryUploadTokens.length > 0) {
+        await profileResourceService.finalizeGallery({
+          companyCode: userObj.companyCode,
+          branchId: userObj.branchId,
+          actorId: userId,
+          actorName: userObj.displayName || userObj.email,
+        }, userObj, req.body.galleryUploadTokens);
+      }
       const company = userObj.companyCode && userObj.companyCode !== "SYSTEM"
         ? await CompanyModel.findOne({ code: userObj.companyCode }).select("enabledModules businessType driveOAuth driveFolderId").lean()
         : null;
