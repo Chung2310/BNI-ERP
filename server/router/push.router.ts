@@ -38,15 +38,16 @@ const unsubscribeSchema = {
 
 const mobileSubscribeSchema = {
   body: Joi.object({
-    token: Joi.string().pattern(/^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$/).required(),
+    token: Joi.string().trim().min(20).max(4096).pattern(/^\S+$/).required(),
     platform: Joi.string().valid("android", "ios").required(),
+    provider: Joi.string().valid("fcm").optional(),
     deviceName: Joi.string().max(160).optional().allow(""),
   }),
 };
 
 const mobileUnsubscribeSchema = {
   body: Joi.object({
-    token: Joi.string().pattern(/^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$/).required(),
+    token: Joi.string().trim().min(20).max(4096).pattern(/^\S+$/).required(),
   }),
 };
 
