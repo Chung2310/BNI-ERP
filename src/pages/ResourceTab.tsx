@@ -19,6 +19,7 @@ import { internalChatService } from "../services/internalChatService";
 import { resourceService } from "../services/resourceService";
 import { useSubTabRouter } from "../hooks/useSubTabRouter";
 import { RESOURCE_SUB_TAB_ROUTES } from "../router/subTabRoutes";
+import { downloadFileFromApi } from "../utils/mediaDownload";
 
 interface Resource {
   _id: string;
@@ -1583,23 +1584,12 @@ export default function ResourceTab() {
                   onClick={(e) => {
                     e.stopPropagation();
                     setActiveMenuId(null);
-                    const token = localStorage.getItem("accessToken") || "";
                     if (isFolder) {
-                      const zipUrl = `/api/v1/resources/${resource.driveFileId}/download-zip?space=${selectedSpace}&token=${encodeURIComponent(token)}`;
-                      window.open(zipUrl, "_blank");
-                    } else if (resource.webContentLink) {
-                      window.open(resource.webContentLink, "_blank");
+                      const zipUrl = `/api/v1/resources/${resource.driveFileId}/download-zip?space=${encodeURIComponent(selectedSpace)}`;
+                      void downloadFileFromApi(zipUrl, `${resource.name}.zip`).catch((error) => toast.error(error.message));
                     } else {
-                      // Google Workspace files export
-                      let exportUrl = resource.webViewLink;
-                      if (resource.mimeType === "application/vnd.google-apps.document") {
-                        exportUrl = `https://docs.google.com/document/d/${resource.driveFileId}/export?format=docx`;
-                      } else if (resource.mimeType === "application/vnd.google-apps.spreadsheet") {
-                        exportUrl = `https://docs.google.com/spreadsheets/d/${resource.driveFileId}/export?format=xlsx`;
-                      } else if (resource.mimeType === "application/vnd.google-apps.presentation") {
-                        exportUrl = `https://docs.google.com/presentation/d/${resource.driveFileId}/export?format=pptx`;
-                      }
-                      window.open(exportUrl, "_blank");
+                      const downloadUrl = `/api/v1/resources/drive/files/${encodeURIComponent(resource.driveFileId)}/download?space=${encodeURIComponent(selectedSpace)}`;
+                      void downloadFileFromApi(downloadUrl, resource.name).catch((error) => toast.error(error.message));
                     }
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
@@ -2732,17 +2722,18 @@ export default function ResourceTab() {
                 <span className="text-sm font-bold text-gray-800 truncate max-w-lg">{previewFile.name}</span>
               </div>
               <div className="flex items-center gap-2">
-                {previewFile.webContentLink && (
-                  <a
-                    href={previewFile.webContentLink}
-                    target="_blank"
-                    rel="noreferrer"
+                <a
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      const downloadUrl = `/api/v1/resources/drive/files/${encodeURIComponent(previewFile.driveFileId)}/download?space=${encodeURIComponent(selectedSpace)}`;
+                      void downloadFileFromApi(downloadUrl, previewFile.name).catch((error) => toast.error(error.message));
+                    }}
                     className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition bg-white"
                   >
                     <Download className="h-3.5 w-3.5" />
                     <span>Tải về</span>
                   </a>
-                )}
                 <button
                   onClick={() => setPreviewFile(null)}
                   className="p-2 hover:bg-gray-200 rounded-xl text-gray-500 hover:text-gray-800 transition cursor-pointer"
@@ -3820,23 +3811,12 @@ export default function ResourceTab() {
               onClick={(e) => {
                 e.stopPropagation();
                 setActiveMenuId(null); setMenuPosition(null);
-                const token = localStorage.getItem("accessToken") || "";
                 if (isFolder) {
-                  const zipUrl = `/api/v1/resources/${resource.driveFileId}/download-zip?space=${selectedSpace}&token=${encodeURIComponent(token)}`;
-                  window.open(zipUrl, "_blank");
-                } else if (resource.webContentLink) {
-                  window.open(resource.webContentLink, "_blank");
+                  const zipUrl = `/api/v1/resources/${resource.driveFileId}/download-zip?space=${encodeURIComponent(selectedSpace)}`;
+                  void downloadFileFromApi(zipUrl, `${resource.name}.zip`).catch((error) => toast.error(error.message));
                 } else {
-                  // Google Workspace files export
-                  let exportUrl = resource.webViewLink;
-                  if (resource.mimeType === "application/vnd.google-apps.document") {
-                    exportUrl = `https://docs.google.com/document/d/${resource.driveFileId}/export?format=docx`;
-                  } else if (resource.mimeType === "application/vnd.google-apps.spreadsheet") {
-                    exportUrl = `https://docs.google.com/spreadsheets/d/${resource.driveFileId}/export?format=xlsx`;
-                  } else if (resource.mimeType === "application/vnd.google-apps.presentation") {
-                    exportUrl = `https://docs.google.com/presentation/d/${resource.driveFileId}/export?format=pptx`;
-                  }
-                  window.open(exportUrl, "_blank");
+                  const downloadUrl = `/api/v1/resources/drive/files/${encodeURIComponent(resource.driveFileId)}/download?space=${encodeURIComponent(selectedSpace)}`;
+                  void downloadFileFromApi(downloadUrl, resource.name).catch((error) => toast.error(error.message));
                 }
               }}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"

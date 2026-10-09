@@ -29,6 +29,7 @@ import { resourceService } from "../../services/resourceService";
 import { internalChatService } from "../../services/internalChatService";
 import { toast } from "../../pages/Toast";
 import { getApiErrorMessage } from "../../utils/errorMessage";
+import { downloadFileFromApi } from "../../utils/mediaDownload";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 // Lazy: modal xem trước kéo theo thư viện đọc Excel/Word nặng, chỉ tải khi người dùng mở xem trước
 const FilePreviewModal = React.lazy(() => import("./FilePreviewModal").then((m) => ({ default: m.FilePreviewModal })));
@@ -1020,9 +1021,8 @@ if (item.type !== "file") return false;
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setMenuOpenId(null);
-                                        const token = localStorage.getItem("accessToken") || "";
-                                        const downloadUrl = `/api/v1/resources/${item._id}/download-zip?token=${encodeURIComponent(token)}`;
-                                        window.open(downloadUrl, "_blank");
+                                        const downloadUrl = `/api/v1/resources/${item._id}/download-zip`;
+                                        void downloadFileFromApi(downloadUrl, `${item.name}.zip`).catch((error) => toast.error(error.message));
                                       }}
                                       className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 rounded-lg text-slate-600 font-semibold text-[11px]"
                                     >
@@ -1160,9 +1160,11 @@ if (item.type !== "file") return false;
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setMenuOpenId(null);
-                                          const token = localStorage.getItem("accessToken") || "";
-                                          const downloadUrl = `/api/v1/media/download?url=${encodeURIComponent(item.fileUrl!)}&filename=${encodeURIComponent(item.name)}&token=${encodeURIComponent(token)}`;
-                                          window.open(downloadUrl, "_blank");
+                                          const isCompanyDriveFile = /(?:drive|docs)\.google\.com/i.test(item.fileUrl!) && !/^[a-f\d]{24}$/i.test(item._id);
+                                          const downloadUrl = isCompanyDriveFile
+                                            ? `/api/v1/resources/drive/files/${encodeURIComponent(item._id)}/download`
+                                            : `/api/v1/media/download?url=${encodeURIComponent(item.fileUrl!)}&filename=${encodeURIComponent(item.name)}`;
+                                          void downloadFileFromApi(downloadUrl, item.name).catch((error) => toast.error(error.message));
                                         }}
                                         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 rounded-lg text-slate-600 font-semibold text-[11px]"
                                       >
@@ -2533,11 +2535,13 @@ const ResourceCard: React.FC<{
                     onClick={(e) => {
                       e.stopPropagation();
                       onToggleMenu(e); // Close menu
-                      const token = localStorage.getItem("accessToken") || "";
+                      const isCompanyDriveFile = !isFolder && /(?:drive|docs)\.google\.com/i.test(item.fileUrl || "") && !/^[a-f\d]{24}$/i.test(item._id);
                       const downloadUrl = isFolder
-                        ? `/api/v1/resources/${item._id}/download-zip?token=${encodeURIComponent(token)}`
-                        : `/api/v1/media/download?url=${encodeURIComponent(item.fileUrl!)}&filename=${encodeURIComponent(item.name)}&token=${encodeURIComponent(token)}`;
-                      window.open(downloadUrl, "_blank");
+                        ? `/api/v1/resources/${item._id}/download-zip`
+                        : isCompanyDriveFile
+                          ? `/api/v1/resources/drive/files/${encodeURIComponent(item._id)}/download`
+                          : `/api/v1/media/download?url=${encodeURIComponent(item.fileUrl!)}&filename=${encodeURIComponent(item.name)}`;
+                      void downloadFileFromApi(downloadUrl, isFolder ? `${item.name}.zip` : item.name).catch((error) => toast.error(error.message));
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                   >

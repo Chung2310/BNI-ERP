@@ -133,12 +133,13 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           ENV_FILE_CONTENT: ${{ vars.ENV_FILE || secrets.ENV_FILE }}
+          FIREBASE_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 || vars.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || '22' }}
-          envs: ENV_FILE_CONTENT
+          envs: ENV_FILE_CONTENT,FIREBASE_SERVICE_ACCOUNT_JSON_BASE64
           script: |
             TARGET_DIR="/opt/igen-erp/staging"
             IMAGE_TAG="develop"
@@ -150,6 +151,9 @@ jobs:
 
             # Ưu tiên GitHub Variables, dùng Secrets nếu variable chưa có giá trị
             echo "$ENV_FILE_CONTENT" > .env
+            test -n "$FIREBASE_SERVICE_ACCOUNT_JSON_BASE64"
+            printf '\nFIREBASE_SERVICE_ACCOUNT_JSON_BASE64=%s\n' "$FIREBASE_SERVICE_ACCOUNT_JSON_BASE64" >> .env
+            chmod 600 .env
 
             # Đăng nhập vào GHCR trên VPS
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -182,12 +186,13 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           ENV_FILE_CONTENT: ${{ vars.ENV_FILE_PROD || secrets.ENV_FILE_PROD }}
+          FIREBASE_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64_PROD || vars.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64_PROD || secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 || vars.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}
         with:
           host: ${{ secrets.SSH_HOST_PROD }}
           username: ${{ secrets.SSH_USER_PROD }}
           key: ${{ secrets.SSH_KEY_PROD }}
           port: ${{ secrets.SSH_PORT_PROD || '22' }}
-          envs: ENV_FILE_CONTENT
+          envs: ENV_FILE_CONTENT,FIREBASE_SERVICE_ACCOUNT_JSON_BASE64
           script: |
             TARGET_DIR="/opt/igen-erp/production"
             IMAGE_TAG="production"
@@ -199,6 +204,9 @@ jobs:
 
             # Ưu tiên GitHub Variables, dùng Secrets nếu variable chưa có giá trị
             echo "$ENV_FILE_CONTENT" > .env
+            test -n "$FIREBASE_SERVICE_ACCOUNT_JSON_BASE64"
+            printf '\nFIREBASE_SERVICE_ACCOUNT_JSON_BASE64=%s\n' "$FIREBASE_SERVICE_ACCOUNT_JSON_BASE64" >> .env
+            chmod 600 .env
 
             # Đăng nhập vào GHCR trên VPS
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin

@@ -26,3 +26,11 @@ test("discards privilege-sensitive and unknown fields", () => {
     { displayName: "Safe Name", email: "member@example.com" },
   );
 });
+
+test("allows members to update their product and activity gallery", () => {
+  const galleryImages = ["https://example.com/product.jpg", "https://example.com/activity.jpg"];
+  assert.deepEqual(
+    pickSelfServiceProfileUpdate({ galleryImages, galleryUploadTokens: [{ index: 0, uploadToken: "token" }] }),
+    { galleryImages },
+  );
+});

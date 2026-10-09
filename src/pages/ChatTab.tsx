@@ -52,6 +52,7 @@ import { EMOJI_CATEGORIES, QUICK_REACTIONS } from "../components/chat/chatData";
 import { CHAT_SOUND_MUTED_KEY, playChatNotificationSound } from "../components/chat/chatSound";
 import { toast } from "./Toast";
 import { getApiErrorMessage } from "../utils/errorMessage";
+import { downloadMediaFile } from "../utils/mediaDownload";
 
 
 export default function ChatTab() {
@@ -3039,7 +3040,10 @@ export default function ChatTab() {
                                     return (
                                       <div
                                         key={idx}
-                                        onClick={(e) => { e.stopPropagation(); window.open(file.url, "_blank"); }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void downloadMediaFile(file.url, file.name).catch((error) => toast.error(error.message));
+                                        }}
                                         className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 transition cursor-pointer"
                                       >
                                         <FileIcon className="h-3 w-3 text-slate-500 shrink-0" />
@@ -3609,9 +3613,11 @@ export default function ChatTab() {
                   {previewAttachment.size ? `Dung lượng: ${(previewAttachment.size / 1024).toFixed(1)} KB` : "Tệp tài liệu"}
                 </p>
                 <a
-                  href={previewAttachment.url}
-                  target="_blank"
-                  rel="noreferrer"
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void downloadMediaFile(previewAttachment.url, previewAttachment.name).catch((error) => toast.error(error.message));
+                  }}
                   className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 text-sm transition active:scale-95"
                 >
                   Tải tệp xuống máy
@@ -3624,12 +3630,14 @@ export default function ChatTab() {
           {(previewAttachment.type.startsWith("image/") || previewAttachment.type.startsWith("video/")) && (
             <div className="absolute bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-0 right-0 flex justify-center">
               <a
-                href={previewAttachment.url}
-                target="_blank"
-                rel="noreferrer"
+                href="#"
+                onClick={(event) => {
+                  event.preventDefault();
+                  void downloadMediaFile(previewAttachment.url, previewAttachment.name).catch((error) => toast.error(error.message));
+                }}
                 className="flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 text-sm shadow-lg transition active:scale-95 cursor-pointer"
               >
-                Mở trong tab mới / Tải xuống
+                Tải xuống
               </a>
             </div>
           )}

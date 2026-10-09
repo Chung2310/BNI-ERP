@@ -2,8 +2,34 @@ import { afterEach, expect, it, vi } from "vitest";
 import { NotificationModel } from "../model/notification.model";
 import { notificationService } from "./notification.service";
 
-vi.mock("../socket", () => ({ emitToUser: vi.fn() }));
+const dependencies = vi.hoisted(() => ({ emitToUser: vi.fn(), sendToUser: vi.fn() }));
+vi.mock("../socket", () => ({ emitToUser: dependencies.emitToUser }));
+vi.mock("./mobile-push.service", () => ({ mobilePushService: { sendToUser: dependencies.sendToUser } }));
 afterEach(() => vi.restoreAllMocks());
+
+it("emits realtime and mobile push after persisting a notification", async () => {
+  vi.spyOn(NotificationModel.prototype, "save").mockResolvedValue(undefined as never);
+  dependencies.sendToUser.mockResolvedValue(undefined);
+
+  const notification = await notificationService.createNotification({
+    title: "Thông báo mới",
+    body: "Nội dung",
+    type: "he-thong",
+    companyCode: "ACME",
+    recipientUid: "member",
+    read: false,
+  });
+
+  expect(dependencies.emitToUser).toHaveBeenCalledWith(
+    "member",
+    "new_notification",
+    expect.objectContaining({ title: "Thông báo mới" }),
+  );
+  expect(dependencies.sendToUser).toHaveBeenCalledWith("member", expect.objectContaining({
+    title: "Thông báo mới",
+    notificationId: notification._id.toString(),
+  }));
+});
 
 it("marks only the signed-in recipient's notification as read", async () => {
   const notification = { read: true };
