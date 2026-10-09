@@ -27,7 +27,6 @@ import {
   resetLuckyDrawWinners,
   getCompanyCheckInQr,
   getManagedCheckInQr,
-  autoStartDueMeetings,
 } from './meeting.service';
 import { recurringMeetingInput, checkinInput, controlInput, meetingInput, updateMeetingInput, bulkUpdateMeetingSeriesInput, slideProfileInput, gameWinnerInput } from './meeting.validation';
 import { updatePresentationState } from './meeting-presentation.service';
@@ -58,7 +57,6 @@ const sendError = (res: import("express").Response, error: unknown) =>
 
 meetingRouter.get('/', read, async (req, res) => {
   try {
-    await autoStartDueMeetings();
     const filter: Record<string, unknown> = { companyCode: company(req) };
     if (req.query.month !== undefined) {
       try {
