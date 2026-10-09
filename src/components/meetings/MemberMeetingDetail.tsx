@@ -25,14 +25,14 @@ export function memberAttendanceLabel(meeting: MemberMeeting, userId?: string) {
 const dateText = (value: string) => new Date(value).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
 const statusLabels = { scheduled: "Sắp diễn ra", live: "Đang diễn ra", paused: "Tạm dừng", ended: "Đã kết thúc", cancelled: "Đã hủy" };
 
-export default function MemberMeetingDetail({ meeting, userId, onClose, onCheckIn }: {
-  meeting: MemberMeeting; userId?: string; onClose: () => void; onCheckIn: (location: { latitude: number; longitude: number }) => Promise<void>;
+export default function MemberMeetingDetail({ meeting, userId, onClose, onCheckIn, readOnly = false }: {
+  meeting: MemberMeeting; userId?: string; onClose: () => void; onCheckIn: (location: { latitude: number; longitude: number }) => Promise<void>; readOnly?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const pending = useRef(false);
   const checkIn = async () => {
-    if (pending.current) return;
+    if (pending.current || readOnly) return;
     pending.current = true; setBusy(true); setError("");
     try { const location = await locate(); await onCheckIn(location); } catch (error) { setError(error.message || "Không thể điểm danh. Vui lòng thử lại."); }
     finally { pending.current = false; setBusy(false); }
@@ -48,8 +48,8 @@ export default function MemberMeetingDetail({ meeting, userId, onClose, onCheckI
   const open = ["scheduled", "live", "paused"].includes(meeting.status);
   const current = attendee && meeting.speakers[meeting.currentIndex]?.id === attendee.id
     && ["live", "paused"].includes(meeting.status) && !meeting.speechesCompletedAt;
-  const canCheckIn = !attendee && open && !!userId;
-  const checkInHint = attendee ? "Bạn đã điểm danh cuộc họp này." : !open ? "Cuộc họp đã đóng điểm danh." : !userId ? "Vui lòng đăng nhập bằng tài khoản thành viên." : "Bạn có thể điểm danh trước giờ và trong lúc họp bằng tài khoản thành viên của mình.";
+  const canCheckIn = !readOnly && !attendee && open && !!userId;
+  const checkInHint = readOnly ? "Superadmin chỉ có quyền xem thông tin cuộc họp." : attendee ? "Bạn đã điểm danh cuộc họp này." : !open ? "Cuộc họp đã đóng điểm danh." : !userId ? "Vui lòng đăng nhập bằng tài khoản thành viên." : "Bạn có thể điểm danh trước giờ và trong lúc họp bằng tài khoản thành viên của mình.";
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:p-6"
       onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
@@ -127,10 +127,10 @@ export default function MemberMeetingDetail({ meeting, userId, onClose, onCheckI
             {error && <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p id="member-checkin-hint" className="text-xs leading-relaxed text-slate-500">{checkInHint}</p>
-              <button type="button" disabled={busy || !canCheckIn} aria-describedby="member-checkin-hint" onClick={() => void checkIn()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-cyan-700 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-60">
+              {!readOnly && <button type="button" disabled={busy || !canCheckIn} aria-describedby="member-checkin-hint" onClick={() => void checkIn()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-cyan-700 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-60">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
                 {busy ? "Đang xác nhận vị trí..." : attendee ? "Đã điểm danh" : "Điểm danh"}
-              </button>
+              </button>}
             </div>
           </footer>
       </section>

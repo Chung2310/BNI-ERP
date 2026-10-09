@@ -17,6 +17,7 @@ export const APP_ROUTES: AppRoute[] = [
     component: lazy(() => import("../pages/DashboardTab")),
     canAccess: (userProfile) =>
       userProfile.role === "admin" ||
+      (userProfile.role === "superadmin" && Boolean(userProfile.companyCode)) ||
       Boolean(
         userProfile.permissions?.includes("*") ||
         MODULE_READ_PERMISSIONS["TỔNG QUAN"]?.some(permission => userProfile.permissions?.includes(permission))

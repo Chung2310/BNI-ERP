@@ -21,9 +21,23 @@ function withAuthHeader(init: RequestInit | undefined, token: string): RequestIn
   return newInit;
 }
 
+function withChapterHeader(input: RequestInfo | URL, init: RequestInit | undefined): RequestInit | undefined {
+  const chapterCode = localStorage.getItem("superadmin_active_chapter");
+  if (!chapterCode) return init;
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const target = new URL(url, window.location.origin);
+  if (target.origin !== window.location.origin || !target.pathname.startsWith("/api/v1/")) return init;
+  if ((target.pathname.startsWith("/api/v1/auth/") && !target.pathname.startsWith("/api/v1/auth/users")) || target.pathname.startsWith("/api/v1/chapters")) return init;
+  const headers = new Headers(input instanceof Request ? input.headers : undefined);
+  new Headers(init?.headers).forEach((value, key) => headers.set(key, value));
+  headers.set("x-chapter-code", chapterCode);
+  return { ...init, headers };
+}
+
 window.fetch = async function (input, init) {
   // 1. Perform the original request
-  const response = await originalFetch(input, init);
+  const scopedInit = withChapterHeader(input, init);
+  const response = await originalFetch(input, scopedInit);
 
   // 2. Check if the response indicates unauthorized/token expired (401)
   if (response.status === 401) {
@@ -45,7 +59,7 @@ window.fetch = async function (input, init) {
           // Refresh hỏng: trả lại chính response 401 để phía gọi xử lý lỗi bình thường,
           // thay vì để promise treo vô thời hạn.
           if (!newToken) return resolve(response);
-          resolve(originalFetch(input, withAuthHeader(init, newToken)));
+          resolve(originalFetch(input, withAuthHeader(scopedInit, newToken)));
         });
       });
     }
@@ -70,7 +84,7 @@ window.fetch = async function (input, init) {
           isRefreshing = false;
 
           // Retry the original request with the new token
-          return originalFetch(input, withAuthHeader(init, newToken));
+          return originalFetch(input, withAuthHeader(scopedInit, newToken));
         }
       }
 

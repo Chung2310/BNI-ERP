@@ -5,10 +5,12 @@ import {
   Package, Megaphone, Sparkles, CheckCheck, ShoppingCart, AlertTriangle, Sun, Moon,
   Briefcase, GraduationCap, LayoutGrid, LayoutDashboard, Users, MessageSquareShare,
   FolderOpen, MessageSquare, Shield, LineChart, Menu, FolderTree, Calendar, Clock, User,
-  LogIn, LogOut as LogOutIcon, Handshake, BriefcaseBusiness, ChevronDown, Landmark, ContactRound
+  LogIn, LogOut as LogOutIcon, Handshake, BriefcaseBusiness, ChevronDown, Landmark, ContactRound,
+  Building2
 } from "lucide-react";
 import { TabType } from "../types";
 import { useAuth } from "../context/AuthContext";
+import { getAccessToken } from "../services/authService";
 import { isTabHidden, filterEnabledTabs } from "../config/modules";
 import { notificationService, WebNotification } from "../services/notificationService";
 import { socketService } from "../services/socketService";
@@ -30,13 +32,36 @@ const searchIndex = [
 ];
 
 export default function Header({ currentTab, onSearchSelect, onMenuClick }: HeaderProps) {
-  const { userProfile, logout } = useAuth();
+  const { userProfile, logout, superadminActiveChapter, setSuperadminActiveChapter } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [notifs, setNotifs] = useState<WebNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [headerChapters, setHeaderChapters] = useState<Array<{ code: string; name: string }>>([]);
+
+  useEffect(() => {
+    if (userProfile?.role !== "superadmin") return;
+    const fetchChapters = async () => {
+      try {
+        const token = getAccessToken();
+        const res = await fetch("/api/v1/chapters/manage", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        if (json.data && Array.isArray(json.data)) {
+          setHeaderChapters(json.data);
+          if (!superadminActiveChapter && json.data.length > 0) {
+            setSuperadminActiveChapter?.(json.data[0].code);
+          }
+        }
+      } catch (e) {
+        console.error("Lỗi tải chapters trong Header:", e);
+      }
+    };
+    void fetchChapters();
+  }, [userProfile?.role, superadminActiveChapter, setSuperadminActiveChapter]);
 
   // ─── helpers & API calls ────────────────────────────────────
   const fetchNotifications = async () => {
@@ -155,54 +180,81 @@ export default function Header({ currentTab, onSearchSelect, onMenuClick }: Head
               <Menu className="h-5 w-5" />
             </button>
           )}
-          <div className="relative hidden w-full sm:block" id="search_container">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-              <Search className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Tìm kiếm trong ERP..."
-              className="block h-12 w-full rounded-full border border-gray-200 bg-white pl-12 pr-5 text-sm text-gray-900 shadow-[0_8px_24px_rgba(15,23,42,0.05)] outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-              value={searchQuery}
-              onChange={(event) => {
-                setSearchQuery(event.target.value);
-                setShowResults(true);
-              }}
-              onFocus={() => setShowResults(true)}
-              id="global_search_input"
-            />
+          <div className="flex items-center gap-3 w-full">
+            <div className="relative hidden w-full sm:block flex-1 max-w-md" id="search_container">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                <Search className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Tìm kiếm trong ERP..."
+                className="block h-12 w-full rounded-full border border-gray-200 bg-white pl-12 pr-5 text-sm text-gray-900 shadow-[0_8px_24px_rgba(15,23,42,0.05)] outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                value={searchQuery}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  setShowResults(true);
+                }}
+                onFocus={() => setShowResults(true)}
+                id="global_search_input"
+              />
 
-            {showResults && searchQuery.trim() !== "" && (
-              <div className="absolute left-0 z-50 mt-3 w-full overflow-hidden rounded-2xl border border-gray-100 bg-white font-sans text-xs shadow-2xl">
-                <div className="border-b border-gray-100 bg-gray-50 px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                  Kết quả tìm kiếm ({filteredResults.length})
-                </div>
-                {filteredResults.length > 0 ? (
-                  <div className="max-h-72 overflow-y-auto">
-                    {filteredResults.map((item, index) => (
-                      <button
-                        key={`${item.label}_${index}`}
-                        onClick={() => {
-                          onSearchSelect(item.tab, item.subTab);
-                          setSearchQuery("");
-                          setShowResults(false);
-                        }}
-                        className="flex w-full flex-col gap-1 border-b border-gray-100 px-4 py-3 text-left transition-colors last:border-0 hover:bg-blue-50/60"
-                      >
-                        <span className="text-sm font-semibold text-gray-800">{item.label}</span>
-                        <span className="text-[10px] text-gray-400">
-                          {item.tab}
-                          {item.subTab ? ` › ${item.subTab}` : ""}
-                        </span>
-                      </button>
-                    ))}
+              {showResults && searchQuery.trim() !== "" && (
+                <div className="absolute left-0 z-50 mt-3 w-full overflow-hidden rounded-2xl border border-gray-100 bg-white font-sans text-xs shadow-2xl">
+                  <div className="border-b border-gray-100 bg-gray-50 px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Kết quả tìm kiếm ({filteredResults.length})
                   </div>
-                ) : (
-                  <div className="p-5 text-center text-sm text-gray-500">Không tìm thấy phân mục phù hợp.</div>
-                )}
+                  {filteredResults.length > 0 ? (
+                    <div className="max-h-72 overflow-y-auto">
+                      {filteredResults.map((item, index) => (
+                        <button
+                          key={`${item.label}_${index}`}
+                          onClick={() => {
+                            onSearchSelect(item.tab, item.subTab);
+                            setSearchQuery("");
+                            setShowResults(false);
+                          }}
+                          className="flex w-full flex-col gap-1 border-b border-gray-100 px-4 py-3 text-left transition-colors last:border-0 hover:bg-blue-50/60"
+                        >
+                          <span className="text-sm font-semibold text-gray-800">{item.label}</span>
+                          <span className="text-[10px] text-gray-400">
+                            {item.tab}
+                            {item.subTab ? ` › ${item.subTab}` : ""}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-5 text-center text-sm text-gray-500">Không tìm thấy phân mục phù hợp.</div>
+                  )}
+                </div>
+              )}
+              {showResults && <div className="fixed inset-0 z-[-1]" onClick={() => setShowResults(false)} />}
+            </div>
+
+            {userProfile?.role === "superadmin" && (
+              <div className="hidden sm:flex items-center shrink-0" id="superadmin_header_chapter_select">
+                <div className="flex h-12 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition-all">
+                  <Building2 className="h-4 w-4 text-sky-600 shrink-0" />
+                  <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">Chapter:</span>
+                  <select
+                    value={superadminActiveChapter || ""}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setSuperadminActiveChapter?.(next);
+                      window.dispatchEvent(new Event("focus"));
+                    }}
+                    className="bg-transparent text-xs font-bold text-gray-800 outline-none cursor-pointer pr-1"
+                  >
+                    <option value="">-- Chưa chọn Chapter --</option>
+                    {headerChapters.map((ch) => (
+                      <option key={ch.code} value={ch.code}>
+                        {ch.name} ({ch.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
-            {showResults && <div className="fixed inset-0 z-[-1]" onClick={() => setShowResults(false)} />}
           </div>
         </div>
 
@@ -317,7 +369,7 @@ export default function Header({ currentTab, onSearchSelect, onMenuClick }: Head
             >
               <div className="hidden text-right lg:block">
                 <p className="text-sm font-semibold text-gray-800 transition-colors hover:text-blue-600">
-                  {userProfile ? userProfile.displayName : "iGen Administrator"}
+                  {userProfile?.role === "superadmin" ? "Superadmin" : userProfile ? userProfile.displayName : "iGen Administrator"}
                 </p>
               </div>
               {userProfile?.photoURL && (userProfile.photoURL.startsWith("http") || userProfile.photoURL.startsWith("/")) ? (
@@ -339,7 +391,7 @@ export default function Header({ currentTab, onSearchSelect, onMenuClick }: Head
                 <div className="absolute right-0 z-50 mt-3 w-56 rounded-2xl border border-gray-100 bg-white/95 py-2 font-sans shadow-2xl backdrop-blur-md">
                   <div className="border-b border-gray-100 px-4 py-2.5">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Tài khoản</p>
-                    <p className="mt-0.5 truncate text-sm font-bold text-gray-800">{userProfile?.displayName}</p>
+                    <p className="mt-0.5 truncate text-sm font-bold text-gray-800">{userProfile?.role === "superadmin" ? "Superadmin" : userProfile?.displayName}</p>
                     <p className="truncate text-xs text-gray-500">{userProfile?.email}</p>
                     {userProfile?.role && (
                       <span className="mt-1 inline-block rounded-md border border-blue-100 bg-blue-50 px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase text-blue-600">

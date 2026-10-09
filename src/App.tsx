@@ -300,12 +300,12 @@ function AppContent() {
           }`}
           id="primary_page_container"
         >
-          {isChapterPage || !userProfile.companyCode || userProfile.role === "superadmin" ? (
+          {isChapterPage || (!userProfile.companyCode && userProfile.role !== "superadmin") ? (
             <Suspense fallback={<AuthLoader />}>
               <ChapterPortal />
             </Suspense>
           ) : (
-            <AppRouterView activeTab={resolvedActiveTab} userProfile={userProfile} />
+            <AppRouterView key={userProfile.role === "superadmin" ? userProfile.companyCode : "chapter-member"} activeTab={resolvedActiveTab} userProfile={userProfile} />
           )}
         </main>
       </div>

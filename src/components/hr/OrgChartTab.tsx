@@ -1433,7 +1433,7 @@ export default function OrgChartTab({
                   </div>
 
                   {/* Modal Actions */}
-                  <div className="pt-4 mt-4 border-t border-slate-100 flex flex-wrap gap-2.5">
+                  {userProfile?.role !== "superadmin" && <div className="pt-4 mt-4 border-t border-slate-100 flex flex-wrap gap-2.5">
                     <MemberMessageButton key={selectedEmp.id} memberId={selectedEmp.id} currentUserId={userProfile?.uid} onOpened={closeDetailModal} />
                     {canEditEmployee(selectedEmp.id) && (
                       <button
@@ -1457,7 +1457,7 @@ export default function OrgChartTab({
                         Xóa
                       </button>
                     )}
-                  </div>
+                  </div>}
                 </div>
               </div>
             )}

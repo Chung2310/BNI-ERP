@@ -5,7 +5,7 @@
 ## 1. Mục tiêu và quyết định kiến trúc
 
 - Hệ thống phục vụ nhiều chapter BNI tại Việt Nam. Mỗi chapter có dữ liệu và tài khoản quản trị riêng.
-- **Superadmin** tạo, quản lý vòng đời chapter và cấp tài khoản admin ban đầu cho chapter.
+- **Superadmin** tạo chapter và cấp tài khoản admin ban đầu; khi chọn một chapter để xem dữ liệu, superadmin chỉ có quyền đọc, không được sửa, xóa hoặc xác nhận đơn thay admin chapter.
 - **Admin chapter** quản lý thành viên, cuộc họp và đơn đăng ký thuộc chapter của mình; không có quyền quản lý chapter khác hoặc tạo chapter mới.
 - Mỗi người dùng chỉ có **một đơn gia nhập đang chờ** và tại một thời điểm chỉ sinh hoạt trong **một chapter**. Có thể sửa chapter trong đơn hoặc xóa đơn trước khi admin xác nhận.
 - Khi admin chapter xác nhận đơn, tài khoản trở thành thành viên chapter đó. Muốn chuyển chapter phải hoàn tất quy trình rời chapter rồi nộp đơn mới.
@@ -36,7 +36,7 @@ Các điểm tham chiếu: `server/model/company.model.ts`, `server/model/user.m
 
 | Vai trò | Phạm vi |
 | --- | --- |
-| Superadmin | Tạo/quản lý chapter và xem dữ liệu của các chapter qua bộ lọc chapter. Mọi dữ liệu hiển thị phải thuộc chapter đang chọn. |
+| Superadmin | Tạo chapter mới, cấp admin ban đầu và xem dữ liệu của từng chapter qua bộ lọc. Dữ liệu chapter đã chọn là chỉ đọc; không được sửa, xóa hay duyệt đơn thay admin chapter. |
 | Admin chapter | Chỉ xác nhận đơn vào/rời chapter, quản lý thành viên và dữ liệu trong `companyCode` của chính mình; không có quyền từ chối đơn. |
 | Người dùng chưa là thành viên | Đăng nhập, sửa hồ sơ cá nhân, xem chapter công khai, nộp/rút đơn, xem kết quả; không truy cập dữ liệu nội bộ chapter. |
 | Thành viên | Dùng chức năng hiện tại trong đúng chapter đang sinh hoạt và gửi yêu cầu rời chapter. |
@@ -122,14 +122,14 @@ Thứ tự triển khai đề xuất:
 - Hồ sơ chỉ cần mức thông tin tương đương check-in khách mời: họ tên, điện thoại, công ty, lĩnh vực, ảnh đại diện nếu có; email và mật khẩu phục vụ đăng nhập. Người dùng có thể sửa hồ sơ sau khi tạo tài khoản hoặc nộp đơn.
 - Đơn gia nhập đơn giản: chọn một chapter và gửi. Một tài khoản chỉ có một đơn đang chờ; người dùng có thể sửa chapter, rút hoặc xóa đơn khi còn chờ.
 - Admin chapter chỉ có nút **Xác nhận** cho đơn gia nhập và yêu cầu rời chapter; không có quyền từ chối.
-- Superadmin có thể xem dữ liệu các chapter. Giao diện theo chapter như admin thông thường, bổ sung bộ lọc chapter; mọi dữ liệu phải thuộc chapter được chọn. Bộ lọc và quyền truy cập phải được kiểm tra tại backend, không chỉ ở giao diện.
+- Superadmin có thể xem **Tổng quan** và **danh sách/hồ sơ thành viên** của chapter đang chọn qua bộ lọc, chỉ ở chế độ đọc. Superadmin không được xem **phí thường niên/phiếu thu** hoặc **email chúc mừng**, cũng không được sửa, xóa, tạo dữ liệu nội bộ hay xác nhận đơn gia nhập/rời chapter. Riêng việc tạo **chapter mới và admin ban đầu** vẫn thuộc quyền superadmin. Backend phải kiểm tra chapter được chọn và chặn cả các API bị loại trừ lẫn thao tác ghi.
 
 ## 10. Vận hành bản triển khai đầu tiên
 
 - Cấu hình `SEED_SUPERADMIN_EMAIL`, `SEED_SUPERADMIN_PASSWORD` (ít nhất 12 ký tự) và tùy chọn `SEED_SUPERADMIN_NAME` trên backend, rồi khởi động server để tạo superadmin. Email này phải khác email admin chapter mặc định. Không đặt mật khẩu thật trong repo.
 - Superadmin đăng nhập và mở `/chapter` để tạo chapter cùng tài khoản admin đầu tiên. Người mới mở `/dang-ky-thanh-vien`, tạo tài khoản rồi nộp đơn trong `/chapter`. Admin chapter mở `/chapter` để xét duyệt.
 - Kết quả đơn và hàng đợi admin được làm mới định kỳ trong `/chapter`. Bản này chưa gửi email hoặc push riêng cho đơn gia nhập/rời chapter.
-- Superadmin hiện có bộ lọc chapter trong `/chapter` để xem thành viên, đơn chờ và yêu cầu rời. Yêu cầu xem toàn bộ các module ERP theo chapter là phạm vi triển khai tiếp theo: mỗi API phải xác thực chapter được chọn ở backend trước khi mở giao diện tương ứng.
+- Superadmin chọn chapter trong bộ lọc để xem dữ liệu theo `companyCode`; backend xác thực chapter và chặn thao tác ghi. Các module ERP cần tiếp tục rà soát để bảo đảm mọi màn hình chỉ hiển thị dữ liệu thuộc chapter đã chọn.
 - Trước khi áp dụng index một đơn chờ trên dữ liệu đã tồn tại, kiểm tra và xử lý các tài khoản đang có nhiều đơn `pending`; nếu không, MongoDB không tạo được unique index mới.
 - Trên MongoDB replica set, thao tác duyệt chạy trong transaction. Trên MongoDB standalone, hệ thống dùng cập nhật có điều kiện để bảo đảm mỗi tài khoản chỉ nhận một `companyCode`; transaction nhiều bản ghi không khả dụng. Nếu yêu cầu độ bền nhất quán tuyệt đối khi máy chủ dừng giữa chừng, triển khai MongoDB replica set trước khi mở chức năng cho người dùng thật.
 - Kiểm thử tích hợp: `npx vitest run server/router/chapter.router.integration.test.ts`. Kiểm tra kiểu: `npm run typecheck`. Build: `npm run build`.

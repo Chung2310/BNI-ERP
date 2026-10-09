@@ -201,7 +201,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, onMobileC
                 : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
             } ${isCollapsed ? "justify-center" : "justify-between"}`}
             id="sidebar_menu_chapter"
-            title={isCollapsed ? "Chapter của tôi" : undefined}
+            title={isCollapsed ? (userProfile?.role === "superadmin" ? "Quản lý Chapter" : "Chapter của tôi") : undefined}
           >
             <div className={`flex min-w-0 items-center ${isCollapsed ? "justify-center" : "gap-3"}`}>
               <Users
@@ -209,7 +209,11 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, onMobileC
                   isChapterActive ? "text-sky-600" : "text-slate-400 group-hover:text-slate-600"
                 }`}
               />
-              {!isCollapsed ? <span className="truncate">Chapter của tôi</span> : null}
+              {!isCollapsed ? (
+                <span className="truncate">
+                  {userProfile?.role === "superadmin" ? "Quản lý Chapter" : "Chapter của tôi"}
+                </span>
+              ) : null}
             </div>
             {!isCollapsed && isChapterActive ? (
               <span className="h-2 w-2 shrink-0 rounded-full bg-sky-500 ring-2 ring-sky-200" />

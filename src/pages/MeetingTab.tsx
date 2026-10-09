@@ -1184,7 +1184,7 @@ function MeetingWorkspace() {
       )}
 
       {/* POPUP CHI TIẾT CUỘC HỌP (Meeting Detail Modal) */}
-      {!canManage && activeMeeting && <MemberMeetingDetail key={activeMeeting._id} onCheckIn={async (location) => { const updated = await api("/" + activeMeeting._id + "/checkin", "POST", location); setItems(previous => previous.map(item => item._id === updated._id ? updated : item)); }} meeting={activeMeeting} userId={userProfile?.uid} onClose={() => setDetailMeetingId(null)} />}
+      {!canManage && activeMeeting && <MemberMeetingDetail key={activeMeeting._id} readOnly={userProfile?.role === "superadmin"} onCheckIn={async (location) => { const updated = await api("/" + activeMeeting._id + "/checkin", "POST", location); setItems(previous => previous.map(item => item._id === updated._id ? updated : item)); }} meeting={activeMeeting} userId={userProfile?.uid} onClose={() => setDetailMeetingId(null)} />}
       {canManage && activeMeeting && (
         <div className={`fixed inset-0 z-50 ${isModalFullscreen ? "bg-slate-900 overflow-hidden" : "flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto"}`}>
           <div className={`${isModalFullscreen ? "w-full h-full max-w-none max-h-none rounded-none border-0" : "w-full max-w-6xl h-[92vh] min-h-[620px] rounded-3xl border border-slate-200 shadow-2xl"} flex flex-col bg-slate-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150`}>

@@ -19,14 +19,18 @@ export default function HRTab() {
   const subTabsRef = useRef<HTMLDivElement>(null);
   const scrollSubTabs = (direction: "left" | "right") => subTabsRef.current?.scrollBy({ left: direction === "left" ? -280 : 280, behavior: "smooth" });
   const { userProfile, hasPermission } = useAuth();
+  const isSuperadmin = userProfile?.role === "superadmin";
   const isManager =
     userProfile?.role === "admin" ||
     userProfile?.role === "manager";
   const canManageOrgChart = isManager || hasPermission("access:manage");
-  const canReadFees = hasPermission("hr:read") || hasPermission("hr:manage") || hasPermission("access:manage");
+  const canReadFees = !isSuperadmin && (hasPermission("hr:read") || hasPermission("hr:manage") || hasPermission("access:manage"));
   const canManageCelebration = userProfile?.role === "admin" || hasPermission("settings:manage");
 
   const [subTab, setSubTab] = useSubTabRouter<HRSubTabType>(HR_SUB_TAB_ROUTES, "SƠ ĐỒ TỔ CHỨC");
+  useEffect(() => {
+    if (isSuperadmin && subTab !== "SƠ ĐỒ TỔ CHỨC") setSubTab("SƠ ĐỒ TỔ CHỨC");
+  }, [isSuperadmin, subTab, setSubTab]);
   const [fetchedUsers, setUsersList] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(!!userProfile?.companyCode);
 
@@ -113,7 +117,7 @@ export default function HRTab() {
 
       {/* Conditional Rendering of Modular Tab Components */}
       <Suspense fallback={<TabLoader label="Đang tải dữ liệu thành viên..." />}>
-        {subTab === "SƠ ĐỒ TỔ CHỨC" && (
+        {(subTab === "SƠ ĐỒ TỔ CHỨC" || isSuperadmin) && (
           <OrgChartTab
             userProfile={userProfile}
             selectedCompanyCode={companyCode}
