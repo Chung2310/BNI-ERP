@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import RemoteMeetingRoom from "./RemoteMeetingRoom";
 const mocks = vi.hoisted(() => ({ manage: true }));
@@ -80,6 +80,29 @@ it("selects the next available prize automatically so the organizer can start wi
   await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/presentation-draw"))).toBe(true));
   const drawCall = vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith("/presentation-draw"));
   expect(JSON.parse(String(drawCall?.[1]?.body)).prizeId).toBe("prize-1");
+});
+it("shows draw and game winners on the control panel without duplicate results", async () => {
+  const drawWinner = {
+    id: "draw-1", prizeId: "prize-1", prizeName: "Giải nhất", winnerId: "a",
+    name: "An", wonAt: "2030-01-02T02:00:00Z", ticketNumber: 7,
+  };
+  snapshot.meeting.luckyDraw = {
+    enabled: true, allowRepeatWinners: false, drawMode: "attendees", numberMin: 1, numberMax: 100,
+    prizes: [{ id: "prize-1", name: "Giải nhất", reward: "", quantity: 1, order: 0, winners: [drawWinner] }],
+  };
+  snapshot.meeting.gameWinners = [
+    drawWinner,
+    { id: "bingo-1", prizeId: "bingo-1", prizeName: "Lồng cầu bingo", winnerId: "b", name: "Bình", wonAt: "2030-01-02T03:00:00Z" },
+  ];
+
+  render(<RemoteMeetingRoom meetingId="m" mode="control" />);
+  const list = await screen.findByRole("list", { name: "Danh sách người trúng thưởng" });
+  const rows = within(list).getAllByRole("listitem");
+  expect(rows).toHaveLength(2);
+  expect(rows[0].textContent).toContain("Bình");
+  expect(rows[1].textContent).toContain("An");
+  expect(rows[1].textContent).toContain("Giải nhất · Số #7");
+  expect(screen.getByText("Danh sách người trúng thưởng (2)")).toBeTruthy();
 });
 it("creates and selects a quick prize from the control panel", async () => {
   snapshot.meeting.luckyDraw = {

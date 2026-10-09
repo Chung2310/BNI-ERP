@@ -181,6 +181,15 @@ function MeetingRoom({ meetingId, mode }: Props) {
   const timer = meeting && getSlideTimer(meeting, current?.id, now);
   const drawing = now < Date.parse(state.drawRevealsAt || "");
   const activePrize = meeting?.luckyDraw?.prizes.find(prize => prize.id === selectedPrize);
+  const prizeWinners = meeting?.luckyDraw?.prizes.flatMap(prize =>
+    (prize.winners || []).map(winner => ({ winner, prizeName: prize.name }))) || [];
+  const prizeWinnerIds = new Set(prizeWinners.map(row => row.winner.id));
+  const winnerRows = [
+    ...prizeWinners,
+    ...(meeting?.gameWinners || [])
+      .filter(winner => !prizeWinnerIds.has(winner.id))
+      .map(winner => ({ winner, prizeName: winner.prizeName || "Giải thưởng may mắn" })),
+  ].sort((a, b) => Date.parse(b.winner.wonAt) - Date.parse(a.winner.wonAt));
   useEffect(() => {
     const available = meeting?.luckyDraw?.prizes ?? [];
     const selectionFrame = requestAnimationFrame(() => {
@@ -616,6 +625,33 @@ function MeetingRoom({ meetingId, mode }: Props) {
                 <span>{drawing ? "Đang quay…" : "Bắt đầu quay"}</span>
               </button>
               <p className="text-[11px] text-slate-400">Hai màn hình cùng hiển thị kết quả sau 5 giây.</p>
+
+              <div className="border-t border-slate-100 pt-4">
+                <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <Trophy className="h-4 w-4 text-amber-600" />
+                  Danh sách người trúng thưởng ({winnerRows.length})
+                </h3>
+                {winnerRows.length === 0 ? (
+                  <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">Chưa có người trúng thưởng.</p>
+                ) : (
+                  <ol className="max-h-72 space-y-2 overflow-y-auto" aria-label="Danh sách người trúng thưởng">
+                    {winnerRows.map(({ winner, prizeName }) => (
+                      <li key={winner.id} className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/50 px-3 py-2.5">
+                        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-800">
+                          {winner.name.slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-slate-800">{winner.name}</p>
+                          <p className="truncate text-xs text-slate-600">{prizeName}{winner.ticketNumber != null ? ` · Số #${winner.ticketNumber}` : ""}</p>
+                        </div>
+                        <time className="shrink-0 text-[11px] text-slate-500" dateTime={winner.wonAt}>
+                          {new Date(winner.wonAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                        </time>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
             </div>
           </section>
         </main>
