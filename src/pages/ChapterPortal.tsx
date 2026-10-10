@@ -13,17 +13,34 @@ import {
   ShieldCheck,
   CheckCircle,
   ExternalLink,
+  Search,
+  MapPin,
+  UserRound,
+  Clock,
+  ArrowRight,
+  ChevronRight,
+  Users,
+  Calendar,
+  Filter,
+  Compass,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { getAccessToken } from "../services/authService";
+import { VIETNAM_PROVINCES, VIETNAM_PROVINCE_NAMES } from "../config/provinces";
 
 type Chapter = {
   code: string;
   name: string;
   chapterRegion?: string;
   chapterAddress?: string;
+  chairpersonName?: string;
   acceptsApplications?: boolean;
   ownerEmail?: string;
+};
+
+type ChapterDetail = Chapter & {
+  memberCount: number;
+  completedMeetingCount: number;
 };
 
 type Application = {
@@ -76,9 +93,17 @@ export default function ChapterPortal() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [directoryLoaded, setDirectoryLoaded] = useState(false);
+  const [selectedChapterCode, setSelectedChapterCode] = useState<string | null>(null);
+  const [chapterDetail, setChapterDetail] = useState<ChapterDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+  const [search, setSearch] = useState("");
+  const [province, setProvince] = useState("");
 
   // Modals & form state
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false);
 
   const [newChapter, setNewChapter] = useState({
     code: "",
@@ -97,6 +122,32 @@ export default function ChapterPortal() {
   const isAdmin = role === "admin";
 
   const effectiveChapterCode = isSuperadmin ? (superadminActiveChapter || "") : (userProfile?.companyCode || "");
+  const isApplicant = Boolean(userProfile && !userProfile.companyCode && !isAdmin && !isSuperadmin);
+  const pendingApplication = isApplicant ? applications.find(application => application.status === "pending") : undefined;
+  const normalize = (value: string) => value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+  const cleanPrefix = (value: string) => value.toLowerCase().replace(/^(tinh|thanh pho|tp\.?)\s+/i, "").trim();
+
+  // Danh sách các khu vực hiện có của chapter + bộ 34 tỉnh/thành phố chuẩn
+  const chapterRegions = chapters.map(c => c.chapterRegion?.trim()).filter((r): r is string => Boolean(r));
+  const provinces = [...new Set([...chapterRegions, ...VIETNAM_PROVINCE_NAMES])].sort((a, b) => a.localeCompare(b, "vi"));
+
+  const matchesProvince = (chapterRegion?: string, selected?: string) => {
+    if (!selected) return true;
+    if (!chapterRegion) return false;
+    const cNorm = normalize(chapterRegion.trim());
+    const sNorm = normalize(selected.trim());
+    if (cNorm === sNorm) return true;
+    const cClean = normalize(cleanPrefix(chapterRegion));
+    const sClean = normalize(cleanPrefix(selected));
+    return cClean === sClean || cNorm.includes(sClean) || sNorm.includes(cClean);
+  };
+
+  const query = normalize(search.trim());
+  const visibleChapters = chapters.filter(chapter =>
+    matchesProvince(chapter.chapterRegion, province) &&
+    (!query || [chapter.name, chapter.code, chapter.chapterRegion, chapter.chapterAddress, chapter.chairpersonName]
+      .some(value => normalize(value || "").includes(query)))
+  );
 
   const reload = useCallback(async () => {
     if (!userProfile) return;
@@ -114,6 +165,8 @@ export default function ChapterPortal() {
             setLeaves(data.leaves || []);
           })
         );
+      } else if (!userProfile.companyCode && !isAdmin && !isSuperadmin) {
+        jobs.push(api<Application[]>("/me/applications").then(setApplications));
       } else if (isAdmin) {
         jobs.push(api<Application[]>("/admin/applications").then(setApplications));
         jobs.push(api<LeaveRequest[]>("/admin/leave-requests").then(setLeaves));
@@ -121,9 +174,10 @@ export default function ChapterPortal() {
         jobs.push(api<LeaveRequest[]>("/me/leave-requests").then(setLeaves));
       }
 
-      await Promise.all(jobs);
+      await Promise.all(jobs).then(() => setDirectoryLoaded(true));
     } catch (e) {
       console.error("Lỗi khi tải dữ liệu ChapterPortal:", e);
+      throw e;
     }
   }, [isAdmin, isSuperadmin, userProfile, effectiveChapterCode]);
 
@@ -144,6 +198,20 @@ export default function ChapterPortal() {
       setError(reason instanceof Error ? reason.message : "Không thể xử lý yêu cầu.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function openChapterDetail(code: string) {
+    setSelectedChapterCode(code);
+    setChapterDetail(null);
+    setDetailError("");
+    setDetailLoading(true);
+    try {
+      setChapterDetail(await api<ChapterDetail>(`/directory/${encodeURIComponent(code)}`));
+    } catch (reason) {
+      setDetailError(reason instanceof Error ? reason.message : "Không thể tải thông tin chapter.");
+    } finally {
+      setDetailLoading(false);
     }
   }
 
@@ -195,20 +263,26 @@ export default function ChapterPortal() {
       {/* 1. TIÊU ĐỀ TRANG */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="h-7 w-1.5 shrink-0 rounded-full bg-red-600" />
+          {isApplicant ? (
+            <Compass className="h-7 w-7 text-sky-600 shrink-0" />
+          ) : (
+            <Building2 className="h-7 w-7 text-sky-600 shrink-0" />
+          )}
           <div>
-            <h1 className="font-extrabold text-xl tracking-tight text-slate-900 md:text-2xl">
-              {isSuperadmin ? "Quản lý hệ thống Chapter" : "Chapter của tôi"}
+            <h1 className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
+              {isSuperadmin ? "Quản lý hệ thống Chapter" : isApplicant ? "Tìm Chapter phù hợp" : "Chapter của tôi"}
             </h1>
-            <p className="text-xs font-medium text-slate-500">
+            <p className="mt-0.5 text-xs text-slate-500 font-medium">
               {isSuperadmin
                 ? "Tạo Chapter mới và xem dữ liệu các Chapter BNI"
+                : isApplicant
+                ? "Khám phá các Chapter BNI đang hoạt động và gửi hồ sơ xin gia nhập"
                 : `Quản lý thành viên và hoạt động Chapter ${userProfile?.companyCode || ""}`}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-start sm:self-auto">
           {isSuperadmin && (
             <button
               onClick={() => setShowCreateModal(true)}
@@ -268,9 +342,7 @@ export default function ChapterPortal() {
           <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs sm:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
-                  <Building2 className="h-4 w-4" />
-                </div>
+                <Building2 className="h-5 w-5 text-sky-600 shrink-0" />
                 <div>
                   <h2 className="text-sm font-bold text-slate-900">
                     Danh sách Chapter ({chapters.length})
@@ -375,9 +447,7 @@ export default function ChapterPortal() {
             <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs sm:p-6">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                    <UserPlus className="h-4 w-4" />
-                  </div>
+                  <UserPlus className="h-5 w-5 text-sky-600 shrink-0" />
                   <div>
                     <h2 className="text-sm font-bold text-slate-900">
                       Đơn gia nhập chờ xác nhận · Chapter {superadminActiveChapter}
@@ -415,7 +485,7 @@ export default function ChapterPortal() {
                               </h3>
                               <p className="text-xs text-slate-500">{snap?.email}</p>
                             </div>
-                            <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                            <span className="rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
                               Chờ duyệt
                             </span>
                           </div>
@@ -444,9 +514,7 @@ export default function ChapterPortal() {
           <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs sm:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
-                  <UserPlus className="h-4 w-4" />
-                </div>
+                <UserPlus className="h-5 w-5 text-sky-600 shrink-0" />
                 <div>
                   <h2 className="text-sm font-bold text-slate-900">
                     Đơn gia nhập chờ duyệt · Chapter {userProfile?.companyCode}
@@ -482,7 +550,7 @@ export default function ChapterPortal() {
                             <h3 className="text-sm font-bold text-slate-900">{snap?.displayName || "Ứng viên"}</h3>
                             <p className="text-xs text-slate-500">{snap?.email}</p>
                           </div>
-                          <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                          <span className="rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
                             Chờ duyệt
                           </span>
                         </div>
@@ -498,7 +566,7 @@ export default function ChapterPortal() {
                         <button
                           disabled={busy}
                           onClick={() => decideApplication(application._id)}
-                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700 active:scale-95 disabled:opacity-50"
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-sky-700 active:scale-95 disabled:opacity-50"
                         >
                           <Check className="h-3.5 w-3.5" />
                           <span>Xác nhận duyệt</span>
@@ -514,9 +582,7 @@ export default function ChapterPortal() {
           <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs sm:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
-                  <UserMinus className="h-4 w-4" />
-                </div>
+                <UserMinus className="h-5 w-5 text-slate-600 shrink-0" />
                 <div>
                   <h2 className="text-sm font-bold text-slate-900">
                     Yêu cầu rời Chapter
@@ -569,14 +635,373 @@ export default function ChapterPortal() {
         </div>
       )}
 
-      {/* 5. DÀNH CHO THÀNH VIÊN THƯỜNG */}
+      {/* 5. TÀI KHOẢN CHƯA THUỘC CHAPTER */}
+      {isApplicant && (
+        <section className="space-y-5">
+          {pendingApplication && (
+            <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4 shadow-2xs sm:p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <Clock className="h-5 w-5 text-sky-600 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800 border border-sky-200/80">
+                        <span className="h-1.5 w-1.5 rounded-full bg-sky-600 animate-ping" />
+                        Đang chờ xét duyệt
+                      </span>
+                      <h3 className="font-bold text-sm text-slate-900">
+                        Đơn gia nhập: <span className="text-sky-900 font-semibold">{chapters.find(chapter => chapter.code === pendingApplication.chapterCode)?.name || pendingApplication.chapterCode}</span>
+                      </h3>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+                      Hồ sơ của bạn đã được gửi tới Ban điều hành Chapter. Bạn có thể chọn chuyển sang chapter khác hoặc rút đơn bất cứ lúc nào trước khi được duyệt.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2 pl-8 sm:pl-0">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setShowWithdrawConfirm(true)}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-red-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-red-700 active:scale-95 disabled:opacity-50"
+                  >
+                    <span>Rút đơn</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
+            <div className="grid gap-3.5 sm:grid-cols-[minmax(0,1fr)_minmax(13rem,17rem)]">
+              <div>
+                <label htmlFor="chapter-search" className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Tìm kiếm Chapter
+                </label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="chapter-search"
+                    type="search"
+                    value={search}
+                    onChange={event => setSearch(event.target.value)}
+                    placeholder="Tên, mã, địa điểm hoặc chủ tịch..."
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-9 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10 placeholder:text-slate-400"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="province-filter" className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Tỉnh / Thành phố
+                </label>
+                <div className="relative">
+                  <Filter className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <select
+                    id="province-filter"
+                    value={province}
+                    onChange={event => setProvince(event.target.value)}
+                    className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-9 text-xs sm:text-sm font-medium text-slate-800 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10 cursor-pointer"
+                  >
+                    <option value="">Tất cả tỉnh / thành phố ({provinces.length})</option>
+                    {provinces.map(region => (
+                      <option key={region} value={region}>
+                        {region}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronRight className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 rotate-90 text-slate-400" />
+                </div>
+              </div>
+            </div>
+
+            {(search || province) && (
+              <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                <span>Đang lọc theo:</span>
+                {search && (
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2 py-1 font-medium text-sky-700">
+                    Từ khóa: &ldquo;{search}&rdquo;
+                    <button onClick={() => setSearch("")} className="cursor-pointer hover:text-sky-900">✕</button>
+                  </span>
+                )}
+                {province && (
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2 py-1 font-medium text-sky-700">
+                    Khu vực: {province}
+                    <button onClick={() => setProvince("")} className="cursor-pointer hover:text-sky-900">✕</button>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setSearch(""); setProvince(""); }}
+                  className="ml-auto font-semibold text-slate-600 hover:text-sky-700 underline cursor-pointer"
+                >
+                  Xóa tất cả bộ lọc
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-base font-extrabold text-slate-900">
+                <span>Danh sách Chapter</span>
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600">
+                  {visibleChapters.length}
+                </span>
+              </h2>
+            </div>
+
+            {!directoryLoaded && !error ? (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white py-12 text-center">
+                <RefreshCw className="h-6 w-6 animate-spin text-sky-600 mb-2" />
+                <p className="text-sm font-medium text-slate-600">Đang tải danh sách Chapter...</p>
+              </div>
+            ) : visibleChapters.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white py-12 text-center text-slate-500">
+                <Inbox className="h-9 w-9 text-slate-300 mb-2" />
+                <p className="text-sm font-semibold text-slate-700">Không tìm thấy Chapter phù hợp</p>
+                <p className="text-xs text-slate-400 mt-1">Hãy thử tìm với từ khóa hoặc khu vực khác.</p>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {visibleChapters.map(chapter => {
+                  const selected = pendingApplication?.chapterCode === chapter.code;
+
+                  return (
+                    <article
+                      key={chapter.code}
+                      className={`group relative flex flex-col justify-between rounded-2xl border bg-white p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 ${
+                        selected
+                          ? "border-sky-500 ring-2 ring-sky-500/15 bg-sky-50/20"
+                          : "border-slate-200/80 hover:border-sky-300"
+                      }`}
+                    >
+                      <div>
+                        {/* Top: Bare icon + Title + Badges */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <Building2 className="h-5 w-5 text-sky-600 shrink-0 mt-0.5" />
+                            <div className="min-w-0">
+                              <h3 className="text-base font-bold text-slate-900 group-hover:text-sky-600 transition-colors line-clamp-1">
+                                {chapter.name}
+                              </h3>
+                              <span className="inline-block font-mono text-[11px] font-semibold text-slate-500 mt-0.5">
+                                {chapter.code}
+                              </span>
+                            </div>
+                          </div>
+
+                          {selected ? (
+                            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800 border border-sky-200/80">
+                              <span className="h-1.5 w-1.5 rounded-full bg-sky-600" />
+                              Đã nộp đơn
+                            </span>
+                          ) : chapter.chapterRegion ? (
+                            <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">
+                              {chapter.chapterRegion}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {/* Meta info: Clean bare icons without box backgrounds */}
+                        <div className="mt-4 space-y-2 text-xs text-slate-600">
+                          <div className="flex items-start gap-2">
+                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                            <span className="line-clamp-2">
+                              {[chapter.chapterAddress, chapter.chapterRegion].filter(Boolean).join(", ") || "Chưa cập nhật địa điểm"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <UserRound className="h-4 w-4 shrink-0 text-slate-400" />
+                            <span className="truncate">
+                              Chủ tịch: {chapter.chairpersonName || "Chưa cập nhật"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Button */}
+                      <div className="mt-5 border-t border-slate-100 pt-4">
+                        <button
+                          type="button"
+                          onClick={() => void openChapterDetail(chapter.code)}
+                          className={`w-full inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-[0.98] ${
+                            selected
+                              ? "bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100 hover:border-sky-300"
+                              : "bg-sky-600 text-white hover:bg-sky-700 shadow-2xs"
+                          }`}
+                        >
+                          <span>{selected ? "Xem đơn & chi tiết Chapter" : "Xem chi tiết Chapter"}</span>
+                          {selected ? <ChevronRight className="h-3.5 w-3.5" /> : <ArrowRight className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {isApplicant && selectedChapterCode && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fade-in"
+          role="presentation"
+          onClick={() => setSelectedChapterCode(null)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label="Chi tiết Chapter"
+            onClick={event => event.stopPropagation()}
+            className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl sm:p-7 border border-slate-100 transform transition-all"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-start gap-3">
+                <Building2 className="h-7 w-7 text-sky-600 shrink-0 mt-0.5" />
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 sm:text-xl">
+                    {chapterDetail?.name || chapters.find(chapter => chapter.code === selectedChapterCode)?.name || "Chi tiết Chapter"}
+                  </h2>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="font-mono text-xs font-semibold text-slate-500">
+                      Mã: {selectedChapterCode}
+                    </span>
+                    {pendingApplication?.chapterCode === selectedChapterCode && (
+                      <span className="rounded-full bg-sky-100 border border-sky-200 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800">
+                        Đang chờ duyệt
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedChapterCode(null)}
+                aria-label="Đóng chi tiết Chapter"
+                className="cursor-pointer rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {detailLoading && (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <RefreshCw className="h-6 w-6 animate-spin text-sky-600 mb-2" />
+                <p className="text-sm font-medium text-slate-600">Đang tải thông tin Chapter...</p>
+              </div>
+            )}
+
+            {detailError && (
+              <div role="alert" className="mt-5 rounded-2xl bg-red-50 p-4 text-xs font-medium text-red-700 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+                <span>{detailError}</span>
+              </div>
+            )}
+
+            {chapterDetail?.code === selectedChapterCode && !detailLoading && (
+              <div className="mt-5 space-y-5">
+                {/* Stat badges */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-4">
+                    <div className="flex items-center gap-2 text-sky-700 mb-1">
+                      <Users className="h-4 w-4" />
+                      <span className="text-xs font-semibold">Thành viên</span>
+                    </div>
+                    <p className="text-2xl font-black text-sky-900">{chapterDetail.memberCount}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Thành viên chính thức</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4">
+                    <div className="flex items-center gap-2 text-slate-700 mb-1">
+                      <Calendar className="h-4 w-4 text-sky-600" />
+                      <span className="text-xs font-semibold">Buổi họp</span>
+                    </div>
+                    <p className="text-2xl font-black text-slate-900">{chapterDetail.completedMeetingCount}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Đã tổ chức thành công</p>
+                  </div>
+                </div>
+
+                {/* Details list */}
+                <div className="space-y-2.5 rounded-2xl bg-slate-50/70 border border-slate-100 p-4 text-xs">
+                  <div className="flex items-start gap-2.5">
+                    <MapPin className="h-4 w-4 shrink-0 text-slate-400 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-slate-700 block">Địa điểm sinh hoạt</span>
+                      <span className="text-slate-600">
+                        {[chapterDetail.chapterAddress, chapterDetail.chapterRegion].filter(Boolean).join(", ") || "Chưa cập nhật địa điểm"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 border-t border-slate-200/50 pt-2.5">
+                    <UserRound className="h-4 w-4 shrink-0 text-slate-400 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-slate-700 block">Chủ tịch Chapter</span>
+                      <span className="text-slate-600">{chapterDetail.chairpersonName || "Chưa cập nhật"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Submit button */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    disabled={busy || pendingApplication?.chapterCode === chapterDetail.code}
+                    onClick={() => void act(
+                      () => pendingApplication
+                        ? api(`/me/applications/${pendingApplication._id}`, "PATCH", { chapterCode: chapterDetail.code })
+                        : api("/me/applications", "POST", { chapterCode: chapterDetail.code }),
+                      pendingApplication ? "Đã chuyển đơn sang Chapter mới." : "Đã gửi đơn gia nhập Chapter."
+                    )}
+                    className={`w-full inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold shadow-xs transition active:scale-[0.98] ${
+                      pendingApplication?.chapterCode === chapterDetail.code
+                        ? "bg-sky-50 text-sky-700 border border-sky-200 cursor-not-allowed"
+                        : "bg-sky-600 text-white hover:bg-sky-700 shadow-sky-600/20"
+                    }`}
+                  >
+                    {pendingApplication?.chapterCode === chapterDetail.code ? (
+                      <>
+                        <Clock className="h-4 w-4 text-sky-600" />
+                        <span>Đơn đang chờ xác nhận</span>
+                      </>
+                    ) : pendingApplication ? (
+                      <>
+                        <ArrowRight className="h-4 w-4" />
+                        <span>Chuyển đơn sang Chapter này</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4" />
+                        <span>Nộp đơn xin gia nhập</span>
+                      </>
+                    )}
+                  </button>
+                  <p className="mt-2 text-center text-[11px] text-slate-400">
+                    Hệ thống sẽ tự động dùng hồ sơ bạn đã đăng ký để gửi cho Ban điều hành xét duyệt.
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {/* 6. DÀNH CHO THÀNH VIÊN THƯỜNG */}
       {userProfile?.companyCode && !isAdmin && !isSuperadmin && (
         <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs sm:p-6">
           <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                <ShieldCheck className="h-4 w-4" />
-              </div>
+              <ShieldCheck className="h-5 w-5 text-sky-600 shrink-0" />
               <div>
                 <h2 className="text-sm font-bold text-slate-900">
                   Chapter đang sinh hoạt: {userProfile.companyCode}
@@ -586,7 +1011,7 @@ export default function ChapterPortal() {
                 </p>
               </div>
             </div>
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+            <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
               Đang hoạt động
             </span>
           </div>
@@ -600,7 +1025,7 @@ export default function ChapterPortal() {
                   value={leaveReason}
                   onChange={(e) => setLeaveReason(e.target.value)}
                   placeholder="Vui lòng cung cấp lý do..."
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-xs text-slate-800 focus:border-rose-500 focus:bg-white focus:outline-hidden"
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-xs text-slate-800 focus:border-sky-500 focus:bg-white focus:outline-hidden"
                 />
               </label>
 
@@ -613,7 +1038,7 @@ export default function ChapterPortal() {
                       "Đã gửi yêu cầu rời Chapter."
                     )
                   }
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-rose-700 active:scale-95 disabled:opacity-50"
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 active:scale-95 disabled:opacity-50"
                 >
                   <UserMinus className="h-3.5 w-3.5" />
                   <span>Gửi yêu cầu rời Chapter</span>
@@ -630,9 +1055,7 @@ export default function ChapterPortal() {
           <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
-                  <Building2 className="h-4 w-4" />
-                </div>
+                <Building2 className="h-5 w-5 text-sky-600 shrink-0" />
                 <div>
                   <h2 className="text-sm font-bold text-slate-900">
                     Khởi tạo Chapter mới & Cấp tài khoản Admin
@@ -670,11 +1093,20 @@ export default function ChapterPortal() {
                       onChange={(e) =>
                         setNewChapter((curr) => ({ ...curr, [key]: e.target.value }))
                       }
+                      list={key === "region" ? "vietnam-provinces-datalist" : undefined}
                       className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 focus:border-sky-500 focus:bg-white focus:outline-hidden"
                     />
                   </label>
                 ))}
               </div>
+
+              <datalist id="vietnam-provinces-datalist">
+                {VIETNAM_PROVINCES.map((p) => (
+                  <option key={p.id} value={p.name}>
+                    {p.shortName} ({p.note})
+                  </option>
+                ))}
+              </datalist>
 
               <div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
                 <button
@@ -695,6 +1127,73 @@ export default function ChapterPortal() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* POPUP BO GÓC XÁC NHẬN RÚT ĐƠN */}
+      {showWithdrawConfirm && pendingApplication && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fade-in"
+          role="presentation"
+          onClick={() => setShowWithdrawConfirm(false)}
+        >
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="withdraw-dialog-title"
+            aria-describedby="withdraw-dialog-desc"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl sm:rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 transform transition-all"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 mb-4">
+              <div className="flex items-center gap-2.5">
+                <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
+                <h2 id="withdraw-dialog-title" className="text-base font-bold text-slate-900">
+                  Xác nhận rút đơn gia nhập
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWithdrawConfirm(false)}
+                aria-label="Đóng"
+                className="cursor-pointer rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p id="withdraw-dialog-desc" className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Bạn có chắc chắn muốn rút đơn gia nhập Chapter{" "}
+              <span className="font-bold text-slate-900">
+                {chapters.find((c) => c.code === pendingApplication.chapterCode)?.name || pendingApplication.chapterCode}
+              </span>
+              ? Sau khi rút đơn, hồ sơ của bạn sẽ không còn trong danh sách chờ duyệt của Chapter này và bạn có thể gửi hồ sơ sang Chapter khác.
+            </p>
+
+            <div className="mt-6 flex items-center justify-end gap-2.5 border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={() => setShowWithdrawConfirm(false)}
+                className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setShowWithdrawConfirm(false);
+                  void act(
+                    () => api(`/me/applications/${pendingApplication._id}`, "DELETE"),
+                    "Đã rút đơn gia nhập."
+                  );
+                }}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-red-700 active:scale-95 disabled:opacity-50 transition"
+              >
+                <span>Xác nhận rút đơn</span>
+              </button>
+            </div>
+          </section>
         </div>
       )}
 

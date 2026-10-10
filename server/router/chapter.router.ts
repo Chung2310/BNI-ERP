@@ -9,6 +9,7 @@ import { ChapterLeaveRequestModel } from "../model/chapter-leave-request.model";
 import { authService } from "../service/auth.service";
 import { runInTransaction } from "../config/database";
 import { disconnectUserSockets } from "../socket";
+import { MeetingModel } from "../modules/meetings/meeting.model";
 
 export const chapterRouter = Router();
 
@@ -32,12 +33,48 @@ function chapterAdmin(req: import("express").Request, res: import("express").Res
 
 function objectId(id: string) { return mongoose.isValidObjectId(id); }
 
-// The public directory exposes only chapter metadata, never its member roster.
+// The public directory exposes chapter metadata and the chairperson's display name, never its member roster.
 chapterRouter.get("/", async (_req, res) => {
   const chapters = await CompanyModel.find({ isBniChapter: true, lifecycleStatus: { $in: ["active", null] }, acceptsApplications: { $ne: false } })
-    .select("code name chapterRegion chapterAddress")
+    .select("code name chapterRegion chapterAddress ownerEmail")
     .sort({ name: 1 }).lean();
-  res.json({ data: chapters });
+  const admins = await UserModel.find({ role: "admin", companyCode: { $in: chapters.map(chapter => chapter.code) } })
+    .select("companyCode email displayName").lean();
+  const chairpersons = new Map<string, string>();
+  for (const chapter of chapters) {
+    const admin = admins.find(user => user.companyCode === chapter.code && user.email?.toLowerCase() === chapter.ownerEmail?.toLowerCase());
+    if (admin?.displayName) chairpersons.set(chapter.code, admin.displayName);
+  }
+  res.json({ data: chapters.map(chapter => ({
+    code: chapter.code,
+    name: chapter.name,
+    chapterRegion: chapter.chapterRegion,
+    chapterAddress: chapter.chapterAddress,
+    chairpersonName: chairpersons.get(chapter.code) || "",
+  })) });
+});
+
+chapterRouter.get("/directory/:code", requireAuth, async (req, res) => {
+  const code = req.params.code.toUpperCase();
+  const chapter = await CompanyModel.findOne({
+    code, isBniChapter: true, lifecycleStatus: { $in: ["active", null] }, acceptsApplications: { $ne: false },
+  }).select("code name chapterRegion chapterAddress ownerEmail").lean();
+  if (!chapter) return res.status(404).json({ message: "Không tìm thấy chapter." });
+
+  const [chairperson, memberCount, completedMeetingCount] = await Promise.all([
+    UserModel.findOne({ companyCode: code, role: "admin", email: chapter.ownerEmail.toLowerCase() }).select("displayName").lean(),
+    UserModel.countDocuments({ companyCode: code, role: { $ne: "superadmin" }, isActive: { $ne: false } }),
+    MeetingModel.countDocuments({ companyCode: code, status: "ended" }),
+  ]);
+  return res.json({ data: {
+    code: chapter.code,
+    name: chapter.name,
+    chapterRegion: chapter.chapterRegion,
+    chapterAddress: chapter.chapterAddress,
+    chairpersonName: chairperson?.displayName || "",
+    memberCount,
+    completedMeetingCount,
+  } });
 });
 
 chapterRouter.use(requireAuth);

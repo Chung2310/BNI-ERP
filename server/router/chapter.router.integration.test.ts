@@ -10,6 +10,7 @@ import { UserModel } from "../model/user.model";
 import { CompanyModel } from "../model/company.model";
 import { MembershipApplicationModel } from "../model/membership-application.model";
 import { ChapterLeaveRequestModel } from "../model/chapter-leave-request.model";
+import { MeetingModel } from "../modules/meetings/meeting.model";
 
 let database: MongoMemoryServer;
 let server: Server;
@@ -70,6 +71,10 @@ it("keeps one editable application, allows confirmation only, and requires confi
   expect((await fetch(`${baseUrl}/api/v1/protected`, { headers: { Authorization: `Bearer ${applicantToken}` } })).status).toBe(403);
   const first = await request("/me/applications", applicantToken, "POST", { chapterCode: "CHAPTER_A" });
   expect(first.status).toBe(201);
+  expect((await request("/admin/applications", token(adminA))).body.data).toMatchObject([
+    { chapterCode: "CHAPTER_A", profileSnapshot: { displayName: "Applicant", phone: "0900000000" } },
+  ]);
+  expect((await request("/admin/applications", token(adminB))).body.data).toHaveLength(0);
   expect((await request("/me/applications", applicantToken, "POST", { chapterCode: "CHAPTER_B" })).status).toBe(409);
   expect((await request(`/me/applications/${first.body.data._id}`, applicantToken, "PATCH", { chapterCode: "CHAPTER_B" })).status).toBe(200);
   expect((await request("/admin/applications", token(adminA))).body.data).toHaveLength(0);
@@ -116,9 +121,26 @@ it("reserves chapter creation for superadmin and provisions an admin in the new 
   const chapterAdmin = await UserModel.findOne({ email: "admin-c@test.vn" }).lean();
   expect(chapterAdmin?.role).toBe("admin");
   expect(chapterAdmin?.companyCode).toBe("CHAPTER_C");
+  const directory = await fetch(`${baseUrl}/api/v1/chapters`).then(response => response.json());
+  const listedChapter = directory.data.find((chapter: { code: string }) => chapter.code === "CHAPTER_C");
+  expect(listedChapter).toMatchObject({
+    name: "Chapter C", chapterRegion: "Hà Nội", chapterAddress: "Hà Nội", chairpersonName: "Admin C",
+  });
+  expect(listedChapter).not.toHaveProperty("ownerEmail");
+  expect(listedChapter).not.toHaveProperty("email");
+  await UserModel.create({ email: "member-c@test.vn", displayName: "Member C", role: "user", companyCode: "CHAPTER_C", membershipStatus: "active" });
+  await MeetingModel.create([
+    { companyCode: "CHAPTER_C", title: "Past meeting", startsAt: new Date("2026-01-01"), reminderAt: new Date("2025-12-31"), status: "ended" },
+    { companyCode: "CHAPTER_C", title: "Upcoming meeting", startsAt: new Date("2026-12-01"), reminderAt: new Date("2026-11-30"), status: "scheduled" },
+  ]);
+  expect((await fetch(`${baseUrl}/api/v1/chapters/directory/CHAPTER_C`)).status).toBe(401);
+  const detail = (await request("/directory/CHAPTER_C", token(admin!))).body;
+  expect(detail.data).toMatchObject({ memberCount: 2, completedMeetingCount: 1, chairpersonName: "Admin C" });
+  expect(detail.data).not.toHaveProperty("ownerEmail");
+  expect(detail.data).not.toHaveProperty("members");
   const overview = await request("/manage/CHAPTER_C/overview", token(superadmin));
   expect(overview.status).toBe(200);
-  expect(overview.body.data.members.map((member: { email: string }) => member.email)).toEqual(["admin-c@test.vn"]);
+  expect(overview.body.data.members.map((member: { email: string }) => member.email)).toEqual(["admin-c@test.vn", "member-c@test.vn"]);
   expect((await request("/manage/CHAPTER_C/overview", token(admin!))).status).toBe(403);
   const selected = await fetch(`${baseUrl}/api/v1/scoped`, { headers: { Authorization: `Bearer ${token(superadmin)}`, "x-chapter-code": "CHAPTER_C" } });
   expect(selected.status).toBe(200);

@@ -47,7 +47,10 @@ export const authService = {
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(data.message || "Đăng ký thất bại");
+      const fieldError = data.errors && typeof data.errors === "object"
+        ? Object.values(data.errors).flat().find((message): message is string => typeof message === "string")
+        : undefined;
+      throw new Error(fieldError || data.message || "Đăng ký thất bại");
     }
 
     const result = await res.json();
