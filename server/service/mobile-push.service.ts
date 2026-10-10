@@ -12,6 +12,7 @@ export type MobilePushPayload = {
   body: string;
   notificationId: string;
   type: string;
+  route?: string;
 };
 
 function chunks<T>(items: T[], size: number): T[][] {
@@ -54,6 +55,8 @@ export const mobilePushService = {
     if (devices.length === 0) return;
 
     const messaging = getFirebaseMessaging();
+    let successCount = 0;
+    const failureCodes: string[] = [];
     for (const batch of chunks(devices, MAX_FCM_BATCH_SIZE)) {
       const tokens = batch.map(({ token }) => token);
       const result = await messaging.sendEachForMulticast({
@@ -65,7 +68,7 @@ export const mobilePushService = {
         data: {
           notificationId: payload.notificationId,
           type: payload.type,
-          route: "/notifications",
+          route: payload.route || "/notifications",
         },
         android: {
           priority: "high",
@@ -77,6 +80,11 @@ export const mobilePushService = {
         },
       });
 
+      successCount += result.responses.filter((response) => response.success).length;
+      failureCodes.push(...result.responses.flatMap((response) =>
+        !response.success ? [response.error?.code || "messaging/unknown-error"] : [],
+      ));
+
       const invalidTokens = result.responses.flatMap((response, index) =>
         !response.success && response.error?.code && PERMANENT_TOKEN_ERRORS.has(response.error.code)
           ? [tokens[index]]
@@ -85,6 +93,12 @@ export const mobilePushService = {
       if (invalidTokens.length > 0) {
         await MobilePushTokenModel.deleteMany({ token: { $in: invalidTokens } });
       }
+    }
+
+    if (failureCodes.length > 0) {
+      const summary = Array.from(new Set(failureCodes)).join(", ");
+      console.error(`[mobilePushService] FCM delivery failed for ${failureCodes.length}/${devices.length} device(s): ${summary}`);
+      if (successCount === 0) throw new Error(`FCM rejected every target device: ${summary}`);
     }
   },
 };

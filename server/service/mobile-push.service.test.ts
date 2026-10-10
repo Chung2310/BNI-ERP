@@ -96,17 +96,32 @@ describe("mobilePushService", () => {
       body: "Nội dung",
       notificationId: "notification-id",
       type: "he-thong",
+      route: "/chat/room-id",
     });
 
     expect(dependencies.sendEachForMulticast).toHaveBeenCalledWith(expect.objectContaining({
       tokens: ["fcm_registration_token_valid_123", "fcm_registration_token_stale_456"],
       notification: { title: "Thông báo mới", body: "Nội dung" },
-      data: expect.objectContaining({ notificationId: "notification-id", route: "/notifications" }),
+      data: expect.objectContaining({ notificationId: "notification-id", route: "/chat/room-id" }),
       android: expect.objectContaining({ priority: "high" }),
       apns: expect.objectContaining({ headers: expect.objectContaining({ "apns-push-type": "alert" }) }),
     }));
     expect(dependencies.deleteMany).toHaveBeenCalledWith({
       token: { $in: ["fcm_registration_token_stale_456"] },
     });
+  });
+
+  it("surfaces Firebase credential failures instead of silently dropping every push", async () => {
+    dependencies.lean.mockResolvedValue([{ token: "fcm_registration_token_123456789" }]);
+    dependencies.sendEachForMulticast.mockResolvedValue({
+      responses: [{ success: false, error: { code: "messaging/mismatched-credential" } }],
+    });
+
+    await expect(mobilePushService.sendToUser("member", {
+      title: "Thong bao",
+      body: "Noi dung",
+      notificationId: "notification-id",
+      type: "he-thong",
+    })).rejects.toThrow("messaging/mismatched-credential");
   });
 });
