@@ -161,3 +161,7 @@ it("member check-in submits phone number identifier and validates with qrMemberI
   expect(payload.password).toBe("secret123");
 });
 
+it("validates invalid email with friendly message", () => {
+  const result = qrMemberInput.validate({ email: "dquangcuong667@", password: "123", latitude: 10, longitude: 106 });
+  expect(result.error?.message).toBe("Vui lòng nhập email hợp lệ");
+});

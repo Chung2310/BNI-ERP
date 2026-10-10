@@ -88,7 +88,13 @@ const registerSchema = {
   }),
 };
 
-const loginIdentifierSchema = Joi.string().trim().max(254).custom((value, helpers) => normalizeLoginIdentifier(value) ? value : helpers.error("any.invalid"));
+const loginIdentifierSchema = Joi.string()
+  .trim()
+  .max(254)
+  .custom((value, helpers) => normalizeLoginIdentifier(value) ? value : helpers.error("any.invalid"))
+  .messages({
+    "any.invalid": "Vui lòng nhập email hợp lệ",
+  });
 export const loginSchema = {
   body: Joi.object({
     identifier: loginIdentifierSchema,

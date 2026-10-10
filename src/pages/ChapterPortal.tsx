@@ -469,38 +469,46 @@ export default function ChapterPortal() {
                   Chapter {superadminActiveChapter} hiện không có đơn xin gia nhập nào đang chờ duyệt.
                 </div>
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {applications.map((application) => {
-                    const snap = application.profileSnapshot;
-                    return (
-                      <div
-                        key={application._id}
-                        className="flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs"
-                      >
-                        <div className="space-y-2.5">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h3 className="text-sm font-bold text-slate-900">
-                                {snap?.displayName || "Ứng viên"}
-                              </h3>
-                              <p className="text-xs text-slate-500">{snap?.email}</p>
-                            </div>
-                            <span className="rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
-                              Chờ duyệt
-                            </span>
-                          </div>
-
-                          <div className="space-y-1 text-xs text-slate-600 rounded-lg bg-slate-50 p-2.5">
-                            {snap?.phone && <p>SĐT: <span className="font-medium text-slate-800">{snap.phone}</span></p>}
-                            {snap?.companyName && <p>Công ty: <span className="font-medium text-slate-800">{snap.companyName}</span></p>}
-                            {snap?.industry && <p>Ngành nghề: <span>{snap.industry}</span></p>}
-                            {snap?.referral && <p>Người giới thiệu: <span className="text-slate-700">{snap.referral}</span></p>}
-                          </div>
-                        </div>
-
-                      </div>
-                    );
-                  })}
+                <div className="overflow-x-auto -mx-5 sm:-mx-6">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200/80 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        <th className="py-3 px-5 sm:px-6">Ứng viên</th>
+                        <th className="py-3 px-4">Doanh nghiệp / Ngành nghề</th>
+                        <th className="py-3 px-4">Số điện thoại</th>
+                        <th className="py-3 px-4">Người giới thiệu</th>
+                        <th className="py-3 px-5 sm:px-6 text-right">Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {applications.map((application) => {
+                        const snap = application.profileSnapshot;
+                        return (
+                          <tr key={application._id} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="py-3.5 px-5 sm:px-6">
+                              <div className="font-bold text-slate-900 text-sm">{snap?.displayName || "Ứng viên"}</div>
+                              <div className="text-slate-500 text-xs mt-0.5">{snap?.email}</div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-semibold text-slate-800">{snap?.companyName || "Chưa cập nhật"}</div>
+                              <div className="text-slate-500 text-xs mt-0.5">{snap?.industry || "—"}</div>
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-slate-700">
+                              {snap?.phone || "—"}
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-600">
+                              {snap?.referral || "—"}
+                            </td>
+                            <td className="py-3.5 px-5 sm:px-6 text-right">
+                              <span className="inline-flex items-center rounded-full bg-sky-50 border border-sky-200/80 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700">
+                                Chờ duyệt
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </section>
@@ -536,45 +544,53 @@ export default function ChapterPortal() {
                 Hiện không có đơn xin gia nhập nào đang chờ xác nhận.
               </div>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {applications.map((application) => {
-                  const snap = application.profileSnapshot;
-                  return (
-                    <div
-                      key={application._id}
-                      className="flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs"
-                    >
-                      <div className="space-y-2.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h3 className="text-sm font-bold text-slate-900">{snap?.displayName || "Ứng viên"}</h3>
-                            <p className="text-xs text-slate-500">{snap?.email}</p>
-                          </div>
-                          <span className="rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
-                            Chờ duyệt
-                          </span>
-                        </div>
-
-                        <div className="space-y-1 text-xs text-slate-600 rounded-lg bg-slate-50 p-2.5">
-                          {snap?.phone && <p>SĐT: <span className="font-medium text-slate-800">{snap.phone}</span></p>}
-                          {snap?.companyName && <p>Công ty: <span className="font-medium text-slate-800">{snap.companyName}</span></p>}
-                          {snap?.industry && <p>Ngành nghề: <span>{snap.industry}</span></p>}
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex justify-end border-t border-slate-100 pt-3">
-                        <button
-                          disabled={busy}
-                          onClick={() => decideApplication(application._id)}
-                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-sky-700 active:scale-95 disabled:opacity-50"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                          <span>Xác nhận duyệt</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="overflow-x-auto -mx-5 sm:-mx-6">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200/80 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <th className="py-3 px-5 sm:px-6">Ứng viên</th>
+                      <th className="py-3 px-4">Doanh nghiệp / Ngành nghề</th>
+                      <th className="py-3 px-4">Số điện thoại</th>
+                      <th className="py-3 px-4">Trạng thái</th>
+                      <th className="py-3 px-5 sm:px-6 text-right">Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {applications.map((application) => {
+                      const snap = application.profileSnapshot;
+                      return (
+                        <tr key={application._id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3.5 px-5 sm:px-6">
+                            <div className="font-bold text-slate-900 text-sm">{snap?.displayName || "Ứng viên"}</div>
+                            <div className="text-slate-500 text-xs mt-0.5">{snap?.email}</div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-slate-800">{snap?.companyName || "Chưa cập nhật"}</div>
+                            <div className="text-slate-500 text-xs mt-0.5">{snap?.industry || "—"}</div>
+                          </td>
+                          <td className="py-3.5 px-4 font-mono text-slate-700">
+                            {snap?.phone || "—"}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="inline-flex items-center rounded-full bg-sky-50 border border-sky-200/80 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700">
+                              Chờ duyệt
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-5 sm:px-6 text-right">
+                            <button
+                              disabled={busy}
+                              onClick={() => decideApplication(application._id)}
+                              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-sky-700 active:scale-95 disabled:opacity-50 transition"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              <span>Xác nhận duyệt</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </section>
@@ -604,31 +620,47 @@ export default function ChapterPortal() {
                 Không có yêu cầu rời Chapter nào đang chờ xử lý.
               </div>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {leaves.map((req) => {
-                  const memberName = typeof req.userId === "object" ? req.userId?.displayName : "Thành viên";
-                  return (
-                    <div
-                      key={req._id}
-                      className="flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs"
-                    >
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-bold text-slate-900">{memberName}</h3>
-                        {req.reason && <p className="text-xs italic text-slate-600 bg-rose-50 p-2 rounded-lg">Lý do: {req.reason}</p>}
-                      </div>
-                      <div className="mt-3 flex justify-end border-t border-slate-100 pt-3">
-                        <button
-                          disabled={busy}
-                          onClick={() => decideLeave(req._id)}
-                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-rose-700 active:scale-95 disabled:opacity-50"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                          <span>Xác nhận cho rời</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="overflow-x-auto -mx-5 sm:-mx-6">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200/80 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <th className="py-3 px-5 sm:px-6">Thành viên</th>
+                      <th className="py-3 px-4">Lý do xin rời</th>
+                      <th className="py-3 px-4">Ngày gửi</th>
+                      <th className="py-3 px-5 sm:px-6 text-right">Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {leaves.map((req) => {
+                      const memberName = typeof req.userId === "object" ? req.userId?.displayName : "Thành viên";
+                      const memberEmail = typeof req.userId === "object" ? req.userId?.email : "";
+                      return (
+                        <tr key={req._id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3.5 px-5 sm:px-6">
+                            <div className="font-bold text-slate-900 text-sm">{memberName}</div>
+                            {memberEmail && <div className="text-slate-500 text-xs mt-0.5">{memberEmail}</div>}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-700">
+                            {req.reason ? <span className="italic">{req.reason}</span> : <span className="text-slate-400">Không có lý do</span>}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-500">
+                            {req.createdAt ? new Date(req.createdAt).toLocaleDateString("vi-VN") : "—"}
+                          </td>
+                          <td className="py-3.5 px-5 sm:px-6 text-right">
+                            <button
+                              disabled={busy}
+                              onClick={() => decideLeave(req._id)}
+                              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-rose-700 active:scale-95 disabled:opacity-50 transition"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              <span>Xác nhận cho rời</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </section>
