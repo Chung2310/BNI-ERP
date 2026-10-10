@@ -4,16 +4,20 @@ import { getMessaging, type Messaging } from "firebase-admin/messaging";
 const FIREBASE_APP_NAME = "igen-mobile-push";
 
 function readServiceAccount(): ServiceAccount {
-  const encoded = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64?.trim();
-  if (!encoded) {
+  const credential = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64?.trim();
+  if (!credential) {
     throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 chưa được cấu hình.");
   }
 
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(Buffer.from(encoded, "base64").toString("utf8")) as Record<string, unknown>;
+    parsed = JSON.parse(credential) as Record<string, unknown>;
   } catch {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 không phải service-account JSON Base64 hợp lệ.");
+    try {
+      parsed = JSON.parse(Buffer.from(credential, "base64").toString("utf8")) as Record<string, unknown>;
+    } catch {
+      throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 không phải service-account JSON hoặc Base64 hợp lệ.");
+    }
   }
 
   const projectId = typeof parsed.project_id === "string" ? parsed.project_id : "";
