@@ -96,12 +96,13 @@ describe("mobilePushService", () => {
       body: "Nội dung",
       notificationId: "notification-id",
       type: "he-thong",
+      route: "/chat/room-id",
     });
 
     expect(dependencies.sendEachForMulticast).toHaveBeenCalledWith(expect.objectContaining({
       tokens: ["fcm_registration_token_valid_123", "fcm_registration_token_stale_456"],
       notification: { title: "Thông báo mới", body: "Nội dung" },
-      data: expect.objectContaining({ notificationId: "notification-id", route: "/notifications" }),
+      data: expect.objectContaining({ notificationId: "notification-id", route: "/chat/room-id" }),
       android: expect.objectContaining({ priority: "high" }),
       apns: expect.objectContaining({ headers: expect.objectContaining({ "apns-push-type": "alert" }) }),
     }));

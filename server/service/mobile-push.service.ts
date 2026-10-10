@@ -12,6 +12,7 @@ export type MobilePushPayload = {
   body: string;
   notificationId: string;
   type: string;
+  route?: string;
 };
 
 function chunks<T>(items: T[], size: number): T[][] {
@@ -67,7 +68,7 @@ export const mobilePushService = {
         data: {
           notificationId: payload.notificationId,
           type: payload.type,
-          route: "/notifications",
+          route: payload.route || "/notifications",
         },
         android: {
           priority: "high",

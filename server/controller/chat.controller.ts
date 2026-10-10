@@ -5,6 +5,7 @@ import { chatService } from "../service/chat.service";
 import { linkPreviewService } from "../service/link-preview.service";
 import { emitToUser, isUserOnline } from "../socket";
 import { pushService } from "../service/push.service";
+import { mobilePushService } from "../service/mobile-push.service";
 
 export const chatController = {
   async setRoomBlocked(req: AuthenticatedRequest, res: Response) {
@@ -347,16 +348,25 @@ export const chatController = {
                 ? `📢 [Nhắc đến bạn] ${senderName} — ${room.name || "Nhóm"}`
                 : (room.isGroup && room.name ? `${senderName} — ${room.name}` : `Tin nhắn mới từ ${senderName}`);
 
-              await pushService.sendToUser(memId, {
-                title: pushTitle,
-                body: preview,
-                url: "/tro-chuyen",
-                tag: `chat-${roomId}`,
-              });
+              await Promise.all([
+                pushService.sendToUser(memId, {
+                  title: pushTitle,
+                  body: preview,
+                  url: "/tro-chuyen",
+                  tag: `chat-${roomId}`,
+                }),
+                mobilePushService.sendToUser(memId, {
+                  title: pushTitle,
+                  body: preview,
+                  notificationId: message._id.toString(),
+                  type: "chat",
+                  route: `/chat/${roomId}`,
+                }),
+              ]);
             })
           );
         } catch (pushError) {
-          console.error("[chatController.sendMessage] Lỗi gửi Web Push:", pushError);
+          console.error("[chatController.sendMessage] Lỗi gửi push:", pushError);
         }
       })();
 
