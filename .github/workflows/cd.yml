@@ -116,6 +116,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Normalize Firebase credential for Staging
+        if: github.ref_name == 'develop'
+        env:
+          FIREBASE_SERVICE_ACCOUNT_INPUT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 || vars.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}
+        run: node tools/normalize-firebase-service-account.mjs
+
+      - name: Normalize Firebase credential for Production
+        if: github.ref_name == 'production'
+        env:
+          FIREBASE_SERVICE_ACCOUNT_INPUT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64_PROD || vars.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64_PROD || secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 || vars.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}
+        run: node tools/normalize-firebase-service-account.mjs
+
       # --- Triển khai lên Staging (nhánh develop) ---
       - name: Copy docker-compose.yml to Staging VPS
         if: github.ref_name == 'develop'
@@ -133,7 +145,6 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           ENV_FILE_CONTENT: ${{ vars.ENV_FILE || secrets.ENV_FILE }}
-          FIREBASE_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 || vars.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
@@ -186,7 +197,6 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           ENV_FILE_CONTENT: ${{ vars.ENV_FILE_PROD || secrets.ENV_FILE_PROD }}
-          FIREBASE_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64_PROD || vars.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64_PROD || secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 || vars.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}
         with:
           host: ${{ secrets.SSH_HOST_PROD }}
           username: ${{ secrets.SSH_USER_PROD }}
