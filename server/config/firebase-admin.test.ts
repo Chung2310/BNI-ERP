@@ -58,4 +58,20 @@ describe("Firebase Admin configuration", () => {
     );
     expect(dependencies.getMessaging).toHaveBeenCalledWith({ name: "igen-mobile-push" });
   });
+
+  it("accepts a raw service-account JSON credential", () => {
+    process.env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 = JSON.stringify({
+      project_id: "igen-test",
+      client_email: "firebase-admin@igen-test.iam.gserviceaccount.com",
+      private_key: "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n",
+    });
+
+    getFirebaseMessaging();
+
+    expect(dependencies.cert).toHaveBeenCalledWith({
+      projectId: "igen-test",
+      clientEmail: "firebase-admin@igen-test.iam.gserviceaccount.com",
+      privateKey: "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n",
+    });
+  });
 });
