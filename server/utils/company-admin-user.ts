@@ -22,6 +22,7 @@ export async function createCompanyAdminUser(input: CreateCompanyAdminUserInput)
     password: hashedPassword,
     displayName: ownerName.trim(),
     role: "admin",
+    membershipStatus: "active",
     createdAt: new Date(),
     companyCode,
     companyName: companyName.trim(),

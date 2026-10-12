@@ -31,7 +31,7 @@ import { useAuth } from "../../context/AuthContext";
 import { tabToPath } from "../../seo/seo-config";
 import { meetingLiveApi, meetingRoomUrl } from "../../services/meetingLiveService";
 import { meetingService } from "../../services/meetingService";
-import { presentationState, type MeetingPresentationState, type PresentationView } from "../../utils/meetingPresentation";
+import { presentationState, type DrawFilter, type MeetingPresentationState, type PresentationView } from "../../utils/meetingPresentation";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { MeetingStage, SpeakerStage } from "./MeetingStage";
 import { getSlideTimer } from "./slideTimer";
@@ -124,6 +124,10 @@ function MeetingRoom({ meetingId, mode }: Props) {
   const [screenError, setScreenError] = useState("");
   const [selectedSpeaker, setSelectedSpeaker] = useState("");
   const [selectedPrize, setSelectedPrize] = useState("");
+  const [dismissedDrawWinnerId, setDismissedDrawWinnerId] = useState("");
+  const [resultPrizeFilter, setResultPrizeFilter] = useState("");
+  const [showDrawFilter, setShowDrawFilter] = useState(false);
+  const [showWinners, setShowWinners] = useState(false);
   const [quickPrizeOpen, setQuickPrizeOpen] = useState(false);
   const [quickPrizeName, setQuickPrizeName] = useState("Giải thưởng may mắn");
   const [quickPrizeQuantity, setQuickPrizeQuantity] = useState(1);
@@ -181,6 +185,26 @@ function MeetingRoom({ meetingId, mode }: Props) {
   const timer = meeting && getSlideTimer(meeting, current?.id, now);
   const drawing = now < Date.parse(state.drawRevealsAt || "");
   const activePrize = meeting?.luckyDraw?.prizes.find(prize => prize.id === selectedPrize);
+  const drawFilter: DrawFilter = state.drawFilter || "all";
+  const currentDrawWinner = meeting?.luckyDraw?.prizes.flatMap(prize => prize.winners || [])
+    .find(winner => winner.id === state.drawWinnerId);
+  const prizeWinners = meeting?.luckyDraw?.prizes.flatMap(prize =>
+    (prize.winners || []).map(winner => ({ winner, prizeName: prize.name }))) || [];
+  const prizeWinnerIds = new Set(prizeWinners.map(row => row.winner.id));
+  const winnerRows = [
+    ...prizeWinners,
+    ...(meeting?.gameWinners || [])
+      .filter(winner => !prizeWinnerIds.has(winner.id))
+      .map(winner => ({ winner, prizeName: winner.prizeName || "Giải thưởng may mắn" })),
+  ].sort((a, b) => Date.parse(b.winner.wonAt) - Date.parse(a.winner.wonAt));
+  const visibleWinnerRows = resultPrizeFilter
+    ? winnerRows.filter(row => row.winner.prizeId === resultPrizeFilter)
+    : winnerRows;
+  const decideWinner = async (repeatEligible: boolean) => {
+    if (!currentDrawWinner) return;
+    const saved = await command(`/lucky-draw/winners/${encodeURIComponent(currentDrawWinner.id)}/repeat`, { repeatEligible }, "PATCH");
+    if (saved) setDismissedDrawWinnerId(currentDrawWinner.id);
+  };
   useEffect(() => {
     const available = meeting?.luckyDraw?.prizes ?? [];
     const selectionFrame = requestAnimationFrame(() => {
@@ -544,6 +568,18 @@ function MeetingRoom({ meetingId, mode }: Props) {
                 <Gift className="h-4 w-4 text-cyan-600" />
                 <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">Quay thưởng trên màn hình lớn</h2>
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                {meeting.luckyDraw?.drawMode !== "numbers" && <button type="button" aria-expanded={showDrawFilter} onClick={() => setShowDrawFilter(open => !open)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 px-2 text-xs font-bold text-cyan-800 hover:bg-cyan-100">
+                  <SlidersHorizontal className="h-4 w-4" /> Chọn bộ lọc quay
+                </button>}
+                <button type="button" aria-expanded={showWinners} onClick={() => {
+                  const open = !showWinners;
+                  setShowWinners(open);
+                  void command("/presentation-state", { drawPanel: open ? "winners" : "participants" }, "PATCH");
+                }} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-2 text-xs font-bold text-amber-800 hover:bg-amber-100">
+                  <Trophy className="h-4 w-4" /> {showWinners ? "Đóng danh sách" : `Người trúng (${winnerRows.length})`}
+                </button>
+              </div>
               <select
                 aria-label="Giải thưởng"
                 value={selectedPrize}
@@ -557,6 +593,23 @@ function MeetingRoom({ meetingId, mode }: Props) {
                   </option>
                 ))}
               </select>
+              {showDrawFilter && meeting.luckyDraw?.drawMode !== "numbers" && (
+                <label className="block space-y-1 text-xs font-semibold text-slate-700">
+                  <span>Chọn người tham gia vòng quay</span>
+                  <select
+                    aria-label="Bộ lọc người quay thưởng"
+                    value={drawFilter}
+                    disabled={disabled || drawing}
+                    onChange={event => void command("/presentation-state", { drawFilter: event.target.value }, "PATCH")}
+                    className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs font-medium text-slate-800 disabled:opacity-40"
+                  >
+                    <option value="all">Tất cả thành viên và khách mời</option>
+                    <option value="all_members">Tất cả thành viên, kể cả vắng mặt</option>
+                    <option value="present_members">Người đã check-in</option>
+                    <option value="guests">Khách mời đã check-in</option>
+                  </select>
+                </label>
+              )}
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-slate-500">
                   {meeting.luckyDraw?.prizes.length ? "Có thể tạo thêm giải ngay tại đây." : "Chưa có giải thưởng để quay."}
@@ -609,13 +662,67 @@ function MeetingRoom({ meetingId, mode }: Props) {
               <button
                 type="button"
                 className="w-full flex items-center justify-center gap-2 min-h-11 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold shadow-sm shadow-amber-500/20 transition cursor-pointer disabled:opacity-40"
-                disabled={disabled || drawing || !activePrize || activePrize.winners.length >= activePrize.quantity || meeting.status === "scheduled"}
-                onClick={() => void command("/presentation-draw", { prizeId: selectedPrize })}
+                disabled={disabled || drawing || !activePrize || activePrize.winners.length >= activePrize.quantity}
+                onClick={() => void command("/presentation-draw", { prizeId: selectedPrize, drawFilter })}
               >
                 <Sparkles className="h-4 w-4" />
                 <span>{drawing ? "Đang quay…" : "Bắt đầu quay"}</span>
               </button>
               <p className="text-[11px] text-slate-400">Hai màn hình cùng hiển thị kết quả sau 5 giây.</p>
+
+              {currentDrawWinner && !drawing && state.drawResultVisible !== false && dismissedDrawWinnerId !== currentDrawWinner.id && (
+                <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4" role="group" aria-label="Xử lý kết quả vừa quay">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase text-amber-700">Kết quả vừa quay</p>
+                      <p className="mt-1 text-base font-bold text-slate-900">{currentDrawWinner.name}</p>
+                      <p className="text-xs text-slate-600">{currentDrawWinner.prizeName}</p>
+                    </div>
+                    <button type="button" aria-label="Giữ người trúng và đóng thông báo" disabled={disabled} onClick={() => void decideWinner(true)} className="rounded-lg p-1 text-slate-500 hover:bg-white disabled:opacity-40"><X className="h-4 w-4" /></button>
+                  </div>
+                  <p className="mt-3 text-xs text-slate-600">Chọn quyền tham gia các lượt quay tiếp theo.</p>
+                  <fieldset disabled={disabled} className="mt-3 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => void decideWinner(false)} className="min-h-11 rounded-xl bg-rose-600 px-2 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-40">Loại & đóng thông báo</button>
+                    <button type="button" onClick={() => void decideWinner(true)} className="min-h-11 rounded-xl bg-slate-900 px-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-40">Giữ lại & Đóng</button>
+                  </fieldset>
+                </div>
+              )}
+
+              {showWinners && <div className="border-t border-slate-100 pt-4">
+                <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <Trophy className="h-4 w-4 text-amber-600" />
+                  Danh sách người trúng thưởng ({winnerRows.length})
+                </h3>
+                {winnerRows.length > 0 && (
+                  <select aria-label="Lọc kết quả theo giải thưởng" value={resultPrizeFilter} onChange={event => setResultPrizeFilter(event.target.value)} className="mb-3 min-h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700">
+                    <option value="">Tất cả giải thưởng</option>
+                    {(meeting.luckyDraw?.prizes || []).map(prize => <option key={prize.id} value={prize.id}>{prize.name}</option>)}
+                  </select>
+                )}
+                {winnerRows.length === 0 ? (
+                  <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">Chưa có người trúng thưởng.</p>
+                ) : visibleWinnerRows.length === 0 ? (
+                  <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">Giải này chưa có người trúng.</p>
+                ) : (
+                  <ol className="max-h-72 space-y-2 overflow-y-auto" aria-label="Danh sách người trúng thưởng">
+                    {visibleWinnerRows.map(({ winner, prizeName }) => (
+                      <li key={winner.id} className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/50 px-3 py-2.5">
+                        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-100 text-xs font-bold text-amber-800">
+                          {winner.name.slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-slate-800">{winner.name}</p>
+                          <p className="truncate text-xs text-slate-600">{prizeName}{winner.ticketNumber != null ? ` · Số #${winner.ticketNumber}` : ""}</p>
+                          {winner.repeatEligible != null && <p className="text-[11px] text-slate-500">{winner.repeatEligible ? "Được tham gia lượt sau" : "Đã loại khỏi lượt sau"}</p>}
+                        </div>
+                        <time className="shrink-0 text-[11px] text-slate-500" dateTime={winner.wonAt}>
+                          {new Date(winner.wonAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                        </time>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>}
             </div>
           </section>
         </main>

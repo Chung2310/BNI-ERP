@@ -41,6 +41,12 @@ it("keeps unrelated management pages restricted for members", () => {
   expect(getRouteByTab("TỔNG QUAN").canAccess?.({ ...profile, permissions: [] })).toBe(false);
 });
 
+it("lets superadmin view the selected chapter overview", () => {
+  const profile = { ...member, role: "superadmin", permissions: [] } as UserProfile;
+  expect(getRouteByTab("TỔNG QUAN").canAccess?.(profile)).toBe(true);
+  expect(getRouteByTab("TỔNG QUAN").canAccess?.({ ...profile, companyCode: "" })).toBe(false);
+});
+
 it("lets a member open overview from the menu and load meeting statistics without user-management access", async () => {
   const navigate = vi.fn();
   render(<>

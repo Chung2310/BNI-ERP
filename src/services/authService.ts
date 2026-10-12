@@ -36,18 +36,21 @@ export const authService = {
     return data;
   },
   // Đăng ký bằng Email & Mật khẩu
-  async registerWithEmail(email: string, password: string, displayName: string) {
+  async registerWithEmail(email: string, password: string, displayName: string, details?: { phone?: string; companyName?: string; industry?: string }) {
     const res = await fetch("/api/v1/auth/register", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email, password, displayName }),
+      body: JSON.stringify({ email, password, displayName, ...details }),
     });
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(data.message || "Đăng ký thất bại");
+      const fieldError = data.errors && typeof data.errors === "object"
+        ? Object.values(data.errors).flat().find((message): message is string => typeof message === "string")
+        : undefined;
+      throw new Error(fieldError || data.message || "Đăng ký thất bại");
     }
 
     const result = await res.json();

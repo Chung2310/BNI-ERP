@@ -1,11 +1,14 @@
 import { meetingMonthRange } from "../../../src/utils/meetingRecurrence";
 import { Router } from 'express';
 import mongoose from 'mongoose';
+import Joi from 'joi';
 import { requireAuth, requirePermission, getEffectivePermissions, hasAnyPermission } from '../../middleware/auth';
 import { MeetingModel } from './meeting.model';
 import {
   MeetingError,
   assertVersion,
+  assertMeetingEditable,
+  saveMeeting,
   checkInFromModule,
   controlMeeting,
   startMeetingPresentation,
@@ -155,7 +158,27 @@ meetingRouter.post('/:id/presentation-draw', manage, async (req: import("express
     if (item.presentation?.drawRevealsAt && +item.presentation.drawRevealsAt > Date.now()) {
       throw new MeetingError(409, 'Đang quay thưởng. Vui lòng chờ công bố kết quả.');
     }
-    res.json({ data: await spinLuckyDraw(item, value.prizeId, req.user.id, true) });
+    res.json({ data: await spinLuckyDraw(item, value.prizeId, req.user.id, true, value.drawFilter || item.presentation?.drawFilter || 'all') });
+  } catch (error) { sendError(res, error); }
+});
+
+meetingRouter.patch('/:id/lucky-draw/winners/:winnerId/repeat', manage, async (req: import("express").Request, res) => {
+  const { error, value } = Joi.object({
+    version: Joi.number().integer().min(0).required(),
+    repeatEligible: Joi.boolean().required(),
+  }).validate(req.body);
+  if (error) return res.status(400).json({ message: error.message });
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
+    const item = await getMeeting(company(req), req.params.id);
+    assertVersion(item, value.version);
+    assertMeetingEditable(item);
+    const winner = item.luckyDraw?.prizes.flatMap(prize => prize.winners || []).find(record => record.id === req.params.winnerId);
+    if (!winner) throw new MeetingError(404, 'Không tìm thấy kết quả quay thưởng.');
+    winner.repeatEligible = value.repeatEligible;
+    if (item.presentation?.drawWinnerId === winner.id) item.presentation.drawResultVisible = false;
+    await saveMeeting(item);
+    res.json({ data: item });
   } catch (error) { sendError(res, error); }
 });
 

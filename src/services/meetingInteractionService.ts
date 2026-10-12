@@ -2,10 +2,13 @@ import { meetingLiveApi } from "./meetingLiveService";
 
 export type MeetingInteractionStatus = "draft" | "open" | "closed";
 export type MeetingInteractionResponseStatus = "pending" | "approved" | "hidden" | "rejected";
+export type MeetingInteractionQuestionType = "text" | "single_choice";
 
 export interface MeetingInteractionQuestion {
   id: string;
   text: string;
+  type?: MeetingInteractionQuestionType;
+  options?: string[];
   order: number;
   responseCount: number;
   approvedCount: number;
@@ -51,6 +54,8 @@ export interface MeetingInteractionState {
 export interface PublicMeetingInteractionQuestion {
   id: string;
   text: string;
+  type?: MeetingInteractionQuestionType;
+  options?: string[];
   order: number;
 }
 
@@ -66,12 +71,12 @@ export interface PublicMeetingInteraction {
   allowMultipleResponses: boolean;
 }
 
-type InteractionSettings = Pick<MeetingInteractionSession, "question" | "durationSeconds" | "requireName" | "showNames" | "moderationEnabled" | "allowMultipleResponses">;
+type InteractionSettings = Pick<MeetingInteractionSession, "question" | "durationSeconds" | "requireName" | "showNames" | "moderationEnabled" | "allowMultipleResponses"> & { type?: MeetingInteractionQuestionType; options?: string[] };
 
 export const meetingInteractionService = {
   get: (meetingId: string, signal?: AbortSignal) => meetingLiveApi<MeetingInteractionState>(`/${meetingId}/interaction`, "GET", undefined, signal),
   save: (meetingId: string, input: InteractionSettings) => meetingLiveApi<MeetingInteractionState>(`/${meetingId}/interaction`, "PUT", input),
-  addQuestion: (meetingId: string, input: { question: string }) => meetingLiveApi<MeetingInteractionState>(`/${meetingId}/interaction/questions`, "POST", input),
+  addQuestion: (meetingId: string, input: { question: string; type?: MeetingInteractionQuestionType; options?: string[] }) => meetingLiveApi<MeetingInteractionState>(`/${meetingId}/interaction/questions`, "POST", input),
   selectQuestion: (meetingId: string, questionId: string) => meetingLiveApi<MeetingInteractionState>(`/${meetingId}/interaction/questions/${encodeURIComponent(questionId)}/select`, "POST", {}),
   deleteQuestion: (meetingId: string, questionId: string) => meetingLiveApi<MeetingInteractionState>(`/${meetingId}/interaction/questions/${encodeURIComponent(questionId)}`, "DELETE"),
   setStatus: (meetingId: string, status: "open" | "closed") => meetingLiveApi<MeetingInteractionState>(`/${meetingId}/interaction/status`, "POST", { status }),

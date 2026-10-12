@@ -69,6 +69,20 @@ it("splits the presentation into one result panel per question", async () => {
   expect(screen.getByText("Hành động")).toBeTruthy();
   expect(screen.getByText("Kết quả bài tương tác · 2 câu hỏi")).toBeTruthy();
 });
+it("shows vote totals for each choice using approved answers", async () => {
+  vi.stubGlobal("ResizeObserver", class { observe = vi.fn(); disconnect = vi.fn(); });
+  vi.mocked(meetingInteractionService.get).mockResolvedValue({
+    session: { id: "i", meetingId: "m", question: "Chọn gì?", activeQuestionId: "q1", questionNumber: 1, totalQuestions: 1, questions: [{ id: "q1", text: "Chọn gì?", type: "single_choice", options: ["A", "B"], order: 1, responseCount: 3, approvedCount: 2 }], durationSeconds: 60, status: "closed", requireName: true, showNames: true, moderationEnabled: true, allowMultipleResponses: false, participationUrl: "/meeting-interaction/token", responseCount: 3, approvedCount: 2 },
+    responses: [
+      { id: "1", questionId: "q1", participantId: "p1", name: "An", answer: "A", status: "approved", createdAt: "" },
+      { id: "2", questionId: "q1", participantId: "p2", name: "Bình", answer: "A", status: "approved", createdAt: "" },
+      { id: "3", questionId: "q1", participantId: "p3", name: "Chi", answer: "B", status: "pending", createdAt: "" },
+    ],
+  });
+  render(<AudienceResponsesStage meeting={{ _id: "m", title: "Demo" } as never} />);
+  expect(await screen.findByText("2 · 100%")).toBeTruthy();
+  expect(screen.getByText("0 · 0%")).toBeTruthy();
+});
 it("groups equivalent approved answers and orders them by frequency", () => {
   const terms = buildResponseCloud({ session: null, responses: [
     { id: "1", questionId: "q1", participantId: "p1", name: "A", answer: " Kết   nối ", status: "approved", createdAt: "" },

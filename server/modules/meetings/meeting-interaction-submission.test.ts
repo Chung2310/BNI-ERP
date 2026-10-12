@@ -18,7 +18,7 @@ test("submitting one of several questions stores only that answer", async t => {
     question: "Question one",
     questions: [
       { id: "q1", text: "Question one" },
-      { id: "q2", text: "Question two" },
+      { id: "q2", text: "Question two", type: "single_choice", options: ["Yes", "No"] },
     ],
     activeQuestionId: "q1",
     durationSeconds: 60,
@@ -57,4 +57,17 @@ test("submitting one of several questions stores only that answer", async t => {
     { status: 400 },
   );
   assert.equal(inserted.length, 1);
+  await submitMeetingInteractionResponse(token, {
+    participantId: "participant-2",
+    answers: [{ questionId: "q2", answer: "Yes" }],
+  });
+  assert.equal(inserted[1].answer, "Yes");
+  await assert.rejects(
+    submitMeetingInteractionResponse(token, {
+      participantId: "participant-3",
+      answers: [{ questionId: "q2", answer: "Other" }],
+    }),
+    { status: 400 },
+  );
+  assert.equal(inserted.length, 2);
 });

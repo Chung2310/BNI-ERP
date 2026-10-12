@@ -29,7 +29,8 @@ export interface UserProfile {
   coverImage?: string;
   galleryImages?: string[];
   industry?: string;
-  role: "user" | "teacher" | "manager" | "branch_owner" | "admin";
+  role: "user" | "teacher" | "manager" | "branch_owner" | "admin" | "superadmin";
+  membershipStatus?: "none" | "active";
   permissions?: string[];
   createdAt: import("../utils/dateValue").DateValue;
   updatedAt?: import("../utils/dateValue").DateValue;

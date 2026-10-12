@@ -43,6 +43,10 @@ export interface ICompany extends Document {
   name: string;
   createdAt: Date;
   ownerEmail: string;
+  chapterRegion?: string;
+  chapterAddress?: string;
+  acceptsApplications?: boolean;
+  isBniChapter?: boolean;
   businessType?: "education" | "labor" | "service" | "recruitment" | "general";
   /** Các module nghiệp vụ được bật cho doanh nghiệp. Rỗng/thiếu = bật tất cả. */
   enabledModules?: string[];

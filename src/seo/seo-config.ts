@@ -112,7 +112,7 @@ export const TAB_SEO_MAP: Partial<Record<TabType, SeoMeta>> & Record<string, Seo
     description:
       "Giải pháp HRM toàn diện trên iGen Connect giúp quản lý hồ sơ nhân sự, vẽ sơ đồ tổ chức tự động, thiết lập KPI và số hóa tài liệu đào tạo nội bộ.",
     keywords:
-      "quản lý thành viên, BNI chapter, sơ đồ tổ chức, thành viên doanh nghiệp",
+      "quản lý thành viên, Chapter, sơ đồ tổ chức, thành viên doanh nghiệp",
     path: "/thanh-vien",
     priority: "0.8",
     changeFrequency: "weekly",
