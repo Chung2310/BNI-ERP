@@ -9,7 +9,7 @@ type AutoAdvanceMeeting = {
   presentation?: { view?: MeetingPresentationState["view"]; autoAdvance?: boolean; autoAdvanceDelay?: number };
 };
 
-export async function updatePresentationState(item: MeetingDocument, input: Partial<Pick<MeetingPresentationState, "view" | "autoAdvance" | "autoAdvanceDelay">>, now = new Date()) {
+export async function updatePresentationState(item: MeetingDocument, input: Partial<Pick<MeetingPresentationState, "view" | "autoAdvance" | "autoAdvanceDelay" | "drawFilter" | "drawPanel" | "drawResultVisible">>, now = new Date()) {
   if (input.view) setMeetingPresentationView(item, input.view, now);
   const current = item.toObject().presentation || {};
   item.set("presentation", { ...current, ...input });

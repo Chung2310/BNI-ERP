@@ -3,6 +3,8 @@ import { Schema, model } from "mongoose";
 const interactionQuestion = new Schema({
   id: { type: String, required: true },
   text: { type: String, required: true, maxlength: 300 },
+  type: { type: String, enum: ["text", "single_choice"], default: "text" },
+  options: { type: [String], default: [] },
   durationSeconds: { type: Number, min: 10, max: 3600 },
 }, { _id: false });
 

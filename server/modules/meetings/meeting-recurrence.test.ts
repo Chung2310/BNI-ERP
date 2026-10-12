@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("../../socket", () => ({ emitToCompany: vi.fn() }));
 import { recurringMeetingDates, meetingMonthRange, vietnamDateTime } from "../../../src/utils/meetingRecurrence";
 import { createRecurringMeetings, updateMeeting, controlMeeting } from "./meeting.service";
@@ -6,6 +6,7 @@ import { MeetingModel } from "./meeting.model";
 import { recurringMeetingInput } from "./meeting.validation";
 import * as sequence from "./meeting-sequence";
 afterEach(() => vi.restoreAllMocks());
+beforeEach(() => { vi.spyOn(MeetingModel, "exists").mockResolvedValue(null); });
 const rule = { startDate: "2030-01-01", months: 6, weekday: 3, time: "07:00" };
 const details = { title: "Họp tuần", tiers: [{ startTime: "07:00", endTime: "08:00", seconds: 30 }], fallbackSeconds:20, reminderDays:1 };
 it("generates every Wednesday in six months at Vietnam time", () => {

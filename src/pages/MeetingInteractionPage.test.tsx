@@ -50,3 +50,29 @@ it("shows all questions with one countdown and submits all answers together", as
   })));
   expect(await screen.findByText("Đã gửi bài trả lời")).toBeTruthy();
 });
+
+it("submits a selected choice with a written answer", async () => {
+  window.history.pushState({}, "", "/meeting-interaction/public-token");
+  vi.mocked(publicMeetingInteractionService.get).mockResolvedValue({
+    meetingTitle: "Họp BNI",
+    questions: [
+      { id: "q1", text: "Bạn học được gì?", order: 1 },
+      { id: "q2", text: "Bạn chọn gì?", type: "single_choice", options: ["A", "B"], order: 2 },
+    ],
+    totalQuestions: 2,
+    durationSeconds: 60,
+    closesAt: new Date(Date.now() + 60000).toISOString(),
+    status: "open",
+    requireName: false,
+    allowMultipleResponses: false,
+  });
+  vi.mocked(publicMeetingInteractionService.submit).mockResolvedValue({ ids: ["1", "2"], status: "approved", meetingTitle: "Họp BNI", answerCount: 2 });
+  render(<MeetingInteractionPage />);
+  fireEvent.change(await screen.findByLabelText("Câu trả lời câu 1"), { target: { value: "Kết nối" } });
+  fireEvent.click(screen.getByRole("radio", { name: "B" }));
+  fireEvent.click(screen.getByRole("button", { name: "Gửi 2 câu trả lời" }));
+  await waitFor(() => expect(publicMeetingInteractionService.submit).toHaveBeenCalledWith("public-token", expect.objectContaining({ answers: [
+    { questionId: "q1", answer: "Kết nối" },
+    { questionId: "q2", answer: "B" },
+  ] })));
+});

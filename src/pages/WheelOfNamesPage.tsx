@@ -271,6 +271,7 @@ export default function WheelOfNamesPage() {
   const presentationMode = searchParams?.get("presentation") === "1";
   const liveState = useMeetingLive(presentationMode ? urlMeetingId || "" : "", true);
   const [presentationSlides, setPresentationSlides] = useState<ProfileSlide[]>([]);
+  const [presentationUsers, setPresentationUsers] = useState<UserProfile[]>([]);
 
   // State
   const [selectedGame, setSelectedGame] = useState<"wheel" | "bingo">(
@@ -349,13 +350,12 @@ export default function WheelOfNamesPage() {
     const selected = categoryParticipants.filter(participant => participant.selected);
     if (!presentationMode || !liveMeeting) return selected;
     const previousWinnerIds = new Set<string>();
-    if (!liveMeeting.luckyDraw?.allowRepeatWinners) {
-      for (const prize of liveMeeting.luckyDraw?.prizes || []) {
-        for (const winner of prize.winners || []) {
-          previousWinnerIds.add(liveMeeting.luckyDraw.drawMode === "numbers" && winner.ticketNumber
-            ? "ticket-" + winner.ticketNumber
-            : String(winner.winnerId));
-        }
+    for (const prize of liveMeeting.luckyDraw?.prizes || []) {
+      for (const winner of prize.winners || []) {
+        if (winner.repeatEligible === true || (winner.repeatEligible == null && liveMeeting.luckyDraw?.allowRepeatWinners)) continue;
+        previousWinnerIds.add(liveMeeting.luckyDraw?.drawMode === "numbers" && winner.ticketNumber
+          ? "ticket-" + winner.ticketNumber
+          : String(winner.winnerId));
       }
     }
     if (remoteSpinActive && currentDrawWinner) {
@@ -485,6 +485,15 @@ export default function WheelOfNamesPage() {
   }, [presentationMode, urlMeetingId]);
 
   useEffect(() => {
+    if (!presentationMode || authLoading) return;
+    let active = true;
+    void loadChapterUsers(userProfile?.companyCode)
+      .then(users => { if (active) setPresentationUsers(users); })
+      .catch(error => console.warn("Could not load draw members:", error));
+    return () => { active = false; };
+  }, [presentationMode, authLoading, userProfile?.companyCode]);
+
+  useEffect(() => {
     if (!presentationMode) return;
     if (!liveMeeting) return;
     const slideById = new Map(presentationSlides.map(slide => [slide.id, slide]));
@@ -494,20 +503,17 @@ export default function WheelOfNamesPage() {
           const number = (luckyDraw.numberMin || 1) + index;
           return { id: "ticket-" + number, name: "#" + number, companyName: "Lucky number", selected: true, type: "guest" };
         })
-      : liveMeeting.speakers.map(speaker => {
+      : buildMeetingParticipants(presentationUsers, liveMeeting.speakers).map(participant => {
+          const speaker = liveMeeting.speakers.find(item => item.id === participant.id);
+          if (!speaker) return participant;
           const slide = slideById.get(speaker.id);
           return {
-            id: speaker.id,
-            name: slide?.name || speaker.name,
-            avatar: slide?.photoURL || speaker.photoURL || speaker.coverImage,
-            companyName: slide?.company || speaker.company || speaker.slideProfile?.company,
-            role: speaker.userId ? "Member" : "Guest",
-            selected: true,
-            type: speaker.userId ? "member_present" : "guest",
-            checkedInAt: speaker.checkedInAt,
-            phone: slide?.phone || speaker.phone || speaker.slideProfile?.phone,
-            email: slide?.email || speaker.email,
-            industry: slide?.industry || speaker.industry || speaker.slideProfile?.industry,
+            ...participant,
+            name: slide?.name || participant.name,
+            avatar: slide?.photoURL || participant.avatar,
+            companyName: slide?.company || participant.companyName,
+            phone: slide?.phone || speaker.phone,
+            industry: slide?.industry || participant.industry,
             bio: slide?.bio,
           };
         });
@@ -519,6 +525,9 @@ export default function WheelOfNamesPage() {
     })).reverse();
     const syncFrame = requestAnimationFrame(() => {
       setParticipants(nextParticipants);
+      setFilterCategory(liveMeeting.presentation?.drawFilter || "all");
+      setActiveDrawerTab(liveMeeting.presentation?.drawPanel || "participants");
+      setIsDrawerOpen(true);
       setMeetingTitle(liveMeeting.title);
       setSelectedGame("wheel");
       if (availablePrize) { setCurrentPrize(availablePrize); setPrizeInput(availablePrize); }
@@ -526,7 +535,13 @@ export default function WheelOfNamesPage() {
       setLoadingUsers(false);
     });
     return () => cancelAnimationFrame(syncFrame);
-  }, [presentationMode, liveMeeting, presentationSlides]);
+  }, [presentationMode, liveMeeting, presentationSlides, presentationUsers]);
+
+  useEffect(() => {
+    if (presentationMode && liveMeeting?.presentation?.drawResultVisible === false) {
+      setWinnerModal(null);
+    }
+  }, [presentationMode, liveMeeting?.presentation?.drawResultVisible]);
 
   // 2. Fullscreen Toggle
   function toggleFullscreen() {
@@ -929,7 +944,7 @@ export default function WheelOfNamesPage() {
     if (!ctx) return;
 
     // Retina DPI scale
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
     // Calculate available dimensions in parent stage container precisely
     const stage = canvas.parentElement?.parentElement;
@@ -939,11 +954,14 @@ export default function WheelOfNamesPage() {
     if (size <= 0) return;
 
     // Set matching CSS display size in pixels to prevent ANY non-square distortion
-    canvas.style.width = `${size}px`;
-    canvas.style.height = `${size}px`;
-    canvas.width = Math.round(size * dpr);
-    canvas.height = Math.round(size * dpr);
-    ctx.scale(dpr, dpr);
+    const pixelSize = Math.round(size * dpr);
+    if (canvas.width !== pixelSize || canvas.height !== pixelSize) {
+      canvas.style.width = `${size}px`;
+      canvas.style.height = `${size}px`;
+      canvas.width = pixelSize;
+      canvas.height = pixelSize;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     ctx.clearRect(0, 0, size, size);
 
@@ -1395,7 +1413,7 @@ export default function WheelOfNamesPage() {
     const loop = (time: number) => {
       if (!isSpinning && !document.hidden) {
         const delta = time - lastTime;
-        if (delta >= 40) {
+        if (delta >= (presentationMode ? 125 : 40)) {
           lastTime = time;
           if (selectedGame === "wheel") {
             lightPhaseRef.current = (lightPhaseRef.current + 0.1) % 28;
@@ -1412,7 +1430,7 @@ export default function WheelOfNamesPage() {
 
     animId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animId);
-  }, [isSpinning, drawWheel, selectedGame]);
+  }, [isSpinning, drawWheel, selectedGame, presentationMode]);
 
   // Resize handler for responsive canvas
   useEffect(() => {
@@ -1465,6 +1483,7 @@ export default function WheelOfNamesPage() {
 
     const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4);
     lastTickIndexRef.current = -1;
+    let lastDrawTime = 0;
 
     const animateSpin = (now: number) => {
       const elapsed = now - startTime;
@@ -1489,7 +1508,10 @@ export default function WheelOfNamesPage() {
         pointerBounceRef.current *= 0.82;
       }
 
-      drawWheel();
+      if (!presentationMode || now - lastDrawTime >= 32) {
+        lastDrawTime = now;
+        drawWheel();
+      }
 
       if (progress < 1) {
         animationFrameIdRef.current = requestAnimationFrame(animateSpin);
@@ -1516,10 +1538,9 @@ export default function WheelOfNamesPage() {
         }
         launchConfetti(4500);
 
-        setWinnerModal({
-          winner,
-          prize: controlled?.prizeName || currentPrize,
-        });
+        if (!presentationMode || liveMeeting?.presentation?.drawResultVisible !== false) {
+          setWinnerModal({ winner, prize: controlled?.prizeName || currentPrize });
+        }
       }
     };
 
@@ -2435,21 +2456,21 @@ export default function WheelOfNamesPage() {
       {/* ======================================================== */}
       {winnerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg rounded-3xl border-2 border-amber-300 bg-white p-8 text-center shadow-2xl overflow-hidden">
+          <div className={`relative w-full max-w-lg rounded-3xl border-2 border-amber-300 bg-white text-center shadow-2xl overflow-hidden ${presentationMode ? "p-4" : "p-8"}`}>
             {/* Top Close Icon */}
-            <button
+            {!presentationMode && <button
               type="button"
               onClick={() => setWinnerModal(null)}
               className="absolute right-4 top-4 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
             >
               <X className="h-5 w-5" />
-            </button>
+            </button>}
 
             {/* Glowing Backdrop Aura */}
             <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-48 w-48 rounded-full bg-amber-300/40 blur-3xl" />
 
             {/* Trophy & Badge */}
-            <div className="relative mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-amber-500 to-yellow-400 p-4 shadow-xl shadow-amber-500/20">
+            <div className={`relative mx-auto flex items-center justify-center rounded-3xl bg-gradient-to-tr from-amber-500 to-yellow-400 shadow-xl shadow-amber-500/20 ${presentationMode ? "mb-2 h-12 w-12 p-2" : "mb-4 h-20 w-20 p-4"}`}>
               {winnerModal.ballNumber ? (
                 <div className="flex flex-col items-center justify-center text-amber-950">
                   <span className="text-[10px] font-black uppercase tracking-wider">BÓNG SỐ</span>
@@ -2475,7 +2496,7 @@ export default function WheelOfNamesPage() {
             </p>
 
             {/* Winner Big Display */}
-            <div className="my-6 rounded-2xl bg-gradient-to-b from-amber-50 to-orange-50/60 border border-amber-200/80 p-6 shadow-inner">
+            <div className={`rounded-2xl bg-gradient-to-b from-amber-50 to-orange-50/60 border border-amber-200/80 shadow-inner ${presentationMode ? "my-3 p-3" : "my-6 p-6"}`}>
               {winnerModal.winner.avatar ? (
                 <img
                   src={winnerModal.winner.avatar}
@@ -2496,7 +2517,7 @@ export default function WheelOfNamesPage() {
             </div>
 
             {/* Actions for Wheel of Names / Bingo */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            {!presentationMode && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               {/* Option 1: Remove from wheel/cage so they don't win again */}
               <button
                 type="button"
@@ -2516,7 +2537,7 @@ export default function WheelOfNamesPage() {
                 <Check className="h-4 w-4 text-emerald-400" />
                 <span>Giữ lại & Đóng</span>
               </button>
-            </div>
+            </div>}
           </div>
         </div>
       )}

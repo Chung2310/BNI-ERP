@@ -41,7 +41,6 @@ import {
   Maximize2,
   Minimize2,
   SlidersHorizontal,
-  UserPlus,
   Trash2,
   Plus,
 } from "lucide-react";
@@ -313,8 +312,6 @@ function MeetingWorkspace() {
   const [isStarting, setIsStarting] = useState(false);
 
   // Guest Checkin state inside detail modal
-  const [guestName, setGuestName] = useState("");
-  const [guestEmail, setGuestEmail] = useState("");
 
   // Speaker search & filter state inside detail modal
   const [speakerSearch, setSpeakerSearch] = useState("");
@@ -660,17 +657,6 @@ function MeetingWorkspace() {
     } finally {
       setIsStarting(false);
     }
-  };
-
-  const addGuest = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeMeeting) return;
-    void run(async () => {
-      await api(`/${activeMeeting._id}/checkin`, "POST", { name: guestName, email: guestEmail });
-      toast.success(`Đã check-in cho khách mời "${guestName}"`);
-      setGuestName("");
-      setGuestEmail("");
-    });
   };
 
   const requestMeetingControl = async (action: string): Promise<void> => {
@@ -1352,28 +1338,6 @@ function MeetingWorkspace() {
             {/* Modal Body Content (Scrollable) */}
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
               {activeMeeting.status === "ended" && <p role="status" className="rounded-xl border border-cyan-100 bg-cyan-50/50 px-4 py-3 text-sm text-slate-600">Cuộc họp đã kết thúc. Bạn chỉ có thể xem thông tin và kết quả.</p>}
-              {flowStep === "presentation" && (
-                <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
-                  <div role="group" aria-label="Chế độ xem thuyết trình" className="inline-flex rounded-xl bg-slate-100 p-1 shrink-0">
-                    <button type="button" aria-pressed={true} onClick={() => setSlidesOpen(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-cyan-700 bg-white shadow-2xs transition cursor-pointer">
-                      <Megaphone className="h-3.5 w-3.5" /> Slide trình chiếu
-                    </button>
-                  </div>
-
-                  {canManage && activeMeeting.status === "scheduled" && (
-                    <button
-                      type="button"
-                      onClick={() => setStartingMeeting(activeMeeting)}
-                      disabled={saving}
-                      className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-medium shadow-sm shadow-emerald-600/20 transition cursor-pointer"
-                    >
-                      <Play className="h-3.5 w-3.5" fill="currentColor" />
-                      Bắt đầu cuộc họp
-                    </button>
-                  )}
-                </div>
-              )}
-
               {flowStep === "presentation" && slidesOpen && (
                 <MeetingSlides
                   key={activeMeeting._id}
@@ -1397,12 +1361,6 @@ function MeetingWorkspace() {
               )}
 
               {/* Status Notice Alerts */}
-              {activeMeeting.status === "scheduled" && flowStep === "presentation" && !slidesOpen && (
-                <div className="flex items-center gap-2.5 rounded-xl border border-cyan-200/70 bg-gradient-to-r from-cyan-50 to-sky-50 px-4 py-3 text-xs text-cyan-900 shadow-2xs">
-                  <span className="flex h-2 w-2 rounded-full bg-cyan-500 shrink-0" />
-                  <p>Kiểm tra danh sách và thứ tự bên dưới, sau đó bấm Bắt đầu cuộc họp. Có thể tiếp tục nhận check-in khi đang họp.</p>
-                </div>
-              )}
               {["ended", "cancelled"].includes(activeMeeting.status) && flowStep === "presentation" && !slidesOpen && (
                 <div className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-xs text-slate-700">
                   <p>Buổi họp đã đóng. Danh sách tham dự được giữ lại bên dưới.</p>
@@ -1412,39 +1370,7 @@ function MeetingWorkspace() {
               {/* SUBTAB 1: CHECK-IN STEP */}
               {flowStep === "checkin" && (
                 <div className="space-y-4">
-                  <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} canManage={canModifyActiveMeeting} onConfigure={() => openEditModal(activeMeeting)} />
-
-                  {/* Guest Checkin Form (MC / Admin) */}
-                  {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
-                    <form
-                      onSubmit={addGuest}
-                      className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs flex flex-wrap items-center gap-3"
-                    >
-                      <span className="font-medium text-xs text-slate-600 shrink-0">MC ghi nhận khách tại chỗ:</span>
-                      <input
-                        required
-                        value={guestName}
-                        onChange={(e) => setGuestName(e.target.value)}
-                        placeholder="Họ tên khách mời..."
-                        className="min-w-36 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none"
-                      />
-                      <input
-                        type="email"
-                        value={guestEmail}
-                        onChange={(e) => setGuestEmail(e.target.value)}
-                        placeholder="Email khách mời..."
-                        className="min-w-44 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none"
-                      />
-                      <button
-                        type="submit"
-                        disabled={!canManage || saving}
-                        title={!canManage ? "Chỉ MC/Admin có quyền check-in khách mời" : ""}
-                        className="rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 text-xs font-medium transition cursor-pointer disabled:opacity-40"
-                      >
-                        Check-in khách
-                      </button>
-                    </form>
-                  )}
+                  <MeetingCheckInPanel key={activeMeeting._id} meeting={activeMeeting} />
 
                   {/* Speakers Queue Table */}
                   <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
@@ -1834,40 +1760,6 @@ function MeetingWorkspace() {
                       </div>
                     )}
 
-                    {/* Guest Check-in Form (MC / Admin) */}
-                    {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && (
-                      <form
-                        onSubmit={addGuest}
-                        className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs flex flex-wrap items-center gap-3"
-                      >
-                        <span className="font-semibold text-xs text-slate-700 shrink-0 flex items-center gap-1.5">
-                          <UserPlus className="h-3.5 w-3.5 text-cyan-600" />
-                          MC ghi nhận khách tại chỗ:
-                        </span>
-                        <input
-                          required
-                          value={guestName}
-                          onChange={(e) => setGuestName(e.target.value)}
-                          placeholder="Họ tên khách mời..."
-                          className="min-w-36 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none"
-                        />
-                        <input
-                          type="email"
-                          value={guestEmail}
-                          onChange={(e) => setGuestEmail(e.target.value)}
-                          placeholder="Email khách mời..."
-                          className="min-w-44 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none"
-                        />
-                        <button
-                          type="submit"
-                          disabled={!canManage || saving}
-                          title={!canManage ? "Chỉ MC/Admin có quyền check-in khách mời" : ""}
-                          className="rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 text-xs font-bold transition cursor-pointer disabled:opacity-40 shadow-xs"
-                        >
-                          Check-in khách
-                        </button>
-                      </form>
-                    )}
                   </div>
 
                   {/* RIGHT COLUMN: SPEAKER QUEUE (5/12) */}

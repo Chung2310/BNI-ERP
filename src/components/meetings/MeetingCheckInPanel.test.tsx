@@ -12,17 +12,10 @@ const result = { checkInUrl: "/meeting-checkin/shared-token", expiresAt: null, s
 
 afterEach(() => { cleanup(); sessionStorage.clear(); });
 
-it("lets an organizer open location configuration for meeting check-in", () => {
-  const onConfigure = vi.fn();
-  render(<MeetingCheckInPanel meeting={meeting} canManage onConfigure={onConfigure} />);
-  expect(screen.getByText(/kiểm tra vị trí trong bán kính/)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Cấu hình địa điểm & thời gian" }));
-  expect(onConfigure).toHaveBeenCalledOnce();
-});
-
-it("tells members to check in at the meeting location", () => {
-  render(<MeetingCheckInPanel meeting={meeting} canManage={false} onConfigure={vi.fn()} />);
-  expect(screen.getByText(/Điểm danh tại địa điểm họp/)).toBeTruthy();
+it("shows the check-in summary without the location configuration notice", () => {
+  render(<MeetingCheckInPanel meeting={meeting} />);
+  expect(screen.getByText("Đón tiếp & check-in")).toBeTruthy();
+  expect(screen.queryByText(/kiểm tra vị trí trong bán kính/)).toBeNull();
   expect(screen.queryByRole("button", { name: "Cấu hình địa điểm & thời gian" })).toBeNull();
 });
 

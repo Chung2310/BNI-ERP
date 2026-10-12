@@ -24,6 +24,30 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+it("hides manual guest check-in in reception and presentation", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, status: "live", startsAt: new Date(Date.now() - 60000).toISOString() }] }) }));
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
+  expect(screen.getByText("Đón tiếp & check-in")).toBeTruthy();
+  expect(screen.queryByText("MC ghi nhận khách tại chỗ:")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Check-in khách" })).toBeNull();
+  fireEvent.click(screen.getByRole("tab", { name: "Thuyết trình" }));
+  expect(screen.queryByText("MC ghi nhận khách tại chỗ:")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Check-in khách" })).toBeNull();
+});
+
+it("omits the presentation and start shortcuts from the meeting modal", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, startsAt: "2030-01-02T00:00:00Z", status: "scheduled" }] }) }));
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Mở buổi họp & check-in" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Thuyết trình" }));
+  expect(screen.queryByRole("button", { name: "Slide trình chiếu" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Bắt đầu cuộc họp" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Bắt đầu thuyết trình" })).toBeTruthy();
+});
+
 it("keeps paused meetings ongoing and advances meeting duration while the speaker timer stays paused", async () => {
   vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
   const origin = Date.now();
@@ -229,7 +253,6 @@ it("shares manual navigation and operating mode between slides and MC controls",
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
   fireEvent.click(screen.getByRole("tab", { name: "Thuyết trình" }));
-  fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
   await screen.findByText("Người đầu");
   await waitFor(() => expect((screen.getByRole("button", { name: "Slide tiếp" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Slide tiếp" }));
@@ -239,7 +262,6 @@ it("shares manual navigation and operating mode between slides and MC controls",
   fireEvent.click(screen.getByRole("button", { name: "Bảng điều hành" }));
   await waitFor(() => expect((screen.getByLabelText("Chế độ điều hành") as HTMLSelectElement).value).toBe("auto"));
   fireEvent.change(screen.getByLabelText("Chế độ điều hành"), { target: { value: "manual" } });
-  fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
   await waitFor(() => expect((screen.getByRole("button", { name: "Slide trước" }) as HTMLButtonElement).disabled).toBe(false));
   await waitFor(() => expect((screen.getByLabelText("Chế độ trình chiếu") as HTMLSelectElement).value).toBe("manual"));
   fireEvent.click(screen.getByRole("button", { name: "Slide trước" }));
@@ -421,7 +443,6 @@ it("polls the active meeting so an in-page presentation advances without a socke
     fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
     fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
     fireEvent.click(screen.getByRole("tab", { name: "Thuyết trình" }));
-    fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
     await waitFor(() => expect(screen.getAllByRole("img").filter(element => element.tagName === "CANVAS").some(element => element.getAttribute("aria-label")?.includes("Người đầu tiên"))).toBe(true));
 
     item = { ...item, currentIndex: 1, speakerStartedAt: new Date(Date.now() + 5000).toISOString(), __v: 1 };
@@ -542,7 +563,6 @@ it("opening a paused presentation resumes the countdown from its remaining time"
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
     fireEvent.click(await screen.findByRole("button", { name: "Tiếp tục điều hành" }));
     fireEvent.click(screen.getByRole("tab", { name: "Thuyết trình" }));
-    fireEvent.click(screen.getByRole("button", { name: "Slide trình chiếu" }));
     await screen.findByText("Khách đang nói");
     fireEvent.click(screen.getByRole("button", { name: "Bắt đầu thuyết trình" }));
     await waitFor(() => expect(item.status).toBe("live"));

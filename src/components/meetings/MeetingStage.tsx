@@ -129,12 +129,9 @@ export function MeetingStage({ snapshot, now, fill = false }: { snapshot: Meetin
   </SpeakerPresentationFrame>;
 
   return <div className={`relative w-full overflow-hidden bg-slate-950 ${fill && view === "speaker" ? "h-full" : "aspect-video"}`}>
-    <div
-      className={`absolute inset-0 ${view === "luckyDraw" ? "visible" : "invisible pointer-events-none"}`}
-      aria-hidden={view !== "luckyDraw"}
-    >
+    {view === "luckyDraw" && <div className="absolute inset-0">
       <DrawStage meeting={meeting} />
-    </div>
+    </div>}
     {view !== "luckyDraw" && <div className="absolute inset-0">{activeStage}</div>}
   </div>;
 }

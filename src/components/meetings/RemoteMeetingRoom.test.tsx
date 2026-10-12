@@ -96,6 +96,9 @@ it("shows draw and game winners on the control panel without duplicate results",
   ];
 
   render(<RemoteMeetingRoom meetingId="m" mode="control" />);
+  fireEvent.click(await screen.findByRole("button", { name: /Người trúng \(2\)/ }));
+  await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url, options]) =>
+    String(url).endsWith("/presentation-state") && JSON.parse(String(options?.body)).drawPanel === "winners")).toBe(true));
   const list = await screen.findByRole("list", { name: "Danh sách người trúng thưởng" });
   const rows = within(list).getAllByRole("listitem");
   expect(rows).toHaveLength(2);

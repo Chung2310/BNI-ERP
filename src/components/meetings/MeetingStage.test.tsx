@@ -22,6 +22,7 @@ it("shows the next three speakers in the fullscreen speaker stage", () => {
     presentation: { view: "speaker" }, speakers, luckyDraw: { prizes: [] },
   }} as unknown as import("../../services/meetingLiveService").MeetingLiveSnapshot;
   render(<MeetingStage snapshot={snapshot} now={snapshot.serverNow} fill />);
+  expect(screen.queryByTitle("Màn hình quay thưởng")).toBeNull();
   const upcoming = screen.getByLabelText("Người thuyết trình tiếp theo");
   expect(upcoming.textContent).toContain("Bình");
   expect(upcoming.textContent).toContain("Chi");

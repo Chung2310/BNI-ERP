@@ -65,6 +65,20 @@ it("creates an additional question in the shared interaction", async () => {
   expect((await screen.findAllByText("Câu hai")).length).toBeGreaterThan(0);
 });
 
+it("creates a single-choice question with its options", async () => {
+  vi.mocked(meetingInteractionService.get).mockResolvedValue(interactionState());
+  vi.mocked(meetingInteractionService.addQuestion).mockResolvedValue(interactionState());
+  render(<MeetingInteractionTab meeting={{ _id: "m", __v: 4, title: "Demo", status: "live" } as never} canManage onRefreshMeeting={vi.fn()} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Thêm câu hỏi" }));
+  const dialog = screen.getByRole("dialog", { name: "Thêm câu hỏi" });
+  fireEvent.change(within(dialog).getByLabelText("Nội dung câu hỏi"), { target: { value: "Bạn chọn gì?" } });
+  fireEvent.change(within(dialog).getByLabelText("Loại câu hỏi"), { target: { value: "single_choice" } });
+  fireEvent.change(within(dialog).getByLabelText("Lựa chọn 1"), { target: { value: "A" } });
+  fireEvent.change(within(dialog).getByLabelText("Lựa chọn 2"), { target: { value: "B" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Thêm câu hỏi" }));
+  await waitFor(() => expect(meetingInteractionService.addQuestion).toHaveBeenCalledWith("m", { question: "Bạn chọn gì?", type: "single_choice", options: ["A", "B"] }));
+});
+
 it("keeps long questions inside cards and confirms before deleting", async () => {
   const initial = interactionState({
     totalQuestions: 2,

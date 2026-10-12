@@ -30,6 +30,7 @@ function QuestionResultPanel({
     [cloudSize, terms],
   );
   const approvedCount = responses.filter(response => response.status === "approved").length;
+  const choiceCounts = (question.options || []).map(option => ({ option, count: responses.filter(response => response.status === "approved" && response.answer === option).length }));
 
   useEffect(() => {
     const element = cloudRoot.current;
@@ -68,7 +69,7 @@ function QuestionResultPanel({
     </header>
 
     <div ref={cloudRoot} className="absolute inset-x-[3%] bottom-[3%] top-[25%] overflow-hidden">
-      {!terms.length ? <div className="absolute inset-0 grid place-items-center text-center"><p className={`font-bold text-slate-400 ${compact ? "text-[clamp(.7rem,1vw,1.1rem)]" : "text-[clamp(1rem,1.6vw,1.8rem)]"}`}>Chờ câu trả lời…</p></div> : placements.map(term => <span
+      {question.type === "single_choice" ? <div className="flex h-full flex-col justify-center gap-[.7vw] overflow-y-auto px-[2%]">{choiceCounts.map(({ option, count }, index) => <div key={option} className="min-w-0"><div className="mb-[.2vw] flex justify-between gap-2 text-[clamp(.65rem,1.15vw,1.4rem)] font-semibold"><span className="truncate">{option}</span><span className="shrink-0">{count} · {approvedCount ? Math.round(count / approvedCount * 100) : 0}%</span></div><div className="h-[clamp(.35rem,.7vw,.8rem)] overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${approvedCount ? count / approvedCount * 100 : 0}%`, backgroundColor: CLOUD_COLORS[index % CLOUD_COLORS.length] }} /></div></div>)}</div> : !terms.length ? <div className="absolute inset-0 grid place-items-center text-center"><p className={`font-bold text-slate-400 ${compact ? "text-[clamp(.7rem,1vw,1.1rem)]" : "text-[clamp(1rem,1.6vw,1.8rem)]"}`}>Chờ câu trả lời…</p></div> : placements.map(term => <span
         key={term.key}
         title={`${term.text}: ${term.count} câu trả lời`}
         className="absolute flex origin-center items-center justify-center whitespace-nowrap font-medium leading-none tracking-[-0.035em] transition-[left,top,font-size] duration-500 ease-out"
