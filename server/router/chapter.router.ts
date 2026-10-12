@@ -135,10 +135,37 @@ const createChapterSchema = Joi.object({
   adminPassword: Joi.string().min(8).max(128).required(),
 }).unknown(false);
 
+const validationFieldNames: Record<string, string> = {
+  code: "Mã Chapter", name: "Tên Chapter", region: "Khu vực / Tỉnh thành",
+  address: "Địa chỉ sinh hoạt định kỳ", adminName: "Họ tên Admin Chapter",
+  adminEmail: "Email đăng nhập Admin", adminPassword: "Mật khẩu Admin ban đầu",
+  chapterRegion: "Khu vực / Tỉnh thành", chapterAddress: "Địa chỉ sinh hoạt định kỳ",
+  acceptsApplications: "Nhận đơn gia nhập", chapterCode: "Mã Chapter",
+  decision: "Quyết định", reason: "Lý do",
+};
+
+function validationMessage(error: Joi.ValidationError): string {
+  const detail = error.details[0];
+  const key = String(detail?.path[0] ?? "");
+  const field = validationFieldNames[key] || "Dữ liệu";
+  const limit = detail?.context?.limit;
+  switch (detail?.type) {
+    case "any.required": case "string.empty": return `Vui lòng nhập ${field}.`;
+    case "string.min": return `${field} phải có ít nhất ${limit} ký tự.`;
+    case "string.max": return `${field} không được vượt quá ${limit} ký tự.`;
+    case "string.email": return `${field} không đúng định dạng email.`;
+    case "string.pattern.base": return `${field} chỉ được gồm chữ cái không dấu, số, dấu gạch ngang hoặc gạch dưới (2–32 ký tự).`;
+    case "any.only": return `${field} không hợp lệ.`;
+    case "object.unknown": return "Yêu cầu chứa trường dữ liệu không được hỗ trợ.";
+    case "object.min": return "Vui lòng nhập ít nhất một thông tin cần cập nhật.";
+    default: return `${field} không hợp lệ.`;
+  }
+}
+
 chapterRouter.post("/manage", async (req, res) => {
   if (req.user?.role !== "superadmin") return res.status(403).json({ message: "Chỉ superadmin được tạo chapter." });
   const { error, value } = createChapterSchema.validate(req.body);
-  if (error) return res.status(400).json({ message: error.message });
+  if (error) return res.status(400).json({ message: validationMessage(error) });
   try {
     const result = await authService.registerCompanyAndAdmin({
       companyCode: value.code, companyName: value.name, ownerName: value.adminName,
@@ -159,7 +186,7 @@ chapterRouter.patch("/manage/:code", async (req, res) => {
     chapterAddress: Joi.string().trim().max(255).allow(""),
     acceptsApplications: Joi.boolean(),
   }).min(1).unknown(false).validate(req.body);
-  if (error) return res.status(400).json({ message: error.message });
+  if (error) return res.status(400).json({ message: validationMessage(error) });
   const chapter = await CompanyModel.findOneAndUpdate(
     { code: req.params.code.toUpperCase(), isBniChapter: true, lifecycleStatus: { $nin: ["archived", "scheduled-deletion"] } }, { $set: value }, { returnDocument: "after", runValidators: true },
   ).select("code name chapterRegion chapterAddress acceptsApplications lifecycleStatus").lean();
@@ -193,7 +220,7 @@ chapterRouter.post("/me/applications", async (req, res) => {
   const { error, value } = Joi.object({
     chapterCode: Joi.string().trim().uppercase().required(),
   }).unknown(false).validate(req.body);
-  if (error) return res.status(400).json({ message: error.message });
+  if (error) return res.status(400).json({ message: validationMessage(error) });
   if (req.user?.role === "superadmin" || req.user?.role === "admin" || req.user?.companyCode) {
     return res.status(409).json({ message: "Tài khoản đã thuộc một chapter hoặc không đủ điều kiện nộp đơn." });
   }
@@ -227,7 +254,7 @@ chapterRouter.post("/me/applications", async (req, res) => {
 chapterRouter.patch("/me/applications/:id", async (req, res) => {
   if (!objectId(req.params.id)) return res.status(400).json({ message: "Mã đơn không hợp lệ." });
   const { error, value } = Joi.object({ chapterCode: Joi.string().trim().uppercase().required() }).unknown(false).validate(req.body);
-  if (error) return res.status(400).json({ message: error.message });
+  if (error) return res.status(400).json({ message: validationMessage(error) });
   if (req.user?.companyCode) return res.status(409).json({ message: "Tài khoản đã thuộc chapter." });
   const chapter = await CompanyModel.findOne({ code: value.chapterCode, isBniChapter: true, lifecycleStatus: { $in: ["active", null] }, acceptsApplications: { $ne: false } }).select("code").lean();
   if (!chapter) return res.status(404).json({ message: "Chapter không tồn tại hoặc chưa nhận đơn." });
@@ -276,7 +303,7 @@ chapterRouter.post("/admin/applications/:id/decision", async (req, res) => {
     decision: Joi.string().valid("approved").required(),
     chapterCode: Joi.string().trim().uppercase().optional(),
   }).unknown(true).validate(req.body);
-  if (error) return res.status(400).json({ message: error.message });
+  if (error) return res.status(400).json({ message: validationMessage(error) });
   try {
     const approved = await runInTransaction(async session => {
         const chapter = await CompanyModel.findOne({ code, isBniChapter: true, lifecycleStatus: { $in: ["active", null] } }).select("_id").session(session || null);
@@ -321,7 +348,7 @@ chapterRouter.post("/me/leave-requests", async (req, res) => {
     return res.status(409).json({ message: "Tài khoản chưa thể gửi yêu cầu rời chapter." });
   }
   const { error, value } = Joi.object({ reason: Joi.string().trim().max(1000).allow("").default("") }).unknown(false).validate(req.body);
-  if (error) return res.status(400).json({ message: error.message });
+  if (error) return res.status(400).json({ message: validationMessage(error) });
   try {
     const request = await ChapterLeaveRequestModel.create({ userId: req.user.id, chapterCode: req.user.companyCode, reason: value.reason });
     return res.status(201).json({ data: request });
@@ -352,7 +379,7 @@ chapterRouter.post("/admin/leave-requests/:id/decision", async (req, res) => {
     decision: Joi.string().valid("approved").required(),
     chapterCode: Joi.string().trim().uppercase().optional(),
   }).unknown(true).validate(req.body);
-  if (error) return res.status(400).json({ message: error.message });
+  if (error) return res.status(400).json({ message: validationMessage(error) });
   try {
     const approved = await runInTransaction(async session => {
         const request = await ChapterLeaveRequestModel.findOneAndUpdate(

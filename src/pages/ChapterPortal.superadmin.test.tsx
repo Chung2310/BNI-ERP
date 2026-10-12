@@ -113,3 +113,26 @@ test("uses the same searchable province list when creating a chapter", async () 
   fireEvent.click(screen.getByRole("button", { name: "Bắc Ninh" }));
   expect(screen.getByRole("button", { name: "Khu vực / Tỉnh thành" }).textContent).toContain("Bắc Ninh");
 });
+
+test("shows Vietnamese validation in the create popup and keeps entered values after a server error", async () => {
+  const fetchMock = vi.fn(async (url: string, options?: RequestInit) => options?.method === "POST"
+    ? new Response(JSON.stringify({ message: "Mã Chapter đã tồn tại." }), { status: 409 })
+    : new Response(JSON.stringify({ data: url.endsWith("/overview") ? { applications: [], leaves: [] } : [] }), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<ChapterPortal />);
+  fireEvent.click(await screen.findByRole("button", { name: "Tạo Chapter mới" }));
+  fireEvent.change(screen.getByLabelText(/Mã Chapter \(VD: HANOI\)/), { target: { value: "TEST" } });
+  fireEvent.change(screen.getByLabelText(/Tên Chapter \(VD: Dynamic\)/), { target: { value: "Chapter thử" } });
+  fireEvent.change(screen.getByLabelText(/Họ tên Admin Chapter/), { target: { value: "Admin thử" } });
+  fireEvent.change(screen.getByLabelText(/Email đăng nhập Admin/), { target: { value: "admin@test.vn" } });
+  fireEvent.change(screen.getByLabelText(/Mật khẩu Admin ban đầu/), { target: { value: "short" } });
+  fireEvent.click(screen.getByRole("button", { name: "Xác nhận tạo Chapter" }));
+  expect(screen.getByRole("alert").textContent).toContain("Mật khẩu Admin ban đầu phải có từ 8 đến 128 ký tự.");
+  expect(fetchMock.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+  fireEvent.change(screen.getByLabelText(/Mật khẩu Admin ban đầu/), { target: { value: "long-password" } });
+  fireEvent.click(screen.getByRole("button", { name: "Xác nhận tạo Chapter" }));
+  await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Mã Chapter đã tồn tại."));
+  expect((screen.getByLabelText(/Tên Chapter \(VD: Dynamic\)/) as HTMLInputElement).value).toBe("Chapter thử");
+  expect((screen.getByLabelText(/Mật khẩu Admin ban đầu/) as HTMLInputElement).value).toBe("long-password");
+});

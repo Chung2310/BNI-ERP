@@ -54,6 +54,21 @@ function regionOptionsFor(value: string) {
     : chapterRegionOptions;
 }
 
+type NewChapterField = "code" | "name" | "region" | "address" | "adminName" | "adminEmail" | "adminPassword";
+type NewChapterForm = Record<NewChapterField, string>;
+
+function validateNewChapter(form: NewChapterForm): Partial<Record<NewChapterField, string>> {
+  const errors: Partial<Record<NewChapterField, string>> = {};
+  if (!/^[A-Z0-9_-]{2,32}$/.test(form.code.trim().toUpperCase())) errors.code = "Mã Chapter phải có 2–32 ký tự, chỉ gồm chữ cái không dấu, số, dấu gạch ngang hoặc gạch dưới.";
+  if (form.name.trim().length < 2 || form.name.trim().length > 150) errors.name = "Tên Chapter phải có từ 2 đến 150 ký tự.";
+  if (form.region.trim().length > 120) errors.region = "Khu vực / Tỉnh thành không được vượt quá 120 ký tự.";
+  if (form.address.trim().length > 255) errors.address = "Địa chỉ sinh hoạt định kỳ không được vượt quá 255 ký tự.";
+  if (form.adminName.trim().length < 2 || form.adminName.trim().length > 120) errors.adminName = "Họ tên Admin Chapter phải có từ 2 đến 120 ký tự.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.adminEmail.trim()) || form.adminEmail.length > 254) errors.adminEmail = "Vui lòng nhập email đăng nhập Admin hợp lệ.";
+  if (form.adminPassword.length < 8 || form.adminPassword.length > 128) errors.adminPassword = "Mật khẩu Admin ban đầu phải có từ 8 đến 128 ký tự.";
+  return errors;
+}
+
 type Chapter = {
   code: string;
   name: string;
@@ -129,13 +144,15 @@ export default function ChapterPortal() {
 
   // Modals & form state
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [createFieldErrors, setCreateFieldErrors] = useState<Partial<Record<NewChapterField, string>>>({});
   const [editingChapter, setEditingChapter] = useState<Chapter | null>(null);
   const [confirmEdit, setConfirmEdit] = useState(false);
   const [deletingChapter, setDeletingChapter] = useState<Chapter | null>(null);
   const [chapterDraft, setChapterDraft] = useState({ name: "", chapterRegion: "", chapterAddress: "", acceptsApplications: true });
   const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false);
 
-  const [newChapter, setNewChapter] = useState({
+  const [newChapter, setNewChapter] = useState<NewChapterForm>({
     code: "",
     name: "",
     region: "",
@@ -272,20 +289,25 @@ export default function ChapterPortal() {
   // Tạo chapter mới
   async function createChapter(event: FormEvent) {
     event.preventDefault();
-    await act(
-      () => api("/manage", "POST", newChapter),
-      `Đã tạo thành công Chapter ${newChapter.name} (${newChapter.code}).`
-    );
-    setNewChapter({
-      code: "",
-      name: "",
-      region: "",
-      address: "",
-      adminName: "",
-      adminEmail: "",
-      adminPassword: "",
+    const fieldErrors = validateNewChapter(newChapter);
+    setCreateFieldErrors(fieldErrors);
+    setCreateError("");
+    if (Object.keys(fieldErrors).length) return;
+    setBusy(true);
+    try {
+      await api("/manage", "POST", newChapter);
+      setShowCreateModal(false);
+      setNewChapter({ code: "", name: "", region: "", address: "", adminName: "", adminEmail: "", adminPassword: "" });
+      setMessage(`Đã tạo thành công Chapter ${newChapter.name} (${newChapter.code}).`);
+    } catch (reason) {
+      setCreateError(reason instanceof Error ? reason.message : "Không thể tạo Chapter. Vui lòng thử lại.");
+      return;
+    } finally {
+      setBusy(false);
+    }
+    await Promise.all([reload(), refreshProfile()]).catch(reason => {
+      setError(reason instanceof Error ? reason.message : "Đã tạo Chapter nhưng chưa thể làm mới dữ liệu.");
     });
-    setShowCreateModal(false);
   }
 
   function openEditChapter(chapter: Chapter) {
@@ -395,7 +417,7 @@ export default function ChapterPortal() {
         <div className="flex items-center gap-2 self-start sm:self-auto">
           {isSuperadmin && (
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => { setCreateError(""); setCreateFieldErrors({}); setShowCreateModal(true); }}
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-sky-700 active:scale-95"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -1317,7 +1339,8 @@ export default function ChapterPortal() {
               </button>
             </div>
 
-            <form onSubmit={createChapter} className="space-y-3">
+            <form onSubmit={createChapter} noValidate className="space-y-3">
+              {createError && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{createError}</p>}
               <div className="grid gap-3 sm:grid-cols-2">
                 {([
                   ["code", "Mã Chapter (VD: HANOI)", "text"],
@@ -1333,11 +1356,12 @@ export default function ChapterPortal() {
                     <SearchableSelect
                       options={chapterRegionOptions}
                       value={newChapter.region}
-                      onChange={value => setNewChapter(current => ({ ...current, region: value }))}
+                      onChange={value => { setNewChapter(current => ({ ...current, region: value })); setCreateFieldErrors(current => ({ ...current, region: undefined })); }}
                       ariaLabel="Khu vực / Tỉnh thành"
                       searchPlaceholder="Tìm tỉnh, thành phố..."
                       placeholder="Toàn quốc"
                     />
+                    {createFieldErrors.region && <p role="alert" className="mt-1 text-xs text-rose-600">{createFieldErrors.region}</p>}
                   </div>
                 ) : (
                   <label key={key} className="text-xs font-medium text-slate-700">
@@ -1346,11 +1370,14 @@ export default function ChapterPortal() {
                       required={!["region", "address"].includes(key)}
                       type={inputType}
                       value={newChapter[key]}
-                      onChange={(e) =>
-                        setNewChapter((curr) => ({ ...curr, [key]: e.target.value }))
-                      }
+                      onChange={(e) => {
+                        setNewChapter((curr) => ({ ...curr, [key]: e.target.value }));
+                        setCreateFieldErrors(current => ({ ...current, [key]: undefined }));
+                        setCreateError("");
+                      }}
                       className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 focus:border-sky-500 focus:bg-white focus:outline-hidden"
                     />
+                    {createFieldErrors[key] && <span role="alert" className="mt-1 block text-xs text-rose-600">{createFieldErrors[key]}</span>}
                   </label>
                 ))}
               </div>
