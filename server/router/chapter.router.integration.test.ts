@@ -57,7 +57,7 @@ async function request(path: string, auth: string, method = "GET", body?: unknow
   return { status: response.status, body: await response.json() };
 }
 
-it("keeps one editable application, allows confirmation only, and requires confirmation to leave", async () => {
+it("keeps one editable application, supports rejection and approval, and requires confirmation to leave", async () => {
   await CompanyModel.create([
     { code: "CHAPTER_A", name: "Chapter A", ownerEmail: "a@test.vn", isBniChapter: true },
     { code: "CHAPTER_B", name: "Chapter B", ownerEmail: "b@test.vn", isBniChapter: true },
@@ -79,8 +79,12 @@ it("keeps one editable application, allows confirmation only, and requires confi
   expect((await request(`/me/applications/${first.body.data._id}`, applicantToken, "PATCH", { chapterCode: "CHAPTER_B" })).status).toBe(200);
   expect((await request("/admin/applications", token(adminA))).body.data).toHaveLength(0);
   expect((await request("/admin/applications", token(adminB))).body.data).toHaveLength(1);
-  expect((await request(`/admin/applications/${first.body.data._id}/decision`, token(adminB), "POST", { decision: "rejected" })).status).toBe(400);
-  expect((await request(`/me/applications/${first.body.data._id}`, applicantToken, "DELETE")).status).toBe(200);
+  expect((await request(`/admin/applications/${first.body.data._id}/decision`, token(adminA), "POST", { decision: "rejected" })).status).toBe(409);
+  const rejected = await request(`/admin/applications/${first.body.data._id}/decision`, token(adminB), "POST", { decision: "rejected" });
+  expect(rejected.status).toBe(200);
+  expect(rejected.body.data).toMatchObject({ status: "rejected", chapterCode: "CHAPTER_B" });
+  expect((await request("/admin/applications", token(adminB))).body.data).toHaveLength(0);
+  expect((await request(`/me/applications/${first.body.data._id}`, applicantToken, "DELETE")).status).toBe(409);
   const second = await request("/me/applications", applicantToken, "POST", { chapterCode: "CHAPTER_B" });
   expect(second.status).toBe(201);
   expect((await request("/admin/applications", token(adminA))).body.data).toHaveLength(0);
@@ -91,7 +95,7 @@ it("keeps one editable application, allows confirmation only, and requires confi
   expect(joined?.companyCode).toBe("CHAPTER_B");
   expect((await fetch(`${baseUrl}/api/v1/protected`, { headers: { Authorization: `Bearer ${applicantToken}` } })).status).toBe(200);
   const applications = await MembershipApplicationModel.find({ applicantUserId: applicant._id }).lean();
-  expect(applications.map(application => application.status)).toEqual(["approved"]);
+  expect(applications.map(application => application.status)).toEqual(["rejected", "approved"]);
 
   // The original token has no companyCode claim. Authorization still uses the current DB record.
   const leave = await request("/me/leave-requests", applicantToken, "POST", { reason: "Moving" });
