@@ -253,7 +253,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
             {readOnly ? <Tv className="h-5 w-5" /> : <SlidersHorizontal className="h-5 w-5" />}
           </div>
           <div className="min-w-0">
-            <h1 className="font-extrabold text-base sm:text-lg text-slate-900 truncate">
+            <h1 className={`${readOnly ? "font-normal" : "font-extrabold"} text-base sm:text-lg text-slate-900 truncate`}>
               {readOnly ? "Màn hình trình chiếu" : "Bảng điều khiển cuộc họp"}
             </h1>
             <p className="text-xs text-slate-500 truncate font-medium">{meeting?.title || "Đang tải…"}</p>

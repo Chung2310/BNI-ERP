@@ -116,6 +116,9 @@ it("reserves chapter creation for superadmin and provisions an admin in the new 
     adminName: "Admin C", adminEmail: "admin-c@test.vn", adminPassword: "strong-password-123",
   };
   expect((await request("/manage", token(admin!), "POST", body)).status).toBe(403);
+  const invalid = await request("/manage", token(superadmin), "POST", { ...body, adminPassword: "short" });
+  expect(invalid.status).toBe(400);
+  expect(invalid.body.message).toBe("Mật khẩu Admin ban đầu phải có ít nhất 8 ký tự.");
   expect((await request("/manage", token(superadmin), "POST", body)).status).toBe(201);
   expect((await CompanyModel.findOne({ code: "CHAPTER_C" }).lean())?.isBniChapter).toBe(true);
   const chapterAdmin = await UserModel.findOne({ email: "admin-c@test.vn" }).lean();
