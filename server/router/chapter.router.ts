@@ -300,11 +300,19 @@ chapterRouter.post("/admin/applications/:id/decision", async (req, res) => {
   if (!code) return;
   if (!objectId(req.params.id)) return res.status(400).json({ message: "Mã đơn không hợp lệ." });
   const { error } = Joi.object({
-    decision: Joi.string().valid("approved").required(),
+    decision: Joi.string().valid("approved", "rejected").required(),
     chapterCode: Joi.string().trim().uppercase().optional(),
   }).unknown(true).validate(req.body);
   if (error) return res.status(400).json({ message: validationMessage(error) });
   try {
+    if (req.body.decision === "rejected") {
+      const application = await MembershipApplicationModel.findOneAndUpdate(
+        { _id: req.params.id, chapterCode: code, status: "pending" },
+        { $set: { status: "rejected", decidedAt: new Date(), decidedBy: req.user!.id } },
+        { returnDocument: "after" },
+      ).lean();
+      return application ? res.json({ data: application }) : res.status(409).json({ message: "Đơn đã được xử lý." });
+    }
     const approved = await runInTransaction(async session => {
         const chapter = await CompanyModel.findOne({ code, isBniChapter: true, lifecycleStatus: { $in: ["active", null] } }).select("_id").session(session || null);
         if (!chapter) throw new Error("Chapter không còn hoạt động.");
