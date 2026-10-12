@@ -129,9 +129,17 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     }
     if (currentRole === "superadmin" && !["GET", "HEAD", "OPTIONS"].includes(req.method.toUpperCase())) {
       const creatingChapter = req.method.toUpperCase() === "POST" && path === "/api/v1/chapters/manage";
-      if (!accountOnlyPaths.has(path) && !creatingChapter && !superadminCompanyCreation) {
+      const managingChapter = ["PATCH", "DELETE"].includes(req.method.toUpperCase())
+        && /^\/api\/v1\/chapters\/manage\/[A-Z0-9_-]{2,32}$/i.test(path);
+      if (!accountOnlyPaths.has(path) && !creatingChapter && !managingChapter && !superadminCompanyCreation) {
         return res.status(403).json({ status: "error", message: "Superadmin chỉ được xem dữ liệu chapter đã chọn." });
       }
+    }
+    if (currentCompanyCode && currentRole !== "superadmin" && await CompanyModel.exists({
+      code: currentCompanyCode,
+      lifecycleStatus: { $in: ["suspended", "archived", "scheduled-deletion"] },
+    })) {
+      return res.status(403).json({ status: "error", message: "Chapter đã ngừng hoạt động." });
     }
     if (!currentCompanyCode && !accountOnlyPaths.has(path) && !path.startsWith("/api/v1/chapters") && !superadminCompanyCreation) {
       return res.status(403).json({ status: "error", message: "Tài khoản chưa là thành viên chapter. Vui lòng nộp đơn và chờ duyệt." });

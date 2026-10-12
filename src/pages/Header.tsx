@@ -53,8 +53,8 @@ export default function Header({ currentTab, onSearchSelect, onMenuClick }: Head
         const json = await res.json();
         if (json.data && Array.isArray(json.data)) {
           setHeaderChapters(json.data);
-          if (!superadminActiveChapter && json.data.length > 0) {
-            setSuperadminActiveChapter?.(json.data[0].code);
+          if (!json.data.some((chapter: { code: string }) => chapter.code === superadminActiveChapter)) {
+            setSuperadminActiveChapter?.(json.data[0]?.code || "");
           }
         }
       } catch (e) {

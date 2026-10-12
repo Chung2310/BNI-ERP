@@ -81,7 +81,7 @@ chapterRouter.use(requireAuth);
 
 chapterRouter.get("/manage", async (req, res) => {
   if (req.user?.role !== "superadmin") return res.status(403).json({ message: "Chỉ superadmin được quản lý chapter." });
-  const chapters = await CompanyModel.find({ isBniChapter: true }).select("code name chapterRegion chapterAddress acceptsApplications lifecycleStatus ownerEmail").sort({ name: 1 }).lean();
+  const chapters = await CompanyModel.find({ isBniChapter: true, lifecycleStatus: { $nin: ["archived", "scheduled-deletion"] } }).select("code name chapterRegion chapterAddress acceptsApplications lifecycleStatus ownerEmail").sort({ name: 1 }).lean();
   return res.json({ data: chapters });
 });
 
@@ -141,8 +141,18 @@ chapterRouter.patch("/manage/:code", async (req, res) => {
   }).min(1).unknown(false).validate(req.body);
   if (error) return res.status(400).json({ message: error.message });
   const chapter = await CompanyModel.findOneAndUpdate(
-    { code: req.params.code.toUpperCase() }, { $set: value }, { returnDocument: "after", runValidators: true },
+    { code: req.params.code.toUpperCase(), isBniChapter: true, lifecycleStatus: { $nin: ["archived", "scheduled-deletion"] } }, { $set: value }, { returnDocument: "after", runValidators: true },
   ).select("code name chapterRegion chapterAddress acceptsApplications lifecycleStatus").lean();
+  return chapter ? res.json({ data: chapter }) : res.status(404).json({ message: "Không tìm thấy chapter." });
+});
+
+chapterRouter.delete("/manage/:code", async (req, res) => {
+  if (req.user?.role !== "superadmin") return res.status(403).json({ message: "Chỉ superadmin được xóa chapter." });
+  const chapter = await CompanyModel.findOneAndUpdate(
+    { code: req.params.code.toUpperCase(), isBniChapter: true, lifecycleStatus: { $nin: ["archived", "scheduled-deletion"] } },
+    { $set: { lifecycleStatus: "archived", lifecycleChangedAt: new Date(), acceptsApplications: false, deletionReason: "Đã xóa bởi superadmin." } },
+    { returnDocument: "after" },
+  ).select("code name lifecycleStatus").lean();
   return chapter ? res.json({ data: chapter }) : res.status(404).json({ message: "Không tìm thấy chapter." });
 });
 
