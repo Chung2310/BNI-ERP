@@ -29,7 +29,29 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { getAccessToken } from "../services/authService";
 import { VIETNAM_PROVINCES, VIETNAM_PROVINCE_NAMES } from "../config/provinces";
+import { SearchableSelect } from "../components/common/SearchableSelect";
 import { chapterDisplayName, chapterNameForCode } from "../utils/chapterDisplayName";
+
+const chapterRegionOptions = [
+  { value: "", label: "Toàn quốc" },
+  ...VIETNAM_PROVINCES.map(province => ({
+    value: province.name,
+    label: province.shortName,
+    searchText: `${province.name} ${province.id}`,
+  })),
+];
+
+function chapterRegionValue(value: string): string {
+  if (!value || value === "Toàn quốc") return "";
+  const province = VIETNAM_PROVINCES.find(item => item.name === value || item.shortName === value);
+  return province?.name || value;
+}
+
+function regionOptionsFor(value: string) {
+  return value && !chapterRegionOptions.some(option => option.value === value)
+    ? [...chapterRegionOptions, { value, label: value, searchText: value }]
+    : chapterRegionOptions;
+}
 
 type Chapter = {
   code: string;
@@ -268,7 +290,7 @@ export default function ChapterPortal() {
     setEditingChapter(chapter);
     setChapterDraft({
       name: chapterDisplayName(chapter.name),
-      chapterRegion: chapter.chapterRegion || "",
+      chapterRegion: chapterRegionValue(chapter.chapterRegion || ""),
       chapterAddress: chapter.chapterAddress || "",
       acceptsApplications: chapter.acceptsApplications !== false,
     });
@@ -1167,19 +1189,38 @@ export default function ChapterPortal() {
               <button type="button" onClick={() => setEditingChapter(null)} aria-label="Đóng sửa Chapter" className="rounded-lg p-1 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
             </div>
             <form onSubmit={saveChapter} className="space-y-3">
-              {([ ["name", "Tên Chapter"], ["chapterRegion", "Khu vực / Tỉnh thành"], ["chapterAddress", "Địa chỉ sinh hoạt định kỳ"] ] as const).map(([key, label]) => (
-                <label key={key} className="block text-xs font-medium text-slate-700">
-                  {label}
-                  <input
-                    type="text"
-                    required={key === "name"}
-                    maxLength={key === "name" ? 150 : key === "chapterRegion" ? 120 : 255}
-                    value={chapterDraft[key]}
-                    onChange={event => setChapterDraft(current => ({ ...current, [key]: event.target.value }))}
-                    className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-sm text-slate-900 focus:border-sky-500 focus:outline-none"
-                  />
-                </label>
-              ))}
+              <label className="block text-xs font-medium text-slate-700">
+                Tên Chapter
+                <input
+                  type="text"
+                  required
+                  maxLength={150}
+                  value={chapterDraft.name}
+                  onChange={event => setChapterDraft(current => ({ ...current, name: event.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-sm text-slate-900 focus:border-sky-500 focus:outline-none"
+                />
+              </label>
+              <div>
+                <span className="mb-1 block text-xs font-medium text-slate-700">Khu vực / Tỉnh thành</span>
+                <SearchableSelect
+                  options={regionOptionsFor(chapterDraft.chapterRegion)}
+                  value={chapterDraft.chapterRegion}
+                  onChange={value => setChapterDraft(current => ({ ...current, chapterRegion: value }))}
+                  ariaLabel="Khu vực / Tỉnh thành"
+                  searchPlaceholder="Tìm tỉnh, thành phố..."
+                  placeholder="Toàn quốc"
+                />
+              </div>
+              <label className="block text-xs font-medium text-slate-700">
+                Địa chỉ sinh hoạt định kỳ
+                <input
+                  type="text"
+                  maxLength={255}
+                  value={chapterDraft.chapterAddress}
+                  onChange={event => setChapterDraft(current => ({ ...current, chapterAddress: event.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-sm text-slate-900 focus:border-sky-500 focus:outline-none"
+                />
+              </label>
               <label className="flex items-center gap-2 text-sm text-slate-700">
                 <input type="checkbox" checked={chapterDraft.acceptsApplications} onChange={event => setChapterDraft(current => ({ ...current, acceptsApplications: event.target.checked }))} />
                 Nhận đơn gia nhập
@@ -1236,12 +1277,24 @@ export default function ChapterPortal() {
                 {([
                   ["code", "Mã Chapter (VD: HANOI)", "text"],
                   ["name", "Tên Chapter (VD: Dynamic)", "text"],
-                  ["region", "Khu vực / Tỉnh thành", "text"],
+                  ["region", "Khu vực / Tỉnh thành", "select"],
                   ["address", "Địa chỉ sinh hoạt định kỳ", "text"],
                   ["adminName", "Họ tên Admin Chapter", "text"],
                   ["adminEmail", "Email đăng nhập Admin", "email"],
                   ["adminPassword", "Mật khẩu Admin ban đầu", "password"],
-                ] as const).map(([key, labelText, inputType]) => (
+                ] as const).map(([key, labelText, inputType]) => inputType === "select" ? (
+                  <div key={key}>
+                    <span className="mb-1 block text-xs font-medium text-slate-700">{labelText}</span>
+                    <SearchableSelect
+                      options={chapterRegionOptions}
+                      value={newChapter.region}
+                      onChange={value => setNewChapter(current => ({ ...current, region: value }))}
+                      ariaLabel="Khu vực / Tỉnh thành"
+                      searchPlaceholder="Tìm tỉnh, thành phố..."
+                      placeholder="Toàn quốc"
+                    />
+                  </div>
+                ) : (
                   <label key={key} className="text-xs font-medium text-slate-700">
                     {labelText} {!["region", "address"].includes(key) && <span className="text-rose-500">*</span>}
                     <input
@@ -1251,20 +1304,11 @@ export default function ChapterPortal() {
                       onChange={(e) =>
                         setNewChapter((curr) => ({ ...curr, [key]: e.target.value }))
                       }
-                      list={key === "region" ? "vietnam-provinces-datalist" : undefined}
                       className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 focus:border-sky-500 focus:bg-white focus:outline-hidden"
                     />
                   </label>
                 ))}
               </div>
-
-              <datalist id="vietnam-provinces-datalist">
-                {VIETNAM_PROVINCES.map((p) => (
-                  <option key={p.id} value={p.name}>
-                    {p.shortName} ({p.note})
-                  </option>
-                ))}
-              </datalist>
 
               <div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
                 <button
