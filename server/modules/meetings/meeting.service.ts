@@ -173,7 +173,7 @@ export async function createRecurringMeetings(companyCode: string, actorId: stri
   const seriesId = randomUUID();
   const customTitle = details.title?.trim();
   const firstNumber = customTitle ? 0 : await reserveMeetingNumbers(companyCode, dates.length);
-  const rows = dates.map((startsAt, index) => ({ ...details, title: customTitle || `BNI Chapter #${firstNumber + index}`, companyCode, createdBy: actorId, seriesId, startsAt, endsAt: new Date(startsAt.getTime() + durationMs), originalStartsAt: startsAt, reminderAt: reminderDueAt(startsAt, details.reminderDays ?? 1) }));
+  const rows = dates.map((startsAt, index) => ({ ...details, title: customTitle || `Chapter #${firstNumber + index}`, companyCode, createdBy: actorId, seriesId, startsAt, endsAt: new Date(startsAt.getTime() + durationMs), originalStartsAt: startsAt, reminderAt: reminderDueAt(startsAt, details.reminderDays ?? 1) }));
   try {
     const meetings = await MeetingModel.insertMany(rows, { ordered: true });
     emitToCompany(companyCode, 'meeting_updated', { seriesId });

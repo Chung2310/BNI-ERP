@@ -32,15 +32,15 @@ it("automatically numbers each occurrence in date order and continues across bat
  const reserve = vi.spyOn(sequence, "reserveMeetingNumbers").mockResolvedValueOnce(1).mockResolvedValueOnce(27);
  vi.spyOn(MeetingModel,"insertMany").mockImplementation(async (rows:any) => rows as any);
  const first = await createRecurringMeetings("BNI", "actor", { ...details, title: undefined, recurrence: rule });
- expect(first.map(row => row.title)).toEqual(Array.from({ length: 26 }, (_, index) => `BNI Chapter #${index + 1}`));
+ expect(first.map(row => row.title)).toEqual(Array.from({ length: 26 }, (_, index) => `Chapter #${index + 1}`));
  const next = await createRecurringMeetings("BNI", "actor", { ...details, title: "", recurrence: { ...rule, startDate: "2030-07-01" } });
- expect(next[0].title).toBe("BNI Chapter #27");
+ expect(next[0].title).toBe("Chapter #27");
  expect(reserve).toHaveBeenNthCalledWith(1, "BNI", 26);
  expect(reserve).toHaveBeenNthCalledWith(2, "BNI", next.length);
 });
 
 it("allows renaming an automatically named occurrence independently", async () => {
- const meeting = { ...item(), title: "BNI Chapter #1" };
+ const meeting = { ...item(), title: "Chapter #1" };
  vi.spyOn(MeetingModel,"findOne").mockResolvedValue(meeting as any);
  await updateMeeting("BNI", "one", { title: "Buổi giao lưu", version: 0 });
  expect(meeting.title).toBe("Buổi giao lưu");

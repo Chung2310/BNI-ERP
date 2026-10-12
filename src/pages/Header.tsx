@@ -14,6 +14,7 @@ import { getAccessToken } from "../services/authService";
 import { isTabHidden, filterEnabledTabs } from "../config/modules";
 import { notificationService, WebNotification } from "../services/notificationService";
 import { socketService } from "../services/socketService";
+import { chapterDisplayName } from "../utils/chapterDisplayName";
 
 
 interface HeaderProps {
@@ -248,7 +249,9 @@ export default function Header({ currentTab, onSearchSelect, onMenuClick }: Head
                     <option value="">-- Chưa chọn Chapter --</option>
                     {headerChapters.map((ch) => (
                       <option key={ch.code} value={ch.code}>
-                        {ch.name} ({ch.code})
+                        {chapterDisplayName(ch.name) === "Chapter" && ch.code === "BNI"
+                          ? "Chapter"
+                          : `${chapterDisplayName(ch.name)} (${ch.code})`}
                       </option>
                     ))}
                   </select>

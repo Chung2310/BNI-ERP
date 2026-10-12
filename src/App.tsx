@@ -270,7 +270,7 @@ function AppContent() {
 
   const chapterSeo = {
     title: "Chapter & Tư cách thành viên",
-    description: "Cổng thông tin và quản lý tư cách thành viên Chapter BNI",
+    description: "Cổng thông tin và quản lý tư cách thành viên Chapter",
     keywords: "chapter, bni, thanh vien, ho so",
     path: "/chapter",
     robots: "noindex, nofollow",

@@ -499,7 +499,7 @@ function ProfileForm({
                     <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
                       <div>
                         <p className="text-xs font-bold text-slate-800">
-                          {profile.companyName || "BNI Chapter"}
+                          {profile.companyName || "Chapter"}
                         </p>
                         <p className="text-[11px] text-slate-500">
                           Mã định danh: <span className="font-mono font-semibold">{profile.companyCode || "BNI"}</span>

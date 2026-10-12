@@ -27,6 +27,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { getAccessToken } from "../services/authService";
 import { VIETNAM_PROVINCES, VIETNAM_PROVINCE_NAMES } from "../config/provinces";
+import { chapterDisplayName, chapterNameForCode } from "../utils/chapterDisplayName";
 
 type Chapter = {
   code: string;
@@ -274,9 +275,9 @@ export default function ChapterPortal() {
             </h1>
             <p className="mt-0.5 text-xs text-slate-500 font-medium">
               {isSuperadmin
-                ? "Tạo Chapter mới và xem dữ liệu các Chapter BNI"
+                ? "Tạo Chapter mới và xem dữ liệu các Chapter"
                 : isApplicant
-                ? "Khám phá các Chapter BNI đang hoạt động và gửi hồ sơ xin gia nhập"
+                ? "Khám phá các Chapter đang hoạt động và gửi hồ sơ xin gia nhập"
                 : `Quản lý thành viên và hoạt động Chapter ${userProfile?.companyCode || ""}`}
             </p>
           </div>
@@ -376,7 +377,7 @@ export default function ChapterPortal() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <h3 className="font-bold text-sm text-slate-900">{ch.name}</h3>
+                            <h3 className="font-bold text-sm text-slate-900">{chapterDisplayName(ch.name)}</h3>
                             {isCurrentlyActive && (
                               <span className="rounded-md bg-sky-600 px-1.5 py-0.2 text-[10px] font-bold text-white">
                                 Đang xem
@@ -450,7 +451,7 @@ export default function ChapterPortal() {
                   <UserPlus className="h-5 w-5 text-sky-600 shrink-0" />
                   <div>
                     <h2 className="text-sm font-bold text-slate-900">
-                      Đơn gia nhập chờ xác nhận · Chapter {superadminActiveChapter}
+                      Đơn gia nhập chờ xác nhận · {chapterNameForCode(superadminActiveChapter, chapters.find(ch => ch.code === superadminActiveChapter)?.name)}
                     </h2>
                     <p className="text-xs text-slate-500">
                       Chỉ xem các đơn gia nhập của Chapter đang chọn ở Header
@@ -466,7 +467,7 @@ export default function ChapterPortal() {
               {applications.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400">
                   <Inbox className="h-7 w-7 mx-auto mb-2 text-slate-300" />
-                  Chapter {superadminActiveChapter} hiện không có đơn xin gia nhập nào đang chờ duyệt.
+                  {chapterNameForCode(superadminActiveChapter, chapters.find(ch => ch.code === superadminActiveChapter)?.name)} hiện không có đơn xin gia nhập nào đang chờ duyệt.
                 </div>
               ) : (
                 <div className="overflow-x-auto -mx-5 sm:-mx-6">
@@ -682,7 +683,7 @@ export default function ChapterPortal() {
                         Đang chờ xét duyệt
                       </span>
                       <h3 className="font-bold text-sm text-slate-900">
-                        Đơn gia nhập: <span className="text-sky-900 font-semibold">{chapters.find(chapter => chapter.code === pendingApplication.chapterCode)?.name || pendingApplication.chapterCode}</span>
+                        Đơn gia nhập: <span className="text-sky-900 font-semibold">{chapterNameForCode(pendingApplication.chapterCode, chapters.find(chapter => chapter.code === pendingApplication.chapterCode)?.name)}</span>
                       </h3>
                     </div>
                     <p className="mt-1 text-xs text-slate-600 leading-relaxed">
@@ -825,7 +826,7 @@ export default function ChapterPortal() {
                             <Building2 className="h-5 w-5 text-sky-600 shrink-0 mt-0.5" />
                             <div className="min-w-0">
                               <h3 className="text-base font-bold text-slate-900 group-hover:text-sky-600 transition-colors line-clamp-1">
-                                {chapter.name}
+                                {chapterDisplayName(chapter.name)}
                               </h3>
                               <span className="inline-block font-mono text-[11px] font-semibold text-slate-500 mt-0.5">
                                 {chapter.code}
@@ -904,7 +905,7 @@ export default function ChapterPortal() {
                 <Building2 className="h-7 w-7 text-sky-600 shrink-0 mt-0.5" />
                 <div>
                   <h2 className="text-lg font-bold text-slate-900 sm:text-xl">
-                    {chapterDetail?.name || chapters.find(chapter => chapter.code === selectedChapterCode)?.name || "Chi tiết Chapter"}
+                    {chapterDisplayName(chapterDetail?.name || chapters.find(chapter => chapter.code === selectedChapterCode)?.name || "Chi tiết Chapter")}
                   </h2>
                   <div className="mt-1 flex items-center gap-2">
                     <span className="font-mono text-xs font-semibold text-slate-500">
@@ -1108,8 +1109,8 @@ export default function ChapterPortal() {
             <form onSubmit={createChapter} className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 {([
-                  ["code", "Mã Chapter (VD: BNI_HANOI)", "text"],
-                  ["name", "Tên Chapter (VD: BNI Dynamic)", "text"],
+                  ["code", "Mã Chapter (VD: HANOI)", "text"],
+                  ["name", "Tên Chapter (VD: Dynamic)", "text"],
                   ["region", "Khu vực / Tỉnh thành", "text"],
                   ["address", "Địa chỉ sinh hoạt định kỳ", "text"],
                   ["adminName", "Họ tên Admin Chapter", "text"],
@@ -1197,7 +1198,7 @@ export default function ChapterPortal() {
             <p id="withdraw-dialog-desc" className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Bạn có chắc chắn muốn rút đơn gia nhập Chapter{" "}
               <span className="font-bold text-slate-900">
-                {chapters.find((c) => c.code === pendingApplication.chapterCode)?.name || pendingApplication.chapterCode}
+                {chapterNameForCode(pendingApplication.chapterCode, chapters.find((c) => c.code === pendingApplication.chapterCode)?.name)}
               </span>
               ? Sau khi rút đơn, hồ sơ của bạn sẽ không còn trong danh sách chờ duyệt của Chapter này và bạn có thể gửi hồ sơ sang Chapter khác.
             </p>

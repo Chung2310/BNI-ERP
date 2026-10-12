@@ -35,7 +35,7 @@ async function seedAdminUser() {
   const seedName = (process.env.SEED_ADMIN_NAME || "Quản trị viên Hệ thống").trim();
   const seedPhone = process.env.SEED_ADMIN_PHONE || "0901234567";
   const seedCompanyCode = (process.env.SEED_ADMIN_COMPANY_CODE || "BNI").toUpperCase().trim();
-  const seedCompanyName = (process.env.SEED_ADMIN_COMPANY_NAME || "BNI Chapter").trim();
+  const seedCompanyName = (process.env.SEED_ADMIN_COMPANY_NAME || "Chapter").trim();
 
   try {
     // 1. Kiểm tra / khởi tạo Doanh nghiệp mặc định
