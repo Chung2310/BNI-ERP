@@ -171,14 +171,12 @@ it("reserves chapter creation for superadmin and provisions an admin in the new 
   expect((await request("/manage", token(superadmin), "POST", emptyChapter)).status).toBe(201);
   expect((await request("/manage/CHAPTER_D/delete-check", token(superadmin))).body.data.canDelete).toBe(true);
   await MeetingModel.create({ companyCode: "CHAPTER_D", title: "Meeting D", startsAt: new Date("2026-11-01"), reminderAt: new Date("2026-10-31"), status: "scheduled" });
-  expect((await request("/manage/CHAPTER_D/delete-check", token(superadmin))).body.data.canDelete).toBe(false);
-  expect((await request("/manage/CHAPTER_D", token(superadmin), "DELETE")).status).toBe(409);
-  await MeetingModel.deleteMany({ companyCode: "CHAPTER_D" });
   await MembershipApplicationModel.create({ applicantUserId: superadmin._id, chapterCode: "CHAPTER_D", status: "withdrawn" });
-  expect((await request("/manage/CHAPTER_D", token(superadmin), "DELETE")).status).toBe(409);
-  await MembershipApplicationModel.deleteMany({ chapterCode: "CHAPTER_D" });
+  expect((await request("/manage/CHAPTER_D/delete-check", token(superadmin))).body.data.canDelete).toBe(true);
   expect((await request("/manage/CHAPTER_D", token(superadmin), "DELETE")).status).toBe(200);
   expect((await CompanyModel.findOne({ code: "CHAPTER_D" }).lean())?.lifecycleStatus).toBe("archived");
+  expect(await MeetingModel.countDocuments({ companyCode: "CHAPTER_D" })).toBe(1);
+  expect(await MembershipApplicationModel.countDocuments({ chapterCode: "CHAPTER_D" })).toBe(1);
   expect((await request("/manage", token(superadmin))).body.data.some((chapter: { code: string }) => chapter.code === "CHAPTER_D")).toBe(false);
   expect((await request("/manage/CHAPTER_D", token(superadmin), "PATCH", { name: "Again" })).status).toBe(404);
   expect((await request("/manage/CHAPTER_D", token(superadmin), "DELETE")).status).toBe(404);

@@ -18,20 +18,7 @@ async function chapterDeletionBlocker(code: string, ownerEmail: string): Promise
     companyCode: code,
     $nor: [{ role: "admin", email: ownerEmail.toLowerCase() }],
   });
-  if (member) return "Chapter đã có thành viên hoặc tài khoản khác, không thể xóa.";
-
-  const db = mongoose.connection.db;
-  if (!db) throw new Error("Không thể kiểm tra dữ liệu Chapter.");
-  const collections = await db.listCollections({}, { nameOnly: true }).toArray();
-  for (const { name } of collections) {
-    if (name === CompanyModel.collection.name || name === UserModel.collection.name || name.startsWith("system.")) continue;
-    const record = await db.collection(name).findOne(
-      { $or: [{ companyCode: code }, { chapterCode: code }] },
-      { projection: { _id: 1 }, maxTimeMS: 5000 },
-    );
-    if (record) return "Chapter đã có dữ liệu, không thể xóa.";
-  }
-  return null;
+  return member ? "Chapter đã có thành viên, không thể xóa." : null;
 }
 
 function fail(res: import("express").Response, error: unknown) {
@@ -135,7 +122,7 @@ chapterRouter.get("/manage/:code/delete-check", async (req, res) => {
   try {
     const reason = await chapterDeletionBlocker(code, chapter.ownerEmail);
     return res.json({ data: { canDelete: !reason, reason } });
-  } catch { return res.status(503).json({ message: "Chưa thể kiểm tra dữ liệu Chapter. Vui lòng thử lại." }); }
+  } catch { return res.status(503).json({ message: "Chưa thể kiểm tra thành viên Chapter. Vui lòng thử lại." }); }
 });
 
 const createChapterSchema = Joi.object({
@@ -194,7 +181,7 @@ chapterRouter.delete("/manage/:code", async (req, res) => {
       { returnDocument: "after" },
     ).select("code name lifecycleStatus").lean();
     return chapter ? res.json({ data: chapter }) : res.status(404).json({ message: "Không tìm thấy chapter." });
-  } catch { return res.status(503).json({ message: "Chưa thể kiểm tra dữ liệu Chapter. Vui lòng thử lại." }); }
+  } catch { return res.status(503).json({ message: "Chưa thể kiểm tra thành viên Chapter. Vui lòng thử lại." }); }
 });
 
 chapterRouter.get("/me/applications", async (req, res) => {

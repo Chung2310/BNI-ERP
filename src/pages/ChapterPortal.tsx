@@ -327,14 +327,14 @@ export default function ChapterPortal() {
     try {
       const result = await api<{ canDelete: boolean; reason: string | null }>(`/manage/${encodeURIComponent(chapter.code)}/delete-check`);
       if (!result.canDelete) {
-        const warning = result.reason || "Chapter đã có dữ liệu, không thể xóa.";
+        const warning = result.reason || "Chapter đã có thành viên, không thể xóa.";
         setError(warning);
         toast.warning(warning);
         return;
       }
       setDeletingChapter(chapter);
     } catch (reason) {
-      const message = reason instanceof Error ? reason.message : "Không thể kiểm tra dữ liệu Chapter.";
+      const message = reason instanceof Error ? reason.message : "Không thể kiểm tra thành viên Chapter.";
       setError(message);
       toast.error(message);
     } finally {
@@ -1284,7 +1284,7 @@ export default function ChapterPortal() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
           <section role="alertdialog" aria-modal="true" aria-label="Xác nhận xóa Chapter" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h2 className="text-lg font-bold text-slate-900">Xóa {chapterDisplayName(deletingChapter.name)} ({deletingChapter.code})?</h2>
-            <p className="mt-3 text-sm text-slate-600">Chỉ Chapter chưa có thành viên hoặc dữ liệu mới được xóa. Chapter này sẽ biến mất khỏi danh sách sau khi xác nhận.</p>
+            <p className="mt-3 text-sm text-slate-600">Chỉ Chapter chưa có thành viên mới được xóa. Cuộc họp và dữ liệu cũ vẫn được lưu trữ sau khi Chapter biến mất khỏi danh sách.</p>
             {error && <p role="alert" className="mt-3 text-sm text-rose-600">{error}</p>}
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => setDeletingChapter(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm">Hủy</button>

@@ -87,7 +87,7 @@ test("warns and does not offer deletion when a chapter has data", async () => {
     data: url.endsWith("/overview")
       ? { applications: [], leaves: [] }
       : url.endsWith("/delete-check")
-        ? { canDelete: false, reason: "Chapter đã có dữ liệu, không thể xóa." }
+        ? { canDelete: false, reason: "Chapter đã có thành viên, không thể xóa." }
         : [{ code: "BNI", name: "BNI Chapter", chapterRegion: "Bắc Ninh" }],
   }), { status: 200 }));
   vi.stubGlobal("fetch", fetchMock);
