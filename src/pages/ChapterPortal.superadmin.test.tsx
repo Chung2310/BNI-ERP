@@ -15,6 +15,7 @@ vi.mock("../context/AuthContext", () => ({
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 test("shows the legacy BNI chapter as Chapter while keeping its code", async () => {
@@ -39,6 +40,7 @@ test("searches the 34 provinces when editing and removes a chapter from the supe
   const fetchMock = vi.fn(async (url: string, options?: RequestInit) => {
     const method = options?.method || "GET";
     if (url.endsWith("/overview")) return new Response(JSON.stringify({ data: { applications: [], leaves: [] } }), { status: 200 });
+    if (url.endsWith("/delete-check")) return new Response(JSON.stringify({ data: { canDelete: true, reason: null } }), { status: 200 });
     if (method === "PATCH") {
       chapter = { ...chapter, ...JSON.parse(String(options?.body)) };
       return new Response(JSON.stringify({ data: chapter }), { status: 200 });
@@ -50,6 +52,7 @@ test("searches the 34 provinces when editing and removes a chapter from the supe
     return new Response(JSON.stringify({ data: archived ? [] : [chapter] }), { status: 200 });
   });
   vi.stubGlobal("fetch", fetchMock);
+  const notifications = vi.spyOn(window, "dispatchEvent");
 
   render(<ChapterPortal />);
   fireEvent.click(await screen.findByRole("button", { name: "Sửa Chapter (BNI)" }));
@@ -62,16 +65,40 @@ test("searches the 34 provinces when editing and removes a chapter from the supe
   fireEvent.click(screen.getByRole("button", { name: "Đà Nẵng" }));
   fireEvent.change(screen.getByLabelText("Tên Chapter"), { target: { value: "Chapter mới" } });
   fireEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
+  expect(screen.getByRole("alertdialog", { name: "Xác nhận sửa Chapter" })).toBeTruthy();
+  expect(fetchMock.mock.calls.some(([url, options]) => url.endsWith("/BNI") && options?.method === "PATCH")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Xác nhận lưu" }));
   await waitFor(() => expect(screen.getByRole("heading", { name: "Chapter mới" })).toBeTruthy());
   expect(fetchMock).toHaveBeenCalledWith("/api/v1/chapters/manage/BNI", expect.objectContaining({
     method: "PATCH", body: expect.stringContaining('"chapterRegion":"Thành phố Đà Nẵng"'),
   }));
+  expect(notifications.mock.calls.some(([event]) => event.type === "igen-toast-trigger" && (event as CustomEvent).detail.type === "success")).toBe(true);
 
   fireEvent.click(screen.getByRole("button", { name: "Xóa Chapter mới (BNI)" }));
-  expect(screen.getByRole("alertdialog", { name: "Xác nhận xóa Chapter" })).toBeTruthy();
+  expect(await screen.findByRole("alertdialog", { name: "Xác nhận xóa Chapter" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Xóa Chapter" }));
   await waitFor(() => expect(screen.queryByRole("heading", { name: "Chapter mới" })).toBeNull());
   expect(fetchMock).toHaveBeenCalledWith("/api/v1/chapters/manage/BNI", expect.objectContaining({ method: "DELETE" }));
+  expect(notifications.mock.calls.filter(([event]) => event.type === "igen-toast-trigger" && (event as CustomEvent).detail.type === "success")).toHaveLength(2);
+});
+
+test("warns and does not offer deletion when a chapter has data", async () => {
+  const fetchMock = vi.fn(async (url: string) => new Response(JSON.stringify({
+    data: url.endsWith("/overview")
+      ? { applications: [], leaves: [] }
+      : url.endsWith("/delete-check")
+        ? { canDelete: false, reason: "Chapter đã có dữ liệu, không thể xóa." }
+        : [{ code: "BNI", name: "BNI Chapter", chapterRegion: "Bắc Ninh" }],
+  }), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+  const notifications = vi.spyOn(window, "dispatchEvent");
+
+  render(<ChapterPortal />);
+  fireEvent.click(await screen.findByRole("button", { name: "Xóa Chapter (BNI)" }));
+  expect(await screen.findByRole("alert", { name: "" })).toBeTruthy();
+  expect(screen.queryByRole("alertdialog", { name: "Xác nhận xóa Chapter" })).toBeNull();
+  expect(fetchMock.mock.calls.some(([url]) => url.endsWith("/BNI") && !url.endsWith("/delete-check"))).toBe(false);
+  expect(notifications.mock.calls.some(([event]) => event.type === "igen-toast-trigger" && (event as CustomEvent).detail.type === "warning")).toBe(true);
 });
 
 test("uses the same searchable province list when creating a chapter", async () => {

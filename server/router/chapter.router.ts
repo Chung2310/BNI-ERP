@@ -13,6 +13,27 @@ import { MeetingModel } from "../modules/meetings/meeting.model";
 
 export const chapterRouter = Router();
 
+async function chapterDeletionBlocker(code: string, ownerEmail: string): Promise<string | null> {
+  const member = await UserModel.exists({
+    companyCode: code,
+    $nor: [{ role: "admin", email: ownerEmail.toLowerCase() }],
+  });
+  if (member) return "Chapter đã có thành viên hoặc tài khoản khác, không thể xóa.";
+
+  const db = mongoose.connection.db;
+  if (!db) throw new Error("Không thể kiểm tra dữ liệu Chapter.");
+  const collections = await db.listCollections({}, { nameOnly: true }).toArray();
+  for (const { name } of collections) {
+    if (name === CompanyModel.collection.name || name === UserModel.collection.name || name.startsWith("system.")) continue;
+    const record = await db.collection(name).findOne(
+      { $or: [{ companyCode: code }, { chapterCode: code }] },
+      { projection: { _id: 1 }, maxTimeMS: 5000 },
+    );
+    if (record) return "Chapter đã có dữ liệu, không thể xóa.";
+  }
+  return null;
+}
+
 function fail(res: import("express").Response, error: unknown) {
   const message = error instanceof Error ? error.message : "Không thể xử lý yêu cầu.";
   const duplicate = (error as { code?: number })?.code === 11000;
@@ -105,6 +126,18 @@ chapterRouter.get("/manage/:code/overview", async (req, res) => {
   })) } });
 });
 
+chapterRouter.get("/manage/:code/delete-check", async (req, res) => {
+  if (req.user?.role !== "superadmin") return res.status(403).json({ message: "Chỉ superadmin được kiểm tra Chapter." });
+  const code = req.params.code.toUpperCase();
+  const chapter = await CompanyModel.findOne({ code, isBniChapter: true, lifecycleStatus: { $nin: ["archived", "scheduled-deletion"] } })
+    .select("ownerEmail").lean();
+  if (!chapter) return res.status(404).json({ message: "Không tìm thấy chapter." });
+  try {
+    const reason = await chapterDeletionBlocker(code, chapter.ownerEmail);
+    return res.json({ data: { canDelete: !reason, reason } });
+  } catch { return res.status(503).json({ message: "Chưa thể kiểm tra dữ liệu Chapter. Vui lòng thử lại." }); }
+});
+
 const createChapterSchema = Joi.object({
   code: Joi.string().trim().uppercase().pattern(/^[A-Z0-9_-]{2,32}$/).required(),
   name: Joi.string().trim().min(2).max(150).required(),
@@ -148,12 +181,20 @@ chapterRouter.patch("/manage/:code", async (req, res) => {
 
 chapterRouter.delete("/manage/:code", async (req, res) => {
   if (req.user?.role !== "superadmin") return res.status(403).json({ message: "Chỉ superadmin được xóa chapter." });
-  const chapter = await CompanyModel.findOneAndUpdate(
-    { code: req.params.code.toUpperCase(), isBniChapter: true, lifecycleStatus: { $nin: ["archived", "scheduled-deletion"] } },
-    { $set: { lifecycleStatus: "archived", lifecycleChangedAt: new Date(), acceptsApplications: false, deletionReason: "Đã xóa bởi superadmin." } },
-    { returnDocument: "after" },
-  ).select("code name lifecycleStatus").lean();
-  return chapter ? res.json({ data: chapter }) : res.status(404).json({ message: "Không tìm thấy chapter." });
+  const code = req.params.code.toUpperCase();
+  const existing = await CompanyModel.findOne({ code, isBniChapter: true, lifecycleStatus: { $nin: ["archived", "scheduled-deletion"] } })
+    .select("ownerEmail").lean();
+  if (!existing) return res.status(404).json({ message: "Không tìm thấy chapter." });
+  try {
+    const reason = await chapterDeletionBlocker(code, existing.ownerEmail);
+    if (reason) return res.status(409).json({ message: reason });
+    const chapter = await CompanyModel.findOneAndUpdate(
+      { code, isBniChapter: true, lifecycleStatus: { $nin: ["archived", "scheduled-deletion"] } },
+      { $set: { lifecycleStatus: "archived", lifecycleChangedAt: new Date(), acceptsApplications: false, deletionReason: "Đã xóa bởi superadmin." } },
+      { returnDocument: "after" },
+    ).select("code name lifecycleStatus").lean();
+    return chapter ? res.json({ data: chapter }) : res.status(404).json({ message: "Không tìm thấy chapter." });
+  } catch { return res.status(503).json({ message: "Chưa thể kiểm tra dữ liệu Chapter. Vui lòng thử lại." }); }
 });
 
 chapterRouter.get("/me/applications", async (req, res) => {

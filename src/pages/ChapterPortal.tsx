@@ -31,6 +31,7 @@ import { getAccessToken } from "../services/authService";
 import { VIETNAM_PROVINCES, VIETNAM_PROVINCE_NAMES } from "../config/provinces";
 import { SearchableSelect } from "../components/common/SearchableSelect";
 import { chapterDisplayName, chapterNameForCode } from "../utils/chapterDisplayName";
+import { toast } from "./Toast";
 
 const chapterRegionOptions = [
   { value: "", label: "Toàn quốc" },
@@ -129,6 +130,7 @@ export default function ChapterPortal() {
   // Modals & form state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingChapter, setEditingChapter] = useState<Chapter | null>(null);
+  const [confirmEdit, setConfirmEdit] = useState(false);
   const [deletingChapter, setDeletingChapter] = useState<Chapter | null>(null);
   const [chapterDraft, setChapterDraft] = useState({ name: "", chapterRegion: "", chapterAddress: "", acceptsApplications: true });
   const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false);
@@ -295,10 +297,10 @@ export default function ChapterPortal() {
       acceptsApplications: chapter.acceptsApplications !== false,
     });
     setError("");
+    setConfirmEdit(false);
   }
 
-  async function saveChapter(event: FormEvent) {
-    event.preventDefault();
+  async function saveChapter() {
     if (!editingChapter) return;
     setBusy(true);
     setError("");
@@ -306,10 +308,35 @@ export default function ChapterPortal() {
       const updated = await api<Chapter>(`/manage/${encodeURIComponent(editingChapter.code)}`, "PATCH", chapterDraft);
       setChapters(current => current.map(chapter => chapter.code === updated.code ? { ...chapter, ...updated } : chapter));
       setEditingChapter(null);
+      setConfirmEdit(false);
       setMessage("Đã cập nhật Chapter.");
+      toast.success(`Đã cập nhật ${chapterDisplayName(updated.name)}.`);
       window.dispatchEvent(new Event("focus"));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Không thể cập nhật Chapter.");
+      const message = reason instanceof Error ? reason.message : "Không thể cập nhật Chapter.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openDeleteChapter(chapter: Chapter) {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api<{ canDelete: boolean; reason: string | null }>(`/manage/${encodeURIComponent(chapter.code)}/delete-check`);
+      if (!result.canDelete) {
+        const warning = result.reason || "Chapter đã có dữ liệu, không thể xóa.";
+        setError(warning);
+        toast.warning(warning);
+        return;
+      }
+      setDeletingChapter(chapter);
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "Không thể kiểm tra dữ liệu Chapter.";
+      setError(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }
@@ -329,10 +356,13 @@ export default function ChapterPortal() {
         setSuperadminActiveChapter?.(chapters.find(chapter => chapter.code !== code)?.code || "");
       }
       setDeletingChapter(null);
-      setMessage("Đã xóa Chapter khỏi danh sách. Dữ liệu cũ được lưu trữ.");
+      setMessage("Đã xóa Chapter khỏi danh sách.");
+      toast.success(`Đã xóa ${chapterDisplayName(deletingChapter.name)}.`);
       window.dispatchEvent(new Event("focus"));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Không thể xóa Chapter.");
+      const message = reason instanceof Error ? reason.message : "Không thể xóa Chapter.";
+      setError(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }
@@ -526,7 +556,8 @@ export default function ChapterPortal() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => { setError(""); setDeletingChapter(ch); }}
+                          onClick={() => void openDeleteChapter(ch)}
+                          disabled={busy}
                           className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer"
                           aria-label={`Xóa ${chapterDisplayName(ch.name)} (${ch.code})`}
                         >
@@ -1188,7 +1219,7 @@ export default function ChapterPortal() {
               <h2 className="text-lg font-bold text-slate-900">Sửa {chapterDisplayName(editingChapter.name)} ({editingChapter.code})</h2>
               <button type="button" onClick={() => setEditingChapter(null)} aria-label="Đóng sửa Chapter" className="rounded-lg p-1 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
             </div>
-            <form onSubmit={saveChapter} className="space-y-3">
+            <form onSubmit={event => { event.preventDefault(); setConfirmEdit(true); }} className="space-y-3">
               <label className="block text-xs font-medium text-slate-700">
                 Tên Chapter
                 <input
@@ -1235,11 +1266,25 @@ export default function ChapterPortal() {
         </div>
       )}
 
+      {editingChapter && confirmEdit && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4">
+          <section role="alertdialog" aria-modal="true" aria-label="Xác nhận sửa Chapter" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-900">Lưu thay đổi Chapter?</h2>
+            <p className="mt-3 text-sm text-slate-600">Thông tin của {chapterDisplayName(editingChapter.name)} ({editingChapter.code}) sẽ được cập nhật.</p>
+            {error && <p role="alert" className="mt-3 text-sm text-rose-600">{error}</p>}
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" onClick={() => setConfirmEdit(false)} disabled={busy} className="rounded-xl border border-slate-200 px-4 py-2 text-sm">Quay lại</button>
+              <button type="button" onClick={() => void saveChapter()} disabled={busy} className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Xác nhận lưu</button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {deletingChapter && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
           <section role="alertdialog" aria-modal="true" aria-label="Xác nhận xóa Chapter" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h2 className="text-lg font-bold text-slate-900">Xóa {chapterDisplayName(deletingChapter.name)} ({deletingChapter.code})?</h2>
-            <p className="mt-3 text-sm text-slate-600">Chapter sẽ biến mất khỏi danh sách. Thành viên không thể đăng nhập hoặc truy cập dữ liệu Chapter này. Dữ liệu cũ vẫn được lưu trữ.</p>
+            <p className="mt-3 text-sm text-slate-600">Chỉ Chapter chưa có thành viên hoặc dữ liệu mới được xóa. Chapter này sẽ biến mất khỏi danh sách sau khi xác nhận.</p>
             {error && <p role="alert" className="mt-3 text-sm text-rose-600">{error}</p>}
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => setDeletingChapter(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm">Hủy</button>
