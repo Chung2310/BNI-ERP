@@ -158,7 +158,8 @@ meetingRouter.post('/:id/presentation-draw', manage, async (req: import("express
     if (item.presentation?.drawRevealsAt && +item.presentation.drawRevealsAt > Date.now()) {
       throw new MeetingError(409, 'Đang quay thưởng. Vui lòng chờ công bố kết quả.');
     }
-    res.json({ data: await spinLuckyDraw(item, value.prizeId, req.user.id, true, value.drawFilter || item.presentation?.drawFilter || 'all') });
+    res.json({ data: await spinLuckyDraw(item, value.prizeId, req.user.id, true, value.drawFilter || item.presentation?.drawFilter || 'all',
+      value.drawParticipantIds ?? item.presentation?.drawParticipantIds ?? null) });
   } catch (error) { sendError(res, error); }
 });
 
