@@ -122,6 +122,7 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       "/api/v1/auth/me", "/api/v1/auth/profile", "/api/v1/auth/logout",
       "/api/v1/auth/change-password",
       "/api/v1/auth/profile/avatar",
+      "/api/v1/auth/profile/image",
     ]);
     const superadminCompanyCreation = currentRole === "superadmin" && req.method.toUpperCase() === "POST" && path === "/api/v1/auth/register-company";
     if (currentRole === "superadmin" && (path.startsWith("/api/v1/member-fees") || path.startsWith("/api/v1/company-email/celebration"))) {
