@@ -36,12 +36,14 @@ describe("mobilePushService", () => {
       companyCode: "ACME",
       token: "not-a-push-token",
       platform: "android",
+      provider: "fcm",
     })).rejects.toThrow("không hợp lệ");
     await expect(mobilePushService.saveToken({
       uid: "member",
       companyCode: "ACME",
       token: "ExpoPushToken[legacy_device_123]",
-      platform: "ios",
+      platform: "android",
+      provider: "fcm",
     })).rejects.toThrow("không hợp lệ");
     expect(dependencies.findOneAndUpdate).not.toHaveBeenCalled();
   });
@@ -53,8 +55,9 @@ describe("mobilePushService", () => {
       uid: "member",
       companyCode: "ACME",
       token: ` ${token} `,
-      platform: "ios",
-      deviceName: "iPhone",
+      platform: "android",
+      provider: "fcm",
+      deviceName: "Android phone",
     });
 
     expect(dependencies.findOneAndUpdate).toHaveBeenCalledWith(
@@ -62,7 +65,7 @@ describe("mobilePushService", () => {
       expect.objectContaining({
         uid: "member",
         companyCode: "ACME",
-        platform: "ios",
+        platform: "android",
         provider: "fcm",
         token,
       }),
@@ -79,11 +82,11 @@ describe("mobilePushService", () => {
     });
   });
 
-  it("sends a platform-aware Firebase multicast and removes permanently invalid tokens", async () => {
+  it("sends FCM push to Android devices and removes permanently invalid tokens", async () => {
     dependencies.lean.mockResolvedValue([
       { token: "fcm_registration_token_valid_123" },
       { token: "fcm_registration_token_stale_456" },
-    ]);
+    ].map((device) => ({ ...device, provider: "fcm", platform: "android" })));
     dependencies.sendEachForMulticast.mockResolvedValue({
       responses: [
         { success: true },
@@ -103,8 +106,10 @@ describe("mobilePushService", () => {
       tokens: ["fcm_registration_token_valid_123", "fcm_registration_token_stale_456"],
       notification: { title: "Thông báo mới", body: "Nội dung" },
       data: expect.objectContaining({ notificationId: "notification-id", route: "/chat/room-id" }),
-      android: expect.objectContaining({ priority: "high" }),
-      apns: expect.objectContaining({ headers: expect.objectContaining({ "apns-push-type": "alert" }) }),
+      android: expect.objectContaining({
+        priority: "high",
+        notification: expect.objectContaining({ channelId: "default" }),
+      }),
     }));
     expect(dependencies.deleteMany).toHaveBeenCalledWith({
       token: { $in: ["fcm_registration_token_stale_456"] },

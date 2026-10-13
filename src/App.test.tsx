@@ -22,7 +22,7 @@ test.each(["/", "/landing", "/landing.html", "/dang-nhap"])("renders login for g
 
   expect(await screen.findByRole("button", { name: "Đăng nhập hệ thống" })).not.toBeNull();
   expect(screen.queryByText("Landing Page Content")).toBeNull();
-  expect(screen.getByRole("link", { name: "Privacy Policy" }).getAttribute("href")).toBe("https://erp.igentechnology.net/privacy-policy");
-  expect(screen.getByRole("link", { name: "Terms of Service" }).getAttribute("href")).toBe("https://erp.igentechnology.net/terms-of-service");
-  expect(screen.getByRole("link", { name: "Data Deletion" }).getAttribute("href")).toBe("https://erp.igentechnology.net/user-data-deletion");
+  expect(screen.getByRole("link", { name: "Privacy Policy" }).getAttribute("href")).toBe("/privacy-policy");
+  expect(screen.getByRole("link", { name: "Terms of Service" }).getAttribute("href")).toBe("/terms-of-service");
+  expect(screen.getByRole("link", { name: "Data Deletion" }).getAttribute("href")).toBe("/user-data-deletion");
 });
