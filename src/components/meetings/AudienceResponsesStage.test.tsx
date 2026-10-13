@@ -9,7 +9,57 @@ import { meetingInteractionService } from "../../services/meetingInteractionServ
 
 vi.mock("../../services/socketService", () => ({ socketService: { on: vi.fn(() => () => undefined) } }));
 vi.mock("../../services/meetingInteractionService", () => ({ meetingInteractionService: { get: vi.fn() } }));
+vi.mock("qrcode", () => ({ default: { toDataURL: vi.fn().mockResolvedValue("data:image/png;base64,qr") } }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
+
+it("projects every configured question without showing answers when the questions panel is selected", async () => {
+  vi.mocked(meetingInteractionService.get).mockResolvedValue({
+    session: {
+      id: "i", meetingId: "m", question: "Câu một?", activeQuestionId: "q1", questionNumber: 1, totalQuestions: 2,
+      questions: [
+        { id: "q1", text: "Câu một?", order: 1, responseCount: 1, approvedCount: 1 },
+        { id: "q2", text: "Chọn phương án?", order: 2, type: "single_choice", options: ["Lựa chọn A", "Lựa chọn B"], responseCount: 0, approvedCount: 0 },
+      ],
+      durationSeconds: 60, status: "closed", requireName: false, showNames: false, moderationEnabled: false, allowMultipleResponses: true,
+      participationUrl: "/meeting-interaction/token", responseCount: 1, approvedCount: 1,
+    }, responses: [{ id: "r1", questionId: "q1", participantId: "p1", name: "An", answer: "Đáp án riêng", status: "approved", createdAt: "" }],
+  });
+  render(<AudienceResponsesStage meeting={{ _id: "m", title: "Demo", presentation: { audienceResponsePanel: "questions" } } as never} now={Date.now()} />);
+  expect(await screen.findByText("Câu một?")).toBeTruthy();
+  expect(screen.getByText("Chọn phương án?")).toBeTruthy();
+  expect(screen.getByText("A. Lựa chọn A")).toBeTruthy();
+  expect(screen.getByText("B. Lựa chọn B")).toBeTruthy();
+  expect(screen.queryByText("Đáp án riêng")).toBeNull();
+  expect(screen.queryByAltText("Mã QR trả lời ý kiến")).toBeNull();
+});
+
+it("shows preparation before the session opens, then QR until the deadline and an expiry message", async () => {
+  const now = Date.now();
+  vi.mocked(meetingInteractionService.get).mockResolvedValue({
+    session: {
+      id: "i", meetingId: "m", question: "Ý kiến của bạn?", activeQuestionId: "q1", questionNumber: 1, totalQuestions: 1,
+      questions: [{ id: "q1", text: "Ý kiến của bạn?", order: 1, responseCount: 0, approvedCount: 0 }],
+      durationSeconds: 60, status: "open", openedAt: new Date(now).toISOString(), closesAt: new Date(now + 60000).toISOString(),
+      requireName: false, showNames: false, moderationEnabled: false, allowMultipleResponses: true,
+      participationUrl: "/meeting-interaction/token", responseCount: 0, approvedCount: 0,
+    }, responses: [],
+  });
+  const meeting = { _id: "m", title: "Demo", presentation: { audienceResponsePanel: "qr" } } as never;
+  const { rerender } = render(<AudienceResponsesStage meeting={meeting} now={now} />);
+  expect(await screen.findByText("Quét QR để trả lời ý kiến")).toBeTruthy();
+  expect(await screen.findByAltText("Mã QR trả lời ý kiến")).toBeTruthy();
+  rerender(<AudienceResponsesStage meeting={meeting} now={now + 61000} />);
+  expect(screen.getByText("Hết thời gian nhận câu trả lời")).toBeTruthy();
+  expect(screen.queryByAltText("Mã QR trả lời ý kiến")).toBeNull();
+  rerender(<AudienceResponsesStage meeting={{ _id: "m", title: "Demo", presentation: { audienceResponsePanel: "prepare" } } as never} now={now + 61000} />);
+  expect(screen.getByText("Đang chuẩn bị câu hỏi")).toBeTruthy();
+});
+
+it("shows preparation while no question session is open", async () => {
+  vi.mocked(meetingInteractionService.get).mockResolvedValue({ session: null, responses: [] });
+  render(<AudienceResponsesStage meeting={{ _id: "m", title: "Demo", presentation: { audienceResponsePanel: "prepare" } } as never} now={Date.now()} />);
+  expect(await screen.findByText("Đang chuẩn bị câu hỏi")).toBeTruthy();
+});
 
 it("shows only approved answers and combines duplicates on the shared screen", async () => {
   const observe = vi.fn();
@@ -22,7 +72,7 @@ it("shows only approved answers and combines duplicates on the shared screen", a
       { id: "three", questionId: "q1", participantId: "p3", name: "Chi", answer: "kết nối", status: "approved", createdAt: new Date().toISOString() },
     ],
   });
-  render(<AudienceResponsesStage meeting={{ _id: "m", title: "Demo" } as never} />);
+  render(<AudienceResponsesStage meeting={{ _id: "m", title: "Demo", presentation: { audienceResponsePanel: "results" } } as never} now={Date.now()} />);
   expect(await screen.findByText("Kết nối")).toBeTruthy();
   expect(screen.getByTitle("Kết nối: 2 câu trả lời")).toBeTruthy();
   expect(screen.queryByText("An")).toBeNull();
@@ -61,7 +111,7 @@ it("splits the presentation into one result panel per question", async () => {
     ],
   });
 
-  render(<AudienceResponsesStage meeting={{ _id: "m", title: "Demo" } as never} />);
+  render(<AudienceResponsesStage meeting={{ _id: "m", title: "Demo", presentation: { audienceResponsePanel: "results" } } as never} now={Date.now()} />);
 
   expect(await screen.findByText("Câu một?")).toBeTruthy();
   expect(screen.getByText("Câu hai?")).toBeTruthy();
@@ -79,7 +129,7 @@ it("shows vote totals for each choice using approved answers", async () => {
       { id: "3", questionId: "q1", participantId: "p3", name: "Chi", answer: "B", status: "pending", createdAt: "" },
     ],
   });
-  render(<AudienceResponsesStage meeting={{ _id: "m", title: "Demo" } as never} />);
+  render(<AudienceResponsesStage meeting={{ _id: "m", title: "Demo", presentation: { audienceResponsePanel: "results" } } as never} now={Date.now()} />);
   expect(await screen.findByText("2 · 100%")).toBeTruthy();
   expect(screen.getByText("0 · 0%")).toBeTruthy();
 });

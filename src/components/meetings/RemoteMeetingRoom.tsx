@@ -34,6 +34,7 @@ import { meetingService } from "../../services/meetingService";
 import { presentationState, type DrawFilter, type MeetingPresentationState, type PresentationView } from "../../utils/meetingPresentation";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { MeetingStage, SpeakerStage } from "./MeetingStage";
+import { AudienceResponseRemote } from "./AudienceResponseRemote";
 import { getSlideTimer } from "./slideTimer";
 import { useMeetingLive } from "./useMeetingLive";
 
@@ -181,7 +182,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
   const closed = meeting?.status === "ended" || meeting?.status === "cancelled";
   const disabled = busy || Boolean(syncError) || !snapshot || closed;
   const control = (action: string) => command("/control", { action });
-  const showView = (view: PresentationView) => command("/presentation-state", { view }, "PATCH");
+  const showView = (view: PresentationView) => command("/presentation-state", view === "audienceResponses" ? { view, audienceResponsePanel: "questions" } : { view }, "PATCH");
   const timer = meeting && getSlideTimer(meeting, current?.id, now);
   const drawing = now < Date.parse(state.drawRevealsAt || "");
   const activePrize = meeting?.luckyDraw?.prizes.find(prize => prize.id === selectedPrize);
@@ -394,6 +395,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
               </p>
             )}
 
+            {state.view !== "audienceResponses" && <>
             {/* Current Speaker & Micro Countdown Controller */}
             <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -496,6 +498,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
               disabled={Boolean(disabled)}
               onSave={value => command("/presentation-state", value, "PATCH")}
             />
+            </>}
 
             {/* End Meeting Action */}
             {["live", "paused"].includes(meeting.status) && (
@@ -511,8 +514,15 @@ function MeetingRoom({ meetingId, mode }: Props) {
             )}
           </section>
 
-          {/* RIGHT COLUMN: SPEAKER SELECTOR & LUCKY DRAW (5/12) */}
+          {/* RIGHT COLUMN: CONTROLS (5/12) */}
           <section className="lg:col-span-5 space-y-5">
+            {state.view === "audienceResponses" ? <AudienceResponseRemote
+              meetingId={meetingId}
+              panel={state.audienceResponsePanel || "questions"}
+              now={now}
+              disabled={disabled}
+              onPanelChange={panel => command("/presentation-state", { view: "audienceResponses", audienceResponsePanel: panel }, "PATCH")}
+            /> : <>
             {/* Pick Speaker Card */}
             <div className="space-y-4 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
               <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
@@ -725,6 +735,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
                 )}
               </div>}
             </div>
+            </>}
           </section>
         </main>
       )}

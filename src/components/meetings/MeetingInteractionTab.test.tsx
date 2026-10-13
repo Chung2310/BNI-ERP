@@ -28,12 +28,12 @@ it("switches to the response view and opens the presentation screen", async () =
   const refresh = vi.fn();
   render(<MeetingInteractionTab meeting={{ _id: "m", __v: 4, title: "Demo", status: "live" } as never} canManage onRefreshMeeting={refresh} />);
   fireEvent.click(await screen.findByRole("button", { name: "Trình chiếu kết quả" }));
-  await waitFor(() => expect(meetingLiveApi).toHaveBeenCalledWith("/m/presentation-state", "PATCH", { version: 4, view: "audienceResponses" }));
+  await waitFor(() => expect(meetingLiveApi).toHaveBeenCalledWith("/m/presentation-state", "PATCH", { version: 4, view: "audienceResponses", audienceResponsePanel: "results" }));
   expect(open).toHaveBeenCalledWith("/cuoc-hop?meeting=m&mode=display", "_blank");
   expect(refresh).toHaveBeenCalledOnce(); expect(popup.opener).toBeNull();
 });
 
-it("opens settings in a popup and saves duration and options inside it", async () => {
+it("shows only the duration setting and saves the simple defaults", async () => {
   const initial = interactionState();
   vi.mocked(meetingInteractionService.get).mockResolvedValue(initial);
   vi.mocked(meetingInteractionService.save).mockImplementation(async (_meetingId, input) => ({ session: { ...initial.session!, ...input }, responses: [] }));
@@ -45,9 +45,11 @@ it("opens settings in a popup and saves duration and options inside it", async (
   fireEvent.change(durationInput, { target: { value: "" } });
   expect(durationInput.value).toBe("");
   fireEvent.change(durationInput, { target: { value: "5" } });
-  fireEvent.click(screen.getByRole("checkbox", { name: /Cho phép gửi nhiều lần/ }));
+  expect(screen.queryByRole("checkbox")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Lưu cấu hình" }));
-  await waitFor(() => expect(meetingInteractionService.save).toHaveBeenCalledWith("m", expect.objectContaining({ durationSeconds: 5, allowMultipleResponses: true })));
+  await waitFor(() => expect(meetingInteractionService.save).toHaveBeenCalledWith("m", expect.objectContaining({
+    durationSeconds: 5, requireName: false, showNames: false, moderationEnabled: false, allowMultipleResponses: true,
+  })));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Cấu hình bài tương tác" })).toBeNull());
 });
 

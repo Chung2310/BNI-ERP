@@ -11,10 +11,10 @@ import { MeetingInteractionModel, MeetingInteractionResponseModel } from "./meet
 it("validates interaction configuration and management actions", () => {
   expect(meetingInteractionInput.validate({ question: "Bạn học được gì?" }).value).toMatchObject({
     durationSeconds: 60,
-    requireName: true,
-    showNames: true,
-    moderationEnabled: true,
-    allowMultipleResponses: false,
+    requireName: false,
+    showNames: false,
+    moderationEnabled: false,
+    allowMultipleResponses: true,
   });
   expect(meetingInteractionInput.validate({ question: "" }).error).toBeDefined();
   expect(meetingInteractionInput.validate({ question: "x".repeat(301) }).error).toBeDefined();

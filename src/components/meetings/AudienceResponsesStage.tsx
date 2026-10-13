@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import QRCode from "qrcode";
 import { Users } from "lucide-react";
 import type { Meeting } from "../../services/meetingService";
 import {
@@ -89,9 +90,10 @@ function QuestionResultPanel({
   </section>;
 }
 
-export function AudienceResponsesStage({ meeting }: { meeting: Meeting }) {
+export function AudienceResponsesStage({ meeting, now }: { meeting: Meeting; now: number }) {
   const [state, setState] = useState<MeetingInteractionState>({ session: null, responses: [] });
   const [error, setError] = useState("");
+  const [qrImage, setQrImage] = useState("");
   const load = useCallback(
     () => meetingInteractionService.get(meeting._id)
       .then(data => { setState(data); setError(""); })
@@ -110,6 +112,57 @@ export function AudienceResponsesStage({ meeting }: { meeting: Meeting }) {
     }),
     [load, meeting._id],
   );
+
+  const participationUrl = state.session?.participationUrl;
+  useEffect(() => {
+    if (!participationUrl) return;
+    let active = true;
+    void QRCode.toDataURL(new URL(participationUrl, window.location.origin).href, { width: 900, margin: 2 })
+      .then(image => { if (active) setQrImage(image); })
+      .catch(() => { if (active) setQrImage(""); });
+    return () => { active = false; };
+  }, [participationUrl]);
+
+  const panel = meeting.presentation?.audienceResponsePanel || "questions";
+  if (panel === "questions") {
+    const questions = state.session?.questions || [];
+    const grid = resultGridLayout(questions.length);
+    const compact = questions.length > 4;
+    return <div className="relative aspect-video w-full overflow-hidden bg-slate-50 px-[3%] py-[2.5%] text-slate-950">
+      <header className="flex items-center justify-between">
+        <div>
+          <p className="text-[clamp(.7rem,1vw,1.2rem)] font-bold uppercase tracking-[.16em] text-cyan-700">Thu ý kiến</p>
+          <h1 className="text-[clamp(1.3rem,2.5vw,3rem)] font-extrabold">Câu hỏi dành cho bạn</h1>
+        </div>
+        <span className="text-[clamp(.75rem,1.2vw,1.5rem)] font-semibold text-slate-500">{questions.length} câu hỏi</span>
+      </header>
+      {questions.length ? <div className="mt-[2%] grid h-[82%] min-h-0" style={{ gridTemplateColumns: `repeat(${grid.trackColumns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${grid.rows}, minmax(0, 1fr))`, gap: questions.length <= 2 ? "1.5vw" : "1vw" }}>
+        {questions.map((question, index) => <section key={question.id} className="min-h-0 overflow-hidden rounded-[1.4vw] border border-slate-200 bg-white p-[5%] shadow-[0_0.4vw_1.5vw_rgba(15,23,42,.08)]" style={{ gridColumn: index === grid.lastRowStartIndex ? `${grid.lastRowStartColumn} / span ${grid.itemSpan}` : `span ${grid.itemSpan}` }}>
+          <p className="text-[clamp(.65rem,.9vw,1.1rem)] font-bold text-cyan-700">Câu {question.order}</p>
+          <h2 className={`mt-[.5vw] break-words font-semibold leading-tight ${compact ? "text-[clamp(.85rem,1.4vw,1.7rem)]" : "text-[clamp(1.1rem,2vw,2.5rem)]"}`}>{question.text}</h2>
+          {question.type === "single_choice" && question.options?.length ? <ul className="mt-[1vw] grid gap-[.45vw] text-[clamp(.7rem,1.1vw,1.35rem)] text-slate-600">{question.options.map((option, optionIndex) => <li key={`${optionIndex}-${option}`} className="break-words">{String.fromCharCode(65 + optionIndex)}. {option}</li>)}</ul> : null}
+        </section>)}
+      </div> : <div className="grid h-[78%] place-items-center text-[clamp(1rem,2vw,2.5rem)] font-semibold text-slate-500">Chưa có câu hỏi</div>}
+      {error ? <p className="absolute bottom-[2%] left-[3%] text-rose-600">{error}</p> : null}
+    </div>;
+  }
+  if (panel !== "results") {
+    const session = state.session;
+    const closesAt = session?.closesAt ? Date.parse(session.closesAt) : NaN;
+    const accepting = session?.status === "open" && Number.isFinite(closesAt) && now < closesAt;
+    const expired = Boolean(session?.openedAt && Number.isFinite(closesAt) && now >= closesAt);
+    const remaining = accepting ? Math.max(0, Math.ceil((closesAt - now) / 1000)) : 0;
+    const heading = panel === "prepare" ? "Đang chuẩn bị câu hỏi" : accepting ? "Quét QR để trả lời ý kiến" : expired ? "Hết thời gian nhận câu trả lời" : session?.openedAt ? "Đã dừng nhận câu trả lời" : "Đang chuẩn bị câu hỏi";
+    return <div className="relative flex aspect-video w-full flex-col items-center justify-center gap-[1.3vw] overflow-hidden bg-slate-950 px-[5%] text-center text-white">
+      <p className="text-[clamp(.7rem,1vw,1.2rem)] font-bold uppercase tracking-[.2em] text-cyan-300">Thu ý kiến · {session?.questions.length || 0} câu hỏi</p>
+      <h1 className="text-[clamp(1.5rem,3.2vw,4.2rem)] font-extrabold">{heading}</h1>
+      {panel === "qr" && accepting ? <>
+        {qrImage ? <div className="rounded-[1.2vw] bg-white p-[.7vw]"><img src={qrImage} alt="Mã QR trả lời ý kiến" className="h-[min(39vh,22vw)] w-[min(39vh,22vw)]" /></div> : <p>Đang tải mã QR…</p>}
+        <p className="text-[clamp(.85rem,1.4vw,1.8rem)] text-cyan-200">Còn {String(Math.floor(remaining / 60)).padStart(2, "0")}:{String(remaining % 60).padStart(2, "0")}</p>
+      </> : null}
+      {error ? <p className="text-[clamp(.7rem,1vw,1.2rem)] text-rose-300">{error}</p> : null}
+    </div>;
+  }
 
   if (error && !state.session) return <div className="flex aspect-video items-center justify-center bg-white p-8 text-center text-2xl font-semibold text-slate-900">{error}</div>;
   if (!state.session) return <div className="flex aspect-video items-center justify-center bg-white p-8 text-center text-3xl font-bold text-slate-900">Chưa tạo câu hỏi tương tác</div>;

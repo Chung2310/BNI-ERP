@@ -122,7 +122,7 @@ export function MeetingStage({ snapshot, now, fill = false }: { snapshot: Meetin
 
   if (view === "checkin") activeStage = <CheckInStage meeting={meeting} />;
   else if (view === "activeMembers") activeStage = <RankingStage meeting={meeting} />;
-  else if (view === "audienceResponses") activeStage = <AudienceResponsesStage meeting={meeting} />;
+  else if (view === "audienceResponses") activeStage = <AudienceResponsesStage meeting={meeting} now={now} />;
   else if (view === "waiting") activeStage = <StageMessage title={meeting.title} text="Vui lòng chờ" />;
   else activeStage = <SpeakerPresentationFrame meeting={meeting} slides={slides} speakerId={speaker?.id} now={now} fill={fill}>
     <SpeakerStage meeting={meeting} slide={slides.find(item => item.id === speaker?.id)} now={now} />
