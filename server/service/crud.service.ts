@@ -50,11 +50,15 @@ export const crudService = {
       query.companyCode = companyCode;
     }
 
-    if (options.search) {
-      const searchRegex = new RegExp(options.search, "i");
+    if (options.search?.trim()) {
+      const escapedSearch = options.search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = new RegExp(escapedSearch, "i");
       query.$or = [
-        { name: searchRegex },
-        { title: searchRegex },
+        { displayName: searchRegex },
+        { email: searchRegex },
+        { phone: searchRegex },
+        { companyName: searchRegex },
+        { industry: searchRegex },
       ];
     }
 
