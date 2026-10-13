@@ -6,7 +6,11 @@ export function speakingSeconds(checkedInAt: Date | string, tiers: SpeakingTier[
     const timestamp = new Date(checkedInAt).getTime();
     if (!Number.isFinite(timestamp)) return fallbackSeconds;
     const time = new Date(timestamp + 7 * 60 * 60 * 1000).toISOString().slice(11, 16);
-    return tiers.find(tier => tier.startTime && tier.endTime && time >= tier.startTime && time < tier.endTime)?.seconds ?? fallbackSeconds;
+    const matchingTier = tiers.find(tier => tier.startTime && tier.endTime && time >= tier.startTime && time < tier.endTime);
+    if (matchingTier) return matchingTier.seconds;
+    const firstTier = tiers.filter(tier => tier.startTime && tier.endTime)
+      .reduce<SpeakingTier | undefined>((first, tier) => !first || tier.startTime! < first.startTime! ? tier : first, undefined);
+    return firstTier && time < firstTier.startTime! ? firstTier.seconds : fallbackSeconds;
   }
   // Preserve previously saved count-based schedules until their configuration is updated.
   let boundary = 0;
