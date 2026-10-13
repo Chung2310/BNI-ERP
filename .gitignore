@@ -48,3 +48,6 @@ service_account*.json
 .worktrees/
 .superpowers/
 docs/
+
+# Keep the standalone mobile repository out of this parent repository
+/BNI-ERP-Mobile/

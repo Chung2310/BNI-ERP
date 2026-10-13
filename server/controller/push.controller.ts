@@ -8,8 +8,8 @@ export const pushController = {
     try {
       const uid = req.user!.id;
       const companyCode = req.user!.companyCode || "SYSTEM";
-      const { token, platform, deviceName } = req.body;
-      await mobilePushService.saveToken({ uid, companyCode, token, platform, deviceName });
+      const { token, platform, provider, deviceName } = req.body;
+      await mobilePushService.saveToken({ uid, companyCode, token, platform, provider, deviceName });
       return res.status(200).json({ status: "success", message: "Đã đăng ký thiết bị nhận thông báo." });
     } catch (error) {
       console.error("[pushController.subscribeMobile] Error:", error);

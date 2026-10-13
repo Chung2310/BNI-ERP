@@ -40,7 +40,7 @@ const mobileSubscribeSchema = {
   body: Joi.object({
     token: Joi.string().trim().min(20).max(4096).pattern(/^\S+$/).required(),
     platform: Joi.string().valid("android", "ios").required(),
-    provider: Joi.string().valid("fcm").optional(),
+    provider: Joi.string().valid("fcm", "expo").required(),
     deviceName: Joi.string().max(160).optional().allow(""),
   }),
 };
