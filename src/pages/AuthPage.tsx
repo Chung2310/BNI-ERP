@@ -5,6 +5,7 @@ import { Mail, Lock, RefreshCw, ArrowRight, Eye, EyeOff, AlertCircle, ArrowLeft 
 import {
   BRAND_LOGO_PATH,
   BRAND_NAME,
+  LUCKY_DRAW_RULES_URL,
   PRIVACY_POLICY_URL,
   TERMS_OF_SERVICE_URL,
   USER_DATA_DELETION_URL,
@@ -231,6 +232,14 @@ export default function AuthPage() {
               className="font-semibold text-slate-600 underline underline-offset-2 hover:text-blue-700"
             >
               Data Deletion
+            </a>
+            <a
+              href={LUCKY_DRAW_RULES_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-slate-600 underline underline-offset-2 hover:text-blue-700"
+            >
+              Lucky Draw Rules
             </a>
           </div>
         </div>

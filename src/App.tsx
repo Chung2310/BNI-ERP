@@ -22,6 +22,7 @@ const UNREAD_TITLE_PREFIX_RE = /^\(\d+\+?\d*\)\s/;
 
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const LuckyDrawRules = lazy(() => import("./pages/LuckyDrawRules"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const UserDataDeletion = lazy(() => import("./pages/UserDataDeletion"));
 const SubmitProofPage = lazy(() => import("./pages/SubmitProofPage"));
@@ -46,6 +47,7 @@ function AppContent() {
   }, []);
 
   const isPrivacyPage = currentPath === "/privacy-policy" || currentPath === "/privacy-policy.html";
+  const isLuckyDrawRulesPage = currentPath === "/lucky-draw-rules" || currentPath === "/lucky-draw-rules.html";
   const isTermsPage = currentPath === "/terms-of-service" || currentPath === "/terms-of-service.html";
   const isDeletionPage = currentPath === "/user-data-deletion" || currentPath === "/user-data-deletion.html";
   const isSubmitProofPage = currentPath.startsWith("/public/submit-proof");
@@ -62,7 +64,7 @@ function AppContent() {
     currentPath === "/quay-thuong" ||
     currentPath === "/quay-thuong.html" ||
     currentPath === "/bingo";
-  const isLegalPublicPage = isPrivacyPage || isTermsPage || isDeletionPage;
+  const isLegalPublicPage = isPrivacyPage || isLuckyDrawRulesPage || isTermsPage || isDeletionPage;
   const isPublicPage =
     isLegalPublicPage ||
     isSubmitProofPage ||
@@ -200,6 +202,8 @@ function AppContent() {
           <Suspense fallback={<AuthLoader />}>
             {isPrivacyPage ? (
               <PrivacyPolicy />
+            ) : isLuckyDrawRulesPage ? (
+              <LuckyDrawRules />
             ) : isTermsPage ? (
               <TermsOfService />
             ) : (
