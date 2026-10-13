@@ -4,6 +4,7 @@ export const SERVICE_WEBSITE_URL = "https://erp.igentechnology.net";
 export const SUPPORT_EMAIL = "igen.work99@gmail.com";
 export const SUPPORT_URL = `${SERVICE_WEBSITE_URL}/#phap-ly`;
 export const PRIVACY_POLICY_URL = "/privacy-policy";
+export const LUCKY_DRAW_RULES_URL = "/lucky-draw-rules";
 export const TERMS_OF_SERVICE_URL = "/terms-of-service";
 export const USER_DATA_DELETION_URL = "/user-data-deletion";
 export const BRAND_LOGO_PATH = "/igen-connect.png";

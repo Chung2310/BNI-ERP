@@ -25,4 +25,14 @@ test.each(["/", "/landing", "/landing.html", "/dang-nhap"])("renders login for g
   expect(screen.getByRole("link", { name: "Privacy Policy" }).getAttribute("href")).toBe("/privacy-policy");
   expect(screen.getByRole("link", { name: "Terms of Service" }).getAttribute("href")).toBe("/terms-of-service");
   expect(screen.getByRole("link", { name: "Data Deletion" }).getAttribute("href")).toBe("/user-data-deletion");
+  expect(screen.getByRole("link", { name: "Lucky Draw Rules" }).getAttribute("href")).toBe("/lucky-draw-rules");
+});
+
+test("shows lucky draw rules to a visitor without signing in", async () => {
+  window.history.replaceState(null, "", "/lucky-draw-rules");
+
+  render(<App />);
+
+  expect(await screen.findByRole("heading", { name: "Lucky Draw Rules" })).not.toBeNull();
+  expect(screen.getByText(/Apple Inc\. is not a sponsor of/)).not.toBeNull();
 });

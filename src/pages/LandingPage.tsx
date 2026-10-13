@@ -22,6 +22,7 @@ import {
   BRAND_LOGO_PATH,
   BRAND_NAME,
   BRAND_TAGLINE,
+  LUCKY_DRAW_RULES_URL,
   PRIVACY_POLICY_URL,
   SUPPORT_URL,
   TERMS_OF_SERVICE_URL,
@@ -840,6 +841,11 @@ export default function LandingPage() {
                 <li>
                   <a href={USER_DATA_DELETION_URL} id="footer_link_data_deletion" className="hover:text-white transition-colors flex items-center gap-1.5 font-semibold text-slate-300">
                     <ChevronRight className="h-3 w-3 text-slate-600" /> Data Deletion Instructions
+                  </a>
+                </li>
+                <li>
+                  <a href={LUCKY_DRAW_RULES_URL} className="hover:text-white transition-colors flex items-center gap-1.5 font-semibold text-slate-300">
+                    <ChevronRight className="h-3 w-3 text-slate-600" /> Lucky Draw Rules (Thể lệ vòng quay)
                   </a>
                 </li>
                 <li>

@@ -62,6 +62,18 @@ export const PRIVACY_SEO: SeoMeta = {
   changeFrequency: "monthly",
 };
 
+export const LUCKY_DRAW_RULES_SEO: SeoMeta = {
+  title: "Lucky Draw Rules | iGen Connect",
+  description: "Rules for the meeting lucky draw in iGen Connect, including eligibility, winner selection, prizes, and Apple's non-involvement.",
+  keywords: "iGen Connect lucky draw rules, meeting draw, vòng quay may mắn, thể lệ vòng quay",
+  path: "/lucky-draw-rules",
+  image: SEO_DEFAULT_IMAGE,
+  robots: "index, follow",
+  type: "website",
+  priority: "0.5",
+  changeFrequency: "monthly",
+};
+
 export const TERMS_SEO: SeoMeta = {
   title: "Điều khoản dịch vụ",
   description: "Điều khoản dịch vụ và thỏa thuận sử dụng phần mềm quản trị doanh nghiệp iGen Connect.",
@@ -207,6 +219,9 @@ export function getSeoForPath(requestPath: string): SeoMeta {
   }
   if (normalized === "/privacy-policy" || normalized === "/privacy-policy.html") {
     return PRIVACY_SEO;
+  }
+  if (normalized === "/lucky-draw-rules" || normalized === "/lucky-draw-rules.html") {
+    return LUCKY_DRAW_RULES_SEO;
   }
   if (normalized === "/terms-of-service" || normalized === "/terms-of-service.html") {
     return TERMS_SEO;
