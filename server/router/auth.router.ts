@@ -174,6 +174,28 @@ authRouter.post("/profile/avatar", requireAuth, (req, res) => {
   });
 });
 
+const selfProfileImageSchema = {
+  body: Joi.object({
+    kind: Joi.string().valid("avatar", "cover").required(),
+    file: Joi.string().max(8_000_000).required(),
+  }).unknown(false),
+};
+authRouter.post("/profile/image", requireAuth, validateRequest(selfProfileImageSchema), async (req, res) => {
+  const { kind, file } = req.body as { kind: "avatar" | "cover"; file: string };
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(file);
+  if (!match) return res.status(400).json({ message: "Ảnh phải là JPG, PNG hoặc WebP hợp lệ." });
+  const buffer = Buffer.from(match[2], "base64");
+  const invalid = guestAvatarError({ buffer, size: buffer.length, mimetype: match[1] });
+  if (invalid) return res.status(400).json({ message: invalid.replace("Ảnh đại diện", kind === "cover" ? "Ảnh bìa" : "Ảnh đại diện") });
+  try {
+    const field = kind === "avatar" ? "photoURL" : "coverImage";
+    const folder = kind === "avatar" ? `bni/profiles/${req.user!.id}` : `bni/profiles/${req.user!.id}/covers`;
+    const url = await cloudinaryService.uploadMediaBuffer(buffer, folder);
+    await UserModel.updateOne({ _id: req.user!.id }, { $set: { [field]: url } });
+    return res.json({ data: { [field]: url } });
+  } catch { return res.status(502).json({ message: "Chưa tải được ảnh hồ sơ. Vui lòng thử lại." }); }
+});
+
 const changePasswordSchema = {
   body: Joi.object({
     password: Joi.string().min(6).required().messages({
