@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { MeetingModel, MeetingDeliveryModel } from './meeting.model';
 import { UserModel } from '../../model/user.model';
 import { companyEmailService } from '../../service/company-email.service';
-import { autoStartDueMeetings } from './meeting.service';
+import { autoEndDueMeetings, autoStartDueMeetings } from './meeting.service';
 import { advanceDuePresentations } from './meeting-presentation.service';
 export async function runMeetingReminderScan(now = new Date()) {
   const due = await MeetingModel.find({ status: 'scheduled', reminderAt: { $lte: now }, startsAt: { $gt: now } }).limit(100).lean(); let queued = 0;
@@ -44,4 +44,23 @@ export function startPresentationScheduler() {
   timer.unref();
   return () => clearInterval(timer);
 }
-export function startMeetingScheduler() { const stopPresentation = startPresentationScheduler(); let running = false; const timer = setInterval(async () => { if (running) return; running = true; try { await autoStartDueMeetings(); await runMeetingReminderScan(); await runMeetingDeliveryScan(); } catch (e) { console.error('[MeetingScheduler]', e); } finally { running = false; } }, 15_000); timer.unref(); return () => { clearInterval(timer); stopPresentation(); }; }
+export function startMeetingScheduler() {
+  const stopPresentation = startPresentationScheduler();
+  let running = false;
+  const timer = setInterval(async () => {
+    if (running) return;
+    running = true;
+    try {
+      await autoEndDueMeetings();
+      await autoStartDueMeetings();
+      await runMeetingReminderScan();
+      await runMeetingDeliveryScan();
+    } catch (error) {
+      console.error('[MeetingScheduler]', error);
+    } finally {
+      running = false;
+    }
+  }, 15_000);
+  timer.unref();
+  return () => { clearInterval(timer); stopPresentation(); };
+}

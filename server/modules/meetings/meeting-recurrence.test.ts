@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("../../socket", () => ({ emitToCompany: vi.fn() }));
 import { recurringMeetingDates, meetingMonthRange, vietnamDateTime } from "../../../src/utils/meetingRecurrence";
 import { createRecurringMeetings, updateMeeting, controlMeeting } from "./meeting.service";
@@ -6,6 +6,7 @@ import { MeetingModel } from "./meeting.model";
 import { recurringMeetingInput } from "./meeting.validation";
 import * as sequence from "./meeting-sequence";
 afterEach(() => vi.restoreAllMocks());
+beforeEach(() => { vi.spyOn(MeetingModel, "exists").mockResolvedValue(null); });
 const rule = { startDate: "2030-01-01", months: 6, weekday: 3, time: "07:00" };
 const details = { title: "Họp tuần", tiers: [{ startTime: "07:00", endTime: "08:00", seconds: 30 }], fallbackSeconds:20, reminderDays:1 };
 it("generates every Wednesday in six months at Vietnam time", () => {
@@ -31,15 +32,15 @@ it("automatically numbers each occurrence in date order and continues across bat
  const reserve = vi.spyOn(sequence, "reserveMeetingNumbers").mockResolvedValueOnce(1).mockResolvedValueOnce(27);
  vi.spyOn(MeetingModel,"insertMany").mockImplementation(async (rows:any) => rows as any);
  const first = await createRecurringMeetings("BNI", "actor", { ...details, title: undefined, recurrence: rule });
- expect(first.map(row => row.title)).toEqual(Array.from({ length: 26 }, (_, index) => `BNI Chapter #${index + 1}`));
+ expect(first.map(row => row.title)).toEqual(Array.from({ length: 26 }, (_, index) => `Chapter #${index + 1}`));
  const next = await createRecurringMeetings("BNI", "actor", { ...details, title: "", recurrence: { ...rule, startDate: "2030-07-01" } });
- expect(next[0].title).toBe("BNI Chapter #27");
+ expect(next[0].title).toBe("Chapter #27");
  expect(reserve).toHaveBeenNthCalledWith(1, "BNI", 26);
  expect(reserve).toHaveBeenNthCalledWith(2, "BNI", next.length);
 });
 
 it("allows renaming an automatically named occurrence independently", async () => {
- const meeting = { ...item(), title: "BNI Chapter #1" };
+ const meeting = { ...item(), title: "Chapter #1" };
  vi.spyOn(MeetingModel,"findOne").mockResolvedValue(meeting as any);
  await updateMeeting("BNI", "one", { title: "Buổi giao lưu", version: 0 });
  expect(meeting.title).toBe("Buổi giao lưu");

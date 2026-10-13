@@ -2,6 +2,7 @@ import { findLoginAccount } from "../utils/login-account";
 import { stripLegacyUserFields } from "../utils/legacy-user-fields";
 import { verifySelfAccountDeletion } from "./self-account-deletion";
 import { PushSubscriptionModel } from "../model/push-subscription.model";
+import { MobilePushTokenModel } from "../model/mobile-push-token.model";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
@@ -45,6 +46,7 @@ export const authService = {
     try { disconnectUserSockets(userId); } catch (error) { console.error("[deleteOwnAccount] Socket cleanup failed", error); }
     const cleanup = await Promise.allSettled([
       PushSubscriptionModel.deleteMany({ uid: userId }),
+      MobilePushTokenModel.deleteMany({ uid: userId }),
     ]);
     if (cleanup.some((result) => result.status === "rejected")) {
       console.error("[deleteOwnAccount] Some account notification records could not be removed", userId);
@@ -93,6 +95,9 @@ export const authService = {
       displayName: data.displayName,
       photoURL: data.photoURL,
       phone: data.phone,
+      companyName: data.companyName?.trim(),
+      industry: data.industry?.trim(),
+      membershipStatus: "none",
       role: "user",
     });
 
@@ -218,21 +223,27 @@ export const authService = {
       code: normalizedCode,
       name: companyName.trim(),
       ownerEmail: emailLower,
+      isBniChapter: true,
       businessType,
       enabledModules: filterModulesForBusinessType(enabledModules, businessType),
       createdAt: new Date(),
     });
     await newCompany.save();
 
-    // 4. Tạo tài khoản admin của doanh nghiệp đó
-    const adminUser = await createCompanyAdminUser({
-      companyCode: normalizedCode,
-      companyName,
-      ownerName,
-      ownerEmail: emailLower,
-      ownerPassword,
-    });
-    return { company: newCompany, admin: adminUser };
+    // 4. Tạo admin; nếu thất bại, không để lại chapter không có người quản lý.
+    try {
+      const adminUser = await createCompanyAdminUser({
+        companyCode: normalizedCode,
+        companyName,
+        ownerName,
+        ownerEmail: emailLower,
+        ownerPassword,
+      });
+      return { company: newCompany, admin: adminUser };
+    } catch (error) {
+      await CompanyModel.deleteOne({ _id: newCompany._id });
+      throw error;
+    }
   },
 
   /**
@@ -430,6 +441,7 @@ export const authService = {
       password: hashedPassword,
       displayName: displayName.trim(),
       role,
+      membershipStatus: "active",
       companyCode: finalCompanyCode,
       companyName: companyName?.trim() || "",
       industry: data.industry?.trim() || "",

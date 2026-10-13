@@ -7,7 +7,7 @@ import { MeetingInteractionModel, MeetingInteractionResponseModel } from "./meet
 
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
 const questionId = () => randomBytes(12).toString("base64url");
-type QuestionInput = { question: string };
+type QuestionInput = { question: string; type?: "text" | "single_choice"; options?: string[] };
 type SettingsInput = QuestionInput & { durationSeconds: number; requireName: boolean; showNames: boolean; moderationEnabled: boolean; allowMultipleResponses: boolean };
 
 async function requireMeeting(companyCode: string, meetingId: string) {
@@ -94,7 +94,7 @@ async function managedPayload(rawSession: Awaited<ReturnType<typeof loadSession>
       totalQuestions: session.questions.length,
       questions: session.questions.map((item, index) => {
         const responses = allResponses.filter(response => response.questionId === item.id);
-        return { id: item.id, text: item.text, order: index + 1, responseCount: responses.length, approvedCount: responses.filter(response => response.status === "approved").length };
+        return { id: item.id, text: item.text, type: item.type || "text", options: item.options || [], order: index + 1, responseCount: responses.length, approvedCount: responses.filter(response => response.status === "approved").length };
       }),
       status: session.status, openedAt: session.openedAt, closesAt: session.closesAt,
       requireName: session.requireName, showNames: session.showNames,
@@ -128,7 +128,7 @@ export async function saveMeetingInteraction(companyCode: string, meetingId: str
     const id = questionId();
     session = new MeetingInteractionModel({
       meetingId, companyCode, createdBy: actorId, question: input.question,
-      questions: [{ id, text: input.question }], activeQuestionId: id, durationSeconds: input.durationSeconds,
+      questions: [{ id, text: input.question, type: input.type || "text", options: input.options || [] }], activeQuestionId: id, durationSeconds: input.durationSeconds,
       tokenHash: tokenHash(token), tokenEncrypted: encryptSecret(token),
       requireName: input.requireName, showNames: input.showNames,
       moderationEnabled: input.moderationEnabled, allowMultipleResponses: input.allowMultipleResponses,
@@ -137,8 +137,12 @@ export async function saveMeetingInteraction(companyCode: string, meetingId: str
     await normalizeSession(session);
     if (session.status === "open") throw new MeetingError(409, "Hãy đóng nhận câu trả lời trước khi sửa bài tương tác.");
     const current = activeQuestion(session);
-    const changedQuestion = current.text !== input.question;
+    const nextType = input.type || "text";
+    const nextOptions = input.options || [];
+    const changedQuestion = current.text !== input.question || (current.type || "text") !== nextType || JSON.stringify(current.options || []) !== JSON.stringify(nextOptions);
     current.text = input.question;
+    current.type = nextType;
+    current.options = nextOptions;
     session.question = input.question;
     session.durationSeconds = input.durationSeconds;
     session.requireName = input.requireName;
@@ -161,7 +165,7 @@ export async function addMeetingInteractionQuestion(companyCode: string, meeting
   if (session.status === "open") throw new MeetingError(409, "Hãy đóng nhận câu trả lời trước khi thêm câu hỏi.");
   if (session.questions.length >= 20) throw new MeetingError(409, "Mỗi bài tương tác chỉ được tạo tối đa 20 câu hỏi.");
   const id = questionId();
-  session.questions.push({ id, text: input.question });
+  session.questions.push({ id, text: input.question, type: input.type || "text", options: input.options || [] });
   session.activeQuestionId = id;
   session.question = input.question;
   await session.save();
@@ -247,7 +251,7 @@ export async function getPublicMeetingInteraction(token: string) {
   const { session, meeting } = await resolvePublicSession(token);
   return {
     meetingTitle: meeting.title,
-    questions: session.questions.map((item, index) => ({ id: item.id, text: item.text, order: index + 1 })),
+    questions: session.questions.map((item, index) => ({ id: item.id, text: item.text, type: item.type || "text", options: item.options || [], order: index + 1 })),
     totalQuestions: session.questions.length,
     durationSeconds: session.durationSeconds,
     openedAt: session.openedAt,
@@ -268,6 +272,9 @@ export async function submitMeetingInteractionResponse(token: string, input: { p
   const answeredQuestions = session.questions.filter(item => answerMap.has(item.id));
   if (!answeredQuestions.length || answeredQuestions.length !== input.answers.length || answeredQuestions.some(item => !answerMap.get(item.id))) {
     throw new MeetingError(400, "Vui lòng trả lời ít nhất một câu hỏi hợp lệ.");
+  }
+  if (answeredQuestions.some(item => item.type === "single_choice" && !(item.options || []).includes(answerMap.get(item.id)!))) {
+    throw new MeetingError(400, "Lựa chọn trả lời không hợp lệ.");
   }
   if (!session.allowMultipleResponses) {
     const exists = await MeetingInteractionResponseModel.exists({ interactionId: session._id, participantId: input.participantId });

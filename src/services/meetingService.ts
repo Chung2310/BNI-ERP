@@ -44,6 +44,7 @@ export interface LuckyDrawWinner {
   verificationHash?: string;
   seed?: string;
   timestamp?: string;
+  repeatEligible?: boolean;
 }
 
 export interface LuckyDrawPrize {

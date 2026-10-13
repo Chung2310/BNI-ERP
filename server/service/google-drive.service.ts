@@ -15,6 +15,13 @@ export interface DriveFile {
   iconLink?: string;
   thumbnailLink?: string;
   modifiedTime?: string;
+  parents?: string[];
+}
+
+export interface DownloadedDriveFile {
+  buffer: Buffer;
+  filename: string;
+  mimeType: string;
 }
 
 const FILE_FIELDS = "id,name,mimeType,size,webViewLink,webContentLink,iconLink,thumbnailLink,modifiedTime";
@@ -89,6 +96,56 @@ export const googleDriveService = {
     if (!res.ok) throw translateDriveError(res.status, await res.text());
     const data = (await res.json()) as { files?: DriveFile[] };
     return data.files || [];
+  },
+
+  /** Read the minimum metadata needed to validate that a file belongs to the company tree. */
+  async getFile(accessToken: string, fileId: string): Promise<DriveFile> {
+    const fields = "id,name,mimeType,parents";
+    const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?supportsAllDrives=true&fields=${encodeURIComponent(fields)}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) throw translateDriveError(res.status, await res.text());
+    return (await res.json()) as DriveFile;
+  },
+
+  /** Download a binary Drive file, or export a Google Workspace file to an Office format. */
+  async downloadFile(accessToken: string, file: DriveFile): Promise<DownloadedDriveFile> {
+    const exports: Record<string, { mimeType: string; extension: string }> = {
+      "application/vnd.google-apps.document": {
+        mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        extension: ".docx",
+      },
+      "application/vnd.google-apps.spreadsheet": {
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        extension: ".xlsx",
+      },
+      "application/vnd.google-apps.presentation": {
+        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        extension: ".pptx",
+      },
+      "application/vnd.google-apps.drawing": { mimeType: "application/pdf", extension: ".pdf" },
+    };
+
+    if (file.mimeType === "application/vnd.google-apps.folder") {
+      throw new Error("Không thể tải thư mục như một tệp. Vui lòng dùng chức năng tải ZIP.");
+    }
+
+    const exportConfig = exports[file.mimeType];
+    const baseUrl = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(file.id)}`;
+    const url = exportConfig
+      ? `${baseUrl}/export?mimeType=${encodeURIComponent(exportConfig.mimeType)}`
+      : `${baseUrl}?alt=media&supportsAllDrives=true`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) throw translateDriveError(res.status, await res.text());
+
+    const extension = exportConfig?.extension || "";
+    const filename = extension && !file.name.toLowerCase().endsWith(extension)
+      ? `${file.name}${extension}`
+      : file.name;
+    return {
+      buffer: Buffer.from(await res.arrayBuffer()),
+      filename,
+      mimeType: exportConfig?.mimeType || res.headers.get("content-type") || file.mimeType || "application/octet-stream",
+    };
   },
 
   /** Xóa (vào thùng rác) một file trong Drive. */

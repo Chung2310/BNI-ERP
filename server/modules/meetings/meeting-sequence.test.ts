@@ -6,11 +6,11 @@ afterEach(() => vi.restoreAllMocks());
 
 it("seeds from the highest existing chapter number within the company", async () => {
   vi.spyOn(MeetingSequenceModel, "exists").mockResolvedValue(null);
-  const find = vi.spyOn(MeetingModel, "find").mockReturnValue({ select: () => ({ lean: async () => [{ title: "BNI Chapter #9" }, { title: "BNI Chapter #12" }] }) } as any);
+  const find = vi.spyOn(MeetingModel, "find").mockReturnValue({ select: () => ({ lean: async () => [{ title: "BNI Chapter #9" }, { title: "Chapter #12" }] }) } as any);
   const initialize = vi.spyOn(MeetingSequenceModel, "updateOne").mockResolvedValue({} as any);
   const increment = vi.spyOn(MeetingSequenceModel, "findOneAndUpdate").mockResolvedValue({ value: 16 } as any);
   expect(await reserveMeetingNumbers("COMPANY-A", 4)).toBe(13);
-  expect(find).toHaveBeenCalledWith({ companyCode: "COMPANY-A", title: /^BNI Chapter #[1-9]\d*$/ });
+  expect(find).toHaveBeenCalledWith({ companyCode: "COMPANY-A", title: /^(?:BNI )?Chapter #[1-9]\d*$/ });
   expect(initialize).toHaveBeenCalledWith({ _id: "COMPANY-A" }, { $setOnInsert: { value: 12 } }, { upsert: true });
   expect(increment).toHaveBeenCalledWith({ _id: "COMPANY-A" }, { $inc: { value: 4 } }, { new: true });
 });

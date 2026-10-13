@@ -4,26 +4,28 @@ import { Check, Clock3, Copy, Eye, EyeOff, MessageSquareText, MonitorUp, Play, P
 import type { Meeting } from "../../services/meetingService";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { MeetingLiveError, meetingLiveApi, meetingRoomUrl } from "../../services/meetingLiveService";
-import { meetingInteractionService, type MeetingInteractionQuestion, type MeetingInteractionResponseStatus, type MeetingInteractionState } from "../../services/meetingInteractionService";
+import { meetingInteractionService, type MeetingInteractionQuestion, type MeetingInteractionQuestionType, type MeetingInteractionResponseStatus, type MeetingInteractionState } from "../../services/meetingInteractionService";
 import { socketService } from "../../services/socketService";
 
 const emptyState: MeetingInteractionState = { session: null, responses: [] };
-type InteractionSettings = { durationSeconds: number | ""; requireName: boolean; showNames: boolean; moderationEnabled: boolean; allowMultipleResponses: boolean };
+type InteractionSettings = { durationSeconds: number | "" };
+const simpleInteractionSettings = { requireName: false, showNames: false, moderationEnabled: false, allowMultipleResponses: true } as const;
 
 const statusLabel: Record<MeetingInteractionResponseStatus, string> = { pending: "Chờ duyệt", approved: "Đang hiển thị", hidden: "Đã ẩn", rejected: "Đã từ chối" };
+const validOptions = (type: MeetingInteractionQuestionType, options: string[]) => type === "text" || (options.length >= 2 && options.length <= 6 && options.every(value => value.trim().length > 0) && new Set(options.map(value => value.trim())).size === options.length);
 
 export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: { meeting: Meeting; canManage: boolean; onRefreshMeeting: () => Promise<unknown> | void }) {
   const [state, setState] = useState<MeetingInteractionState>(emptyState);
   const [question, setQuestion] = useState("");
+  const [questionType, setQuestionType] = useState<MeetingInteractionQuestionType>("text");
+  const [questionOptions, setQuestionOptions] = useState<string[]>(["", ""]);
   const [durationSeconds, setDurationSeconds] = useState(60);
-  const [requireName, setRequireName] = useState(true);
-  const [showNames, setShowNames] = useState(true);
-  const [moderationEnabled, setModerationEnabled] = useState(true);
-  const [allowMultipleResponses, setAllowMultipleResponses] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsDraft, setSettingsDraft] = useState<InteractionSettings>({ durationSeconds: 60, requireName: true, showNames: true, moderationEnabled: true, allowMultipleResponses: false });
+  const [settingsDraft, setSettingsDraft] = useState<InteractionSettings>({ durationSeconds: 60 });
   const [addQuestionOpen, setAddQuestionOpen] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
+  const [newQuestionType, setNewQuestionType] = useState<MeetingInteractionQuestionType>("text");
+  const [newQuestionOptions, setNewQuestionOptions] = useState<string[]>(["", ""]);
   const [questionToDelete, setQuestionToDelete] = useState<MeetingInteractionQuestion | null>(null);
 
   const [now, setNow] = useState(Date.now);
@@ -37,11 +39,10 @@ export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: 
     setState(next);
     if (next.session) {
       setQuestion(next.session.question);
+      const active = next.session.questions.find(item => item.id === next.session?.activeQuestionId);
+      setQuestionType(active?.type || "text");
+      setQuestionOptions(active?.options?.length ? active.options : ["", ""]);
       setDurationSeconds(next.session.durationSeconds);
-      setRequireName(next.session.requireName);
-      setShowNames(next.session.showNames);
-      setModerationEnabled(next.session.moderationEnabled);
-      setAllowMultipleResponses(next.session.allowMultipleResponses);
     }
   }, []);
   const load = useCallback(async (silent = false) => {
@@ -69,32 +70,33 @@ export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: 
     finally { setBusy(""); }
   };
   const save = () => {
-    const changesQuestion = state.session && state.session.question !== question.trim() && state.responses.length > 0;
+    if (!question.trim() || !validOptions(questionType, questionOptions)) return;
+    const options = questionType === "single_choice" ? questionOptions.map(value => value.trim()) : [];
+    const active = state.session?.questions.find(item => item.id === state.session?.activeQuestionId);
+    const changesQuestion = state.session && (state.session.question !== question.trim() || (active?.type || "text") !== questionType || JSON.stringify(active?.options || []) !== JSON.stringify(options)) && state.responses.length > 0;
     if (changesQuestion && !window.confirm("Đổi câu hỏi sẽ xóa các câu trả lời hiện tại. Bạn có muốn tiếp tục?")) return;
-    void run("save", () => meetingInteractionService.save(meeting._id, { question: question.trim(), durationSeconds, requireName, showNames, moderationEnabled, allowMultipleResponses }));
+    void run("save", () => meetingInteractionService.save(meeting._id, { question: question.trim(), type: questionType, ...(questionType === "single_choice" ? { options } : {}), durationSeconds, ...simpleInteractionSettings }));
   };
   const openSettings = () => {
-    setSettingsDraft({ durationSeconds, requireName, showNames, moderationEnabled, allowMultipleResponses });
+    setSettingsDraft({ durationSeconds });
     setSettingsError("");
     setSettingsOpen(true);
   };
   const applySettings = async () => {
+    if (!validOptions(questionType, questionOptions)) { setSettingsError("Vui lòng nhập ít nhất 2 lựa chọn khác nhau."); return; }
     const parsedDuration = Number(settingsDraft.durationSeconds);
     if (!Number.isInteger(parsedDuration) || parsedDuration <= 0 || parsedDuration > 3600) {
       setSettingsError("Vui lòng nhập thời gian hợp lệ từ 1 đến 3600 giây.");
       return;
     }
     setDurationSeconds(parsedDuration);
-    setRequireName(settingsDraft.requireName);
-    setShowNames(settingsDraft.showNames);
-    setModerationEnabled(settingsDraft.moderationEnabled);
-    setAllowMultipleResponses(settingsDraft.allowMultipleResponses);
     if (!state.session) { setSettingsOpen(false); return; }
-    const changesQuestion = state.session.question !== question.trim() && state.responses.length > 0;
+    const active = state.session.questions.find(item => item.id === state.session?.activeQuestionId);
+    const changesQuestion = (state.session.question !== question.trim() || (active?.type || "text") !== questionType || JSON.stringify(active?.options || []) !== JSON.stringify(questionType === "single_choice" ? questionOptions.map(value => value.trim()) : [])) && state.responses.length > 0;
     if (changesQuestion && !window.confirm("Đổi câu hỏi sẽ xóa các câu trả lời hiện tại. Bạn có muốn tiếp tục?")) return;
     setBusy("settings"); setSettingsError("");
     try {
-      apply(await meetingInteractionService.save(meeting._id, { question: question.trim(), ...settingsDraft, durationSeconds: parsedDuration }));
+      apply(await meetingInteractionService.save(meeting._id, { question: question.trim(), type: questionType, ...(questionType === "single_choice" ? { options: questionOptions.map(value => value.trim()) } : {}), durationSeconds: parsedDuration, ...simpleInteractionSettings }));
       setSettingsOpen(false);
     } catch (err) { setSettingsError(err instanceof Error ? err.message : "Không thể lưu cấu hình."); }
     finally { setBusy(""); }
@@ -106,9 +108,9 @@ export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: 
     setQuestionToDelete(null);
   };
   const addQuestion = async () => {
-    if (!newQuestion.trim()) return;
+    if (!newQuestion.trim() || !validOptions(newQuestionType, newQuestionOptions)) return;
     setBusy("add-question"); setSettingsError("");
-    try { apply(await meetingInteractionService.addQuestion(meeting._id, { question: newQuestion.trim() })); setAddQuestionOpen(false); setNewQuestion(""); }
+    try { apply(await meetingInteractionService.addQuestion(meeting._id, { question: newQuestion.trim(), ...(newQuestionType === "single_choice" ? { type: newQuestionType, options: newQuestionOptions.map(value => value.trim()) } : {}) })); setAddQuestionOpen(false); setNewQuestion(""); setNewQuestionType("text"); setNewQuestionOptions(["", ""]); }
     catch (err) { setSettingsError(err instanceof Error ? err.message : "Không thể thêm câu hỏi."); }
     finally { setBusy(""); }
   };
@@ -119,7 +121,7 @@ export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: 
     const presentationWindow = window.open(displayUrl, "_blank");
     if (presentationWindow) presentationWindow.opener = null;
     setBusy("present"); setError("");
-    const switchToResponses = (version: number) => meetingLiveApi(`/${meeting._id}/presentation-state`, "PATCH", { version, view: "audienceResponses" });
+    const switchToResponses = (version: number) => meetingLiveApi(`/${meeting._id}/presentation-state`, "PATCH", { version, view: "audienceResponses", audienceResponsePanel: "results" });
     try {
       try {
         await switchToResponses(meeting.__v);
@@ -136,6 +138,8 @@ export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: 
     } finally { setBusy(""); }
   };
   const url = state.session ? new URL(state.session.participationUrl, window.location.origin).href : "";
+  const activeQuestion = state.session?.questions.find(item => item.id === state.session?.activeQuestionId);
+  const questionChanged = Boolean(state.session && (state.session.question !== question.trim() || (activeQuestion?.type || "text") !== questionType || JSON.stringify(activeQuestion?.options || []) !== JSON.stringify(questionType === "single_choice" ? questionOptions.map(value => value.trim()) : [])));
   const remainingSeconds = state.session?.status === "open" && state.session.closesAt ? Math.max(0, Math.ceil((Date.parse(state.session.closesAt) - now) / 1000)) : 0;
   const locked = !canManage || ["ended", "cancelled"].includes(meeting.status);
   const editingLocked = locked || state.session?.status === "open";
@@ -152,7 +156,7 @@ export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: 
               <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-xs font-black ${item.id === state.session?.activeQuestionId ? "bg-cyan-600 text-white" : "bg-cyan-50 text-cyan-700"}`}>{item.order}</span>
               <span className="min-w-0">
                 <span className="block overflow-hidden text-sm font-semibold leading-5 text-slate-800 [display:-webkit-box] [overflow-wrap:anywhere] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">{item.text}</span>
-                <span className="mt-1 block text-[11px] text-slate-500">{item.responseCount} phản hồi</span>
+                <span className="mt-1 block text-[11px] text-slate-500">{item.type === "single_choice" ? "Trắc nghiệm · " : "Tự luận · "}{item.responseCount} phản hồi</span>
               </span>
               {item.id === state.session?.activeQuestionId && <span className="rounded-full bg-cyan-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-cyan-700">Đang chọn</span>}
             </button>
@@ -160,19 +164,16 @@ export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: 
           </div>)}</div>
         </div>}
         <label className="block text-sm font-medium text-slate-700">{state.session ? `Câu hỏi ${state.session.questionNumber}/${state.session.totalQuestions}` : "Câu hỏi"}<textarea value={question} maxLength={300} rows={3} disabled={editingLocked} onChange={e => setQuestion(e.target.value)} placeholder="Ví dụ: Điều giá trị nhất bạn nhận được hôm nay là gì?" className="mt-1.5 w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-cyan-500 disabled:bg-slate-50" /><span className="mt-1 block text-right text-xs text-slate-400">{question.length}/300</span></label>
+        <QuestionOptionsEditor type={questionType} options={questionOptions} disabled={Boolean(editingLocked)} onTypeChange={setQuestionType} onOptionsChange={setQuestionOptions} />
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-          <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-            <span className="rounded-full bg-white px-2.5 py-1 shadow-xs">{requireName ? "Yêu cầu tên" : "Tên không bắt buộc"}</span>
-            <span className="rounded-full bg-white px-2.5 py-1 shadow-xs">{moderationEnabled ? "Có kiểm duyệt" : "Tự động hiển thị"}</span>
-            <span className="rounded-full bg-white px-2.5 py-1 shadow-xs">{allowMultipleResponses ? "Được gửi nhiều lần" : "Mỗi người một lần"}</span>
-          </div>
+          <span className="text-xs font-medium text-slate-600">Thời gian trả lời: {durationSeconds} giây</span>
           <button type="button" onClick={openSettings} disabled={editingLocked} className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-white px-3 py-2 text-xs font-semibold text-cyan-800 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50"><SlidersHorizontal className="h-4 w-4" />Cấu hình</button>
         </div>
         {error && <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
 {state.session?.status === "open" && <div role="timer" className={`mt-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold ${remainingSeconds <= 10 ? "bg-rose-50 text-rose-700" : "bg-cyan-50 text-cyan-700"}`}><Clock3 className="h-4 w-4" />Bài gồm {state.session.totalQuestions} câu tự đóng sau {remainingSeconds} giây</div>}
         {canManage && !locked && <div className="mt-5 flex flex-wrap gap-2">
-          {!state.session && <button type="button" disabled={!question.trim() || Boolean(busy)} onClick={save} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Save className="h-4 w-4" />{busy === "save" ? "Đang tạo…" : "Tạo phiên tương tác"}</button>}
-          {state.session && state.session.status !== "open" && <button type="button" disabled={Boolean(busy)} onClick={() => setStatus("open")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Play className="h-4 w-4" />Mở nhận toàn bài ({durationSeconds} giây)</button>}
+          {(!state.session || state.session.status !== "open" && questionChanged) && <button type="button" disabled={!question.trim() || !validOptions(questionType, questionOptions) || Boolean(busy)} onClick={save} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Save className="h-4 w-4" />{busy === "save" ? "Đang lưu…" : state.session ? "Lưu câu hỏi" : "Tạo phiên tương tác"}</button>}
+          {state.session && state.session.status !== "open" && <button type="button" disabled={Boolean(busy) || questionChanged} onClick={() => setStatus("open")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Play className="h-4 w-4" />Mở nhận toàn bài ({durationSeconds} giây)</button>}
           {state.session?.status === "open" && <button type="button" disabled={Boolean(busy)} onClick={() => setStatus("closed")} className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Square className="h-4 w-4" />Đóng nhận câu trả lời</button>}
           {state.session && <button type="button" disabled={Boolean(busy)} onClick={present} className="inline-flex items-center gap-2 rounded-xl border border-cyan-300 bg-cyan-50 px-4 py-2.5 text-sm font-semibold text-cyan-800 disabled:opacity-50"><MonitorUp className="h-4 w-4" />{busy === "present" ? "Đang mở…" : "Trình chiếu kết quả"}</button>}
         </div>}
@@ -201,9 +202,10 @@ export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: 
       <section role="dialog" aria-modal="true" aria-labelledby="add-interaction-question-title" className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-2xl sm:p-6">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4"><div><h4 id="add-interaction-question-title" className="text-lg font-bold text-slate-900">Thêm câu hỏi</h4><p className="mt-1 text-sm text-slate-500">Câu hỏi mới dùng chung thời gian và cấu hình của bài.</p></div><button type="button" aria-label="Đóng thêm câu hỏi" onClick={() => setAddQuestionOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
         <label className="mt-5 block text-sm font-semibold text-slate-800">Nội dung câu hỏi<textarea autoFocus rows={4} maxLength={300} value={newQuestion} onChange={event => setNewQuestion(event.target.value)} className="mt-1.5 w-full resize-none rounded-xl border border-slate-300 px-4 py-3 font-normal outline-none focus:border-cyan-500" /></label>
+        <QuestionOptionsEditor type={newQuestionType} options={newQuestionOptions} disabled={Boolean(busy)} onTypeChange={setNewQuestionType} onOptionsChange={setNewQuestionOptions} />
 
         {settingsError && <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{settingsError}</p>}
-        <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setAddQuestionOpen(false)} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">Hủy</button><button type="button" disabled={!newQuestion.trim() || Boolean(busy)} onClick={() => void addQuestion()} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "add-question" ? "Đang thêm…" : "Thêm câu hỏi"}</button></div>
+        <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setAddQuestionOpen(false)} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">Hủy</button><button type="button" disabled={!newQuestion.trim() || !validOptions(newQuestionType, newQuestionOptions) || Boolean(busy)} onClick={() => void addQuestion()} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "add-question" ? "Đang thêm…" : "Thêm câu hỏi"}</button></div>
       </section>
     </div>}
     {settingsOpen && <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
@@ -213,12 +215,6 @@ export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: 
           <button type="button" aria-label="Đóng cấu hình" onClick={() => setSettingsOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button>
         </div>
         <div className="mt-5 rounded-xl border border-slate-200 p-3"><label htmlFor="interaction-duration" className="flex items-center justify-between gap-4 text-sm font-semibold text-slate-800"><span><span className="block">Thời gian trả lời</span><span className="mt-0.5 block text-xs font-normal text-slate-500">Áp dụng chung cho toàn bộ câu hỏi, tính từ lúc mở nhận.</span></span><span className="flex items-center gap-2"><input id="interaction-duration" type="number" max={3600} value={settingsDraft.durationSeconds} onChange={event => setSettingsDraft(current => ({ ...current, durationSeconds: event.target.value === "" ? "" : Number(event.target.value) }))} className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-right" /><span className="text-xs text-slate-500">giây</span></span></label></div>
-        <div className="mt-3 space-y-3">
-          <Option checked={settingsDraft.requireName} disabled={editingLocked} onChange={value => setSettingsDraft(current => ({ ...current, requireName: value }))} label="Yêu cầu người tham dự nhập tên" description="Tên được lưu cùng câu trả lời để người điều hành nhận biết." />
-          <Option checked={settingsDraft.showNames} disabled={editingLocked} onChange={value => setSettingsDraft(current => ({ ...current, showNames: value }))} label="Cho phép hiển thị tên" description="Dùng khi chuyển sang kiểu trình chiếu có kèm tên người gửi." />
-          <Option checked={settingsDraft.moderationEnabled} disabled={editingLocked} onChange={value => setSettingsDraft(current => ({ ...current, moderationEnabled: value }))} label="Duyệt trước khi trình chiếu" description="Câu trả lời chỉ xuất hiện sau khi người điều hành duyệt." />
-          <Option checked={settingsDraft.allowMultipleResponses} disabled={editingLocked} onChange={value => setSettingsDraft(current => ({ ...current, allowMultipleResponses: value }))} label="Cho phép gửi nhiều lần" description="Một thiết bị có thể gửi lại toàn bộ bài trả lời nhiều lần." />
-        </div>
         {settingsError && <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{settingsError}</p>}
         <p className="mt-4 text-xs text-slate-500">{state.session ? "Thay đổi sẽ được lưu ngay khi bạn bấm Lưu cấu hình." : "Lựa chọn sẽ được dùng khi bạn tạo phiên tương tác."}</p>
         <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setSettingsOpen(false)} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">Hủy</button><button type="button" disabled={Boolean(busy) || !question.trim()} onClick={() => void applySettings()} className="rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-cyan-700 disabled:opacity-50">{busy === "settings" ? "Đang lưu…" : state.session ? "Lưu cấu hình" : "Áp dụng cấu hình"}</button></div>
@@ -237,9 +233,13 @@ export function MeetingInteractionTab({ meeting, canManage, onRefreshMeeting }: 
   </div>;
 }
 
-function Option({ checked, disabled, onChange, label, description }: { checked: boolean; disabled: boolean; onChange: (value: boolean) => void; label: string; description?: string }) {
-  return <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 text-slate-700 hover:border-cyan-200 hover:bg-cyan-50/40"><input type="checkbox" checked={checked} disabled={disabled} onChange={e => onChange(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-cyan-600" /><span><span className="block text-sm font-semibold text-slate-800">{label}</span>{description && <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">{description}</span>}</span></label>;
+function QuestionOptionsEditor({ type, options, disabled, onTypeChange, onOptionsChange }: { type: MeetingInteractionQuestionType; options: string[]; disabled: boolean; onTypeChange: (value: MeetingInteractionQuestionType) => void; onOptionsChange: (value: string[]) => void }) {
+  return <div className="mt-4 space-y-3">
+    <label className="block text-sm font-medium text-slate-700">Loại câu hỏi<select value={type} disabled={disabled} onChange={event => onTypeChange(event.target.value as MeetingInteractionQuestionType)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 disabled:bg-slate-50"><option value="text">Tự luận</option><option value="single_choice">Trắc nghiệm</option></select></label>
+    {type === "single_choice" && <div className="space-y-2"><p className="text-sm font-medium text-slate-700">Các lựa chọn (2–6)</p>{options.map((value, index) => <div key={index} className="flex gap-2"><input aria-label={`Lựa chọn ${index + 1}`} value={value} maxLength={200} disabled={disabled} onChange={event => onOptionsChange(options.map((option, i) => i === index ? event.target.value : option))} placeholder={`Lựa chọn ${index + 1}`} className="min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-2.5 disabled:bg-slate-50" />{options.length > 2 && <button type="button" aria-label={`Xóa lựa chọn ${index + 1}`} disabled={disabled} onClick={() => onOptionsChange(options.filter((_, i) => i !== index))} className="rounded-lg border border-slate-200 px-3 text-slate-500 disabled:opacity-50"><X className="h-4 w-4" /></button>}</div>)}{options.length < 6 && <button type="button" disabled={disabled} onClick={() => onOptionsChange([...options, ""])} className="inline-flex items-center gap-1 text-sm font-semibold text-cyan-700 disabled:opacity-50"><Plus className="h-4 w-4" />Thêm lựa chọn</button>}</div>}
+  </div>;
 }
+
 function SmallButton({ onClick, disabled, icon: Icon, label, danger = false }: { onClick: () => void; disabled: boolean; icon: React.ComponentType<{ className?: string }>; label: string; danger?: boolean }) {
   return <button type="button" onClick={onClick} disabled={disabled} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-50 ${danger ? "border-rose-200 text-rose-700" : "border-slate-200 text-slate-700"}`}><Icon className="h-3.5 w-3.5" />{label}</button>;
 }

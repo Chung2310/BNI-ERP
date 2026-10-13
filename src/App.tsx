@@ -29,11 +29,22 @@ const PublicRegisterPage = lazy(() => import("./pages/PublicRegisterPage"));
 const WheelOfNamesPage = lazy(() => import("./pages/WheelOfNamesPage"));
 const MeetingCheckInPage = lazy(() => import("./pages/MeetingCheckInPage"));
 const MeetingInteractionPage = lazy(() => import("./pages/MeetingInteractionPage"));
+const ChapterRegistrationPage = lazy(() => import("./pages/ChapterRegistrationPage"));
+const ChapterPortal = lazy(() => import("./pages/ChapterPortal"));
 
 function AppContent() {
   const { user, userProfile, loading } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
-  const currentPath = normalizePublicPath(window.location.pathname);
+  const [currentPath, setCurrentPath] = React.useState(() => normalizePublicPath(window.location.pathname));
+
+  React.useEffect(() => {
+    const handleLocationChange = () => {
+      setCurrentPath(normalizePublicPath(window.location.pathname));
+    };
+    window.addEventListener("popstate", handleLocationChange);
+    return () => window.removeEventListener("popstate", handleLocationChange);
+  }, []);
+
   const isPrivacyPage = currentPath === "/privacy-policy" || currentPath === "/privacy-policy.html";
   const isTermsPage = currentPath === "/terms-of-service" || currentPath === "/terms-of-service.html";
   const isDeletionPage = currentPath === "/user-data-deletion" || currentPath === "/user-data-deletion.html";
@@ -41,6 +52,8 @@ function AppContent() {
   const isPublicRegisterPage = currentPath.startsWith("/public/dang-ky");
   const isMeetingCheckInPage = currentPath.startsWith("/meeting-checkin/");
   const isMeetingInteractionPage = currentPath.startsWith("/meeting-interaction/");
+  const isChapterRegistrationPage = currentPath === "/dang-ky-thanh-vien";
+  const isChapterPage = currentPath === "/chapter";
   const isWheelPage =
     currentPath === "/wheel-of-names" ||
     currentPath === "/wheel-of-names.html" ||
@@ -56,10 +69,11 @@ function AppContent() {
     isPublicRegisterPage ||
     isMeetingCheckInPage ||
     isMeetingInteractionPage ||
+    isChapterRegistrationPage ||
     isWheelPage;
 
   const { activeTab, setActiveTab } = useTabRouter({
-    enabled: !isPublicPage && !loading && Boolean(user && userProfile),
+    enabled: !isPublicPage && !isChapterPage && !loading && Boolean(user && userProfile),
   });
 
   const resolvedActiveTab = resolveEnabledTab(activeTab, userProfile?.enabledModules, userProfile?.businessType);
@@ -158,6 +172,10 @@ function AppContent() {
     return (<Suspense fallback={<AuthLoader />}><MeetingInteractionPage /></Suspense>);
   }
 
+  if (isChapterRegistrationPage) {
+    return (<Suspense fallback={<AuthLoader />}><ChapterRegistrationPage /></Suspense>);
+  }
+
   if (isPublicRegisterPage) {
     return (
       <Suspense fallback={<AuthLoader />}>
@@ -250,9 +268,18 @@ function AppContent() {
     console.log(`Global Navigation search redirected to Tab: ${tab}, Section: ${subTab || "None"}`);
   };
 
+  const chapterSeo = {
+    title: "Chapter & Tư cách thành viên",
+    description: "Cổng thông tin và quản lý tư cách thành viên Chapter",
+    keywords: "chapter, bni, thanh vien, ho so",
+    path: "/chapter",
+    robots: "noindex, nofollow",
+    type: "website" as const,
+  };
+
   return (
     <div className="flex h-dvh w-full min-w-0 overflow-hidden bg-background font-sans text-on-surface" id="app_root_layout">
-      <SEOHead meta={getSeoForTab(resolvedActiveTab)} />
+      <SEOHead meta={isChapterPage ? chapterSeo : getSeoForTab(resolvedActiveTab)} />
       <Sidebar
         activeTab={resolvedActiveTab}
         setActiveTab={setActiveTab}
@@ -273,7 +300,13 @@ function AppContent() {
           }`}
           id="primary_page_container"
         >
-          <AppRouterView activeTab={resolvedActiveTab} userProfile={userProfile} />
+          {isChapterPage || (!userProfile.companyCode && userProfile.role !== "superadmin") ? (
+            <Suspense fallback={<AuthLoader />}>
+              <ChapterPortal />
+            </Suspense>
+          ) : (
+            <AppRouterView key={userProfile.role === "superadmin" ? userProfile.companyCode : "chapter-member"} activeTab={resolvedActiveTab} userProfile={userProfile} />
+          )}
         </main>
       </div>
 

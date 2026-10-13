@@ -815,6 +815,34 @@ export const resourceDriveService = {
     return googleDriveService.uploadToFolder(accessToken, folderId, file);
   },
 
+  async download(companyCode: string, fileId: string, permittedRootId?: string) {
+    const { accessToken, folderId } = await this.ensureCompanyDrive(companyCode);
+    const downloadRootId = permittedRootId || folderId;
+    const file = await googleDriveService.getFile(accessToken, fileId);
+
+    // Do not turn the company's OAuth token into a generic Google Drive proxy.
+    // Walk upward and only permit files inside the selected company/group root.
+    const visited = new Set<string>([fileId]);
+    let parentIds = file.parents || [];
+    let belongsToPermittedRoot = parentIds.includes(downloadRootId);
+    while (!belongsToPermittedRoot && parentIds.length > 0) {
+      const nextParentId = parentIds.find((id) => !visited.has(id));
+      if (!nextParentId) break;
+      if (nextParentId === downloadRootId) {
+        belongsToPermittedRoot = true;
+        break;
+      }
+      visited.add(nextParentId);
+      const parent = await googleDriveService.getFile(accessToken, nextParentId);
+      parentIds = parent.parents || [];
+    }
+    if (!belongsToPermittedRoot) {
+      throw new Error("Tệp không thuộc thư mục Google Drive được phép tải.");
+    }
+
+    return googleDriveService.downloadFile(accessToken, file);
+  },
+
   async delete(companyCode: string, fileId: string): Promise<void> {
     const { accessToken } = await this.ensureCompanyDrive(companyCode);
     return googleDriveService.deleteFile(accessToken, fileId);

@@ -10,9 +10,9 @@ export const MeetingSequenceModel = model("MeetingSequence", new Schema({
 export async function reserveMeetingNumbers(companyCode: string, count: number): Promise<number> {
   if (!Number.isSafeInteger(count) || count < 1) throw new Error("Số buổi họp không hợp lệ.");
   if (!await MeetingSequenceModel.exists({ _id: companyCode })) {
-    const existing = await MeetingModel.find({ companyCode, title: /^BNI Chapter #[1-9]\d*$/ }).select("title").lean();
+    const existing = await MeetingModel.find({ companyCode, title: /^(?:BNI )?Chapter #[1-9]\d*$/ }).select("title").lean();
     const maximum = existing.reduce((max, meeting) => {
-      const number = Number(meeting.title.slice("BNI Chapter #".length));
+      const number = Number(meeting.title.slice(meeting.title.lastIndexOf("#") + 1));
       return Number.isSafeInteger(number) ? Math.max(max, number) : max;
     }, 0);
     try {

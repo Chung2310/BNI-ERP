@@ -116,6 +116,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Normalize Firebase credential for Staging
+        if: github.ref_name == 'develop'
+        env:
+          FIREBASE_SERVICE_ACCOUNT_INPUT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 || vars.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}
+        run: node tools/normalize-firebase-service-account.mjs
+
+      - name: Normalize Firebase credential for Production
+        if: github.ref_name == 'production'
+        env:
+          FIREBASE_SERVICE_ACCOUNT_INPUT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64_PROD || vars.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64_PROD || secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 || vars.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}
+        run: node tools/normalize-firebase-service-account.mjs
+
       # --- Triển khai lên Staging (nhánh develop) ---
       - name: Copy docker-compose.yml to Staging VPS
         if: github.ref_name == 'develop'
@@ -138,7 +150,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || '22' }}
-          envs: ENV_FILE_CONTENT
+          envs: ENV_FILE_CONTENT,FIREBASE_SERVICE_ACCOUNT_JSON_BASE64
           script: |
             TARGET_DIR="/opt/igen-erp/staging"
             IMAGE_TAG="develop"
@@ -150,6 +162,9 @@ jobs:
 
             # Ưu tiên GitHub Variables, dùng Secrets nếu variable chưa có giá trị
             echo "$ENV_FILE_CONTENT" > .env
+            test -n "$FIREBASE_SERVICE_ACCOUNT_JSON_BASE64"
+            printf '\nFIREBASE_SERVICE_ACCOUNT_JSON_BASE64=%s\n' "$FIREBASE_SERVICE_ACCOUNT_JSON_BASE64" >> .env
+            chmod 600 .env
 
             # Đăng nhập vào GHCR trên VPS
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -187,7 +202,7 @@ jobs:
           username: ${{ secrets.SSH_USER_PROD }}
           key: ${{ secrets.SSH_KEY_PROD }}
           port: ${{ secrets.SSH_PORT_PROD || '22' }}
-          envs: ENV_FILE_CONTENT
+          envs: ENV_FILE_CONTENT,FIREBASE_SERVICE_ACCOUNT_JSON_BASE64
           script: |
             TARGET_DIR="/opt/igen-erp/production"
             IMAGE_TAG="production"
@@ -199,6 +214,9 @@ jobs:
 
             # Ưu tiên GitHub Variables, dùng Secrets nếu variable chưa có giá trị
             echo "$ENV_FILE_CONTENT" > .env
+            test -n "$FIREBASE_SERVICE_ACCOUNT_JSON_BASE64"
+            printf '\nFIREBASE_SERVICE_ACCOUNT_JSON_BASE64=%s\n' "$FIREBASE_SERVICE_ACCOUNT_JSON_BASE64" >> .env
+            chmod 600 .env
 
             # Đăng nhập vào GHCR trên VPS
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin

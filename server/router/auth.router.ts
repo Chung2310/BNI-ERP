@@ -8,6 +8,9 @@ import { authRateLimiter, loginAccountRateLimiter, refreshTokenRateLimiter } fro
 import { UserModel } from "../model/user.model";
 import { isIP } from "node:net";
 import { branchController } from "../controller/branch.controller";
+import multer from "multer";
+import { guestAvatarError, MAX_GUEST_AVATAR_BYTES } from "../modules/meetings/meeting-guest-avatar";
+import { cloudinaryService } from "../service/cloudinary.service";
 
 import { importUsers, UserImportError } from "../service/user-import.service";
 
@@ -76,6 +79,7 @@ const registerSchema = {
     // endpoint đăng ký công khai này — các trường đó chỉ được gán qua
     // register-company/register-user (đã kiểm tra xác thực + phân quyền).
     companyName: Joi.string().optional().allow(""),
+    industry: Joi.string().trim().max(150).optional().allow(""),
     branchId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow(""),
     monthlySalary: Joi.number().min(0).optional(),
     phone: Joi.string().pattern(vnPhoneRegex).optional().allow("").messages({
@@ -84,7 +88,13 @@ const registerSchema = {
   }),
 };
 
-const loginIdentifierSchema = Joi.string().trim().max(254).custom((value, helpers) => normalizeLoginIdentifier(value) ? value : helpers.error("any.invalid"));
+const loginIdentifierSchema = Joi.string()
+  .trim()
+  .max(254)
+  .custom((value, helpers) => normalizeLoginIdentifier(value) ? value : helpers.error("any.invalid"))
+  .messages({
+    "any.invalid": "Vui lòng nhập email hợp lệ",
+  });
 export const loginSchema = {
   body: Joi.object({
     identifier: loginIdentifierSchema,
@@ -106,6 +116,11 @@ const updateProfileSchema = {
       "string.uri": "Ảnh đại diện phải là một đường dẫn URL hợp lệ.",
     }),
     coverImage: Joi.string().optional().allow(""),
+    galleryImages: Joi.array().items(Joi.string().uri()).max(5).optional(),
+    galleryUploadTokens: Joi.array().items(Joi.object({
+      index: Joi.number().integer().min(0).max(4).required(),
+      uploadToken: Joi.string().trim().required(),
+    }).unknown(false)).max(5).optional(),
     industry: Joi.string().optional().allow(""),
     phone: Joi.string().pattern(vnPhoneRegex).optional().allow(""),
     birthDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow("", null),
@@ -143,6 +158,43 @@ authRouter.delete("/me", requireAuth, authRateLimiter, validateRequest(deleteOwn
 
 // Cập nhật thông tin tài khoản hiện tại (yêu cầu Access Token)
 authRouter.patch("/profile", requireAuth, validateRequest(updateProfileSchema), authController.updateProfile);
+
+const avatarUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_GUEST_AVATAR_BYTES, files: 1 } }).single("avatar");
+authRouter.post("/profile/avatar", requireAuth, (req, res) => {
+  avatarUpload(req, res, async error => {
+    if (error) return res.status(400).json({ message: "Ảnh đại diện tối đa 5 MB." });
+    if (!req.file) return res.status(400).json({ message: "Chưa chọn ảnh đại diện." });
+    const invalid = guestAvatarError(req.file);
+    if (invalid) return res.status(400).json({ message: invalid });
+    try {
+      const url = await cloudinaryService.uploadMediaBuffer(req.file.buffer, `bni/profiles/${req.user!.id}`);
+      await UserModel.updateOne({ _id: req.user!.id }, { $set: { photoURL: url } });
+      return res.json({ data: { photoURL: url } });
+    } catch { return res.status(502).json({ message: "Chưa tải được ảnh đại diện. Bạn có thể bổ sung sau." }); }
+  });
+});
+
+const selfProfileImageSchema = {
+  body: Joi.object({
+    kind: Joi.string().valid("avatar", "cover").required(),
+    file: Joi.string().max(8_000_000).required(),
+  }).unknown(false),
+};
+authRouter.post("/profile/image", requireAuth, validateRequest(selfProfileImageSchema), async (req, res) => {
+  const { kind, file } = req.body as { kind: "avatar" | "cover"; file: string };
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(file);
+  if (!match) return res.status(400).json({ message: "Ảnh phải là JPG, PNG hoặc WebP hợp lệ." });
+  const buffer = Buffer.from(match[2], "base64");
+  const invalid = guestAvatarError({ buffer, size: buffer.length, mimetype: match[1] });
+  if (invalid) return res.status(400).json({ message: invalid.replace("Ảnh đại diện", kind === "cover" ? "Ảnh bìa" : "Ảnh đại diện") });
+  try {
+    const field = kind === "avatar" ? "photoURL" : "coverImage";
+    const folder = kind === "avatar" ? `bni/profiles/${req.user!.id}` : `bni/profiles/${req.user!.id}/covers`;
+    const url = await cloudinaryService.uploadMediaBuffer(buffer, folder);
+    await UserModel.updateOne({ _id: req.user!.id }, { $set: { [field]: url } });
+    return res.json({ data: { [field]: url } });
+  } catch { return res.status(502).json({ message: "Chưa tải được ảnh hồ sơ. Vui lòng thử lại." }); }
+});
 
 const changePasswordSchema = {
   body: Joi.object({
@@ -187,8 +239,8 @@ const registerCompanySchema = {
   }),
 };
 
-// Đăng ký doanh nghiệp và tài khoản Admin (yêu cầu Access Token và vai trò admin)
-authRouter.post("/register-company", requireAuth, requireRole(["admin"]), validateRequest(registerCompanySchema), authController.registerCompany);
+// Tạo chapter và tài khoản Admin (chỉ superadmin)
+authRouter.post("/register-company", requireAuth, requireRole(["superadmin"]), validateRequest(registerCompanySchema), authController.registerCompany);
 
 const registerUserSchema = {
   body: Joi.object({

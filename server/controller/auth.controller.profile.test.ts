@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const deps = vi.hoisted(() => ({ getMe: vi.fn(), updateProfile: vi.fn(), findCompany: vi.fn(), permissions: vi.fn(), finalizeCover: vi.fn() }));
+const deps = vi.hoisted(() => ({ getMe: vi.fn(), updateProfile: vi.fn(), findCompany: vi.fn(), permissions: vi.fn(), finalizeCover: vi.fn(), finalizeGallery: vi.fn() }));
 vi.mock("../service/auth.service", () => ({ authService: { getMe: deps.getMe, updateProfile: deps.updateProfile } }));
 vi.mock("../model/user.model", () => ({ UserModel: {} }));
 vi.mock("../model/company.model", () => ({ CompanyModel: { findOne: deps.findCompany } }));
@@ -8,7 +8,7 @@ vi.mock("../service/google-oauth.service", () => ({ googleOAuthService: {} }));
 vi.mock("../middleware/user-activity", () => ({ recordUserActivity: vi.fn() }));
 vi.mock("../middleware/require-module", () => ({ clearModuleCache: vi.fn() }));
 vi.mock("../service/company-module-notify", () => ({ notifyCompanyModulesChanged: vi.fn() }));
-vi.mock("../service/profile-resource.service", () => ({ profileResourceService: { finalizeCover: deps.finalizeCover } }));
+vi.mock("../service/profile-resource.service", () => ({ profileResourceService: { finalizeCover: deps.finalizeCover, finalizeGallery: deps.finalizeGallery } }));
 vi.mock("../service/employee-document-resource.service", () => ({ employeeDocumentResourceService: {} }));
 vi.mock("../service/resource-indexing.service", () => ({ resourceIndexingService: {} }));
 import { authController } from "./auth.controller";
@@ -75,4 +75,19 @@ it("finalizes cover uploads for the authenticated member without losing access r
   expect(deps.updateProfile).toHaveBeenCalledWith("member-1", body);
   expect(deps.finalizeCover).toHaveBeenCalledWith(expect.objectContaining({ actorId: "member-1", companyCode: "BNI" }), expect.objectContaining({ _id: "member-1" }), "cover-token");
   expect(res.json.mock.calls[0][0].user.permissions).toEqual(["hr:read", "chat:read"]);
+});
+
+it("finalizes gallery uploads for the authenticated member", async () => {
+  const res = response();
+  const body = {
+    galleryImages: ["https://example.com/product.jpg"],
+    galleryUploadTokens: [{ index: 0, uploadToken: "gallery-token" }],
+  };
+  await authController.updateProfile(({ user: { id: "member-1" }, body } as unknown as Parameters<typeof authController.updateProfile>[0]), ((res) as unknown as Parameters<typeof authController.updateProfile>[1]));
+  expect(deps.updateProfile).toHaveBeenCalledWith("member-1", body);
+  expect(deps.finalizeGallery).toHaveBeenCalledWith(
+    expect.objectContaining({ actorId: "member-1", companyCode: "BNI" }),
+    expect.objectContaining({ _id: "member-1" }),
+    body.galleryUploadTokens,
+  );
 });

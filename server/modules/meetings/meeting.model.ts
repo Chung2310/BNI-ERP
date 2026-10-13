@@ -49,6 +49,7 @@ const luckyDrawWinner = new Schema(
     verificationHash: String,
     seed: String,
     timestamp: String,
+    repeatEligible: Boolean,
   },
   { _id: false }
 );
@@ -121,6 +122,11 @@ const meeting = new Schema(
         autoAdvanceDelay: { type: Number, default: 3, min: 0, max: 3600 },
         speakerTimerPausedByView: { type: Boolean, default: false },
         drawWinnerId: String, drawStartedAt: Date, drawRevealsAt: Date,
+        drawFilter: { type: String, enum: ['all', 'all_members', 'present_members', 'absent_members', 'guests'], default: 'all' },
+        drawParticipantIds: { type: [String], default: undefined },
+        drawPanel: { type: String, enum: ['participants', 'winners'], default: 'participants' },
+        drawResultVisible: { type: Boolean, default: true },
+        audienceResponsePanel: { type: String, enum: ['questions', 'prepare', 'qr', 'results'], default: 'questions' },
       }, { _id: false }),
       default: () => ({}),
     },
@@ -149,6 +155,7 @@ const meeting = new Schema(
 meeting.index({ companyCode: 1, startsAt: -1 });
 meeting.index({ companyCode: 1, seriesId: 1 });
 meeting.index({ status: 1, reminderAt: 1 });
+meeting.index({ status: 1, endsAt: 1 });
 meeting.index({ status: 1, "presentation.autoAdvance": 1 });
 
 export const MeetingModel = model('Meeting', meeting);

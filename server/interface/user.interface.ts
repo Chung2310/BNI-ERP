@@ -38,6 +38,7 @@ export interface IUser extends Document {
   disabledAt?: Date | null;
   companyCode?: string;
   companyName?: string;
+  membershipStatus?: "none" | "active";
   branchId?: string;
   activeSessionId?: string;
   activeSessionIssuedAt?: Date;

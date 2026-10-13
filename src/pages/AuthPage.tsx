@@ -205,6 +205,7 @@ export default function AuthPage() {
             <span>Đăng nhập hệ thống</span>
           </button>
         </form>
+        <a href="/dang-ky-thanh-vien" className="block text-center text-sm font-semibold text-blue-700 hover:underline">Tạo tài khoản và đăng ký chapter</a>
         <div className="border-t border-slate-100 pt-4 text-center text-[11px] text-slate-500">
           <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
             <a

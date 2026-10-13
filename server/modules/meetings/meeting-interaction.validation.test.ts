@@ -11,15 +11,18 @@ import { MeetingInteractionModel, MeetingInteractionResponseModel } from "./meet
 it("validates interaction configuration and management actions", () => {
   expect(meetingInteractionInput.validate({ question: "Bạn học được gì?" }).value).toMatchObject({
     durationSeconds: 60,
-    requireName: true,
-    showNames: true,
-    moderationEnabled: true,
-    allowMultipleResponses: false,
+    requireName: false,
+    showNames: false,
+    moderationEnabled: false,
+    allowMultipleResponses: true,
   });
   expect(meetingInteractionInput.validate({ question: "" }).error).toBeDefined();
   expect(meetingInteractionInput.validate({ question: "x".repeat(301) }).error).toBeDefined();
   expect(meetingInteractionInput.validate({ question: "Câu hỏi", durationSeconds: 0 }).error).toBeDefined();
-  expect(meetingInteractionQuestionInput.validate({ question: "Câu tiếp theo" }).value).toEqual({ question: "Câu tiếp theo" });
+  expect(meetingInteractionQuestionInput.validate({ question: "Câu tiếp theo" }).value).toEqual({ question: "Câu tiếp theo", type: "text" });
+  expect(meetingInteractionQuestionInput.validate({ question: "Chọn một", type: "single_choice", options: ["Có", "Không"] }).error).toBeUndefined();
+  expect(meetingInteractionQuestionInput.validate({ question: "Chọn một", type: "single_choice", options: ["Có"] }).error).toBeDefined();
+  expect(meetingInteractionQuestionInput.validate({ question: "Chọn một", type: "single_choice", options: ["Có", "Có"] }).error).toBeDefined();
   expect(meetingInteractionQuestionInput.validate({ question: "Câu tiếp theo", durationSeconds: 60 }).error).toBeDefined();
   expect(meetingInteractionStatusInput.validate({ status: "open" }).error).toBeUndefined();
   expect(meetingInteractionStatusInput.validate({ status: "draft" }).error).toBeDefined();

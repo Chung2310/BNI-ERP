@@ -122,19 +122,16 @@ export function MeetingStage({ snapshot, now, fill = false }: { snapshot: Meetin
 
   if (view === "checkin") activeStage = <CheckInStage meeting={meeting} />;
   else if (view === "activeMembers") activeStage = <RankingStage meeting={meeting} />;
-  else if (view === "audienceResponses") activeStage = <AudienceResponsesStage meeting={meeting} />;
+  else if (view === "audienceResponses") activeStage = <AudienceResponsesStage meeting={meeting} now={now} />;
   else if (view === "waiting") activeStage = <StageMessage title={meeting.title} text="Vui lòng chờ" />;
   else activeStage = <SpeakerPresentationFrame meeting={meeting} slides={slides} speakerId={speaker?.id} now={now} fill={fill}>
     <SpeakerStage meeting={meeting} slide={slides.find(item => item.id === speaker?.id)} now={now} />
   </SpeakerPresentationFrame>;
 
   return <div className={`relative w-full overflow-hidden bg-slate-950 ${fill && view === "speaker" ? "h-full" : "aspect-video"}`}>
-    <div
-      className={`absolute inset-0 ${view === "luckyDraw" ? "visible" : "invisible pointer-events-none"}`}
-      aria-hidden={view !== "luckyDraw"}
-    >
+    {view === "luckyDraw" && <div className="absolute inset-0">
       <DrawStage meeting={meeting} />
-    </div>
+    </div>}
     {view !== "luckyDraw" && <div className="absolute inset-0">{activeStage}</div>}
   </div>;
 }

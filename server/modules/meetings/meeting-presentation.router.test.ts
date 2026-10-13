@@ -105,8 +105,36 @@ it("applies a view change from the controller to the next display snapshot", asy
   const display = await (await fetch(base + "/live")).json();
   expect(display.data.meeting.presentation.view).toBe("activeMembers");
 });
+it("opens the winners panel on the shared display", async () => {
+  seed();
+  const response = await fetch(base + "/presentation-state", { method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ version: 2, drawPanel: "winners" }) });
+  expect(response.status).toBe(200);
+  const display = await (await fetch(base + "/live")).json();
+  expect(display.data.meeting.presentation.drawPanel).toBe("winners");
+});
+it("shares the audience questions panel with the display", async () => {
+  seed();
+  const response = await fetch(base + "/presentation-state", { method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ version: 2, view: "audienceResponses", audienceResponsePanel: "questions" }) });
+  expect(response.status).toBe(200);
+  const display = await (await fetch(base + "/live")).json();
+  expect(display.data.meeting.presentation).toMatchObject({ view: "audienceResponses", audienceResponsePanel: "questions" });
+});
 it("rejects a second draw until the first result is revealed", async () => {
   const { item } = seed(); item.set("presentation.drawRevealsAt", new Date(Date.now() + 5000));
   const response = await fetch(base + "/presentation-draw", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: 2, prizeId: "prize" }) });
   expect(response.status).toBe(409); expect(item.save).not.toHaveBeenCalled();
+});
+it("starts a presentation draw before the speaking part of a scheduled meeting", async () => {
+  const { item } = seed();
+  item.set("status", "scheduled");
+  item.set("luckyDraw", { enabled: true, drawMode: "numbers", numberMin: 1, numberMax: 1,
+    prizes: [{ id: "prize", name: "Giải thưởng", quantity: 1, order: 0, winners: [] }] });
+  const response = await fetch(base + "/presentation-draw", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ version: 2, prizeId: "prize" }) });
+  expect(response.status).toBe(200);
+  expect(item.status).toBe("scheduled");
+  expect(item.presentation.view).toBe("luckyDraw");
+  expect(item.luckyDraw.prizes[0].winners).toHaveLength(1);
 });

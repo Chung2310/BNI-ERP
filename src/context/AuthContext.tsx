@@ -16,6 +16,8 @@ interface AuthContextType {
   user: UserProfile | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  superadminActiveChapter: string;
+  setSuperadminActiveChapter: (code: string) => void;
   loginWithIdentifier: (identifier: string, password: string, rememberMe?: boolean) => Promise<ErpLoginOutcome>;
   completeErpChallenge: () => Promise<void>;
   registerWithEmail: (email: string, password: string, displayName: string, rememberMe?: boolean) => Promise<void>;
@@ -32,9 +34,22 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [, setUser] = useState<UserProfile | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [superadminActiveChapter, setSuperadminActiveChapterState] = useState<string>(() => {
+    return localStorage.getItem("superadmin_active_chapter") || "";
+  });
+
+  const setSuperadminActiveChapter = (code: string) => {
+    const trimmed = (code || "").trim().toUpperCase();
+    setSuperadminActiveChapterState(trimmed);
+    if (trimmed) {
+      localStorage.setItem("superadmin_active_chapter", trimmed);
+    } else {
+      localStorage.removeItem("superadmin_active_chapter");
+    }
+  };
 
   // Khởi tạo trạng thái đăng nhập khi mount app
   useEffect(() => {
@@ -243,7 +258,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const isModuleEnabled = (key: ModuleKey) => checkModule(userProfile?.enabledModules, key);
+  const isModuleEnabled = (key: ModuleKey) => {
+    if (userProfile?.role === "superadmin") {
+      return Boolean(superadminActiveChapter);
+    }
+    return checkModule(userProfile?.enabledModules, key);
+  };
 
   useEffect(() => {
     if (!userProfile) return;
@@ -262,17 +282,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, [userProfile?.uid, userProfile?.role, userProfile?.companyCode]);
 
-  const hasPermission = (code: string) => Boolean(
-    userProfile?.permissions &&
-    (userProfile.permissions.includes("*") || userProfile.permissions.includes(code))
-  );
+  const hasPermission = (code: string) => {
+    if (userProfile?.role === "superadmin") {
+      return Boolean(superadminActiveChapter) && code.endsWith(":read");
+    }
+    if (userProfile?.role === "admin") return true;
+    return Boolean(
+      userProfile?.permissions &&
+      (userProfile.permissions.includes("*") || userProfile.permissions.includes(code))
+    );
+  };
+
+  const effectiveUserProfile = userProfile
+    ? {
+        ...userProfile,
+        companyCode:
+          userProfile.role === "superadmin"
+            ? (superadminActiveChapter || userProfile.companyCode || "")
+            : userProfile.companyCode,
+      }
+    : null;
 
   return (
     <AuthContext.Provider
       value={{
-        user,
-        userProfile,
+        user: effectiveUserProfile,
+        userProfile: effectiveUserProfile,
         loading,
+        superadminActiveChapter,
+        setSuperadminActiveChapter,
         loginWithIdentifier,
         completeErpChallenge,
         registerWithEmail,

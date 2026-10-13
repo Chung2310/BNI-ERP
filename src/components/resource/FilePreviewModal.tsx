@@ -46,8 +46,10 @@ const FilePreviewContent: React.FC<FilePreviewModalProps> = ({
 
   const url = item.fileUrl;
   const kind = getPreviewKind(item.mimeType, item.name);
-  const token = localStorage.getItem("accessToken") || "";
-  const downloadHref = `/api/v1/media/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(item.name)}&token=${encodeURIComponent(token)}`;
+  const isCompanyDriveFile = /(?:drive|docs)\.google\.com/i.test(url) && !/^[a-f\d]{24}$/i.test(item._id);
+  const downloadHref = isCompanyDriveFile
+    ? `/api/v1/resources/drive/files/${encodeURIComponent(item._id)}/download`
+    : `/api/v1/media/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(item.name)}`;
   const officeViewer = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
   const { Icon, color } = getFileIcon(item.mimeType, item.name);
   const lowerName = item.name.toLowerCase();
@@ -78,10 +80,20 @@ const FilePreviewContent: React.FC<FilePreviewModalProps> = ({
       }
 
       const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const encodedFilename = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+      let downloadedFilename = item.name;
+      if (encodedFilename) {
+        try {
+          downloadedFilename = decodeURIComponent(encodedFilename);
+        } catch {
+          // Keep the resource name when an upstream filename is malformed.
+        }
+      }
       const blobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = item.name;
+      a.download = downloadedFilename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

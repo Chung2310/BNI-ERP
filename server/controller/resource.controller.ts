@@ -8,6 +8,7 @@ import {
   type ResourceAccessContext,
 } from "../service/resource-access.service";
 import { resourceFileAccessService } from "../service/resource-file-access.service";
+import { ChatRoomModel } from "../model/chat-room.model";
 
 interface ZipFileItem {
   name: string;
@@ -390,7 +391,43 @@ export const resourceController = {
     }
   },
 
-  /** DELETE /api/v1/resources/drive/files/:fileId — xóa file khỏi thư mục Drive chung */
+  /** GET /api/v1/resources/drive/files/:fileId/download */
+  async driveDownload(req: AuthenticatedRequest, res: Response) {
+    try {
+      const companyCode = getCompanyCode(req);
+      const space = String(req.query.space || "personal");
+      let permittedRootId: string | undefined;
+      if (space !== "personal") {
+        const room = await ChatRoomModel.findOne({ _id: space, companyCode }).lean();
+        if (!room?.driveFolderId) {
+          return res.status(404).json({ status: "error", message: "Không tìm thấy thư mục Google Drive của nhóm." });
+        }
+        const isMember = room.members.some((member) => {
+          const memberId = typeof member.userId === "object" && member.userId && "_id" in member.userId
+            ? member.userId._id
+            : member.userId;
+          return String(memberId) === req.user?.id;
+        });
+        const canReadRoom = isMember || room.driveGeneralAccess === "company" || req.user?.role === "admin";
+        if (!canReadRoom) {
+          return res.status(403).json({ status: "error", message: "Bạn không có quyền tải tài liệu của nhóm này." });
+        }
+        permittedRootId = room.driveFolderId;
+      }
+
+      const file = await resourceDriveService.download(companyCode, req.params.fileId, permittedRootId);
+      const asciiFallback = file.filename.replace(/["\\]/g, "").replace(/[^\x20-\x7E]/g, "_");
+      res.setHeader("Content-Type", file.mimeType);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(file.filename)}`
+      );
+      return res.send(file.buffer);
+    } catch (error) {
+      return sendError(res, error, "driveDownload");
+    }
+  },
+
   async driveDelete(req: AuthenticatedRequest, res: Response) {
     try {
       await resourceDriveService.delete(getCompanyCode(req), req.params.fileId);

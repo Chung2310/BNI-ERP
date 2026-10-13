@@ -1,8 +1,33 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { pushService } from "../service/push.service";
+import { mobilePushService } from "../service/mobile-push.service";
 
 export const pushController = {
+  async subscribeMobile(req: AuthenticatedRequest, res: Response) {
+    try {
+      const uid = req.user!.id;
+      const companyCode = req.user!.companyCode || "SYSTEM";
+      const { token, platform, deviceName } = req.body;
+      await mobilePushService.saveToken({ uid, companyCode, token, platform, deviceName });
+      return res.status(200).json({ status: "success", message: "Đã đăng ký thiết bị nhận thông báo." });
+    } catch (error) {
+      console.error("[pushController.subscribeMobile] Error:", error);
+      const message = error instanceof Error ? error.message : "Không thể đăng ký thiết bị nhận thông báo.";
+      return res.status(message.includes("không hợp lệ") ? 400 : 500).json({ status: "error", message });
+    }
+  },
+
+  async unsubscribeMobile(req: AuthenticatedRequest, res: Response) {
+    try {
+      await mobilePushService.removeToken(req.user!.id, req.body.token);
+      return res.status(200).json({ status: "success", message: "Đã hủy thông báo trên thiết bị." });
+    } catch (error) {
+      console.error("[pushController.unsubscribeMobile] Error:", error);
+      return res.status(500).json({ status: "error", message: "Không thể hủy thông báo trên thiết bị." });
+    }
+  },
+
   /**
    * GET /api/v1/push/public-key
    */

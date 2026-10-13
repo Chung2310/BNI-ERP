@@ -194,6 +194,7 @@ test('revocation during guest image upload cleans up the image and creates no at
 
 test('meeting end must follow its start, including partial updates', async t => {
   const { source } = setup(t);
+  t.mock.method(MeetingModel, 'exists', async () => null);
   source.status = 'scheduled';
   const base = { title: 'Meeting', startsAt: '2030-02-01T01:00:00Z', tiers: [{ startTime: "07:00", endTime: "08:00", seconds: 30 }], fallbackSeconds: 20 };
   assert.ok(meetingInput.validate({ ...base, endsAt: base.startsAt }).error);

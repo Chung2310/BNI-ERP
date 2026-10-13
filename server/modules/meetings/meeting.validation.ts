@@ -6,17 +6,28 @@ export const presentationStateInput = Joi.object({
   view: Joi.string().valid("checkin", "speaker", "luckyDraw", "activeMembers", "audienceResponses", "waiting"),
   autoAdvance: Joi.boolean(),
   autoAdvanceDelay: Joi.number().integer().min(0).max(3600),
-}).or("view", "autoAdvance", "autoAdvanceDelay");
+  drawFilter: Joi.string().valid("all", "all_members", "present_members", "absent_members", "guests"),
+  drawParticipantIds: Joi.array().items(Joi.string().trim().max(150)).max(5000).unique().allow(null),
+  drawPanel: Joi.string().valid("participants", "winners"),
+  drawResultVisible: Joi.boolean(),
+  audienceResponsePanel: Joi.string().valid("questions", "prepare", "qr", "results"),
+}).or("view", "autoAdvance", "autoAdvanceDelay", "drawFilter", "drawParticipantIds", "drawPanel", "drawResultVisible", "audienceResponsePanel");
+const interactionQuestionFields = {
+  type: Joi.string().valid("text", "single_choice").default("text"),
+  options: Joi.array().items(Joi.string().trim().min(1).max(200)).min(2).max(6).unique().when("type", { is: "single_choice", then: Joi.required(), otherwise: Joi.forbidden() }),
+};
 export const meetingInteractionInput = Joi.object({
   question: Joi.string().trim().min(1).max(300).required(),
+  ...interactionQuestionFields,
   durationSeconds: Joi.number().integer().min(1).max(3600).default(60),
-  requireName: Joi.boolean().default(true),
-  showNames: Joi.boolean().default(true),
-  moderationEnabled: Joi.boolean().default(true),
-  allowMultipleResponses: Joi.boolean().default(false),
+  requireName: Joi.boolean().default(false),
+  showNames: Joi.boolean().default(false),
+  moderationEnabled: Joi.boolean().default(false),
+  allowMultipleResponses: Joi.boolean().default(true),
 });
 export const meetingInteractionQuestionInput = Joi.object({
   question: Joi.string().trim().min(1).max(300).required(),
+  ...interactionQuestionFields,
 });
 export const meetingInteractionStatusInput = Joi.object({ status: Joi.string().valid("open", "closed").required() });
 export const meetingInteractionModerationInput = Joi.object({ status: Joi.string().valid("approved", "hidden", "rejected").required() });
@@ -29,6 +40,8 @@ export const presentationStartInput = Joi.object({
 export const presentationDrawInput = Joi.object({
   version: Joi.number().integer().min(0).required(),
   prizeId: Joi.string().max(100).required(),
+  drawFilter: Joi.string().valid("all", "all_members", "present_members", "absent_members", "guests"),
+  drawParticipantIds: Joi.array().items(Joi.string().trim().max(150)).max(5000).unique(),
 });
 export const gameWinnerInput = Joi.object({
   id: Joi.string().max(100).required(),
@@ -86,7 +99,13 @@ export const checkinInput = Joi.object({ latitude: Joi.number().min(-90).max(90)
 export const controlInput = Joi.object({ action: Joi.string().valid('start', 'pause', 'resume', 'next', 'previous', 'finish', 'cancel', 'start_speaker', 'reset_speaker').required(), version: Joi.number().integer().min(0).required() });
 
 
-const checkInIdentifierSchema = Joi.string().trim().max(254).custom((value, helpers) => normalizeLoginIdentifier(value) ? value : helpers.error("any.invalid"));
+const checkInIdentifierSchema = Joi.string()
+  .trim()
+  .max(254)
+  .custom((value, helpers) => normalizeLoginIdentifier(value) ? value : helpers.error("any.invalid"))
+  .messages({
+    "any.invalid": "Vui lòng nhập email hợp lệ",
+  });
 export const qrMemberInput = Joi.object({
   identifier: checkInIdentifierSchema,
   email: checkInIdentifierSchema,
@@ -94,7 +113,7 @@ export const qrMemberInput = Joi.object({
   latitude: Joi.number().min(-90).max(90).required(),
   longitude: Joi.number().min(-180).max(180).required()
 }).or("identifier", "email");
-export const qrGuestInput = Joi.object({ name: Joi.string().trim().min(2).max(150).required(), email: Joi.string().email().max(254).allow('').default(''), phone: Joi.string().trim().max(40).allow('').default(''), company: Joi.string().trim().max(150).allow('').default(''), industry: Joi.string().trim().max(150).allow('').default(''), bio: Joi.string().trim().max(1000).allow('').default(''), latitude: Joi.number().min(-90).max(90).required(), longitude: Joi.number().min(-180).max(180).required() });
+export const qrGuestInput = Joi.object({ name: Joi.string().trim().min(2).max(150).required(), email: Joi.string().email().max(254).allow('').default('').messages({ "string.email": "Vui lòng nhập email hợp lệ" }), phone: Joi.string().trim().max(40).allow('').default(''), company: Joi.string().trim().max(150).allow('').default(''), industry: Joi.string().trim().max(150).allow('').default(''), bio: Joi.string().trim().max(1000).allow('').default(''), latitude: Joi.number().min(-90).max(90).required(), longitude: Joi.number().min(-180).max(180).required() });
 
 export const recurringMeetingInput = meetingInput.fork(["startsAt", "endsAt"], () => Joi.forbidden()).keys({
   title: Joi.string().trim().max(200).allow("").optional(),

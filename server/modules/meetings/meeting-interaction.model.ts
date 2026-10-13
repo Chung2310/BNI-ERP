@@ -3,6 +3,8 @@ import { Schema, model } from "mongoose";
 const interactionQuestion = new Schema({
   id: { type: String, required: true },
   text: { type: String, required: true, maxlength: 300 },
+  type: { type: String, enum: ["text", "single_choice"], default: "text" },
+  options: { type: [String], default: [] },
   durationSeconds: { type: Number, min: 10, max: 3600 },
 }, { _id: false });
 
@@ -17,10 +19,10 @@ const meetingInteraction = new Schema({
   status: { type: String, enum: ["draft", "open", "closed"], default: "draft", index: true },
   tokenHash: { type: String, required: true, unique: true, select: false },
   tokenEncrypted: { type: String, required: true, select: false },
-  requireName: { type: Boolean, default: true },
-  showNames: { type: Boolean, default: true },
-  moderationEnabled: { type: Boolean, default: true },
-  allowMultipleResponses: { type: Boolean, default: false },
+  requireName: { type: Boolean, default: false },
+  showNames: { type: Boolean, default: false },
+  moderationEnabled: { type: Boolean, default: false },
+  allowMultipleResponses: { type: Boolean, default: true },
   createdBy: { type: String, required: true },
   openedAt: Date,
   closesAt: Date,
