@@ -600,12 +600,13 @@ function MeetingRoom({ meetingId, mode }: Props) {
                     aria-label="Bộ lọc người quay thưởng"
                     value={drawFilter}
                     disabled={disabled || drawing}
-                    onChange={event => void command("/presentation-state", { drawFilter: event.target.value }, "PATCH")}
+                    onChange={event => void command("/presentation-state", { drawFilter: event.target.value, drawParticipantIds: null }, "PATCH")}
                     className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs font-medium text-slate-800 disabled:opacity-40"
                   >
                     <option value="all">Tất cả thành viên và khách mời</option>
                     <option value="all_members">Tất cả thành viên, kể cả vắng mặt</option>
                     <option value="present_members">Người đã check-in</option>
+                    <option value="absent_members">Thành viên vắng mặt</option>
                     <option value="guests">Khách mời đã check-in</option>
                   </select>
                 </label>

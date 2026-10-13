@@ -43,6 +43,12 @@ describe("WheelOfNamesPage participant filtering logic", () => {
     expect(matchesFilterCategory(guestAttendee, "present_members")).toBe(true);
   });
 
+  it("filter 'absent_members' includes only absent members", () => {
+    expect(matchesFilterCategory(memberPresent, "absent_members")).toBe(false);
+    expect(matchesFilterCategory(memberAbsent, "absent_members")).toBe(true);
+    expect(matchesFilterCategory(guestAttendee, "absent_members")).toBe(false);
+  });
+
   it("filter 'guests' includes only guests", () => {
     expect(matchesFilterCategory(memberPresent, "guests")).toBe(false);
     expect(matchesFilterCategory(memberAbsent, "guests")).toBe(false);

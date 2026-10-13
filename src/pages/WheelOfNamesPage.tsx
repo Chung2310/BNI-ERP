@@ -42,7 +42,7 @@ async function loadChapterUsers(companyCode?: string): Promise<UserProfile[]> {
 }
 
 export type ParticipantType = "member_present" | "member_absent" | "guest";
-export type ParticipantFilterCategory = "all" | "all_members" | "present_members" | "guests";
+export type ParticipantFilterCategory = "all" | "all_members" | "present_members" | "absent_members" | "guests";
 
 export interface Participant {
   id: string;
@@ -253,6 +253,8 @@ export const matchesFilterCategory = (p: Participant, category: ParticipantFilte
     case "present_members":
       // Tất cả người đã check-in cuộc họp, gồm thành viên và khách mời.
       return pType === "member_present" || pType === "guest";
+    case "absent_members":
+      return pType === "member_absent";
     case "guests":
       // Chỉ khách mời
       return pType === "guest";
@@ -326,6 +328,7 @@ export default function WheelOfNamesPage() {
   const currentAngleRef = useRef(0);
   const animationFrameIdRef = useRef<number | null>(null);
   const lastPresentedDrawIdRef = useRef<string | null>(null);
+  const drawResultVisibleRef = useRef(true);
   const lastTickIndexRef = useRef<number>(-1);
   const pointerBounceRef = useRef(0);
   const lightPhaseRef = useRef(0);
@@ -372,6 +375,7 @@ export default function WheelOfNamesPage() {
     (p) => p.type === "member_present" || p.type === "member_absent"
   ).length;
   const countPresent = participants.filter((p) => p.type === "member_present" || p.type === "guest").length;
+  const countAbsent = participants.filter((p) => p.type === "member_absent").length;
   const countGuests = participants.filter((p) => p.type === "guest").length;
 
   // 1. Fetch Users & Today's Meeting Check-in status directly from system
@@ -524,7 +528,10 @@ export default function WheelOfNamesPage() {
       avatar: winner.photoURL, companyName: liveMeeting.speakers.find(speaker => speaker.id === winner.winnerId)?.company, wonAt: winner.wonAt,
     })).reverse();
     const syncFrame = requestAnimationFrame(() => {
-      setParticipants(nextParticipants);
+      const selectedIds = liveMeeting.presentation?.drawParticipantIds;
+      setParticipants(selectedIds == null ? nextParticipants : nextParticipants.map(participant => ({
+        ...participant, selected: selectedIds.includes(participant.id),
+      })));
       setFilterCategory(liveMeeting.presentation?.drawFilter || "all");
       setActiveDrawerTab(liveMeeting.presentation?.drawPanel || "participants");
       setIsDrawerOpen(true);
@@ -538,9 +545,8 @@ export default function WheelOfNamesPage() {
   }, [presentationMode, liveMeeting, presentationSlides, presentationUsers]);
 
   useEffect(() => {
-    if (presentationMode && liveMeeting?.presentation?.drawResultVisible === false) {
-      setWinnerModal(null);
-    }
+    drawResultVisibleRef.current = liveMeeting?.presentation?.drawResultVisible !== false;
+    if (presentationMode && !drawResultVisibleRef.current) setWinnerModal(null);
   }, [presentationMode, liveMeeting?.presentation?.drawResultVisible]);
 
   // 2. Fullscreen Toggle
@@ -1530,15 +1536,17 @@ export default function WheelOfNamesPage() {
         };
 
         record.source = "wheel";
-        setWinners((prev) => [record, ...prev]);
-        if (!presentationMode) persistWinner(record, winner, "wheel");
+        if (!presentationMode) {
+          setWinners((prev) => [record, ...prev]);
+          persistWinner(record, winner, "wheel");
+        }
 
         if (soundEnabled) {
           playWinFanfare();
         }
         launchConfetti(4500);
 
-        if (!presentationMode || liveMeeting?.presentation?.drawResultVisible !== false) {
+        if (!presentationMode || drawResultVisibleRef.current) {
           setWinnerModal({ winner, prize: controlled?.prizeName || currentPrize });
         }
       }
@@ -2120,7 +2128,7 @@ export default function WheelOfNamesPage() {
             </form>
 
             {/* 4-Category Filter Bar */}
-            <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100/90 rounded-xl border border-slate-200">
+            <div className="grid grid-cols-5 gap-1 p-1 bg-slate-100/90 rounded-xl border border-slate-200">
               <button
                 type="button"
                 onClick={() => setFilterCategory("all")}
@@ -2184,6 +2192,20 @@ export default function WheelOfNamesPage() {
                 </span>
               </button>
 
+              <button
+                type="button"
+                onClick={() => setFilterCategory("absent_members")}
+                disabled={isSpinning || presentationMode}
+                title="Chỉ thành viên chưa check-in"
+                className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-lg text-center transition cursor-pointer disabled:opacity-50 ${
+                  filterCategory === "absent_members"
+                    ? "bg-[#cf142b] text-white font-bold shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/80 font-medium"
+                }`}
+              >
+                <span className="text-[11px] leading-tight">Vắng mặt</span>
+                <span className="text-[10px] leading-tight mt-0.5">({countAbsent})</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setFilterCategory("guests")}
@@ -2454,7 +2476,7 @@ export default function WheelOfNamesPage() {
       {/* ======================================================== */}
       {/* WINNER POPUP CELEBRATION MODAL */}
       {/* ======================================================== */}
-      {winnerModal && (
+      {winnerModal && (!presentationMode || liveMeeting?.presentation?.drawResultVisible !== false) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md animate-in fade-in duration-200">
           <div className={`relative w-full max-w-lg rounded-3xl border-2 border-amber-300 bg-white text-center shadow-2xl overflow-hidden ${presentationMode ? "p-4" : "p-8"}`}>
             {/* Top Close Icon */}

@@ -740,7 +740,7 @@ export async function deletePrize(item: MeetingDocument, prizeId: string) {
  * QUAY THƯỞNG: Chức năng quay ngẫu nhiên công bằng giống Random.org
  * Quay trên màn hình trình chiếu có thể bắt đầu trước phần phát biểu của cuộc họp.
  */
-export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, actorId: string, broadcast = false, drawFilter: DrawFilter = 'present_members') {
+export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, actorId: string, broadcast = false, drawFilter: DrawFilter = 'present_members', drawParticipantIds: string[] | null = null) {
   assertMeetingEditable(item);
   // Luồng quay trong tab quản lý vẫn yêu cầu cuộc họp đã bắt đầu.
   if (item.status === 'scheduled' && !broadcast) {
@@ -810,6 +810,8 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
     }));
     const candidates = drawFilter === 'all_members'
       ? [...memberCandidates, ...presentCandidates.filter(candidate => candidate.userId)]
+      : drawFilter === 'absent_members'
+        ? memberCandidates.filter(candidate => candidate.ticketNumber == null)
       : drawFilter === 'guests'
         ? presentCandidates.filter(candidate => !candidate.userId)
         : drawFilter === 'present_members'
@@ -819,7 +821,8 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
               ticketNumber: attendees.indexOf(attendee) + 1,
             }))
           : [...memberCandidates, ...presentCandidates];
-    const eligibleAttendees = candidates.filter(candidate =>
+    const selectedCandidates = drawParticipantIds == null ? candidates : candidates.filter(candidate => drawParticipantIds.includes(String(candidate.id)));
+    const eligibleAttendees = selectedCandidates.filter(candidate =>
       !previousWinnerIds.has(String(candidate.id)) && (!candidate.userId || !previousWinnerIds.has(String(candidate.userId))));
     if (!eligibleAttendees.length) {
       throw new MeetingError(400, 'Không còn người phù hợp với bộ lọc để tiếp tục quay.');
@@ -899,7 +902,7 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
   if (broadcast) {
     setMeetingPresentationView(item, 'luckyDraw', now);
     const state = item.toObject().presentation || {};
-    item.set('presentation', { ...state, view: 'luckyDraw', drawFilter, drawPanel: 'participants', drawResultVisible: true, drawWinnerId: winnerRecord.id,
+    item.set('presentation', { ...state, view: 'luckyDraw', drawFilter, drawParticipantIds, drawPanel: 'participants', drawResultVisible: true, drawWinnerId: winnerRecord.id,
       drawStartedAt: now, drawRevealsAt: new Date(now.getTime() + 5000) });
   }
   await saveMeeting(item);

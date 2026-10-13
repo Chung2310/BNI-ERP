@@ -6,10 +6,11 @@ export const presentationStateInput = Joi.object({
   view: Joi.string().valid("checkin", "speaker", "luckyDraw", "activeMembers", "audienceResponses", "waiting"),
   autoAdvance: Joi.boolean(),
   autoAdvanceDelay: Joi.number().integer().min(0).max(3600),
-  drawFilter: Joi.string().valid("all", "all_members", "present_members", "guests"),
+  drawFilter: Joi.string().valid("all", "all_members", "present_members", "absent_members", "guests"),
+  drawParticipantIds: Joi.array().items(Joi.string().trim().max(150)).max(5000).unique().allow(null),
   drawPanel: Joi.string().valid("participants", "winners"),
   drawResultVisible: Joi.boolean(),
-}).or("view", "autoAdvance", "autoAdvanceDelay", "drawFilter", "drawPanel", "drawResultVisible");
+}).or("view", "autoAdvance", "autoAdvanceDelay", "drawFilter", "drawParticipantIds", "drawPanel", "drawResultVisible");
 const interactionQuestionFields = {
   type: Joi.string().valid("text", "single_choice").default("text"),
   options: Joi.array().items(Joi.string().trim().min(1).max(200)).min(2).max(6).unique().when("type", { is: "single_choice", then: Joi.required(), otherwise: Joi.forbidden() }),
@@ -38,7 +39,8 @@ export const presentationStartInput = Joi.object({
 export const presentationDrawInput = Joi.object({
   version: Joi.number().integer().min(0).required(),
   prizeId: Joi.string().max(100).required(),
-  drawFilter: Joi.string().valid("all", "all_members", "present_members", "guests"),
+  drawFilter: Joi.string().valid("all", "all_members", "present_members", "absent_members", "guests"),
+  drawParticipantIds: Joi.array().items(Joi.string().trim().max(150)).max(5000).unique(),
 });
 export const gameWinnerInput = Joi.object({
   id: Joi.string().max(100).required(),

@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 vi.mock("../../socket", () => ({ emitToCompany: vi.fn() }));
 vi.mock("../../service/notification.service", () => ({ notificationService: { createNotification: vi.fn() } }));
 import { MeetingModel } from "./meeting.model";
+import { UserModel } from "../../model/user.model";
 import { advanceDuePresentations, isAutoAdvanceDue, updatePresentationState } from "./meeting-presentation.service";
 import { startMeetingPresentation, spinLuckyDraw } from "./meeting.service";
 import { presentationStateInput } from "./meeting.validation";
@@ -104,6 +105,31 @@ it("saves one shared draw result and reveal timestamp in the same write", async 
   expect(+item.presentation.drawRevealsAt - +item.presentation.drawStartedAt).toBe(5000);
   expect(item.luckyDraw.prizes[0].winners).toHaveLength(1);
 });
+it("draws only from the participant IDs chosen by the controller", async () => {
+  const item = meeting();
+  item.set("luckyDraw", { drawMode: "attendees", allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
+  await updatePresentationState(item, { drawFilter: "present_members", drawParticipantIds: ["second"] });
+  const result = await spinLuckyDraw(item, "prize", "organizer", true, "present_members", item.presentation.drawParticipantIds);
+  expect(result.winner.winnerId).toBe("second");
+  expect(item.presentation.drawParticipantIds).toEqual(["second"]);
+});
+
+it("draws only absent members when the display filter is Vắng mặt", async () => {
+  const item = meeting();
+  item.set("luckyDraw", { drawMode: "attendees", allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
+  vi.spyOn(UserModel, "find").mockReturnValue({ select: () => ({ lean: async () => [
+    { _id: "member-present", displayName: "An", email: "an@example.com" },
+    { _id: "member-absent", displayName: "Bao", email: "bao@example.com" },
+  ] }) } as unknown as ReturnType<typeof UserModel.find>);
+  const result = await spinLuckyDraw(item, "prize", "organizer", true, "absent_members");
+  expect(result.winner.winnerId).toBe("member-absent");
+  expect(item.presentation.drawFilter).toBe("absent_members");
+});
+
+it("accepts the absent-only presentation filter", () => {
+  expect(presentationStateInput.validate({ version: 0, drawFilter: "absent_members" }).error).toBeUndefined();
+});
+
 it("rejects malformed states and prevents clients from setting draw results", () => {
   for (const body of [{ view: "speaker" }, { version: 0 }, { version: 0, view: "anything" }, { version: 0, autoAdvanceDelay: -1 }, { version: 0, autoAdvanceDelay: 3601 }, { version: 0, view: "luckyDraw", drawWinnerId: "chosen-by-client" }]) {
     expect(presentationStateInput.validate(body).error).toBeDefined();
