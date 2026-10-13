@@ -28,8 +28,8 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
 
   const state = presentationState(meeting.presentation);
   const [additionalSlides, setAdditionalSlides] = useState<ProfileSlide[]>([]);
-  const prizes = meeting.luckyDraw?.prizes ?? [];
-  const winner = prizes.flatMap(prize => prize.winners ?? []).find(item => item.id === state.drawWinnerId);
+  const prizes = useMemo(() => meeting.luckyDraw?.prizes ?? [], [meeting.luckyDraw?.prizes]);
+  const winner = state.drawResultVisible === false ? undefined : prizes.flatMap(prize => prize.winners ?? []).find(item => item.id === state.drawWinnerId);
   const startAt = state.drawStartedAt ? Date.parse(state.drawStartedAt) : Number.NaN;
   const revealAt = state.drawRevealsAt ? Date.parse(state.drawRevealsAt) : Number.NaN;
   const spinning = Boolean(winner && Number.isFinite(startAt) && Number.isFinite(revealAt) && now < revealAt);
@@ -48,11 +48,24 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
         return { id: "ticket-" + from, label: from === to ? "#" + from : "#" + from + "–" + to };
       });
     }
-    return meeting.speakers.map((speaker, index) => ({
+    const filter = state.drawFilter || "all";
+    const selectedIds = state.drawParticipantIds;
+    const excludedIds = new Set(prizes.flatMap(prize => prize.winners ?? []).filter(record =>
+      record.repeatEligible !== true && (record.repeatEligible === false || !meeting.luckyDraw?.allowRepeatWinners) &&
+      record.id !== winner?.id
+    ).map(record => record.winnerId));
+    return meeting.speakers.filter(speaker =>
+      (filter !== "guests" || !speaker.userId) &&
+      (filter !== "all_members" || !!speaker.userId) &&
+      (selectedIds == null || selectedIds.includes(speaker.id)) &&
+      !excludedIds.has(speaker.id)
+    ).map((speaker, index) => ({
       id: speaker.id,
       label: shortLabel(speaker.name || "Người tham gia " + (index + 1)),
     }));
-  }, [numericMode, numberRange, minNumber, meeting.speakers]);
+  }, [numericMode, numberRange, minNumber, meeting.speakers, meeting.luckyDraw?.allowRepeatWinners, prizes, winner, state.drawFilter, state.drawParticipantIds]);
+
+  const visibleSpeakers = meeting.speakers.filter(speaker => entries.some(entry => entry.id === speaker.id));
 
   const targetIndex = useMemo(() => {
     if (!winner || !entries.length) return 0;
@@ -60,7 +73,7 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
       const ticket = winner.ticketNumber ?? minNumber;
       return Math.max(0, Math.min(entries.length - 1, Math.floor((ticket - minNumber) * entries.length / numberRange)));
     }
-    const index = meeting.speakers.findIndex(speaker => speaker.id === winner.winnerId || (!!winner.userId && speaker.userId === winner.userId));
+    const index = entries.findIndex(entry => entry.id === winner.winnerId || (!!winner.userId && meeting.speakers.some(speaker => speaker.id === entry.id && speaker.userId === winner.userId)));
     return Math.max(0, index);
   }, [winner, entries.length, numericMode, minNumber, numberRange, meeting.speakers]);
 
@@ -117,7 +130,7 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
         <div className="absolute left-5 top-5 z-10">
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-300">{meeting.title}</p>
           <h2 className="mt-1 text-xl font-black sm:text-3xl">{winner?.prizeName || "Vòng quay may mắn"}</h2>
-          <p className="mt-1 text-sm text-slate-300">{meeting.speakers.length} người tham gia</p>
+          <p className="mt-1 text-sm text-slate-300">{entries.length} người tham gia</p>
         </div>
         <svg
           viewBox="0 0 600 600"
@@ -184,7 +197,7 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
             <h3 className="font-bold">Danh sách người tham gia</h3>
             <p className="text-xs text-slate-400">Thông tin thành viên và khách đã check-in</p>
           </div>
-          <span className="rounded-full bg-cyan-400/10 px-2.5 py-1 text-xs font-bold text-cyan-200">{meeting.speakers.length}</span>
+          <span className="rounded-full bg-cyan-400/10 px-2.5 py-1 text-xs font-bold text-cyan-200">{entries.length}</span>
         </div>
         {winner && !spinning && (
           <div className="flex items-center gap-3 border-b border-amber-300/30 bg-amber-300/10 p-4">
@@ -200,7 +213,7 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
           </div>
         )}
         <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-white/5">
-          {meeting.speakers.map((speaker: Speaker, index) => {
+          {visibleSpeakers.map((speaker: Speaker, index) => {
             const slide = slideById.get(speaker.id);
             const name = slide?.name || speaker.name;
             const company = slide?.company || speaker.company || "Chưa cập nhật đơn vị";
@@ -227,7 +240,7 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
               </div>
             );
           })}
-          {!meeting.speakers.length && <p className="p-5 text-center text-sm text-slate-400">Chưa có người check-in.</p>}
+          {!visibleSpeakers.length && <p className="p-5 text-center text-sm text-slate-400">Chưa có người check-in.</p>}
         </div>
       </aside>
     </div>
