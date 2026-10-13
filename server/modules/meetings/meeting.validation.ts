@@ -10,7 +10,8 @@ export const presentationStateInput = Joi.object({
   drawParticipantIds: Joi.array().items(Joi.string().trim().max(150)).max(5000).unique().allow(null),
   drawPanel: Joi.string().valid("participants", "winners"),
   drawResultVisible: Joi.boolean(),
-}).or("view", "autoAdvance", "autoAdvanceDelay", "drawFilter", "drawParticipantIds", "drawPanel", "drawResultVisible");
+  audienceResponsePanel: Joi.string().valid("questions", "prepare", "qr", "results"),
+}).or("view", "autoAdvance", "autoAdvanceDelay", "drawFilter", "drawParticipantIds", "drawPanel", "drawResultVisible", "audienceResponsePanel");
 const interactionQuestionFields = {
   type: Joi.string().valid("text", "single_choice").default("text"),
   options: Joi.array().items(Joi.string().trim().min(1).max(200)).min(2).max(6).unique().when("type", { is: "single_choice", then: Joi.required(), otherwise: Joi.forbidden() }),
@@ -19,10 +20,10 @@ export const meetingInteractionInput = Joi.object({
   question: Joi.string().trim().min(1).max(300).required(),
   ...interactionQuestionFields,
   durationSeconds: Joi.number().integer().min(1).max(3600).default(60),
-  requireName: Joi.boolean().default(true),
-  showNames: Joi.boolean().default(true),
-  moderationEnabled: Joi.boolean().default(true),
-  allowMultipleResponses: Joi.boolean().default(false),
+  requireName: Joi.boolean().default(false),
+  showNames: Joi.boolean().default(false),
+  moderationEnabled: Joi.boolean().default(false),
+  allowMultipleResponses: Joi.boolean().default(true),
 });
 export const meetingInteractionQuestionInput = Joi.object({
   question: Joi.string().trim().min(1).max(300).required(),

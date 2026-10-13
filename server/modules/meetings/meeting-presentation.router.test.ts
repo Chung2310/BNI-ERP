@@ -113,6 +113,14 @@ it("opens the winners panel on the shared display", async () => {
   const display = await (await fetch(base + "/live")).json();
   expect(display.data.meeting.presentation.drawPanel).toBe("winners");
 });
+it("shares the audience questions panel with the display", async () => {
+  seed();
+  const response = await fetch(base + "/presentation-state", { method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ version: 2, view: "audienceResponses", audienceResponsePanel: "questions" }) });
+  expect(response.status).toBe(200);
+  const display = await (await fetch(base + "/live")).json();
+  expect(display.data.meeting.presentation).toMatchObject({ view: "audienceResponses", audienceResponsePanel: "questions" });
+});
 it("rejects a second draw until the first result is revealed", async () => {
   const { item } = seed(); item.set("presentation.drawRevealsAt", new Date(Date.now() + 5000));
   const response = await fetch(base + "/presentation-draw", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: 2, prizeId: "prize" }) });

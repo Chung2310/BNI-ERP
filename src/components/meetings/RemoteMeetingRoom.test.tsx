@@ -12,13 +12,28 @@ vi.mock("./MeetingStage", () => ({
 }));
 vi.mock("qrcode", () => ({ default: { toDataURL: vi.fn().mockResolvedValue("data:image/png;base64,qr") } }));
 let snapshot: import('../../services/meetingLiveService').MeetingLiveSnapshot;
+let interactionState: import('../../services/meetingInteractionService').MeetingInteractionState;
 beforeEach(() => {
   mocks.manage = true;
   snapshot = { serverNow: Date.now(), slides: [{ id: "a", name: "An" }, { id: "b", name: "Binh" }],
     meeting: { _id: "m", title: "Meeting", status: "live", __v: 0, currentIndex: 0, elapsedSeconds: 0,
       presentation: { view: "speaker", autoAdvance: false, autoAdvanceDelay: 3 },
       speakers: [{ id: "a", name: "An", seconds: 30 }, { id: "b", name: "Binh", seconds: 20 }], luckyDraw: { prizes: [] } } } as unknown as import("../../services/meetingLiveService").MeetingLiveSnapshot;
+  interactionState = { session: null, responses: [] };
   vi.stubGlobal("fetch", vi.fn(async (url, options) => {
+    if (String(url).endsWith("/interaction")) {
+      if (options.method === "PUT" && interactionState.session) interactionState.session.durationSeconds = JSON.parse(options.body).durationSeconds;
+      return { ok: true, json: async () => ({ data: interactionState }) };
+    }
+    if (String(url).endsWith("/interaction/status") && interactionState.session) {
+      const status = JSON.parse(options.body).status;
+      interactionState.session.status = status;
+      if (status === "open") {
+        interactionState.session.openedAt = new Date().toISOString();
+        interactionState.session.closesAt = new Date(Date.now() + interactionState.session.durationSeconds * 1000).toISOString();
+      }
+      return { ok: true, json: async () => ({ data: interactionState }) };
+    }
     if (String(url).endsWith("/lucky-draw/prizes") && options.method === "POST") {
       const body = JSON.parse(options.body);
       const prize = { id: "quick-prize", reward: "", winners: [], ...body };
@@ -36,11 +51,37 @@ beforeEach(() => {
       snapshot.meeting.__v++;
       if (String(url).endsWith("/presentation")) snapshot.meeting.currentIndex = 1;
       if (body.view) snapshot.meeting.presentation.view = body.view;
+      if (body.audienceResponsePanel) snapshot.meeting.presentation.audienceResponsePanel = body.audienceResponsePanel;
     }
     return { ok: true, json: async () => JSON.parse(JSON.stringify({ data: options.method === "GET" ? snapshot : snapshot.meeting })) };
   }));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+it("controls the question, QR, timer and results sequence from the website", async () => {
+  snapshot.meeting.presentation.view = "audienceResponses";
+  snapshot.meeting.presentation.audienceResponsePanel = "questions";
+  interactionState.session = {
+    id: "i", meetingId: "m", question: "Ý kiến của bạn?", activeQuestionId: "q1", questionNumber: 1, totalQuestions: 1,
+    questions: [{ id: "q1", text: "Ý kiến của bạn?", order: 1, responseCount: 0, approvedCount: 0 }],
+    durationSeconds: 60, status: "draft", requireName: false, showNames: false, moderationEnabled: false, allowMultipleResponses: true,
+    participationUrl: "/meeting-interaction/token", responseCount: 0, approvedCount: 0,
+  };
+  render(<RemoteMeetingRoom meetingId="m" mode="control" />);
+  expect(await screen.findByText("Ý kiến của bạn?")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Bắt đầu quay" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "QR trả lời" }));
+  await waitFor(() => expect(snapshot.meeting.presentation.audienceResponsePanel).toBe("prepare"));
+  fireEvent.change(screen.getByLabelText("Thời gian nhận câu trả lời (giây)"), { target: { value: "90" } });
+  fireEvent.click(screen.getByRole("button", { name: "Nhận câu trả lời" }));
+  await waitFor(() => expect(snapshot.meeting.presentation.audienceResponsePanel).toBe("qr"));
+  expect(interactionState.session.durationSeconds).toBe(90);
+  expect(interactionState.session.status).toBe("open");
+  expect(screen.getByText(/Đang chiếu QR/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Xem kết quả" }));
+  await waitFor(() => expect(snapshot.meeting.presentation.audienceResponsePanel).toBe("results"));
+  fireEvent.click(screen.getByRole("button", { name: "Câu hỏi" }));
+  await waitFor(() => expect(snapshot.meeting.presentation.audienceResponsePanel).toBe("questions"));
+});
 it("previews a selection locally and publishes only after an explicit start", async () => {
   render(<RemoteMeetingRoom meetingId="m" mode="control" />);
   await screen.findByText("Đang chiếu: speaker");

@@ -126,6 +126,7 @@ const meeting = new Schema(
         drawParticipantIds: { type: [String], default: undefined },
         drawPanel: { type: String, enum: ['participants', 'winners'], default: 'participants' },
         drawResultVisible: { type: Boolean, default: true },
+        audienceResponsePanel: { type: String, enum: ['questions', 'prepare', 'qr', 'results'], default: 'questions' },
       }, { _id: false }),
       default: () => ({}),
     },
