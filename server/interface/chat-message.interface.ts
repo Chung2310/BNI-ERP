@@ -24,6 +24,7 @@ export interface IChatMessage extends Document {
   reactions?: IChatReaction[];
   replyTo?: Types.ObjectId | string | IChatMessage;
   isDeleted?: boolean;
+  awaitingReview?: boolean;
   editedAt?: Date | null;
   createdAt: Date;
 }

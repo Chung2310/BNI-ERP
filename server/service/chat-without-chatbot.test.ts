@@ -2,10 +2,12 @@ import { afterEach, expect, it, vi } from "vitest";
 import { chatService } from "./chat.service";
 import { ChatRoomModel } from "../model/chat-room.model";
 import { ChatMessageModel } from "../model/chat-message.model";
+import { ChatUserBlockModel } from "../model/chat-safety.model";
 
 afterEach(() => vi.restoreAllMocks());
 
 it("lists only internal rooms and does not create a chatbot room", async () => {
+  vi.spyOn(ChatUserBlockModel, "find").mockReturnValue({ lean: vi.fn().mockResolvedValue([]) } as never);
   const cloudExec = vi.fn().mockResolvedValue({ _id: "cloud" });
   const findOne = vi.spyOn(ChatRoomModel, "findOne").mockReturnValue({ exec: cloudExec } as never);
   const rooms = [{ _id: "room-1", members: [{ userId: "member-1", isPinned: false }], updatedAt: new Date() }];

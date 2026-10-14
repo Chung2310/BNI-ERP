@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { SEOHead } from "../seo/SEOHead";
 import { getApiErrorMessage } from "../utils/errorMessage";
+import { getAccountDeletionReceipt } from "../services/authService";
 import {
   BRAND_NAME,
   SERVICE_WEBSITE_URL,
@@ -27,10 +28,20 @@ interface DeletionStatus {
   details?: string;
 }
 
-const lastUpdated = "June 30, 2026";
+const lastUpdated = "October 14, 2026";
+
+async function fetchDeletionStatus(code: string): Promise<DeletionStatus> {
+  const accountReceipt = /^[a-f0-9]{64}$/.test(code);
+  const response = await fetch(accountReceipt ? "/api/v1/auth/account-deletion-status" : `/api/v1/facebook/data-deletion-status/${encodeURIComponent(code)}`, {
+    headers: accountReceipt ? { "X-Deletion-Token": code } : {}, cache: "no-store",
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message || "Deletion request code not found.");
+  return accountReceipt ? { code, facebookUserId: "", status: result.data.state, requestedAt: result.data.requestedAt, completedAt: result.data.completedAt } : result.data;
+}
 
 export default function UserDataDeletion() {
-  const [initialCode] = useState(() => { const params = new URLSearchParams(window.location.search); return params.get("code") || params.get("id") || ""; });
+  const [initialCode] = useState(() => { const params = new URLSearchParams(window.location.search); return params.get("code") || params.get("id") || getAccountDeletionReceipt() || ""; });
   const [code, setCode] = useState(initialCode);
   const [loading, setLoading] = useState(!!initialCode);
   const [error, setError] = useState<string | null>(null);
@@ -46,12 +57,7 @@ export default function UserDataDeletion() {
   useEffect(() => {
     if (!initialCode) return;
     let active = true;
-    fetch(`/api/v1/facebook/data-deletion-status/${initialCode.trim()}`)
-      .then(async response => {
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || "Deletion request code not found.");
-        return result.data as DeletionStatus;
-      })
+    fetchDeletionStatus(initialCode.trim())
       .then(result => { if (active) setStatusResult(result); })
       .catch(error => { if (active) setError(getApiErrorMessage(error, "Không thể kiểm tra trạng thái yêu cầu xóa dữ liệu.")); })
       .finally(() => { if (active) setLoading(false); });
@@ -70,14 +76,7 @@ export default function UserDataDeletion() {
     setStatusResult(null);
 
     try {
-      const response = await fetch(`/api/v1/facebook/data-deletion-status/${activeCode.trim()}`);
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || "Deletion request code not found.");
-      }
-
-      setStatusResult(result.data);
+      setStatusResult(await fetchDeletionStatus(activeCode.trim()));
     } catch (err) {
       setError(getApiErrorMessage(err, "Không thể kiểm tra trạng thái yêu cầu xóa dữ liệu."));
     } finally {
@@ -131,9 +130,7 @@ export default function UserDataDeletion() {
               Check Request Status
             </h2>
             <p className="text-sm leading-6 text-slate-600">
-              If you already submitted a platform-triggered deletion request and received a
-              confirmation code such as <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">DEL-XXXXXXXX</code>,
-              you can check its processing status here.
+              Nhập mã theo dõi được cấp sau khi xóa tài khoản trong ứng dụng hoặc mã xóa dữ liệu Facebook. Không cần đăng nhập. Mã xóa tài khoản có hiệu lực đến 30 ngày sau khi hoàn tất; hãy giữ mã riêng tư.
             </p>
 
             <div className="space-y-3">
@@ -164,7 +161,7 @@ export default function UserDataDeletion() {
             {statusResult && (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 space-y-3 text-sm">
                 <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
-                  <span className="font-mono font-semibold text-slate-800">{statusResult.code}</span>
+                  <span className="min-w-0 break-all font-mono font-semibold text-slate-800">{statusResult.code}</span>
                   {statusResult.status === "completed" ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
                       <CheckCircle2 className="h-3 w-3" />
@@ -179,12 +176,12 @@ export default function UserDataDeletion() {
                 </div>
 
                 <div className="space-y-2 text-slate-600">
-                  <p>
+                  {statusResult.facebookUserId ? <p>
                     Platform user reference:{" "}
                     <span className="font-mono text-slate-800">
                       {statusResult.facebookUserId.slice(0, 6)}***
                     </span>
-                  </p>
+                  </p> : null}
                   <p>
                     Requested at:{" "}
                     <span className="text-slate-800">
@@ -209,15 +206,17 @@ export default function UserDataDeletion() {
             )}
 
             <p className="text-xs leading-5 text-slate-500">
-              Note: the live status checker currently supports deletion codes generated by
-              existing platform webhook flows. If your TikTok-related revocation or deletion
-              request was submitted outside an automated callback, use the manual support
-              channel below.
+              Yêu cầu xóa tài khoản thường hoàn tất trong vài phút. Khi dịch vụ lưu trữ gặp lỗi, hệ thống tiếp tục thử lại. Nếu quá 24 giờ, có thể liên hệ hỗ trợ kèm mã theo dõi. Các yêu cầu TikTok gửi ngoài luồng tự động dùng kênh hỗ trợ bên dưới.
             </p>
           </div>
         </div>
 
         <div className="lg:col-span-3 bg-white border border-slate-200 rounded-3xl p-6 lg:p-8 shadow-sm space-y-8">
+          <section className="space-y-3">
+            <h2 className="text-lg font-bold text-slate-900">Xóa tài khoản iGen Connect và dữ liệu</h2>
+            <p className="text-sm leading-6 text-slate-600">Trong app: Cài đặt → Quyền riêng tư → Xóa tài khoản. Trên web: Cài đặt tài khoản → Xóa tài khoản của tôi. Xác nhận bằng mật khẩu hiện tại. Quản trị viên chọn người nhận quyền trong cùng Chapter; nếu không còn thành viên đang hoạt động khác, Chapter được lưu trữ. Bạn sẽ đăng xuất ngay khi yêu cầu được tiếp nhận và có mã riêng để theo dõi; không cần gửi email để thực hiện xóa.</p>
+            <p className="text-sm leading-6 text-slate-600">Hồ sơ, ảnh cá nhân, tin nhắn và tệp bạn gửi/tải lên gắn với tài khoản, đăng ký thông báo, đơn gia nhập/rời Chapter và lịch sử hoạt động sẽ được xóa. Danh tính trong cuộc họp và trò chơi được gỡ bỏ. Cuộc họp, nội dung của người khác và số liệu thu chi đã loại bỏ danh tính vẫn được giữ. Không thể thu hồi bản sao đã được người nhận tải xuống hay tệp đã xuất ra ngoài ứng dụng.</p>
+          </section>
           <section className="space-y-3">
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <Unplug className="h-5 w-5 text-slate-700" />
@@ -264,12 +263,12 @@ export default function UserDataDeletion() {
           <section className="space-y-3">
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <Mail className="h-5 w-5 text-slate-700" />
-              3. Request Manual Deletion
+              3. Additional Integration Data Requests
             </h2>
             <p className="text-sm leading-6 text-slate-600">
-              If you want eligible data removed from the service entirely, submit a deletion
-              request through our support channel and include enough information for us to
-              identify the workspace or integration to be removed.
+              For additional third-party integration data requests, contact support and
+              identify the relevant workspace or integration. App account deletion uses
+              the automated flow described above and does not require an email or support call.
             </p>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
               <p>

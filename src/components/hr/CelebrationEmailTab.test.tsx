@@ -90,16 +90,17 @@ describe("CelebrationEmailTab variable palettes", () => {
     render(<CelebrationEmailTab />);
     await waitFor(() => expect((screen.getByRole("button", { name: "Cấu hình ngày lễ" }) as HTMLButtonElement).disabled).toBe(false));
     fireEvent.change(screen.getByLabelText("Giờ gửi tự động"), { target: { value: "09:30" } });
-    await openHolidaySettings();
-    fireEvent.click(screen.getByRole("button", { name: "Thêm ngày lễ" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Tên ngày lễ" }), { target: { value: "Quốc khánh" } });
-    fireEvent.change(within(screen.getByRole("dialog", { name: "Thêm ngày lễ" })).getByLabelText("Ngày gửi"), { target: { value: "2027-09-02" } });
-    fireEvent.click(screen.getByRole("button", { name: "Thêm vào danh sách" }));
+    const holidaySettings = within(await openHolidaySettings());
+    fireEvent.click(holidaySettings.getByRole("button", { name: "Thêm ngày lễ" }));
+    const addHoliday = within(screen.getByRole("dialog", { name: "Thêm ngày lễ" }));
+    fireEvent.change(addHoliday.getByRole("textbox", { name: "Tên ngày lễ" }), { target: { value: "Quốc khánh" } });
+    fireEvent.change(addHoliday.getByLabelText("Ngày gửi"), { target: { value: "2027-09-02" } });
+    fireEvent.click(addHoliday.getByRole("button", { name: "Thêm vào danh sách" }));
     expect(screen.queryByRole("dialog", { name: "Thêm ngày lễ" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Xem trước ngày lễ" }));
+    fireEvent.click(holidaySettings.getByRole("button", { name: "Xem trước ngày lễ" }));
     await waitFor(() => expect(preview).toHaveBeenCalledWith(expect.objectContaining({ holidayName: "Quốc khánh" })));
     fireEvent.click(screen.getByRole("button", { name: "Đóng bản xem trước" }));
-    fireEvent.click(screen.getByRole("button", { name: "Lưu cấu hình" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Cấu hình ngày lễ" })).getByRole("button", { name: "Lưu cấu hình" }));
     await waitFor(() => expect(saveCelebration).toHaveBeenCalledWith(expect.objectContaining({
       holidayEnabled: true, sendTime: "09:30", holidayOverrides: [{ name: "Quốc khánh", date: "2027-09-02", enabled: true }],
     })));

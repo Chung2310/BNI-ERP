@@ -28,6 +28,8 @@ export interface IResourceItem extends Document {
   size?: number;
   driveType?: "folder" | "document" | "spreadsheet" | "presentation" | "pdf" | "file";
   creatorUid?: string;
+  awaitingReview?: boolean;
+  moderationRejected?: boolean;
   creatorName?: string;
   isFixed?: boolean;
   isDeleted?: boolean;
@@ -73,6 +75,8 @@ const ResourceItemSchema = new Schema<IResourceItem>(
       default: "file",
     },
     creatorUid: { type: String, default: "" },
+    awaitingReview: { type: Boolean, default: false, index: true },
+    moderationRejected: { type: Boolean, default: false },
     creatorName: { type: String, default: "" },
     isFixed: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false, index: true },

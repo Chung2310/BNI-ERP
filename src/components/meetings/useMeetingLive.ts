@@ -16,11 +16,7 @@ export function useMeetingLive(meetingId: string, readOnly: boolean) {
   const clock = useRef({ server: 0, local: 0 });
 
   useEffect(() => {
-    if (!meetingId) {
-      setSnapshot(null);
-      setConnected(false);
-      return;
-    }
+    if (!meetingId) return;
     mounted.current = true;
     latest.current = null;
     clock.current = { server: Date.now(), local: performance.now() };
@@ -142,5 +138,5 @@ export function useMeetingLive(meetingId: string, readOnly: boolean) {
     return success;
   }, [meetingId, readOnly, refresh]);
 
-  return { snapshot: snapshot?.meeting._id === meetingId ? snapshot : null, now, syncError, commandError, connected, busy, refresh, command };
+  return { snapshot: snapshot?.meeting._id === meetingId ? snapshot : null, now, syncError, commandError, connected: Boolean(meetingId && connected), busy, refresh, command };
 }

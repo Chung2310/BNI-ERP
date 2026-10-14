@@ -4,9 +4,14 @@ export interface ResourceAccessContext {
   userId: string;
   role: string;
   permissions: ReadonlySet<string>;
+  blockedChatUserIds?: ReadonlySet<string>;
 }
 
 export interface ResourceAccessItem {
+  awaitingReview?: boolean;
+  moderationRejected?: boolean;
+  creatorUid?: string;
+  sourceEntityType?: string;
   companyCode: string;
   managedType?: "user" | "system";
   branchId?: string | null;
@@ -30,6 +35,9 @@ function isBranchReadable(item: ResourceAccessItem, context: ResourceAccessConte
 
 export function isResourceReadable(item: ResourceAccessItem, context: ResourceAccessContext): boolean {
   if (String(item.companyCode).toUpperCase() !== String(context.companyCode).toUpperCase()) return false;
+  if (item.moderationRejected) return false;
+  if (item.sourceEntityType === "chat-room" && item.creatorUid && context.blockedChatUserIds?.has(item.creatorUid)) return false;
+  if (item.awaitingReview && item.creatorUid !== context.userId) return false;
   if (item.managedType !== "system") return true;
   if (!hasPermission(context, "resource:read")) return false;
   if (!isBranchReadable(item, context)) return false;

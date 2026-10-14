@@ -58,6 +58,9 @@ async function seedAdminUser() {
       await company.save();
     }
 
+    // Ownership transfer/deletion must not recreate the old seed account on restart.
+    if (company.lifecycleStatus === "archived" || company.ownerEmail !== seedEmail) return;
+
     // 2. Kiểm tra / đồng bộ vai trò admin trong RolePermission
     await RolePermissionModel.updateOne(
       { companyCode: seedCompanyCode, role: "admin" },
@@ -76,6 +79,7 @@ async function seedAdminUser() {
 
     // 3. Kiểm tra tài khoản admin theo email
     let adminUser = await UserModel.findOne({ email: seedEmail });
+    if (adminUser?.deletionRequestedAt) return;
     if (!adminUser) {
       const hashedPassword = await bcrypt.hash(seedPassword, 10);
       adminUser = new UserModel({
@@ -138,8 +142,11 @@ async function seedSuperadminUser() {
     throw new Error("Email superadmin phải khác tài khoản admin chapter mặc định.");
   }
   const existing = await UserModel.findOne({ email });
+  const bootstrap = mongoose.connection.collection<{ _id: string; initializedAt: Date }>("system_bootstrap");
+  if (!existing && await bootstrap.findOne({ _id: "superadmin_initialized" })) return;
   if (existing) {
     if (existing.role !== "superadmin" || existing.companyCode) throw new Error("Email superadmin đã thuộc tài khoản khác.");
+    await bootstrap.updateOne({ _id: "superadmin_initialized" }, { $set: { initializedAt: new Date() } }, { upsert: true });
     return;
   }
   await UserModel.create({
@@ -147,6 +154,7 @@ async function seedSuperadminUser() {
     displayName: process.env.SEED_SUPERADMIN_NAME?.trim() || "Quản trị hệ thống BNI",
     role: "superadmin", membershipStatus: "none", isActive: true, permissions: [],
   });
+  await bootstrap.updateOne({ _id: "superadmin_initialized" }, { $set: { initializedAt: new Date() } }, { upsert: true });
   console.log(`[Backend Database] Đã tạo superadmin: ${email}`);
 }
 

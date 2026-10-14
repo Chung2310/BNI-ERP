@@ -11,6 +11,7 @@ import { branchController } from "../controller/branch.controller";
 import multer from "multer";
 import { guestAvatarError, MAX_GUEST_AVATAR_BYTES } from "../modules/meetings/meeting-guest-avatar";
 import { cloudinaryService } from "../service/cloudinary.service";
+import { registerOwnedMedia } from "../service/owned-media.service";
 
 import { importUsers, UserImportError } from "../service/user-import.service";
 
@@ -147,10 +148,13 @@ authRouter.post("/logout", requireAuth, authController.logout);
 
 // Lấy thông tin tài khoản hiện tại (yêu cầu Access Token)
 authRouter.get("/me", requireAuth, authController.getMe);
+authRouter.get("/me/deletion-options", requireAuth, authController.accountDeletionOptions);
+authRouter.get("/account-deletion-status", authRateLimiter, authController.accountDeletionStatus);
 const deleteOwnAccountSchema = {
   body: Joi.object({
     password: Joi.string().max(1024).required(),
     confirmation: Joi.string().valid("XÓA TÀI KHOẢN").required(),
+    successorId: Joi.string().hex().length(24).optional(),
   }),
 };
 authRouter.delete("/me", requireAuth, authRateLimiter, validateRequest(deleteOwnAccountSchema), authController.deleteOwnAccount);
@@ -167,8 +171,11 @@ authRouter.post("/profile/avatar", requireAuth, (req, res) => {
     const invalid = guestAvatarError(req.file);
     if (invalid) return res.status(400).json({ message: invalid });
     try {
-      const url = await cloudinaryService.uploadMediaBuffer(req.file.buffer, `bni/profiles/${req.user!.id}`);
-      await UserModel.updateOne({ _id: req.user!.id }, { $set: { photoURL: url } });
+      const asset = await cloudinaryService.uploadMediaBufferAsset(req.file.buffer, `bni/profiles/${req.user!.id}`);
+      await registerOwnedMedia(req.user!.id, asset);
+      const url = asset.secureUrl;
+      const { queueProfileMedia } = await import("../service/content-safety.service");
+      await queueProfileMedia(req.user!.id, { photoURL: url });
       return res.json({ data: { photoURL: url } });
     } catch { return res.status(502).json({ message: "Chưa tải được ảnh đại diện. Bạn có thể bổ sung sau." }); }
   });
@@ -190,8 +197,11 @@ authRouter.post("/profile/image", requireAuth, validateRequest(selfProfileImageS
   try {
     const field = kind === "avatar" ? "photoURL" : "coverImage";
     const folder = kind === "avatar" ? `bni/profiles/${req.user!.id}` : `bni/profiles/${req.user!.id}/covers`;
-    const url = await cloudinaryService.uploadMediaBuffer(buffer, folder);
-    await UserModel.updateOne({ _id: req.user!.id }, { $set: { [field]: url } });
+    const asset = await cloudinaryService.uploadMediaBufferAsset(buffer, folder);
+    await registerOwnedMedia(req.user!.id, asset);
+    const url = asset.secureUrl;
+    const { queueProfileMedia } = await import("../service/content-safety.service");
+    await queueProfileMedia(req.user!.id, { [field]: url });
     return res.json({ data: { [field]: url } });
   } catch { return res.status(502).json({ message: "Chưa tải được ảnh hồ sơ. Vui lòng thử lại." }); }
 });

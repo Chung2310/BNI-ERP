@@ -3,9 +3,12 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { chatService } from "../service/chat.service";
 import { linkPreviewService } from "../service/link-preview.service";
-import { emitToUser, isUserOnline } from "../socket";
+import { isUserOnline } from "../socket";
+import { privatePushContent } from "../service/private-push-content";
 import { pushService } from "../service/push.service";
 import { mobilePushService } from "../service/mobile-push.service";
+
+import { blockedChatPeers, emitSafeChatToUser as emitToUser } from "../service/chat-safety.service";
 
 export const chatController = {
   async setRoomBlocked(req: AuthenticatedRequest, res: Response) {
@@ -323,41 +326,22 @@ export const chatController = {
       // Đẩy Web Push cho các thành viên đang offline (đã đóng web) — chạy nền, không chặn phản hồi
       void (async () => {
         try {
-          const senderName = (message).senderName || "Đồng nghiệp";
-          const preview =
-            content && String(content).trim()
-              ? String(content).slice(0, 120)
-              : "Đã gửi tệp đính kèm";
-
-          const hasMentionAll = content && (
-            content.toLowerCase().includes("@all") || 
-            content.toLowerCase().includes("@tất cả")
-          );
+          const pushContent = privatePushContent(true);
 
           await Promise.all(
             room.members.map(async (member) => {
               const memId = entityId(member.userId);
-              if (memId === senderId) return;
-              if (await isUserOnline(memId)) return; // Đang mở web — socket + Notification API đã lo
-
-              const memberUser = member.userId;
-              const hasPersonalMention = content && memberUser && typeof memberUser === "object" && "displayName" in memberUser && typeof memberUser.displayName === "string" && memberUser.displayName && content.includes(`@${memberUser.displayName}`);
-              const isMentioned = room.isGroup && (hasMentionAll || hasPersonalMention);
-
-              const pushTitle = isMentioned
-                ? `📢 [Nhắc đến bạn] ${senderName} — ${room.name || "Nhóm"}`
-                : (room.isGroup && room.name ? `${senderName} — ${room.name}` : `Tin nhắn mới từ ${senderName}`);
+              if (memId === senderId || message.awaitingReview || (await blockedChatPeers(senderId, companyCode)).includes(memId)) return;
+              const online = await isUserOnline(memId);
 
               await Promise.all([
-                pushService.sendToUser(memId, {
-                  title: pushTitle,
-                  body: preview,
+                online ? Promise.resolve() : pushService.sendToUser(memId, {
+                  ...pushContent,
                   url: "/tro-chuyen",
                   tag: `chat-${roomId}`,
                 }),
                 mobilePushService.sendToUser(memId, {
-                  title: pushTitle,
-                  body: preview,
+                  ...pushContent,
                   notificationId: message._id.toString(),
                   type: "chat",
                   route: `/chat/${roomId}`,
@@ -376,7 +360,7 @@ export const chatController = {
       });
     } catch (error) {
       console.error("[chatController.sendMessage] Error:", error);
-      return res.status(error.statusCode === 403 ? 403 : 500).json({
+      return res.status([400, 403].includes(error.statusCode) ? error.statusCode : 500).json({
         status: "error",
         message: error.message || "Lỗi khi gửi tin nhắn.",
       });

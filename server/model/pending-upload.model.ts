@@ -16,6 +16,8 @@ export interface IPendingUpload extends Document {
   storagePublicId?: string;
   storageResourceType?: string;
   status: "pending" | "finalized";
+  heldForReview?: boolean;
+  reviewRevision?: string;
   finalizedResourceId?: string;
   createdAt: Date;
   expiresAt: Date;
@@ -36,6 +38,8 @@ const PendingUploadSchema = new Schema<IPendingUpload>({
   storagePublicId: { type: String, default: undefined },
   storageResourceType: { type: String, default: undefined },
   status: { type: String, enum: ["pending", "finalized"], default: "pending", index: true },
+  heldForReview: { type: Boolean, default: false },
+  reviewRevision: { type: String },
   finalizedResourceId: { type: String, default: undefined },
   createdAt: { type: Date, default: Date.now, index: true },
   expiresAt: { type: Date, required: true, index: true },

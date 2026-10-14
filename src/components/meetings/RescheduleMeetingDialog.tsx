@@ -1,8 +1,16 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { X } from "lucide-react";
 import { VietnameseDatePicker } from "../common/VietnameseDatePicker";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { vietnamDateTime } from "../../utils/meetingRecurrence";
+
+function validateRescheduleDate(date: string, original: string, now: number) {
+  const startsAt = new Date(`${date}T${original.slice(11)}:00+07:00`).getTime();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(startsAt)) return "Vui lòng chọn ngày mới.";
+  if (date === original.slice(0, 10)) return "Vui lòng chọn ngày khác với lịch hiện tại.";
+  if (startsAt <= now) return "Vui lòng chọn thời gian trong tương lai.";
+  return "";
+}
 
 export function RescheduleMeetingDialog({ meeting, onClose, onConfirm }: {
   meeting: { title: string; startsAt: string };
@@ -17,23 +25,17 @@ export function RescheduleMeetingDialog({ meeting, onClose, onConfirm }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const dateLabel = (value: string) => value.split("-").reverse().join("/");
-  const newStart = () => new Date(`${date}T${originalTime}:00+07:00`);
-  const validate = () => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(newStart().getTime())) return "Vui lòng chọn ngày mới.";
-    if (date === original.slice(0, 10)) return "Vui lòng chọn ngày khác với lịch hiện tại.";
-    if (newStart().getTime() <= Date.now()) return "Vui lòng chọn thời gian trong tương lai.";
-    return "";
-  };
-
-  if (confirming) return <ConfirmDialog isOpen title="Xác nhận dời lịch" description={`Dời cuộc họp “${meeting.title}” từ ngày ${dateLabel(original.slice(0, 10))} sang ngày ${dateLabel(date)}? Giờ bắt đầu ${originalTime} và thời lượng cuộc họp được giữ nguyên.`} tone="warning" confirmLabel="Xác nhận dời lịch" cancelLabel="Quay lại" isSubmitting={saving} onClose={() => setConfirming(false)} onConfirm={async () => {
+  const handleConfirm = useCallback(async () => {
     if (saving) return;
-    const validation = validate();
+    const validation = validateRescheduleDate(date, original, Date.now());
     if (validation) { setError(validation); setConfirming(false); return; }
     setSaving(true);
-    try { await onConfirm(newStart().toISOString()); onClose(); }
+    try { await onConfirm(new Date(`${date}T${originalTime}:00+07:00`).toISOString()); onClose(); }
     catch (err) { setError(err instanceof Error ? err.message : "Không thể dời lịch. Vui lòng thử lại."); setConfirming(false); }
     finally { setSaving(false); }
-  }} />;
+  }, [date, original, originalTime, saving, onConfirm, onClose]);
+
+  if (confirming) return <ConfirmDialog isOpen title="Xác nhận dời lịch" description={`Dời cuộc họp “${meeting.title}” từ ngày ${dateLabel(original.slice(0, 10))} sang ngày ${dateLabel(date)}? Giờ bắt đầu ${originalTime} và thời lượng cuộc họp được giữ nguyên.`} tone="warning" confirmLabel="Xác nhận dời lịch" cancelLabel="Quay lại" isSubmitting={saving} onClose={() => setConfirming(false)} onConfirm={handleConfirm} />;
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section role="dialog" aria-modal="true" aria-labelledby="reschedule-meeting-title" className="w-full max-w-md rounded-2xl border border-cyan-100 bg-white p-5 shadow-xl">
@@ -52,7 +54,7 @@ export function RescheduleMeetingDialog({ meeting, onClose, onConfirm }: {
       </div>
       <div className="mt-5 flex justify-end gap-2">
         <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">Đóng</button>
-        <button type="button" onClick={() => { const validation = validate(); setError(validation); if (!validation) setConfirming(true); }} className="rounded-lg bg-cyan-600 px-3 py-2 text-xs text-white hover:bg-cyan-700">Tiếp tục</button>
+        <button type="button" onClick={() => { const validation = validateRescheduleDate(date, original, Date.now()); setError(validation); if (!validation) setConfirming(true); }} className="rounded-lg bg-cyan-600 px-3 py-2 text-xs text-white hover:bg-cyan-700">Tiếp tục</button>
       </div>
     </section>
   </div>;

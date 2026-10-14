@@ -239,7 +239,7 @@ export default function AuthPage() {
               rel="noopener noreferrer"
               className="font-semibold text-slate-600 underline underline-offset-2 hover:text-blue-700"
             >
-              Lucky Draw Rules
+              Wheel Selection Guide
             </a>
           </div>
         </div>

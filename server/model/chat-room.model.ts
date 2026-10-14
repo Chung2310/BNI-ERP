@@ -16,6 +16,7 @@ const ChatRoomSchema = new Schema<IChatRoom>(
   {
     name: { type: String, default: "" },
     isGroup: { type: Boolean, default: false, index: true },
+    hasDeletedMember: { type: Boolean, default: false },
     blockedBy: { type: [Schema.Types.ObjectId], ref: "User", default: [] },
     companyCode: { type: String, required: true, index: true },
     branchId: { type: String, index: true },

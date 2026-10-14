@@ -104,7 +104,7 @@ describe("mobilePushService", () => {
 
     expect(dependencies.sendEachForMulticast).toHaveBeenCalledWith(expect.objectContaining({
       tokens: ["fcm_registration_token_valid_123", "fcm_registration_token_stale_456"],
-      notification: { title: "Thông báo mới", body: "Nội dung" },
+      notification: { title: "iGen Connect", body: "Bạn có thông báo mới. Mở ứng dụng để xem." },
       data: expect.objectContaining({ notificationId: "notification-id", route: "/chat/room-id" }),
       android: expect.objectContaining({
         priority: "high",
@@ -117,7 +117,7 @@ describe("mobilePushService", () => {
   });
 
   it("surfaces Firebase credential failures instead of silently dropping every push", async () => {
-    dependencies.lean.mockResolvedValue([{ token: "fcm_registration_token_123456789" }]);
+    dependencies.lean.mockResolvedValue([{ token: "fcm_registration_token_123456789", provider: "fcm", platform: "android" }]);
     dependencies.sendEachForMulticast.mockResolvedValue({
       responses: [{ success: false, error: { code: "messaging/mismatched-credential" } }],
     });

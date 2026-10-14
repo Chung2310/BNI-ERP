@@ -52,8 +52,8 @@ export const AUTH_SEO: SeoMeta = {
 
 export const PRIVACY_SEO: SeoMeta = {
   title: "Chính sách bảo mật",
-  description: "Chính sách bảo mật thông tin người dùng và dữ liệu của iGen Connect.",
-  keywords: "chính sách bảo mật, bảo mật dữ liệu, igen connect, igen erp",
+  description: "Cách iGen Connect xử lý dữ liệu tài khoản, GPS check-in, chat, ảnh/video, Face ID, thông báo và yêu cầu xóa dữ liệu trên mobile và website.",
+  keywords: "chính sách bảo mật, quyền riêng tư, GPS check-in, Face ID, xóa dữ liệu, igen connect, igen erp",
   path: "/privacy-policy",
   image: SEO_DEFAULT_IMAGE,
   robots: "index, follow",
@@ -63,9 +63,9 @@ export const PRIVACY_SEO: SeoMeta = {
 };
 
 export const LUCKY_DRAW_RULES_SEO: SeoMeta = {
-  title: "Lucky Draw Rules | iGen Connect",
-  description: "Rules for the meeting lucky draw in iGen Connect, including eligibility, winner selection, prizes, and Apple's non-involvement.",
-  keywords: "iGen Connect lucky draw rules, meeting draw, vòng quay may mắn, thể lệ vòng quay",
+  title: "Wheel Selection Guide | iGen Connect",
+  description: "How iGen Connect randomly selects meeting participants for speaking, presenting, and group activities.",
+  keywords: "iGen Connect, random name picker, meeting participants, vòng quay chọn người, hướng dẫn vòng quay",
   path: "/lucky-draw-rules",
   image: SEO_DEFAULT_IMAGE,
   robots: "index, follow",

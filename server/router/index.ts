@@ -7,6 +7,7 @@ import { rolePermissionRouter } from "./role-permission.router";
 import { crudRouter } from "./crud.router";
 import { googleDriveRouter } from "./google-drive.router";
 import { chatRouter } from "./chat.router";
+import { contentSafetyRouter } from "./content-safety.router";
 import { chatbotRouter } from "./chatbot.router";
 import { resourceRouter } from "./resource.router";
 import { analyticsRouter } from "./analytics.router";
@@ -55,6 +56,7 @@ apiRouter.use("/resources", requireAuth, requireModule("resource"), resourceRout
 
 // Gắn kết router phụ của Xác thực JWT
 apiRouter.use("/auth", authRouter);
+apiRouter.use("/content-safety", contentSafetyRouter);
 apiRouter.use("/chapters", chapterRouter);
 
 // Gắn kết router phụ của Quản lý mã quyền hệ thống

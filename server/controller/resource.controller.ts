@@ -9,6 +9,7 @@ import {
 } from "../service/resource-access.service";
 import { resourceFileAccessService } from "../service/resource-file-access.service";
 import { ChatRoomModel } from "../model/chat-room.model";
+import { ChatUserBlockModel } from "../model/chat-safety.model";
 
 interface ZipFileItem {
   name: string;
@@ -77,12 +78,15 @@ async function getResourceAccessContext(req: AuthenticatedRequest): Promise<Reso
   if (!req.user) throw new Error("Người dùng chưa xác thực.");
   const companyCode = getCompanyCode(req);
   const permissions = await getEffectivePermissions(req.user.id, req.user.role, req.user.companyCode);
+  const blocks = await ChatUserBlockModel.find({ companyCode, $or: [{ userId: req.user.id }, { blockedUserId: req.user.id }] }).lean();
+  const peers = blocks.map(block => String(block.userId) === req.user!.id ? String(block.blockedUserId) : String(block.userId));
   return {
     companyCode,
     branchId: req.user.branchId,
     userId: req.user.id,
     role: req.user.role,
     permissions,
+    blockedChatUserIds: new Set(peers),
   };
 }
 

@@ -2,6 +2,8 @@ import { Router } from "express";
 import { chatController } from "../controller/chat.controller";
 import { requireAuth, requirePermission } from "../middleware/auth";
 import { validateRequest } from "../middleware/validation";
+import { chatSafetyRouter } from "./chat-safety.router";
+import { blockedChatPeers, sanitizeChatResponse } from "../service/chat-safety.service";
 import {
   setRoomBlockedSchema,
   createRoomSchema,
@@ -23,6 +25,18 @@ import {
 
 export const chatRouter = Router();
 chatRouter.use(requireAuth, requirePermission("chat:read"));
+chatRouter.use(async (req, res, next) => {
+  // Guard every chat response, including mutations returning a complete room.
+  // Moderation has separate permission and tenant checks.
+  if (req.path.startsWith("/moderation")) return next();
+  try {
+    const peers = await blockedChatPeers(req.user!.id, req.user!.companyCode || "SYSTEM");
+    const json = res.json.bind(res);
+    res.json = body => json(sanitizeChatResponse(JSON.parse(JSON.stringify(body)), req.user!.id, peers));
+    next();
+  } catch { res.status(503).json({ status: "error", message: "Chưa kiểm tra được quyền an toàn trò chuyện. Vui lòng thử lại." }); }
+});
+chatRouter.use(chatSafetyRouter);
 
 // Xem trước liên kết (OG metadata)
 chatRouter.get(

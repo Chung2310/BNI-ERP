@@ -25,8 +25,8 @@ export default function SettingsTab() {
   const { userProfile, uploadAvatar } = useAuth();
   const isAdmin = userProfile?.role === "admin";
 
-  const [photoURL, setPhotoURL] = useState(userProfile?.photoURL || "");
-  const [displayName, setDisplayName] = useState(userProfile?.displayName || "");
+  const photoURL = userProfile?.photoURL || "";
+  const displayName = userProfile?.displayName || "";
   const [uploading, setUploading] = useState(false);
 
   // Sub-tabs in Settings
@@ -37,12 +37,6 @@ export default function SettingsTab() {
   React.useEffect(() => {
     if (userProfile && !isAdmin && activeSubTab === "erp") setActiveSubTab("profile");
   }, [userProfile, isAdmin, activeSubTab, setActiveSubTab]);
-
-  // Synchronize display name and photo url from context if it updates
-  React.useEffect(() => {
-    if (userProfile?.displayName) setDisplayName(userProfile.displayName);
-    if (userProfile?.photoURL) setPhotoURL(userProfile.photoURL);
-  }, [userProfile?.displayName, userProfile?.photoURL]);
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -64,8 +58,7 @@ export default function SettingsTab() {
 
     setUploading(true);
     try {
-      const downloadURL = await uploadAvatar(file);
-      setPhotoURL(downloadURL);
+      await uploadAvatar(file);
     } catch (error) {
       console.error(error);
     } finally {

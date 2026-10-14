@@ -30,7 +30,7 @@ it("validates common meeting details and recurrence before creating the series",
 });
 it("automatically numbers each occurrence in date order and continues across batches", async () => {
  const reserve = vi.spyOn(sequence, "reserveMeetingNumbers").mockResolvedValueOnce(1).mockResolvedValueOnce(27);
- vi.spyOn(MeetingModel,"insertMany").mockImplementation(async (rows:any) => rows as any);
+ vi.spyOn(MeetingModel,"insertMany").mockImplementation(async rows => rows as never);
  const first = await createRecurringMeetings("BNI", "actor", { ...details, title: undefined, recurrence: rule });
  expect(first.map(row => row.title)).toEqual(Array.from({ length: 26 }, (_, index) => `Chapter #${index + 1}`));
  const next = await createRecurringMeetings("BNI", "actor", { ...details, title: "", recurrence: { ...rule, startDate: "2030-07-01" } });
@@ -41,7 +41,7 @@ it("automatically numbers each occurrence in date order and continues across bat
 
 it("allows renaming an automatically named occurrence independently", async () => {
  const meeting = { ...item(), title: "Chapter #1" };
- vi.spyOn(MeetingModel,"findOne").mockResolvedValue(meeting as any);
+ vi.spyOn(MeetingModel,"findOne").mockResolvedValue(meeting as unknown as Awaited<ReturnType<typeof MeetingModel.findOne>>);
  await updateMeeting("BNI", "one", { title: "Buổi giao lưu", version: 0 });
  expect(meeting.title).toBe("Buổi giao lưu");
  expect(meeting.seriesId).toBe("series");

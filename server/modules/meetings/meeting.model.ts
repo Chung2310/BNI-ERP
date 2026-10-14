@@ -5,6 +5,7 @@ const speaker = new Schema(
   {
     id: { type: String, required: true },
     userId: String,
+    deletedAccount: { type: Boolean, default: false },
     name: { type: String, required: true },
     email: String,
     phone: String,

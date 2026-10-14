@@ -94,11 +94,12 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     const decoded = jwt.verify(token, getJwtAccessSecret());
       if (typeof decoded === "string") throw new Error("Invalid token payload");
 
-    const userDoc = await UserModel.findById(decoded.id).select("branchId displayName role companyCode email disabledAt").lean();
+    const userDoc = await UserModel.findById(decoded.id).select("branchId displayName role companyCode email disabledAt deletionRequestedAt").lean();
     if (!userDoc) {
       return res.status(401).json({ status: "error", message: "Mã xác thực không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại." });
     }
     if (userDoc.disabledAt) return res.status(401).json({ status: "error", message: "Tài khoản đã bị vô hiệu hóa." });
+    if (userDoc.deletionRequestedAt) return res.status(401).json({ status: "error", message: "Tài khoản đang được xóa." });
 
     const currentRole = String(userDoc.role || "user");
     let currentCompanyCode = userDoc.companyCode ? String(userDoc.companyCode) : undefined;
@@ -119,7 +120,7 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       }
     }
     const accountOnlyPaths = new Set([
-      "/api/v1/auth/me", "/api/v1/auth/profile", "/api/v1/auth/logout",
+      "/api/v1/auth/me", "/api/v1/auth/me/deletion-options", "/api/v1/auth/profile", "/api/v1/auth/logout",
       "/api/v1/auth/change-password",
       "/api/v1/auth/profile/avatar",
       "/api/v1/auth/profile/image",
@@ -136,7 +137,7 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
         return res.status(403).json({ status: "error", message: "Superadmin chỉ được xem dữ liệu chapter đã chọn." });
       }
     }
-    if (currentCompanyCode && currentRole !== "superadmin" && await CompanyModel.exists({
+    if (currentCompanyCode && currentRole !== "superadmin" && !accountOnlyPaths.has(path) && await CompanyModel.exists({
       code: currentCompanyCode,
       lifecycleStatus: { $in: ["suspended", "archived", "scheduled-deletion"] },
     })) {

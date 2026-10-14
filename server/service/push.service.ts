@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { PushSubscriptionModel } from "../model/push-subscription.model";
+import { privatePushContent } from "./private-push-content";
 
 export interface PushPayload {
   title: string;
@@ -56,7 +57,7 @@ export const pushService = {
     const subscriptions = await PushSubscriptionModel.find({ uid }).lean();
     if (subscriptions.length === 0) return;
 
-    const data = JSON.stringify(payload);
+    const data = JSON.stringify({ ...payload, ...privatePushContent(payload.url === "/tro-chuyen") });
     await Promise.all(
       subscriptions.map(async (sub) => {
         try {

@@ -128,14 +128,14 @@ it.each(["live", "paused"])("disables cancellation and rescheduling in the list 
   expect((screen.getByRole("button", { name: "Dời lịch" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
-it("keeps scheduling actions outside the meeting operations modal", async () => {
+it("keeps scheduling actions accessible from the meeting header", async () => {
   mockApi();
   const day = await openDay();
   fireEvent.click(day.getByRole("button", { name: /07:00 · Họp tuần/ }));
   expect(screen.getByTitle("Đóng popup")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Hủy" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Dời lịch" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Xóa cuộc họp" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Dời lịch" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Xóa cuộc họp" })).toBeTruthy();
 });
 
 it("keeps ended meetings read-only but exposes deletion in calendar, list and detail views", async () => {
@@ -148,15 +148,15 @@ it("keeps ended meetings read-only but exposes deletion in calendar, list and de
   expect(screen.queryByTitle("Sửa cuộc họp")).toBeNull();
   expect(screen.getByText("Cuộc họp đã kết thúc. Bạn chỉ có thể xem thông tin và kết quả.")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Cấu hình địa điểm & thời gian" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: /Thuyết trình/ }));
+  fireEvent.click(screen.getByRole("tab", { name: /Thuyết trình/ }));
   expect(screen.queryByRole("button", { name: "Bắt đầu thuyết trình" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: /Quay thưởng/ }));
+  fireEvent.click(screen.getByRole("tab", { name: "Chọn người" }));
   expect(screen.queryByRole("link", { name: /Mở vòng quay/ })).toBeNull();
   expect(screen.queryByRole("button", { name: "Cài đặt" })).toBeNull();
   fireEvent.click(screen.getByTitle("Đóng popup"));
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   expect(screen.getByText("Họp tuần")).toBeTruthy();
   expect(screen.queryByTitle("Sửa cuộc họp")).toBeNull();
-  expect(screen.getByTitle("Xóa cuộc họp")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Xóa cuộc họp" })).toBeTruthy();
   expect(request.mock.calls.some(([, options]) => options?.method && options.method !== "GET")).toBe(false);
 });
