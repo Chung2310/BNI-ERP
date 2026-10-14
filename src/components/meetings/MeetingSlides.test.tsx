@@ -18,6 +18,26 @@ const meeting = { _id: "m", __v: 1, currentIndex: 1, status: "live", speakers: s
 beforeEach(() => vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(({ drawImage: vi.fn() } as unknown as Parameters<((value: ReturnType<typeof HTMLCanvasElement.prototype.getContext>) => void)>[0])));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
+it("puts the current and full restart controls above the slide", async () => {
+  const resetCurrent = vi.fn().mockResolvedValue(undefined);
+  const restartAll = vi.fn().mockResolvedValue(undefined);
+  render(<MeetingSlides
+    meeting={{ ...meeting, speakerStartedAt: new Date().toISOString(), elapsedSeconds: 4 }}
+    canManage
+    api={vi.fn().mockResolvedValue({ slides, version: 1 })}
+    onResetCurrentSpeaker={resetCurrent}
+    onRestartSpeakers={restartAll}
+  />);
+  fireEvent.click(await screen.findByRole("button", { name: "Đặt lại người này" }));
+  await waitFor(() => expect(resetCurrent).toHaveBeenCalledTimes(1));
+  expect(restartAll).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Chạy lại từ đầu" }));
+  expect(restartAll).not.toHaveBeenCalled();
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Chạy lại toàn bộ lượt phát biểu?" })).getByRole("button", { name: "Chạy lại từ đầu" }));
+  await waitFor(() => expect(restartAll).toHaveBeenCalledTimes(1));
+});
+
 it("checks multiple attendees and submits one batch while preserving the selection on failure", async () => {
   const defer = vi.fn().mockRejectedValueOnce(new Error("Thử lại" )).mockResolvedValue(undefined);
   const deck = [...slides, { ...slides[1], id: "c", name: "Người thứ ba" }];

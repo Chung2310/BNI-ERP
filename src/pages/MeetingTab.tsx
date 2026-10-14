@@ -198,6 +198,7 @@ function MeetingWorkspace() {
   const [tick, setTick] = useState(Date.now);
   const [saving, setSaving] = useState(false);
   const [finishRequested, setFinishRequested] = useState(false);
+  const [restartSpeakersRequested, setRestartSpeakersRequested] = useState(false);
   const [dismissedCompletion, setDismissedCompletion] = useState("");
   const [startPresentation, setStartPresentation] = useState(false);
   const [presentationSpeakerId, setPresentationSpeakerId] = useState("");
@@ -1353,6 +1354,8 @@ function MeetingWorkspace() {
                   onStartPresentation={canModifyActiveMeeting ? startPresentationTimer : undefined}
                   onMoveSpeaker={direction => requestMeetingControl(direction > 0 ? "next" : "previous")}
                   onTogglePause={() => control(activeMeeting.status === "paused" ? "resume" : "pause")}
+                  onResetCurrentSpeaker={canModifyActiveMeeting ? () => requestMeetingControl("reset_speaker") : undefined}
+                  onRestartSpeakers={canModifyActiveMeeting ? () => requestMeetingControl("restart_speakers") : undefined}
                   controlBusy={saving}
                   autoAdvance={autoAdvance}
                   onAutoAdvanceChange={updateAutoAdvance}
@@ -1687,8 +1690,32 @@ function MeetingWorkspace() {
                                       <span>Bấm giờ lại ({current.seconds}s)</span>
                                     </button>
                                   )}
+                                  {(Boolean(activeMeeting.speakerStartedAt) || activeMeeting.elapsedSeconds > 0) && (
+                                    <button
+                                      type="button"
+                                      disabled={saving}
+                                      onClick={() => control("reset_speaker")}
+                                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100 disabled:opacity-50"
+                                      title="Đưa đồng hồ của người hiện tại về 0 và chờ bắt đầu lại"
+                                    >
+                                      <RotateCcw className="h-3.5 w-3.5" />
+                                      <span>Đặt lại đồng hồ</span>
+                                    </button>
+                                  )}
                                 </div>
                               </div>
+                            )}
+
+                            {canManage && activeMeeting.speakers.length > 0 && ["live", "paused"].includes(activeMeeting.status) && (
+                              <button
+                                type="button"
+                                disabled={saving}
+                                onClick={() => setRestartSpeakersRequested(true)}
+                                className="flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                Bắt đầu lại lượt phát biểu
+                              </button>
                             )}
 
                             {/* Auto-Advance Setting Box */}
@@ -2239,6 +2266,24 @@ function MeetingWorkspace() {
       {canManage && completionKey && dismissedCompletion !== completionKey && <SpeechesCompleteDialog onClose={dismissCompletion} />}
       {bulkEditingMeeting && bulkEditingSeed && <MeetingSeriesBulkEditDialog key={bulkEditingMeeting._id} meeting={bulkEditingMeeting} meetings={bulkMeetingCandidates} seed={bulkEditingSeed} loading={bulkEditingLoading} saving={bulkEditingSaving} onClose={closeBulkEditSelection} onApply={applyBulkMeetingChanges} />}
       <ConfirmDialog isOpen={finishRequested} title="Kết thúc buổi họp?" description="Sau khi kết thúc, buổi họp ngừng nhận check-in và điều hành phát biểu." confirmLabel="Kết thúc buổi họp" isSubmitting={saving} onClose={() => setFinishRequested(false)} onConfirm={async () => { await control("finish"); setFinishRequested(false); }} />
+      <ConfirmDialog
+        isOpen={restartSpeakersRequested}
+        title="Bắt đầu lại lượt phát biểu?"
+        description="Toàn bộ tiến trình và thời gian thuyết trình sẽ được đặt lại từ đầu. Tiếp tục?"
+        confirmLabel="Bắt đầu lại"
+        tone="warning"
+        isSubmitting={saving}
+        onClose={() => setRestartSpeakersRequested(false)}
+        onConfirm={async () => {
+          try {
+            await requestMeetingControl("restart_speakers");
+            setRestartSpeakersRequested(false);
+            toast.success("Đã bắt đầu lại lượt phát biểu");
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Không thể bắt đầu lại lượt phát biểu.");
+          }
+        }}
+      />
       {/* POPUP XÁC NHẬN BẮT ĐẦU CUỘC HỌP */}
       <ConfirmDialog
         isOpen={!!startingMeeting}
