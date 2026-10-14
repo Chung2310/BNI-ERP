@@ -11,7 +11,7 @@ afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 const slots = defaultSpeakingTimeSlots();
 
 it.each([
-  ["2030-01-01T23:59:59.999Z", 15],
+  ["2030-01-01T23:59:59.999Z", 30],
   ["2030-01-02T00:00:00.000Z", 30],
   ["2030-01-02T00:59:59.999Z", 30],
   ["2030-01-02T01:00:00.000Z", 20],
@@ -21,6 +21,18 @@ it.each([
   ["invalid", 15],
 ])("allocates %s by Vietnam check-in time to %s seconds", (at, expected) => {
   expect(speakingSeconds(at, slots, 15, 999)).toBe(expected);
+});
+
+it("gives arrivals before the first slot its time even when slots are unsorted", () => {
+  const tiers = [
+    { startTime: "06:50", endTime: "07:00", seconds: 20 },
+    { startTime: "06:30", endTime: "06:45", seconds: 25 },
+    { startTime: "07:00", endTime: "07:15", seconds: 15 },
+  ];
+  expect(speakingSeconds("2030-01-01T23:29:59Z", tiers, 10)).toBe(25);
+  expect(speakingSeconds("2030-01-01T23:30:00Z", tiers, 10)).toBe(25);
+  expect(speakingSeconds("2030-01-01T23:47:00Z", tiers, 10)).toBe(10);
+  expect(speakingSeconds("2030-01-02T00:15:00Z", tiers, 10)).toBe(10);
 });
 
 it("uses a person's own check-in time after the speaking queue is reordered", () => {
@@ -33,6 +45,15 @@ it("uses a person's own check-in time after the speaking queue is reordered", ()
   expect(allocated.map(person => person.id)).toEqual(people.map(person => person.id));
   expect(allocated.map(person => person.seconds)).toEqual([20, 30, 30]);
   expect(people.map(person => person.seconds)).toEqual([0, 0, 0]);
+});
+
+it("reallocates early arrivals to the first slot without changing speaking order", () => {
+  const people = [
+    { id: "later", name: "Later", checkedInAt: "2030-01-02T00:10:00Z", seconds: 10 },
+    { id: "earlier", name: "Earlier", checkedInAt: "2030-01-01T23:30:00Z", seconds: 10 },
+  ];
+  expect(allocateSpeakers(people, slots, 15).map(person => person.seconds)).toEqual([30, 30]);
+  expect(people.map(person => person.seconds)).toEqual([10, 10]);
 });
 
 it.each([

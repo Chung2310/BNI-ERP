@@ -15,7 +15,7 @@ export function MeetingSpeakingTimeFields({ value, onChange, fallbackSeconds, on
   return (
     <fieldset className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-3">
       {!hideTitle && <legend className="px-1 font-bold text-slate-700">Thời lượng phát biểu theo giờ check-in</legend>}
-      <p className="text-xs text-slate-500">Áp dụng cho thành viên và khách mời, theo giờ Việt Nam. Tính từ giờ bắt đầu đến trước giờ kết thúc của mỗi khung.</p>
+      <p className="text-xs text-slate-500">Áp dụng cho thành viên và khách mời, theo giờ Việt Nam. Tính từ giờ bắt đầu đến trước giờ kết thúc của mỗi khung. Check-in trước khung đầu tiên được hưởng số giây của khung đó.</p>
       {value.map((slot, index) => (
         <div key={index} className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
           <label className="text-xs text-slate-600">Từ giờ
@@ -42,7 +42,7 @@ export function MeetingSpeakingTimeFields({ value, onChange, fallbackSeconds, on
       </button>
       <label className="block border-t border-slate-200 pt-3 text-xs font-semibold text-slate-700">Ngoài khung giờ (giây)
         <input required type="number" min={1} max={3600} value={fallbackSeconds} onChange={event => onFallbackChange(Number(event.target.value))} className={field} />
-        <span className="mt-1 block font-normal text-slate-500">Dùng khi giờ check-in không nằm trong các khung đã cấu hình.</span>
+        <span className="mt-1 block font-normal text-slate-500">Dùng sau khung cuối hoặc giữa các khung không liền nhau.</span>
       </label>
     </fieldset>
   );
