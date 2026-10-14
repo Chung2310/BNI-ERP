@@ -1,5 +1,7 @@
 import { ensureAutomaticResourceFolders } from "./resource-folder-provisioning.service";
 import mongoose from "mongoose";
+import { assertSafeContentText as assertSafeChatText } from "../utils/content-filter";
+import { queueResourceReview } from "./content-safety.service";
 import { ResourceItemModel, IResourceItem } from "../model/resource-item.model";
 import { CompanyModel } from "../model/company.model";
 import { googleDriveService, DriveFile } from "./google-drive.service";
@@ -179,7 +181,10 @@ export const resourceService = {
       const virtualItems: Array<{ _id: string; companyCode: string; section: string; type: string; name: string; parentId: null; fileUrl: string; mimeType: string; size: number; creatorUid: string; creatorName: string; isFixed: boolean; createdAt: Date; updatedAt: Date }> = [];
       let uniqueIndex = 1;
       
+      const { blockedChatPeers, visibleChatMessage } = await import("./chat-safety.service");
+      const peers = effectiveRequesterId ? await blockedChatPeers(effectiveRequesterId, companyCode) : [];
       for (const msg of messages) {
+        if (!effectiveRequesterId || !visibleChatMessage(msg, effectiveRequesterId, peers)) continue;
         if (msg.content) {
           const urlRegex = /(https?:\/\/[^\s]+)/g;
           const urls = msg.content.match(urlRegex);
@@ -312,6 +317,7 @@ export const resourceService = {
     input: { name: string; parentId?: string | null; section?: "local" | "drive"; roomId?: string | null },
     creator: ResourceCreator
   ) {
+    assertSafeChatText(input.name);
     const section = input.section || "local";
     const parentId = await this.assertParent(companyCode, section, input.parentId ?? null);
 
@@ -343,6 +349,8 @@ export const resourceService = {
     },
     creator: ResourceCreator
   ) {
+    assertSafeChatText(input.name);
+    if (!creator.uid || !mongoose.Types.ObjectId.isValid(creator.uid)) throw new Error("Không xác định được tài khoản tải lên.");
     let parentId = input.parentId ?? null;
     if (parentId === "google-documents") {
       let fixedFolder = await ResourceItemModel.findOne({
@@ -376,12 +384,14 @@ export const resourceService = {
       name: input.name.trim(),
       parentId,
       fileUrl: input.fileUrl,
+      awaitingReview: true,
       mimeType: input.mimeType || "",
       size: input.size || 0,
       creatorUid: creator.uid || "",
       creatorName: creator.name || "",
       roomId: input.roomId || null,
     });
+    await queueResourceReview(item);
     return item.toObject();
   },
 
@@ -393,9 +403,12 @@ export const resourceService = {
     input: { name: string; driveLink: string; driveType?: IResourceItem["driveType"] },
     creator: ResourceCreator
   ) {
+    assertSafeChatText(input.name);
+    if (!creator.uid || !mongoose.Types.ObjectId.isValid(creator.uid)) throw new Error("Không xác định được tài khoản tải lên.");
     const item = await ResourceItemModel.create({
       companyCode,
       section: "drive",
+      awaitingReview: true,
       type: "file",
       name: input.name.trim(),
       parentId: null,
@@ -404,6 +417,7 @@ export const resourceService = {
       creatorUid: creator.uid || "",
       creatorName: creator.name || "",
     });
+    await queueResourceReview(item);
     return item.toObject();
   },
 
@@ -411,6 +425,7 @@ export const resourceService = {
    * Đổi tên một mục.
    */
   async rename(companyCode: string, id: string, name: string, userId?: string, userRole?: string) {
+    assertSafeChatText(name);
     if (!isValidObjectId(id)) throw new Error("Mã tài nguyên không hợp lệ.");
     
     const query: Record<string, unknown> = { _id: id, companyCode };
@@ -542,6 +557,7 @@ export const resourceService = {
 
     const item = await ResourceItemModel.findOne(query).lean();
     if (!item) throw new Error("Không tìm thấy tài nguyên trong Thùng rác.");
+    if (item.moderationRejected) throw new Error("Nội dung đã bị gỡ do kiểm duyệt và không thể khôi phục từ Thùng rác.");
     assertResourceMutable(item);
 
     const idsToRestore: string[] = [String(item._id)];
@@ -560,7 +576,7 @@ export const resourceService = {
 
     // Khôi phục bằng cách đặt isDeleted: false và unset deletedAt để ngừng đếm ngược xóa vĩnh viễn
     await ResourceItemModel.updateMany(
-      { companyCode, _id: { $in: idsToRestore } },
+      { companyCode, _id: { $in: idsToRestore }, moderationRejected: { $ne: true } },
       { $set: { isDeleted: false }, $unset: { deletedAt: 1 } }
     );
 
@@ -632,6 +648,20 @@ export const resourceService = {
     const isAdmin = userRole === "admin";
     if (!isAdmin && userId && item.creatorUid !== userId) {
       throw new Error("Bạn không có quyền di chuyển tài nguyên này.");
+    }
+    const nextOwner = targetOwnerId || (targetOwnerId === null && targetRoomId === null ? userId : item.creatorUid);
+    if (nextOwner && nextOwner !== item.creatorUid) {
+      if (item.awaitingReview) throw new Error("Hãy chờ kiểm duyệt trước khi chuyển tài nguyên cho người khác.");
+      if (item.type === "folder") {
+        let parents = [String(item._id)];
+        const visited = new Set(parents);
+        while (parents.length) {
+          const children = await ResourceItemModel.find({ companyCode, parentId: { $in: parents }, isDeleted: { $ne: true } }).select("_id type awaitingReview").lean();
+          if (children.some(child => child.awaitingReview)) throw new Error("Thư mục còn tệp chờ kiểm duyệt. Hãy chờ duyệt trước khi chuyển cho người khác.");
+          parents = children.filter(child => child.type === "folder" && !visited.has(String(child._id))).map(child => String(child._id));
+          parents.forEach(parent => visited.add(parent));
+        }
+      }
     }
 
     // 2. Chuẩn hóa parentId đích
@@ -756,6 +786,7 @@ export const resourceService = {
     if (!isValidObjectId(id)) throw new Error("Mã tài nguyên không hợp lệ.");
     const item = await ResourceItemModel.findOne({ _id: id, companyCode }).lean();
     if (!item) throw new Error("Không tìm thấy tài nguyên.");
+    if (item.awaitingReview && shares.length) throw new Error("Tài nguyên đang chờ kiểm duyệt. Hãy chờ duyệt trước khi chia sẻ.");
     assertResourceMutable(item);
 
     const isAdmin = userRole === "admin";

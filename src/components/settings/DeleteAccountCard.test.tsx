@@ -6,6 +6,7 @@ import DeleteAccountCard from "./DeleteAccountCard";
 const auth = vi.hoisted(() => ({ userProfile: { role: "user", email: "me@example.com" }, deleteOwnAccount: vi.fn() }));
 vi.mock("../../context/AuthContext", () => ({ useAuth: () => auth }));
 vi.mock("../../pages/Toast", () => ({ toast: { error: vi.fn() } }));
+vi.mock("../../services/authService", () => ({ authService: { accountDeletionOptions: vi.fn(async () => ({ requiresTransfer: false, archivesChapter: false, successors: [] })) } }));
 afterEach(cleanup);
 beforeEach(() => { auth.userProfile.role = "user"; auth.deleteOwnAccount.mockReset().mockResolvedValue(undefined); });
 function openForm() {
@@ -19,8 +20,9 @@ it("requires both password and confirmation before submitting", async () => {
   fireEvent.change(screen.getByLabelText("Mật khẩu hiện tại"), { target: { value: "password" } });
   expect(submit.disabled).toBe(true);
   fireEvent.change(screen.getByLabelText("Nhập XÓA TÀI KHOẢN để xác nhận"), { target: { value: "XÓA TÀI KHOẢN" } });
+  await waitFor(() => expect(submit.disabled).toBe(false));
   fireEvent.click(submit);
-  await waitFor(() => expect(auth.deleteOwnAccount).toHaveBeenCalledWith("password", "XÓA TÀI KHOẢN"));
+  await waitFor(() => expect(auth.deleteOwnAccount).toHaveBeenCalledWith("password", "XÓA TÀI KHOẢN", undefined));
 });
 it("cancels without deleting and clears credentials", () => {
   openForm();
@@ -35,12 +37,13 @@ it("retains the account and permits retry after a deletion error", async () => {
   openForm();
   fireEvent.change(screen.getByLabelText("Mật khẩu hiện tại"), { target: { value: "wrong" } });
   fireEvent.change(screen.getByLabelText("Nhập XÓA TÀI KHOẢN để xác nhận"), { target: { value: "XÓA TÀI KHOẢN" } });
+  await waitFor(() => expect((screen.getByRole("button", { name: "Xóa vĩnh viễn tài khoản" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Xóa vĩnh viễn tài khoản" }));
   await waitFor(() => expect((screen.getByLabelText("Mật khẩu hiện tại") as HTMLInputElement).value).toBe(""));
   expect((screen.getByRole("button", { name: "Hủy" }) as HTMLButtonElement).disabled).toBe(false);
 });
-it("does not offer self-deletion to administrators", () => {
+it("offers account deletion to administrators", () => {
   auth.userProfile.role = "admin";
   render(<DeleteAccountCard />);
-  expect(screen.queryByRole("button", { name: "Xóa tài khoản của tôi" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Xóa tài khoản của tôi" })).toBeTruthy();
 });

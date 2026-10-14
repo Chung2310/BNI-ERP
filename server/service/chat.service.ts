@@ -1,5 +1,7 @@
 import { entityId } from "../../src/utils/entityId";
 import { assertChatNotBlocked } from "./chat-blocking";
+import { assertSafeChatText, blockedChatPeers, sanitizeChatRoom } from "./chat-safety.service";
+import { ChatReportModel } from "../model/chat-safety.model";
 import { ChatRoomModel } from "../model/chat-room.model";
 import { ChatMessageModel } from "../model/chat-message.model";
 import { chatResourceIndexingService } from "./chat-resource-indexing.service";
@@ -41,9 +43,11 @@ export const chatService = {
    * Lấy danh sách các phòng chat mà người dùng tham gia
    */
   async getRooms(userId: string, companyCode: string) {
+    const blockedPeers = await blockedChatPeers(userId, companyCode);
     // Tự động tạo phòng "Cloud của tôi" nếu chưa có
     const cloudRoom = await ChatRoomModel.findOne({
       isGroup: false,
+      hasDeletedMember: { $ne: true },
       isChatbot: { $ne: true },
       companyCode,
       creatorId: userId,
@@ -85,10 +89,11 @@ export const chatService = {
       rooms.map(async (room) => {
         const unreadCount = await ChatMessageModel.countDocuments({
           roomId: room._id,
-          senderId: { $ne: userId },
+          senderId: { $nin: [userId, ...blockedPeers] },
+          awaitingReview: { $ne: true },
           readBy: { $ne: userId },
         });
-        return { ...room, unreadCount };
+        return { ...sanitizeChatRoom(room, userId, blockedPeers), unreadCount };
       })
     );
 
@@ -136,7 +141,7 @@ export const chatService = {
       throw new Error("Không tìm thấy phòng chat hoặc bạn không có quyền truy cập.");
     }
 
-    return room;
+    return sanitizeChatRoom(room, userId, await blockedChatPeers(userId, companyCode));
   },
 
   /**
@@ -481,10 +486,16 @@ export const chatService = {
 
     assertChatNotBlocked(room);
 
+    assertSafeChatText([content, ...attachments.map(item => item.name)].join(" "));
+    const blockedPeers = await blockedChatPeers(senderId, companyCode);
+    if (!room.isGroup && room.members.some(member => blockedPeers.includes(entityId(member.userId)))) throw Object.assign(new Error("Không thể gửi tin nhắn cho người dùng đã chặn."), { statusCode: 403 });
+    if (replyTo && !await ChatMessageModel.exists({ _id: replyTo, roomId, senderId: { $nin: blockedPeers }, awaitingReview: { $ne: true }, isDeleted: { $ne: true } })) throw new Error("Tin nhắn trả lời không còn khả dụng.");
+
     const sender = await UserModel.findById(senderId).lean();
     if (!sender) {
       throw new Error("Không tìm thấy thông tin tài khoản người gửi.");
     }
+    if (sender.deletionRequestedAt) throw new Error("Tài khoản đang được xóa.");
 
     // Tạo tin nhắn mới
     const message = new ChatMessageModel({
@@ -494,12 +505,14 @@ export const chatService = {
       senderPhoto: sender.photoURL || "",
       content,
       attachments,
+      awaitingReview: attachments.length > 0,
       replyTo: replyTo || undefined,
       readBy: [senderId], // Đánh dấu chính người gửi đã đọc
     });
 
     const savedMessage = await message.save();
-    await chatResourceIndexingService.finalizeMessage({
+    if (savedMessage.awaitingReview) await ChatReportModel.create({ companyCode, roomId, messageId: savedMessage._id, reporterId: senderId, reportedUserId: senderId, reason: "media_review" });
+    else await chatResourceIndexingService.finalizeMessage({
       companyCode,
       actorId: senderId,
       actorName: sender.displayName || sender.email,
@@ -513,7 +526,7 @@ export const chatService = {
     return (await ChatMessageModel.findById(savedMessage._id)
       .populate({
         path: "replyTo",
-        select: "senderName content attachments isDeleted"
+        select: "senderId senderName content attachments isDeleted awaitingReview"
       })
       .exec())!;
   },
@@ -540,7 +553,8 @@ export const chatService = {
       throw new Error("Phòng chat không tồn tại hoặc bạn không phải là thành viên.");
     }
 
-    const query: Record<string, unknown> = { roomId };
+    const blockedPeers = await blockedChatPeers(userId, companyCode);
+    const query: Record<string, unknown> = { roomId, senderId: { $nin: blockedPeers }, $or: [{ awaitingReview: { $ne: true } }, { senderId: userId }] };
     if (beforeDate) {
       query.createdAt = { $lt: beforeDate };
     }
@@ -550,7 +564,8 @@ export const chatService = {
       .limit(limit)
       .populate({
         path: "replyTo",
-        select: "senderName content attachments isDeleted"
+        select: "senderId senderName content attachments isDeleted awaitingReview",
+        match: { roomId, senderId: { $nin: blockedPeers }, awaitingReview: { $ne: true } },
       })
       .exec();
 
@@ -687,6 +702,7 @@ export const chatService = {
     if (!message) {
       throw new Error("Tin nhắn không tồn tại trong phòng này.");
     }
+    if (message.awaitingReview || message.isDeleted) throw new Error("Chỉ được ghim nội dung đã duyệt và chưa bị gỡ.");
 
     if (!room.pinnedMessageIds) {
       room.pinnedMessageIds = [];
@@ -808,6 +824,7 @@ export const chatService = {
     }
 
     const trimmed = String(content || "").trim();
+    assertSafeChatText(trimmed);
     if (!trimmed) {
       throw new Error("Nội dung tin nhắn không được để trống.");
     }
@@ -817,7 +834,7 @@ export const chatService = {
     await message.save();
 
     return (await ChatMessageModel.findById(messageId)
-      .populate({ path: "replyTo", select: "senderName content attachments isDeleted" })
+      .populate({ path: "replyTo", select: "senderId senderName content attachments isDeleted awaitingReview", match: { roomId, senderId: { $nin: await blockedChatPeers(userId, companyCode) }, awaitingReview: { $ne: true } } })
       .exec())!;
   },
 
@@ -868,7 +885,7 @@ export const chatService = {
     await message.save();
 
     return (await ChatMessageModel.findById(messageId)
-      .populate({ path: "replyTo", select: "senderName content attachments isDeleted" })
+      .populate({ path: "replyTo", select: "senderId senderName content attachments isDeleted awaitingReview", match: { roomId, senderId: { $nin: await blockedChatPeers(userId, companyCode) }, awaitingReview: { $ne: true } } })
       .exec())!;
   },
 
@@ -897,6 +914,8 @@ export const chatService = {
     const queryObj: Record<string, unknown> = {
       roomId,
       isDeleted: { $ne: true },
+      senderId: { $nin: await blockedChatPeers(userId, companyCode) },
+      awaitingReview: { $ne: true },
     };
 
     const cleanQuery = (query || "").trim();
@@ -942,7 +961,7 @@ export const chatService = {
       .sort({ createdAt: -1 })
       .populate({
         path: "replyTo",
-        select: "senderName content attachments isDeleted",
+        select: "senderId senderName content attachments isDeleted awaitingReview",
       })
       .exec();
   },

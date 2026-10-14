@@ -62,6 +62,7 @@ export interface PendingUploadRecord {
   storagePublicId?: string;
   storageResourceType?: string;
   status: "pending" | "finalized";
+  heldForReview?: boolean;
   finalizedResourceId?: string;
   createdAt: Date;
   expiresAt: Date;
@@ -117,7 +118,7 @@ const mongooseRepository: PendingUploadRepository = {
     return record ? toRecord(record) : null;
   },
   async findExpired(expiresBefore, limit) {
-    const records = await PendingUploadModel.find({ expiresAt: { $lte: expiresBefore } })
+    const records = await PendingUploadModel.find({ expiresAt: { $lte: expiresBefore }, heldForReview: { $ne: true } })
       .sort({ expiresAt: 1 })
       .limit(limit)
       .lean();
@@ -160,7 +161,7 @@ export function createManagedUploadService(dependencies: ManagedUploadDependenci
     if (!actor.trusted && pending.actorId !== actor.actorId) {
       throw new Error("Upload không thuộc người tải lên hiện tại.");
     }
-    if (pending.status === "pending" && pending.expiresAt.getTime() <= now().getTime()) {
+    if (pending.status === "pending" && !pending.heldForReview && pending.expiresAt.getTime() <= now().getTime()) {
       throw new Error("Upload đang chờ đã hết hạn.");
     }
     return pending;

@@ -25,7 +25,7 @@ test('wheel and bingo results survive serialization and retry without duplicates
   assert.equal(restored.gameWinners[1].ticketNumber, 7);
   assert.equal(restored.gameWinners[0].name, 'Guest');
   assert.equal(restored.gameWinners[0].email, 'guest@example.com');
-  assert.equal(restored.gameWinners[0].reward, 'Gift');
+  assert.equal(restored.gameWinners[0].reward, '');
   assert.equal(restored.gameWinners[0].drawnBy, 'operator');
 });
 

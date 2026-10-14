@@ -16,9 +16,9 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
-  delete (document as any).fullscreenElement;
-  delete (document as any).exitFullscreen;
-  delete (document.documentElement as any).requestFullscreen;
+  Reflect.deleteProperty(document, "fullscreenElement");
+  Reflect.deleteProperty(document, "exitFullscreen");
+  Reflect.deleteProperty(document.documentElement, "requestFullscreen");
   vi.clearAllMocks();
 });
 

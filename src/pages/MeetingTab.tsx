@@ -27,7 +27,6 @@ import {
   Users,
   Gift,
   Play,
-  Pause,
   Square,
   MapPin,
   X,
@@ -35,7 +34,6 @@ import {
   Pencil,
   ExternalLink,
   ChevronRight,
-  Sparkles,
   RotateCcw,
   ArrowDownToLine,
   Maximize2,
@@ -170,9 +168,12 @@ function MeetingWorkspace() {
     setFlowStep(step);
     setSlidesOpen(true);
   }, []);
-  const meetingFlowSteps = useRef(new Map<string, MeetingFlowStep>());
+  const [meetingFlowSteps, setMeetingFlowSteps] = useState<Record<string, MeetingFlowStep>>({});
+  if (detailMeetingId && canManage && meetingFlowSteps[detailMeetingId] !== flowStep) {
+    setMeetingFlowSteps({ ...meetingFlowSteps, [detailMeetingId]: flowStep });
+  }
   const getMeetingFlowStep = (meetingId: string): MeetingFlowStep => {
-    const inMemory = meetingFlowSteps.current.get(meetingId);
+    const inMemory = meetingFlowSteps[meetingId];
     if (inMemory && DEFAULT_MEETING_FLOW.includes(inMemory)) return inMemory;
     try {
       const saved = localStorage.getItem("bni_meeting_flow_step:" + meetingId);
@@ -185,7 +186,6 @@ function MeetingWorkspace() {
   };
   useEffect(() => {
     if (!detailMeetingId || !canManage) return;
-    meetingFlowSteps.current.set(detailMeetingId, flowStep);
     try {
       localStorage.setItem("bni_meeting_flow_step:" + detailMeetingId, flowStep);
     } catch { /* The in-memory state still remembers the step during this visit. */ }
@@ -279,7 +279,8 @@ function MeetingWorkspace() {
   const [fallbackSeconds, setFallbackSeconds] = useState(20);
 
   // Edit Meeting Modal state
-  const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
+  const [editingMeetingSelection, setEditingMeeting] = useState<Meeting | null>(null);
+  const editingMeeting = editingMeetingSelection && !items.some(item => item._id === editingMeetingSelection._id && item.status === "ended") ? editingMeetingSelection : null;
   const [bulkEditingMeeting, setBulkEditingMeeting] = useState<Meeting | null>(null);
   const [bulkMeetingCandidates, setBulkMeetingCandidates] = useState<Meeting[]>([]);
   const [bulkEditingSeed, setBulkEditingSeed] = useState<MeetingSeriesBulkEditSeed | null>(null);
@@ -378,16 +379,16 @@ function MeetingWorkspace() {
     };
   }, [activeMeeting?._id, activeMeeting?.status, flowStep, slidesOpen]);
 
-  useEffect(() => {
-    if (editingMeeting && items.some(item => item._id === editingMeeting._id && item.status === "ended")) setEditingMeeting(null);
-  }, [items, editingMeeting]);
   const activePresentationSpeakerId = activeMeeting?.speakers[activeMeeting.currentIndex]?.id;
-  useEffect(() => {
+  const selectionScope = JSON.stringify([activeMeeting?._id, activePresentationSpeakerId]);
+  const [previousSelectionScope, setPreviousSelectionScope] = useState(selectionScope);
+  if (previousSelectionScope !== selectionScope) {
+    setPreviousSelectionScope(selectionScope);
     setPresentationSpeakerId("");
     setCheckedSpeakerIds([]);
     setSpeakerSearch("");
     setSpeakerTypeFilter("all");
-  }, [activeMeeting?._id, activePresentationSpeakerId]);
+  }
 
   const speakersWithIndex = useMemo(() => {
     if (!activeMeeting?.speakers) return [];
@@ -748,7 +749,7 @@ function MeetingWorkspace() {
       autoStartPresentation.current = false;
       setSaving(false);
     }
-  }, [activeMeeting?._id, canManage]);
+  }, [activeMeeting, canManage]);
 
   const current = activeMeeting && ["live", "paused"].includes(activeMeeting.status) ? activeMeeting.speakers[activeMeeting.currentIndex] : undefined;
   const upcoming = activeMeeting && !["ended", "cancelled"].includes(activeMeeting.status) ? activeMeeting.speakers[activeMeeting.status === "scheduled" ? 0 : activeMeeting.currentIndex + 1] : undefined;
@@ -1981,10 +1982,10 @@ function MeetingWorkspace() {
 
               {flowStep === "interaction" && <MeetingInteractionTab meeting={activeMeeting} canManage={canModifyActiveMeeting} onRefreshMeeting={refresh} />}
 
-              {/* SUBTAB 2: VÒNG QUAY MAY MẮN (RANDOM.ORG) */}
+              {/* SUBTAB 2: VÒNG QUAY CHỌN NGƯỜI (RANDOM.ORG) */}
               {flowStep === "luckyDraw" && (
                 <LuckyDrawTab
-                  meeting={activeMeeting as any}
+                  meeting={activeMeeting}
                   canManage={canModifyActiveMeeting}
                   onRefreshMeeting={refresh}
                   onStartMeeting={() => control("start")}
@@ -2288,7 +2289,7 @@ function MeetingWorkspace() {
       <ConfirmDialog
         isOpen={!!deletingMeeting}
         title="Xác nhận xóa cuộc họp"
-        description={`Bạn có chắc chắn muốn xóa cuộc họp "${deletingMeeting?.title}"? Toàn bộ danh sách diễn giả check-in và dữ liệu quay thưởng của cuộc họp này sẽ bị xóa hoàn toàn.`}
+        description={`Bạn có chắc chắn muốn xóa cuộc họp "${deletingMeeting?.title}"? Toàn bộ danh sách diễn giả check-in và dữ liệu quay chọn người của cuộc họp này sẽ bị xóa hoàn toàn.`}
         tone="danger"
         confirmLabel="Xóa cuộc họp"
         cancelLabel="Hủy"

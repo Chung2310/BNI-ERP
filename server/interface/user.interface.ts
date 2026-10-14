@@ -23,6 +23,12 @@ export interface IUser extends Document {
   photoURL?: string;
   coverImage?: string;
   galleryImages?: string[];
+  profileMediaPending?: boolean;
+  pendingProfileMedia?: {
+    revision: string;
+    values: { photoURL?: string; coverImage?: string; galleryImages?: string[] };
+    uploads?: { photoUploadToken?: string; coverUploadToken?: string; galleryUploadTokens?: { index: number; uploadToken: string }[] };
+  };
   industry?: string;
   role: string;
   createdAt: Date;
@@ -36,6 +42,7 @@ export interface IUser extends Document {
   parentId?: string;
   status?: "online" | "offline";
   disabledAt?: Date | null;
+  deletionRequestedAt?: Date | null;
   companyCode?: string;
   companyName?: string;
   membershipStatus?: "none" | "active";

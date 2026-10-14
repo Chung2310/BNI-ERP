@@ -18,11 +18,11 @@ export const browserNotificationService = {
     return Notification.permission;
   },
 
-  show(title: string, options: { body?: string; tag?: string; onClick?: () => void }) {
+  show(_title: string, options: { body?: string; tag?: string; onClick?: () => void }) {
     if (!this.isSupported() || Notification.permission !== "granted") return;
     try {
-      const notification = new Notification(title, {
-        body: options.body,
+      const notification = new Notification("iGen Connect", {
+        body: "Bạn có thông báo mới. Mở ứng dụng để xem.",
         tag: options.tag,
         icon: "/igen-connect.png",
       });

@@ -353,7 +353,7 @@ export default function ChatTab() {
         if (activeRoom && activeRoom._id === data.roomId) {
           setMessages((prevMsgs) => {
             // Tránh trùng lặp tin nhắn
-            if (prevMsgs.some((m) => m._id === data.message._id)) return prevMsgs;
+            if (prevMsgs.some((m) => m._id === data.message._id)) return prevMsgs.map(message => message._id === data.message._id ? data.message : message);
 
             // Nếu tin nhắn là của chính mình gửi, thử tìm xem có tin nhắn tạm (temp-) nào trong danh sách không
             const msgSenderId = data.message.senderId && typeof data.message.senderId === "object"
@@ -558,7 +558,12 @@ export default function ChatTab() {
       }
     );
 
+    const unsubscribeSafety = socketService.on("internal_safety_changed", () => {
+      void internalChatService.getRooms().then(setRooms).catch(() => undefined);
+      if (activeRoom) void internalChatService.getMessages(activeRoom._id).then(setMessages).catch(() => undefined);
+    });
     return () => {
+      unsubscribeSafety();
       unsubscribeNewMsg();
       unsubscribeRoomUpdate();
       unsubscribeRoomDeleted();
@@ -1605,6 +1610,7 @@ export default function ChatTab() {
   // Format Room display Name
   const getRoomName = (room: ChatRoom) => {
     if (room.isGroup) return room.name || "Nhóm trò chuyện";
+    if (room.hasDeletedMember) return "Tài khoản đã xóa";
 
     // Phòng Cloud của tôi (chỉ có 1 thành viên là chính mình)
     if (room.members.length === 1) {
@@ -1621,6 +1627,7 @@ export default function ChatTab() {
   // Format Room display Avatar
   const getRoomAvatar = (room: ChatRoom) => {
     if (room.isGroup) return room.avatarURL || "";
+    if (room.hasDeletedMember) return "";
 
     // Phòng Cloud của tôi (chỉ có 1 thành viên là chính mình)
     if (room.members.length === 1) {
@@ -2394,6 +2401,7 @@ export default function ChatTab() {
                               )}
 
                               {/* Bubble */}
+                              {msg.awaitingReview ? <p className="text-xs text-amber-700">Đang chờ quản trị viên duyệt tệp đính kèm</p> : null}
                               <div
                                 className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm transition-all duration-300 ${isMe
                                   ? "bg-gradient-to-br from-indigo-650 via-indigo-600 to-violet-600 text-white rounded-tr-none shadow-md shadow-indigo-100/40"

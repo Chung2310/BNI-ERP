@@ -23,7 +23,7 @@ interface AuthContextType {
   registerWithEmail: (email: string, password: string, displayName: string, rememberMe?: boolean) => Promise<void>;
   loginWithGoogle: (rememberMe?: boolean) => Promise<void>;
   logout: () => Promise<void>;
-  deleteOwnAccount: (password: string, confirmation: string) => Promise<void>;
+  deleteOwnAccount: (password: string, confirmation: string, successorId?: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateProfileInfo: (displayName: string, photoURL: string, details?: PersonalProfileDetails) => Promise<void>;
   uploadAvatar: (file: File) => Promise<string>;
@@ -191,13 +191,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const deleteOwnAccount = async (password: string, confirmation: string) => {
-    await authService.deleteOwnAccount(password, confirmation);
+  const deleteOwnAccount = async (password: string, confirmation: string, successorId?: string) => {
+    await authService.deleteOwnAccount(password, confirmation, successorId);
     localStorage.removeItem("accessToken");
+    localStorage.removeItem("igen_device_id");
+    localStorage.removeItem("superadmin_active_chapter");
+    localStorage.removeItem("meeting_interaction_name");
     socketService.disconnect();
     setUser(null);
     setUserProfile(null);
-    toast.success("Đã xóa tài khoản của bạn.");
+    toast.success("Đã tiếp nhận yêu cầu xóa tài khoản và dữ liệu.");
   };
   async function logout() {
     setLoading(true);

@@ -4,6 +4,7 @@ import { INotification, NotifType } from "../interface/notification.interface";
 import { UserModel } from "../model/user.model";
 import { emitToUser } from "../socket";
 import { mobilePushService } from "./mobile-push.service";
+import { privatePushContent } from "./private-push-content";
 
 export const notificationService = {
   /**
@@ -69,8 +70,7 @@ export const notificationService = {
         notification.toObject()
       );
       void mobilePushService.sendToUser(recipientUid, {
-        title: notification.title,
-        body: notification.body,
+        ...privatePushContent(),
         notificationId: notification._id.toString(),
         type: notification.type,
       }).catch((error) => {

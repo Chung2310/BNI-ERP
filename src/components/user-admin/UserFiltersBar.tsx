@@ -1,6 +1,6 @@
 import { Search } from "lucide-react";
 
-﻿interface Props {
+interface Props {
   searchQuery: string;
   filterStartDate: string;
   filterEndDate: string;

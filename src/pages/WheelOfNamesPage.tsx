@@ -63,8 +63,9 @@ export interface Participant {
 const normalizedIdentity = (value?: string) => (value || "").trim().toLocaleLowerCase("vi");
 
 export function buildMeetingParticipants(users: UserProfile[], speakers: Speaker[]): Participant[] {
+  speakers = speakers.filter((speaker) => !speaker.deletedAccount);
   const matchedSpeakerIds = new Set<string>();
-  const loadedMembers: Participant[] = users.map(user => {
+  const loadedMembers: Participant[] = users.filter((user) => user.isActive !== false).map(user => {
     const memberIds = [user.uid, user.id, user._id].filter(Boolean).map(String);
     const memberName = (user.displayName || user.email?.split("@")[0] || "Thành viên").trim();
     const memberEmail = normalizedIdentity(user.email);
@@ -286,7 +287,7 @@ export default function WheelOfNamesPage() {
     try {
       await meetingService.recordGameWinner(entry.meetingId, entry.winner);
       setUnsavedResults(previous => previous.filter(result => result.winner.id !== entry.winner.id));
-    } catch (error) { console.error("Không thể lưu kết quả quay thưởng:", error); }
+    } catch (error) { console.error("Không thể lưu kết quả quay chọn người:", error); }
   };
   const persistWinner = (record: WinnerRecord, participant: Participant, source: "wheel" | "bingo", ticketNumber?: number) => {
     if (!resultMeetingId) return;
@@ -304,7 +305,7 @@ export default function WheelOfNamesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [newGuestName, setNewGuestName] = useState("");
   const [filterCategory, setFilterCategory] = useState<ParticipantFilterCategory>("all");
-  const [currentPrize, setCurrentPrize] = useState("Giải Thưởng May Mắn");
+  const [currentPrize, setCurrentPrize] = useState("Chọn người tham gia");
   const [isEditingPrize, setIsEditingPrize] = useState(false);
   const [prizeInput, setPrizeInput] = useState(currentPrize);
 
@@ -1826,7 +1827,7 @@ export default function WheelOfNamesPage() {
   // Export winners to CSV
   const handleExportWinners = () => {
     if (winners.length === 0) return;
-    const header = "STT,Tên người trúng giải,Giải thưởng,Doanh nghiệp / Vai trò,Thời gian trúng\n";
+    const header = "STT,Tên người được chọn,Lượt chọn,Doanh nghiệp / Vai trò,Thời gian chọn\n";
     const rows = winners
       .map(
         (w, idx) =>
@@ -1880,7 +1881,7 @@ export default function WheelOfNamesPage() {
               className="h-7 w-7 rounded-md border border-slate-200 object-cover"
             />
 
-            <span className="text-sm font-semibold text-slate-800">Quay thưởng</span>
+            <span className="text-sm font-semibold text-slate-800">Quay chọn người</span>
 
             <span className="rounded bg-[#cf142b] px-1.5 py-0.5 text-[9px] font-semibold text-white uppercase tracking-wide">
               {userProfile?.companyName || userProfile?.companyCode || "BNI"}
@@ -1927,7 +1928,7 @@ export default function WheelOfNamesPage() {
                   onChange={(e) => setPrizeInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      setCurrentPrize(prizeInput.trim() || "Giải Thưởng May Mắn");
+                      setCurrentPrize(prizeInput.trim() || "Chọn người tham gia");
                       setIsEditingPrize(false);
                     }
                   }}
@@ -1937,7 +1938,7 @@ export default function WheelOfNamesPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setCurrentPrize(prizeInput.trim() || "Giải Thưởng May Mắn");
+                    setCurrentPrize(prizeInput.trim() || "Chọn người tham gia");
                     setIsEditingPrize(false);
                   }}
                   className="text-emerald-600 hover:text-emerald-700 p-0.5 cursor-pointer"
@@ -2093,7 +2094,7 @@ export default function WheelOfNamesPage() {
             }`}
           >
             <Trophy className="h-4 w-4" />
-            <span>Trúng giải ({winners.length})</span>
+            <span>Đã chọn ({winners.length})</span>
           </button>
 
           <button
@@ -2416,7 +2417,7 @@ export default function WheelOfNamesPage() {
         {activeDrawerTab === "winners" && (
           <div className="flex flex-1 flex-col overflow-hidden p-4 space-y-4 bg-white">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <span className="text-xs text-slate-700 font-bold">Lịch sử trúng giải hôm nay</span>
+              <span className="text-xs text-slate-700 font-bold">Lịch sử được chọn hôm nay</span>
               {winners.length > 0 && (
                 <div className="flex items-center gap-2">
                   <button
@@ -2447,7 +2448,7 @@ export default function WheelOfNamesPage() {
               {winners.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center text-slate-400 space-y-2">
                   <Trophy className="h-8 w-8 text-slate-300" />
-                  <p className="text-xs">Chưa có ai trúng thưởng. Hãy bấm QUAY để bắt đầu!</p>
+                  <p className="text-xs">Chưa có ai được chọn. Hãy bấm QUAY để bắt đầu!</p>
                 </div>
               ) : (
                 winners.map((w, idx) => (
@@ -2508,13 +2509,13 @@ export default function WheelOfNamesPage() {
               <span>
                 {winnerModal.ballNumber
                   ? `LỒNG CẦU BINGO • BÓNG SỐ #${winnerModal.ballNumber}`
-                  : "CHÚC MỪNG CHIẾN THẮNG"}
+                  : "NGƯỜI ĐƯỢC CHỌN"}
               </span>
             </div>
 
             {/* Prize Label */}
             <p className="text-sm font-semibold text-slate-600 mb-2">
-              Đã trúng: <span className="text-[#cf142b] font-bold">{winnerModal.prize}</span>
+              Lượt chọn: <span className="text-[#cf142b] font-bold">{winnerModal.prize}</span>
             </p>
 
             {/* Winner Big Display */}

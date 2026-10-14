@@ -18,8 +18,8 @@ it("lets users open any meeting section without sequential step controls", () =>
   expect(screen.queryByText(/Bước \d/)).toBeNull();
   expect(screen.queryByRole("button", { name: /Quay lại|Tiếp tục/ })).toBeNull();
 
-  fireEvent.click(screen.getByRole("tab", { name: "Quay thưởng" }));
-  expect(screen.getByRole("tab", { name: "Quay thưởng" }).getAttribute("aria-selected")).toBe("true");
+  fireEvent.click(screen.getByRole("tab", { name: "Chọn người" }));
+  expect(screen.getByRole("tab", { name: "Chọn người" }).getAttribute("aria-selected")).toBe("true");
 
   fireEvent.click(screen.getByRole("tab", { name: "Tương tác" }));
   expect(screen.getByRole("tab", { name: "Tương tác" }).getAttribute("aria-selected")).toBe("true");

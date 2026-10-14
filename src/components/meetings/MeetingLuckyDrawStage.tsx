@@ -23,8 +23,10 @@ function shortLabel(value: string) {
 export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
   const wheel = useRef<SVGGElement>(null);
   const slideRequestSignature = useRef("");
-  const clock = useRef({ server: now, local: performance.now() });
-  clock.current = { server: now, local: performance.now() };
+  const clock = useRef({ server: 0, local: 0 });
+  useEffect(() => {
+    clock.current = { server: now, local: performance.now() };
+  }, [now]);
 
   const state = presentationState(meeting.presentation);
   const [additionalSlides, setAdditionalSlides] = useState<ProfileSlide[]>([]);
@@ -55,6 +57,7 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
       record.id !== winner?.id
     ).map(record => record.winnerId));
     return meeting.speakers.filter(speaker =>
+      !speaker.deletedAccount &&
       (filter !== "guests" || !speaker.userId) &&
       (filter !== "all_members" || !!speaker.userId) &&
       (selectedIds == null || selectedIds.includes(speaker.id)) &&
@@ -75,7 +78,7 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
     }
     const index = entries.findIndex(entry => entry.id === winner.winnerId || (!!winner.userId && meeting.speakers.some(speaker => speaker.id === entry.id && speaker.userId === winner.userId)));
     return Math.max(0, index);
-  }, [winner, entries.length, numericMode, minNumber, numberRange, meeting.speakers]);
+  }, [winner, entries, numericMode, minNumber, numberRange, meeting.speakers]);
 
   const sliceAngle = entries.length ? 360 / entries.length : 360;
   const baseRotation = -sliceAngle / 2;
@@ -101,7 +104,7 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
     };
     frame = requestAnimationFrame(drawFrame);
     return () => cancelAnimationFrame(frame);
-  }, [meeting._id, winner?.id, startAt, revealAt, entries.length, targetIndex, duration, baseRotation, extraRotation, finalRotation]);
+  }, [meeting._id, winner, startAt, revealAt, entries.length, targetIndex, duration, baseRotation, extraRotation, finalRotation]);
 
   useEffect(() => {
     const known = new Set([...slides, ...additionalSlides].map(slide => slide.id));
@@ -129,7 +132,7 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
       <section className="relative flex min-h-[400px] flex-col items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_center,_#263449_0%,_#101827_70%)] p-4 md:min-h-0 md:p-7">
         <div className="absolute left-5 top-5 z-10">
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-300">{meeting.title}</p>
-          <h2 className="mt-1 text-xl font-black sm:text-3xl">{winner?.prizeName || "Vòng quay may mắn"}</h2>
+          <h2 className="mt-1 text-xl font-black sm:text-3xl">{winner?.prizeName || "Vòng quay chọn người"}</h2>
           <p className="mt-1 text-sm text-slate-300">{entries.length} người tham gia</p>
         </div>
         <svg
@@ -186,7 +189,7 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
         {!entries.length && <p className="mt-3 text-center text-sm text-amber-200">Chưa có người check-in để tham gia vòng quay.</p>}
         {winner && (
           <div className="absolute inset-x-4 bottom-3 text-center text-sm font-semibold text-amber-200" aria-live="polite">
-            {spinning ? "Đang quay thưởng…" : "Kết quả đã được công bố"}
+            {spinning ? "Đang quay chọn người…" : "Kết quả đã được công bố"}
           </div>
         )}
       </section>
@@ -205,10 +208,10 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
               <img src={winner.photoURL || winnerSlide?.photoURL} alt="" className="h-14 w-14 rounded-full border-2 border-amber-300 object-cover" />
             ) : <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-amber-300 text-lg font-black text-slate-950">{winner.name.slice(0, 1)}</div>}
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-200">Người trúng thưởng</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-200">Người được chọn</p>
               <p className="truncate text-lg font-black text-white">{winner.name}</p>
               <p className="truncate text-xs text-amber-100">{winnerSlide?.company || winnerSpeaker?.company || winner.prizeName}</p>
-              {winner.ticketNumber && <p className="text-xs text-slate-300">Số may mắn: {winner.ticketNumber}</p>}
+              {winner.ticketNumber && <p className="text-xs text-slate-300">Số thứ tự: {winner.ticketNumber}</p>}
             </div>
           </div>
         )}

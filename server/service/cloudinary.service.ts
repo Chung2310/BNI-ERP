@@ -83,6 +83,34 @@ export const cloudinaryService = {
     });
   },
 
+  async deleteOwnedMedia(publicId: string, resourceType: string, access = "upload"): Promise<void> {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      throw new Error("Cloudinary deletion credentials are missing");
+    }
+    ensureConfigured();
+    const response = await cloudinary.uploader.destroy(publicId, {
+      resource_type: resourceType, type: access, invalidate: true,
+    });
+    if (response.result !== "ok" && response.result !== "not found") {
+      throw new Error("Cloudinary did not confirm asset deletion");
+    }
+  },
+
+  async listAccountProfileMedia(userId: string): Promise<PublicMediaAsset[]> {
+    if (!/^[a-f0-9]{24}$/i.test(userId)) throw new Error("Invalid account profile folder");
+    ensureConfigured();
+    const assets: PublicMediaAsset[] = [];
+    let cursor: string | undefined;
+    do {
+      const result = await cloudinary.api.resources({ prefix: `bni/profiles/${userId}/`, type: "upload", resource_type: "image", max_results: 500, ...(cursor ? { next_cursor: cursor } : {}) }) as {
+        resources: { public_id: string; secure_url: string; bytes: number }[]; next_cursor?: string;
+      };
+      for (const asset of result.resources) assets.push({ publicId: asset.public_id, resourceType: "image", secureUrl: asset.secure_url, bytes: asset.bytes });
+      cursor = result.next_cursor;
+    } while (cursor);
+    return assets;
+  },
+
   /**
    * Tải tệp tin dạng Buffer trực tiếp lên Cloudinary bằng stream
    * @param buffer Dữ liệu file dạng Buffer
@@ -90,6 +118,10 @@ export const cloudinaryService = {
    * @returns URL công khai bảo mật (secure_url)
    */
   async uploadMediaBuffer(buffer: Buffer, folder: string): Promise<string> {
+    return (await this.uploadMediaBufferAsset(buffer, folder)).secureUrl;
+  },
+
+  async uploadMediaBufferAsset(buffer: Buffer, folder: string): Promise<PublicMediaAsset> {
     if (
       !process.env.CLOUDINARY_CLOUD_NAME ||
       !process.env.CLOUDINARY_API_KEY ||
@@ -112,7 +144,7 @@ export const cloudinaryService = {
             console.error("[cloudinaryService.uploadMediaBuffer] Error:", error);
             reject(new Error(`Tải lên Cloudinary thất bại: ${error.message || error}`));
           } else {
-            resolve(result!.secure_url);
+            resolve({ secureUrl: result!.secure_url, publicId: result!.public_id, resourceType: result!.resource_type, bytes: result!.bytes });
           }
         }
       );
