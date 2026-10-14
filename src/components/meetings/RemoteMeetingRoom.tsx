@@ -135,6 +135,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
   const [creatingPrize, setCreatingPrize] = useState(false);
   const [quickPrizeError, setQuickPrizeError] = useState("");
   const [showFinish, setShowFinish] = useState(false);
+  const [showRestartSpeakers, setShowRestartSpeakers] = useState(false);
   const [share, setShare] = useState(false);
   const [shareQr, setShareQr] = useState("");
   const controlUrl = meetingRoomUrl(meetingId, "control");
@@ -488,6 +489,17 @@ function MeetingRoom({ meetingId, mode }: Props) {
                   <RotateCcw className="h-3.5 w-3.5" />
                   <span>Đặt lại đồng hồ</span>
                 </button>
+                {["live", "paused"].includes(meeting.status) && (
+                  <button
+                    type="button"
+                    className="col-span-2 flex items-center justify-center gap-1.5 min-h-11 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-bold transition hover:bg-amber-100 disabled:opacity-40"
+                    disabled={!meeting.speakers.length}
+                    onClick={() => setShowRestartSpeakers(true)}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>Bắt đầu lại lượt phát biểu</span>
+                  </button>
+                )}
               </fieldset>
             </div>
 
@@ -773,6 +785,16 @@ function MeetingRoom({ meetingId, mode }: Props) {
         </div>
       )}
 
+      <ConfirmDialog
+        isOpen={showRestartSpeakers}
+        title="Bắt đầu lại lượt phát biểu?"
+        description="Toàn bộ tiến trình và thời gian thuyết trình sẽ được đặt lại từ đầu. Tiếp tục?"
+        tone="warning"
+        isSubmitting={busy}
+        onClose={() => setShowRestartSpeakers(false)}
+        onConfirm={async () => { if (await control("restart_speakers")) setShowRestartSpeakers(false); }}
+        confirmLabel="Bắt đầu lại"
+      />
       <ConfirmDialog
         isOpen={showFinish}
         title="Kết thúc cuộc họp?"

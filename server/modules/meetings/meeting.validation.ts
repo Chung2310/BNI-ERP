@@ -96,7 +96,7 @@ export const bulkUpdateMeetingSeriesInput = Joi.object({
   }).and('latitude', 'longitude').min(1).required(),
 });
 export const checkinInput = Joi.object({ latitude: Joi.number().min(-90).max(90), longitude: Joi.number().min(-180).max(180), userId: Joi.string().hex().length(24), name: Joi.string().trim().max(150), email: Joi.string().email().max(254).allow('').default(''), photoURL: image, coverImage: image });
-export const controlInput = Joi.object({ action: Joi.string().valid('start', 'pause', 'resume', 'next', 'previous', 'finish', 'cancel', 'start_speaker', 'reset_speaker').required(), version: Joi.number().integer().min(0).required() });
+export const controlInput = Joi.object({ action: Joi.string().valid('start', 'pause', 'resume', 'next', 'previous', 'finish', 'cancel', 'start_speaker', 'reset_speaker', 'restart_speakers').required(), version: Joi.number().integer().min(0).required() });
 
 
 const checkInIdentifierSchema = Joi.string()

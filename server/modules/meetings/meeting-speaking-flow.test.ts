@@ -180,6 +180,60 @@ test("last next completes speeches without ending the meeting; explicit finish s
   assert.equal(item.status, "ended");
 });
 
+test("restart speakers clears a completed practice run without changing check-ins or allocations", async () => {
+  const item = meeting();
+  item.currentIndex = item.speakers.length;
+  item.speakerStartedAt = undefined;
+  item.speechesCompletedAt = now;
+  item.speakers[0].spokenSeconds = 60;
+  item.speakers[1].spokenSeconds = 20;
+  item.speakers[2].deferred = true;
+  item.presentation.view = 'waiting';
+  item.presentation.speakerTimerPausedByView = true;
+  const original = item.speakers.map(({ id, seconds, checkedInAt }) => ({ id, seconds, checkedInAt }));
+
+  await controlMeeting((item as unknown as Parameters<typeof controlMeeting>[0]), "restart_speakers", now);
+
+  assert.equal(item.status, "paused");
+  assert.equal(item.currentIndex, 0);
+  assert.equal(item.elapsedSeconds, 0);
+  assert.equal(item.speakerStartedAt, undefined);
+  assert.equal(item.speechesCompletedAt, undefined);
+  assert.equal(item.presentation.view, "speaker");
+  assert.equal(item.presentation.speakerTimerPausedByView, false);
+  assert.deepEqual(item.speakers.map(({ id, seconds, checkedInAt }) => ({ id, seconds, checkedInAt })), original);
+  assert.ok(item.speakers.every(speaker => speaker.spokenSeconds == null && speaker.deferred == null));
+});
+
+test("restart speakers stops a running clock and rejects meetings without check-ins", async () => {
+  const item = meeting();
+  item.currentIndex = 1;
+  item.elapsedSeconds = 12;
+  await controlMeeting((item as unknown as Parameters<typeof controlMeeting>[0]), "restart_speakers", now);
+  assert.equal(item.status, "paused");
+  assert.equal(item.currentIndex, 0);
+  assert.equal(item.speakerStartedAt, undefined);
+  assert.equal(item.elapsedSeconds, 0);
+  item.speakers.splice(0);
+  await assert.rejects(controlMeeting((item as unknown as Parameters<typeof controlMeeting>[0]), "restart_speakers", now), { status: 409 });
+});
+
+test("reset speaker stops only the current clock at zero", async () => {
+  const item = meeting();
+  item.currentIndex = 1;
+  item.elapsedSeconds = 12;
+  item.speakers[0].spokenSeconds = 60;
+
+  await controlMeeting((item as unknown as Parameters<typeof controlMeeting>[0]), "reset_speaker", now);
+
+  assert.equal(item.status, "live");
+  assert.equal(item.currentIndex, 1);
+  assert.equal(item.elapsedSeconds, 0);
+  assert.equal(item.speakerStartedAt, undefined);
+  assert.deepEqual(item.speakers.map(speaker => speaker.seconds), [60, 20, 20]);
+  assert.equal(item.speakers[0].spokenSeconds, 60);
+});
+
 test("a new guest can check in after speeches complete and resumes the queue without starting a timer", async () => {
   const item = meeting(); item.currentIndex = 2;
   await controlMeeting((item as unknown as Parameters<typeof controlMeeting>[0]), "next", now);
