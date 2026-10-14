@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import { UserActivityEventModel, type UserActivityInput, type UserActivityCategory } from "../model/user-activity-event.model";
+import { UserModel } from "../model/user.model";
 
 const bounded = (value: unknown, max: number) => typeof value === "string" && value.trim() ? value.trim().slice(0, max) : undefined;
 const NOISY = [/\/health(?:\/|$)/, /\/users\/:userId\/activity$/, /\/socket/, /\/heartbeat/];
@@ -66,7 +67,10 @@ export function buildUserActivityFromRequest(req: Request, statusCode: number, d
 }
 
 export async function recordUserActivity(event: UserActivityInput) {
-  try { await UserActivityEventModel.create({ ...event, occurredAt: event.occurredAt || new Date() }); }
+  try {
+    if (!await UserModel.exists({ _id: event.userId, deletionRequestedAt: null })) return;
+    await UserActivityEventModel.create({ ...event, occurredAt: event.occurredAt || new Date() });
+  }
   catch (error) { console.error("[user activity] Failed to record event:", error); }
 }
 
@@ -96,7 +100,12 @@ export function createActivityBatchWriter<T>(
   return writer;
 }
 
-const routineActivityWriter = createActivityBatchWriter<UserActivityInput>((events) => UserActivityEventModel.insertMany(events));
+const routineActivityWriter = createActivityBatchWriter<UserActivityInput>(async (events) => {
+  const users = await UserModel.find({ _id: { $in: events.map((event) => event.userId) }, deletionRequestedAt: null }).select("_id").lean();
+  const allowed = new Set(users.map((user) => String(user._id)));
+  const filtered = events.filter((event) => allowed.has(String(event.userId)));
+  if (filtered.length) await UserActivityEventModel.insertMany(filtered);
+});
 
 export function flushUserActivityQueue() {
   return routineActivityWriter.flush();

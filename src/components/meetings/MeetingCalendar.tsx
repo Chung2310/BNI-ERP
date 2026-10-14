@@ -11,27 +11,33 @@ const labels: Record<string, string> = { scheduled: "Sắp diễn ra", live: "Đ
 const statusDots: Record<string, string> = { scheduled: "bg-sky-400", live: "bg-cyan-500", paused: "bg-amber-400", ended: "bg-slate-400", cancelled: "bg-rose-400" };
 const weekDays = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ nhật"];
 
-export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChange, revision, tick = Date.now(), flowStepLabel = () => "Check-in", load, canManage, onOpen, onReschedule, onCancel, onDelete, filter }: {
+export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChange, revision, tick, flowStepLabel = () => "Check-in", load, canManage, onOpen, onReschedule, onCancel, onDelete, filter }: {
   month: string; onMonthChange: (value: string) => void; revision: number; tick?: number; flowStepLabel?: (meetingId: string) => string;
   load: (path: string) => Promise<T[]>; canManage: boolean; onOpen: (item: T) => void; onReschedule: (item: T) => void; onCancel: (item: T) => void; onDelete: (item: T) => void; filter: (item: T) => boolean;
 }) {
-  const [items, setItems] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [result, setResult] = useState<{ month: string; revision: number; retry: number; load: typeof load; items: T[]; error: string } | null>(null);
+  const loading = !result || result.month !== month || result.revision !== revision || result.retry !== retry || result.load !== load;
+  const error = !loading && result ? result.error : "";
+  const [selection, setSelection] = useState<{ month: string; day: string } | null>(null);
+  const selectedDay = selection?.month === month ? selection.day : null;
+  const [localTick, setLocalTick] = useState(Date.now);
+  const currentTick = tick ?? localTick;
   const dayDialog = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
+    if (tick !== undefined) return;
+    const timer = window.setInterval(() => setLocalTick(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [tick]);
+
+  useEffect(() => {
     let active = true;
-    setLoading(true); setError("");
-    load("?month=" + month).then(data => { if (active) setItems(data); })
-      .catch(error => { if (active) setError(error.message || "Không thể tải lịch."); })
-      .finally(() => { if (active) setLoading(false); });
+    load("?month=" + month)
+      .then(items => { if (active) setResult({ month, revision, retry, load, items, error: "" }); })
+      .catch(cause => { if (active) setResult({ month, revision, retry, load, items: [], error: cause instanceof Error ? cause.message : "Không thể tải lịch." }); });
     return () => { active = false; };
   }, [month, revision, retry, load]);
-
-  useEffect(() => { setSelectedDay(null); }, [month]);
 
   useEffect(() => {
     if (selectedDay) dayDialog.current?.showModal();
@@ -42,9 +48,9 @@ export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChang
   const offset = (first.getUTCDay() + 6) % 7;
   const days = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
   const weeks = Math.ceil((offset + days) / 7);
-  const today = vietnamDateTime(new Date()).slice(0, 10);
+  const today = vietnamDateTime(new Date(currentTick)).slice(0, 10);
   const move = (amount: number) => { const next = new Date(first); next.setUTCMonth(next.getUTCMonth() + amount); onMonthChange(next.toISOString().slice(0, 7)); };
-  const visible = useMemo(() => items.filter(filter).sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()), [items, filter]);
+  const visible = useMemo(() => (loading ? [] : result?.items || []).filter(filter).sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()), [loading, result, filter]);
   const byDay = useMemo(() => {
     const result = new Map<string, T[]>();
     visible.forEach(item => {
@@ -55,10 +61,10 @@ export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChang
   }, [visible]);
   const selectedMeetings = selectedDay ? byDay.get(selectedDay) || [] : [];
   const dateLabel = (date: string) => date.split("-").reverse().join("/");
-  const closeDay = () => { dayDialog.current?.close(); setSelectedDay(null); };
+  const closeDay = () => { dayDialog.current?.close(); setSelection(null); };
   const openDay = (key: string, meetings: T[]) => {
     if (meetings.length === 1) onOpen(meetings[0]);
-    else setSelectedDay(key);
+    else setSelection({ month, day: key });
   };
 
   return <section aria-label="Lịch cuộc họp" className="flex min-h-[420px] flex-col rounded-2xl border border-slate-200/80 bg-white p-2.5 shadow-xs sm:min-h-0 sm:flex-1">
@@ -84,8 +90,8 @@ export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChang
             const isToday = key === today;
             return <div key={key} data-calendar-day={key} onClick={() => meetings.length > 0 && openDay(key, meetings)} className={`flex min-h-0 min-w-0 flex-col overflow-hidden p-1 ${meetings.length > 0 ? "cursor-pointer" : ""} ${isToday ? "bg-cyan-50 ring-1 ring-inset ring-cyan-300" : index % 7 >= 5 ? "bg-slate-50" : "bg-white"}`}>
               <div className="flex h-4 shrink-0 items-center justify-between gap-0.5">
-                <button type="button" aria-label={`Xem lịch ngày ${dateLabel(key)}`} aria-current={isToday ? "date" : undefined} onClick={event => { event.stopPropagation(); openDay(key, meetings); }} className={`grid h-4 min-w-4 place-items-center rounded-full text-[11px] font-normal tabular-nums cursor-pointer ${isToday ? "bg-cyan-500 text-white" : "text-slate-600 hover:bg-cyan-50 hover:text-cyan-700"}`}>{day}</button>
-                {meetings.length > 1 ? <button type="button" onClick={event => { event.stopPropagation(); setSelectedDay(key); }} aria-label={`Xem ${meetings.length} buổi họp ngày ${dateLabel(key)}`} className="truncate rounded px-0.5 text-[10px] font-normal leading-4 text-cyan-700 hover:bg-cyan-100 cursor-pointer">+{meetings.length - 1}<span className="hidden sm:inline"> buổi</span></button> : isToday && <span className="hidden lg:inline text-[10px] text-cyan-700">Hôm nay</span>}
+                <button type="button" aria-label={`Xem lịch ngày ${dateLabel(key)}`} aria-current={isToday ? "date" : undefined} onClick={event => { event.stopPropagation(); setSelection({ month, day: key }); }} className={`grid h-4 min-w-4 place-items-center rounded-full text-[11px] font-normal tabular-nums cursor-pointer ${isToday ? "bg-cyan-500 text-white" : "text-slate-600 hover:bg-cyan-50 hover:text-cyan-700"}`}>{day}</button>
+                {meetings.length > 1 ? <button type="button" onClick={event => { event.stopPropagation(); setSelection({ month, day: key }); }} aria-label={`Xem ${meetings.length} buổi họp ngày ${dateLabel(key)}`} className="truncate rounded px-0.5 text-[10px] font-normal leading-4 text-cyan-700 hover:bg-cyan-100 cursor-pointer">+{meetings.length - 1}<span className="hidden sm:inline"> buổi</span></button> : isToday && <span className="hidden lg:inline text-[10px] text-cyan-700">Hôm nay</span>}
               </div>
               {meetings.slice(0, 1).map(item => <button key={item._id} type="button" onClick={event => { event.stopPropagation(); onOpen(item); }} title={`${vietnamDateTime(item.startsAt).slice(11)} · ${item.title} · ${labels[item.status] || item.status}${item.seriesId ? " · Định kỳ" : ""}`} className={`flex h-4 min-w-0 shrink-0 items-center gap-1 rounded border px-1 text-left text-[10px] font-normal leading-none sm:text-[11px] cursor-pointer ${item.status === "cancelled" ? "border-rose-100 bg-rose-50 text-rose-700" : "border-cyan-100 bg-cyan-50/80 text-cyan-800 hover:border-cyan-300 hover:bg-cyan-100"}`}>
                 <span aria-hidden="true" className={`hidden sm:block h-1.5 w-1.5 shrink-0 rounded-full ${statusDots[item.status] || "bg-slate-400"}`} />
@@ -97,7 +103,7 @@ export function MeetingCalendar<T extends CalendarMeeting>({ month, onMonthChang
       </div>
     )}
 
-    {createPortal(<dialog ref={dayDialog} aria-labelledby="calendar-day-title" onCancel={() => setSelectedDay(null)} onClose={() => setSelectedDay(null)} onClick={event => { if (event.target === event.currentTarget) closeDay(); }} className="fixed inset-0 m-auto max-h-[80dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl border border-cyan-100 bg-white p-0 text-slate-700 shadow-xl backdrop:bg-slate-900/40">
+    {createPortal(<dialog ref={dayDialog} aria-labelledby="calendar-day-title" onCancel={() => setSelection(null)} onClose={() => setSelection(null)} onClick={event => { if (event.target === event.currentTarget) closeDay(); }} className="fixed inset-0 m-auto max-h-[80dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl border border-cyan-100 bg-white p-0 text-slate-700 shadow-xl backdrop:bg-slate-900/40">
       {selectedDay && <div className="p-4">
         <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div><h2 id="calendar-day-title" className="text-sm font-medium">Lịch ngày {selectedDay ? dateLabel(selectedDay) : ""}</h2><p className="mt-0.5 text-xs text-slate-500">{selectedMeetings.length} buổi</p></div>

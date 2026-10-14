@@ -26,7 +26,8 @@ it("emits realtime and mobile push after persisting a notification", async () =>
     expect.objectContaining({ title: "Thông báo mới" }),
   );
   expect(dependencies.sendToUser).toHaveBeenCalledWith("member", expect.objectContaining({
-    title: "Thông báo mới",
+    title: "iGen Connect",
+    body: "Bạn có thông báo mới. Mở ứng dụng để xem.",
     notificationId: notification._id.toString(),
   }));
 });

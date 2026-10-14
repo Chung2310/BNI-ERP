@@ -26,6 +26,7 @@ import { notifyCompanyModulesChanged } from "../service/company-module-notify";
 import { PERMISSION_CODES } from "../config/permission-catalog";
 import { getEffectivePermissions } from "../middleware/auth";
 import { profileResourceService } from "../service/profile-resource.service";
+import { accountDeletionService } from "../service/account-deletion.service";
 import { employeeDocumentResourceService } from "../service/employee-document-resource.service";
 import { resourceIndexingService } from "../service/resource-indexing.service";
 import { normalizeError } from "../errors/normalize-error";
@@ -78,12 +79,23 @@ export function buildUserRosterFilter(companyCode?: string): Record<string, unkn
   };
 }
 export const authController = {
+  async accountDeletionOptions(req: AuthenticatedRequest, res: Response) {
+    if (!req.user?.id) return res.status(401).json({ status: "error", message: "Vui lòng đăng nhập." });
+    try { return res.json({ data: await accountDeletionService.options(req.user.id) }); }
+    catch (error) { return res.status(400).json({ message: error.message || "Không thể tải thông tin xóa tài khoản." }); }
+  },
+  async accountDeletionStatus(req: Request, res: Response) {
+    res.setHeader("Cache-Control", "no-store");
+    try { return res.json({ data: await accountDeletionService.status(String(req.headers["x-deletion-token"] || "")) }); }
+    catch (error) { return res.status(404).json({ message: error.message || "Không tìm thấy yêu cầu." }); }
+  },
   async deleteOwnAccount(req: AuthenticatedRequest, res: Response) {
     if (!req.user?.id) return res.status(401).json({ status: "error", message: "Vui lòng đăng nhập." });
     try {
-      await authService.deleteOwnAccount(req.user.id, req.body.password, req.body.confirmation);
+      const result = await authService.deleteOwnAccount(req.user.id, req.body.password, req.body.confirmation, req.body.successorId);
       res.clearCookie("refreshToken", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict" });
-      return res.status(200).json({ status: "success", message: "Đã xóa tài khoản của bạn." });
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(202).json({ status: "accepted", message: "Đã tiếp nhận yêu cầu xóa tài khoản và dữ liệu. Thông thường vài phút; nếu dịch vụ lưu trữ gặp lỗi, hệ thống sẽ tự thử lại. Bạn có thể theo dõi đến khi hoàn tất.", data: result });
     } catch (error) {
       return res.status(400).json({ status: "error", message: error.message || "Không thể xóa tài khoản." });
     }
@@ -306,7 +318,7 @@ export const authController = {
       }
 
       const userObj = updatedUser.toObject() as UserProfileResponse;
-      if (req.body.photoUploadToken) {
+      if (req.body.photoUploadToken && !userObj.profileMediaPending) {
         await profileResourceService.finalizeAvatar({
           companyCode: userObj.companyCode,
           branchId: userObj.branchId,
@@ -314,7 +326,7 @@ export const authController = {
           actorName: userObj.displayName || userObj.email,
         }, userObj, req.body.photoUploadToken);
       }
-      if (req.body.coverUploadToken) {
+      if (req.body.coverUploadToken && !userObj.profileMediaPending) {
         await profileResourceService.finalizeCover({
           companyCode: userObj.companyCode,
           branchId: userObj.branchId,
@@ -322,7 +334,7 @@ export const authController = {
           actorName: userObj.displayName || userObj.email,
         }, userObj, req.body.coverUploadToken);
       }
-      if (Array.isArray(req.body.galleryUploadTokens) && req.body.galleryUploadTokens.length > 0) {
+      if (!userObj.profileMediaPending && Array.isArray(req.body.galleryUploadTokens) && req.body.galleryUploadTokens.length > 0) {
         await profileResourceService.finalizeGallery({
           companyCode: userObj.companyCode,
           branchId: userObj.branchId,

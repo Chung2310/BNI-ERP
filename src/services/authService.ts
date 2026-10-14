@@ -1,4 +1,9 @@
 import { UserProfile, CompanyProfile } from "../types";
+let deletionReceipt: string | null = null;
+export function getAccountDeletionReceipt(): string | null {
+  try { return deletionReceipt || localStorage.getItem("igen_account_deletion_receipt"); }
+  catch { return deletionReceipt; }
+}
 
 function getDeviceId(): string {
   const key = "igen_device_id";
@@ -16,16 +21,26 @@ export function getAccessToken(): string | null {
 }
 
 export const authService = {
-  async deleteOwnAccount(password: string, confirmation: string): Promise<void> {
+  async accountDeletionOptions(): Promise<{ requiresTransfer: boolean; archivesChapter: boolean; successors: { id: string; name: string; role: string }[] }> {
+    const response = await fetch("/api/v1/auth/me/deletion-options", { headers: { Authorization: `Bearer ${getAccessToken()}` } });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || "Không thể tải thông tin xóa tài khoản.");
+    return result.data;
+  },
+  async deleteOwnAccount(password: string, confirmation: string, successorId?: string): Promise<void> {
     const response = await fetch("/api/v1/auth/me", {
       method: "DELETE",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAccessToken()}` },
-      body: JSON.stringify({ password, confirmation }),
+      body: JSON.stringify({ password, confirmation, successorId }),
     });
     if (!response.ok) {
       const result = await response.json().catch(() => ({}));
       throw new Error(result.message || "Không thể xóa tài khoản.");
     }
+    const result = await response.json();
+    deletionReceipt = result.data.receiptToken;
+    try { localStorage.setItem("igen_account_deletion_receipt", deletionReceipt); }
+    catch { window.prompt("Yêu cầu xóa đã được tiếp nhận. Lưu mã để theo dõi trên trang /user-data-deletion:", deletionReceipt); }
   },
   async getUserActivity(userId: string, filters: Record<string, string | number | undefined> = {}) {
     const query = new URLSearchParams();

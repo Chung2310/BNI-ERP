@@ -1,5 +1,5 @@
 import React from "react";
-import { Check, Gift, Megaphone, MessageSquareText, Star, Users } from "lucide-react";
+import { Check, RotateCw, Megaphone, MessageSquareText, Star, Users } from "lucide-react";
 
 export type MeetingFlowStep = "checkin" | "presentation" | "interaction" | "luckyDraw" | "activeMembers";
 
@@ -9,7 +9,7 @@ export const MEETING_FLOW_META: Record<MeetingFlowStep, { label: string; icon: R
   checkin: { label: "Check-in", icon: Users },
   presentation: { label: "Thuyết trình", icon: Megaphone },
   interaction: { label: "Tương tác", icon: MessageSquareText },
-  luckyDraw: { label: "Quay thưởng", icon: Gift },
+  luckyDraw: { label: "Chọn người", icon: RotateCw },
   activeMembers: { label: "Thành viên tích cực", icon: Star },
 };
 

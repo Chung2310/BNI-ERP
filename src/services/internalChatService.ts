@@ -28,6 +28,7 @@ export interface ChatMessage {
   reactions?: { emoji: string; userId: string }[];
   replyTo?: ChatMessage;
   isDeleted?: boolean;
+  awaitingReview?: boolean;
   editedAt?: string | null;
   createdAt: string;
 }
@@ -52,6 +53,7 @@ export interface ChatRoom {
   _id: string;
   name?: string;
   isGroup: boolean;
+  hasDeletedMember?: boolean;
   blockedBy?: string[];
   companyCode: string;
   creatorId: string;

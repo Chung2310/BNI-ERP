@@ -8,8 +8,8 @@ it("requires the current password and the exact confirmation", async () => {
   await expect(verifySelfAccountDeletion(user, "", "XÓA TÀI KHOẢN")).rejects.toThrow("Mật khẩu");
   await expect(verifySelfAccountDeletion(user, "current-password", "XÓA TÀI KHOẢN")).resolves.toBeUndefined();
 });
-it("rejects administrators even with valid credentials", async () => {
-  await expect(verifySelfAccountDeletion({ ...user, role: "admin" }, "current-password", "XÓA TÀI KHOẢN")).rejects.toThrow("quản trị viên");
+it("allows administrators to verify deletion before the service checks ownership transfer", async () => {
+  await expect(verifySelfAccountDeletion({ ...user, role: "admin" }, "current-password", "XÓA TÀI KHOẢN")).resolves.toBeUndefined();
 });
 it("requires setting a password for passwordless accounts", async () => {
   await expect(verifySelfAccountDeletion({ role: "user" }, "anything", "XÓA TÀI KHOẢN")).rejects.toThrow("thiết lập mật khẩu");

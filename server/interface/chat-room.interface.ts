@@ -11,6 +11,7 @@ export interface IChatRoomMember {
 export interface IChatRoom extends Document {
   name?: string;
   isGroup: boolean;
+  hasDeletedMember?: boolean;
   blockedBy?: (Types.ObjectId | string)[];
   companyCode: string;
   branchId?: string;

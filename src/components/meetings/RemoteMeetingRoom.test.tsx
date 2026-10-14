@@ -156,16 +156,16 @@ it("shows draw and game winners on the control panel without duplicate results",
   ];
 
   render(<RemoteMeetingRoom meetingId="m" mode="control" />);
-  fireEvent.click(await screen.findByRole("button", { name: /Người trúng \(2\)/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /Người được chọn \(2\)/ }));
   await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url, options]) =>
     String(url).endsWith("/presentation-state") && JSON.parse(String(options?.body)).drawPanel === "winners")).toBe(true));
-  const list = await screen.findByRole("list", { name: "Danh sách người trúng thưởng" });
+  const list = await screen.findByRole("list", { name: "Danh sách người được chọn" });
   const rows = within(list).getAllByRole("listitem");
   expect(rows).toHaveLength(2);
   expect(rows[0].textContent).toContain("Bình");
   expect(rows[1].textContent).toContain("An");
   expect(rows[1].textContent).toContain("Giải nhất · Số #7");
-  expect(screen.getByText("Danh sách người trúng thưởng (2)")).toBeTruthy();
+  expect(screen.getByText("Danh sách người được chọn (2)")).toBeTruthy();
 });
 it("creates and selects a quick prize from the control panel", async () => {
   snapshot.meeting.luckyDraw = {
@@ -173,11 +173,11 @@ it("creates and selects a quick prize from the control panel", async () => {
   };
   render(<RemoteMeetingRoom meetingId="m" mode="control" />);
   await screen.findByText("Đang chiếu: speaker");
-  fireEvent.click(screen.getByRole("button", { name: "Tạo giải nhanh" }));
-  fireEvent.change(screen.getByDisplayValue("Giải thưởng may mắn"), { target: { value: "Giải khách mời" } });
-  fireEvent.click(screen.getByRole("button", { name: "Tạo và chọn giải này" }));
+  fireEvent.click(screen.getByRole("button", { name: "Tạo lượt chọn" }));
+  fireEvent.change(screen.getByDisplayValue("Chọn người tham gia"), { target: { value: "Giải khách mời" } });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo và dùng lượt chọn" }));
   await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/lucky-draw/prizes"))).toBe(true));
-  const prizeSelect = screen.getByRole("combobox", { name: "Giải thưởng" }) as HTMLSelectElement;
+  const prizeSelect = screen.getByRole("combobox", { name: "Lượt chọn" }) as HTMLSelectElement;
   await waitFor(() => expect(prizeSelect.value).toBe("quick-prize"));
   expect(screen.getByRole("option", { name: /Giải khách mời/ })).toBeTruthy();
   await waitFor(() => expect((screen.getByRole("button", { name: "Bắt đầu quay" }) as HTMLButtonElement).disabled).toBe(false));

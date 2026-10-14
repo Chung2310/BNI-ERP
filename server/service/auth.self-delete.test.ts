@@ -4,24 +4,25 @@ const sockets = vi.hoisted(() => ({ disconnectUserSockets: vi.fn() }));
 vi.mock("../socket", () => sockets);
 import { authService } from "./auth.service";
 import { UserModel } from "../model/user.model";
-import { PushSubscriptionModel } from "../model/push-subscription.model";
-import { MobilePushTokenModel } from "../model/mobile-push-token.model";
+import { AccountDeletionModel } from "../model/account-deletion.model";
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); });
-it("deletes only the authenticated account after verification and revokes notifications and sockets", async () => {
-  vi.spyOn(UserModel, "findById").mockResolvedValue({ role: "user", companyCode: "BNI", password: bcrypt.hashSync("password", 4) });
-  const remove = vi.spyOn(authService, "deleteUser").mockResolvedValue();
-  const push = vi.spyOn(PushSubscriptionModel, "deleteMany").mockResolvedValue(({ deletedCount: 1 } as unknown as Parameters<((value: Awaited<ReturnType<typeof PushSubscriptionModel.deleteMany>>) => void)>[0]));
-  const mobilePush = vi.spyOn(MobilePushTokenModel, "deleteMany").mockResolvedValue(({ deletedCount: 1 } as unknown as Parameters<((value: Awaited<ReturnType<typeof MobilePushTokenModel.deleteMany>>) => void)>[0]));
-  await authService.deleteOwnAccount("me", "password", "XÓA TÀI KHOẢN");
-  expect(remove).toHaveBeenCalledWith("me", "BNI", "user");
+it("queues deletion of only the authenticated account and revokes access after verification", async () => {
+  vi.spyOn(UserModel, "findById").mockResolvedValue({ _id: "me", email: "me@example.com", role: "user", password: bcrypt.hashSync("password", 4) });
+  vi.spyOn(AccountDeletionModel, "exists").mockResolvedValue(null);
+  const queue = vi.spyOn(AccountDeletionModel, "create").mockResolvedValue(undefined);
+  const revoke = vi.spyOn(UserModel, "updateOne").mockResolvedValue({ acknowledged: true, matchedCount: 1, modifiedCount: 1, upsertedCount: 0, upsertedId: null });
+  const result = await authService.deleteOwnAccount("me", "password", "XÓA TÀI KHOẢN");
+  expect(queue).toHaveBeenCalledWith(expect.objectContaining({ userId: "me", receiptHash: expect.any(String) }));
+  expect(result.receiptToken).toMatch(/^[a-f0-9]{64}$/);
+  expect(queue.mock.calls[0][0]).not.toHaveProperty("receiptToken");
+  expect(queue.mock.calls[0][0]).not.toHaveProperty("password");
+  expect(revoke).toHaveBeenCalledWith({ _id: "me" }, expect.objectContaining({ $set: expect.objectContaining({ isActive: false, deletionRequestedAt: expect.any(Date) }) }));
   expect(sockets.disconnectUserSockets).toHaveBeenCalledWith("me");
-  expect(push).toHaveBeenCalledWith({ uid: "me" });
-  expect(mobilePush).toHaveBeenCalledWith({ uid: "me" });
 });
 it("does not delete or disconnect when password verification fails", async () => {
   vi.spyOn(UserModel, "findById").mockResolvedValue({ role: "user", companyCode: "BNI", password: bcrypt.hashSync("password", 4) });
-  const remove = vi.spyOn(authService, "deleteUser").mockResolvedValue();
+  const queue = vi.spyOn(AccountDeletionModel, "create");
   await expect(authService.deleteOwnAccount("me", "wrong", "XÓA TÀI KHOẢN")).rejects.toThrow();
-  expect(remove).not.toHaveBeenCalled();
+  expect(queue).not.toHaveBeenCalled();
   expect(sockets.disconnectUserSockets).not.toHaveBeenCalled();
 });

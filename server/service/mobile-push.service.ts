@@ -1,5 +1,6 @@
 import { getFirebaseMessaging } from "../config/firebase-admin";
 import { MobilePushTokenModel } from "../model/mobile-push-token.model";
+import { privatePushContent } from "./private-push-content";
 
 const MAX_FCM_BATCH_SIZE = 500;
 const MAX_EXPO_BATCH_SIZE = 100;
@@ -169,6 +170,7 @@ export const mobilePushService = {
   },
 
   async sendToUser(uid: string, payload: MobilePushPayload): Promise<void> {
+    payload = { ...payload, ...privatePushContent(payload.type === "chat") };
     const devices = await MobilePushTokenModel.find({ uid }).select("token provider platform").lean() as MobilePushDevice[];
     if (devices.length === 0) return;
 

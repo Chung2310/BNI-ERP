@@ -12,7 +12,7 @@ it("uses the meeting wheel screen for the lucky draw stage", () => {
     presentation: { view: "luckyDraw" }, speakers: [], luckyDraw: { drawMode: "attendees", prizes: [] },
   }} as unknown as import("../../services/meetingLiveService").MeetingLiveSnapshot;
   render(<MeetingStage snapshot={snapshot} now={snapshot.serverNow} />);
-  const frame = screen.getByTitle("Màn hình quay thưởng") as HTMLIFrameElement;
+  const frame = screen.getByTitle("Màn hình quay chọn người") as HTMLIFrameElement;
   expect(frame.getAttribute("src")).toBe("/quay-thuong?meetingId=meeting&game=wheel&presentation=1");
 });
 it("shows the next three speakers in the fullscreen speaker stage", () => {
@@ -22,7 +22,7 @@ it("shows the next three speakers in the fullscreen speaker stage", () => {
     presentation: { view: "speaker" }, speakers, luckyDraw: { prizes: [] },
   }} as unknown as import("../../services/meetingLiveService").MeetingLiveSnapshot;
   render(<MeetingStage snapshot={snapshot} now={snapshot.serverNow} fill />);
-  expect(screen.queryByTitle("Màn hình quay thưởng")).toBeNull();
+  expect(screen.queryByTitle("Màn hình quay chọn người")).toBeNull();
   const upcoming = screen.getByLabelText("Người thuyết trình tiếp theo");
   expect(upcoming.textContent).toContain("Bình");
   expect(upcoming.textContent).toContain("Chi");

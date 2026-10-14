@@ -15,13 +15,13 @@ import { authController } from "./auth.controller";
 
 beforeEach(() => vi.clearAllMocks());
 it("uses only the session account id and clears the refresh cookie after success", async () => {
-  deps.deleteOwnAccount.mockResolvedValue(undefined);
-  const res = { status: vi.fn(), json: vi.fn(), clearCookie: vi.fn() };
+  deps.deleteOwnAccount.mockResolvedValue({ receiptToken: "receipt", state: "pending" });
+  const res = { status: vi.fn(), json: vi.fn(), clearCookie: vi.fn(), setHeader: vi.fn() };
   res.status.mockReturnValue(res);
   await authController.deleteOwnAccount(({ user: { id: "me" }, body: { id: "another-user", password: "password", confirmation: "XÓA TÀI KHOẢN" } } as unknown as Parameters<typeof authController.deleteOwnAccount>[0]), ((res) as unknown as Parameters<typeof authController.deleteOwnAccount>[1]));
-  expect(deps.deleteOwnAccount).toHaveBeenCalledWith("me", "password", "XÓA TÀI KHOẢN");
+  expect(deps.deleteOwnAccount).toHaveBeenCalledWith("me", "password", "XÓA TÀI KHOẢN", undefined);
   expect(res.clearCookie).toHaveBeenCalledWith("refreshToken", expect.objectContaining({ httpOnly: true, sameSite: "strict" }));
-  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res.status).toHaveBeenCalledWith(202);
 });
 it("requires authentication and keeps the session cookie when verification fails", async () => {
   const res = { status: vi.fn(), json: vi.fn(), clearCookie: vi.fn() };

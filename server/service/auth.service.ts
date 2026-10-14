@@ -1,8 +1,7 @@
 import { findLoginAccount } from "../utils/login-account";
 import { stripLegacyUserFields } from "../utils/legacy-user-fields";
-import { verifySelfAccountDeletion } from "./self-account-deletion";
-import { PushSubscriptionModel } from "../model/push-subscription.model";
-import { MobilePushTokenModel } from "../model/mobile-push-token.model";
+import { accountDeletionService } from "./account-deletion.service";
+import { assertSafeProfileText, ownProfilePreview, queueProfileMedia } from "./content-safety.service";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
@@ -25,6 +24,7 @@ import { getJwtAccessSecret, getJwtRefreshSecret } from "../config/env";
  * Chặn đăng nhập/làm mới token cho tài khoản bị vô hiệu hoá hoặc thuộc doanh nghiệp không còn active.
  */
 async function assertAccountUsable(user: IUser): Promise<void> {
+  if (user.deletionRequestedAt) throw new Error("Tài khoản đang được xóa và không thể đăng nhập lại.");
   if (user.disabledAt) {
     throw new Error("Tài khoản của bạn đã bị vô hiệu hoá.");
   }
@@ -37,20 +37,8 @@ async function assertAccountUsable(user: IUser): Promise<void> {
 }
 
 export const authService = {
-  async deleteOwnAccount(userId: string, password: string, confirmation: string): Promise<void> {
-    const user = await UserModel.findById(userId);
-    await verifySelfAccountDeletion(user, password, confirmation);
-    const { disconnectUserSockets } = await import("../socket");
-    await authService.deleteUser(userId, user!.companyCode!, user!.role);
-    // The user record no longer exists, so existing access/refresh tokens cannot authenticate.
-    try { disconnectUserSockets(userId); } catch (error) { console.error("[deleteOwnAccount] Socket cleanup failed", error); }
-    const cleanup = await Promise.allSettled([
-      PushSubscriptionModel.deleteMany({ uid: userId }),
-      MobilePushTokenModel.deleteMany({ uid: userId }),
-    ]);
-    if (cleanup.some((result) => result.status === "rejected")) {
-      console.error("[deleteOwnAccount] Some account notification records could not be removed", userId);
-    }
+  async deleteOwnAccount(userId: string, password: string, confirmation: string, successorId?: string) {
+    return accountDeletionService.request(userId, password, confirmation, successorId);
   },
   /**
    * Tạo bộ đôi Access Token và Refresh Token
@@ -74,6 +62,7 @@ export const authService = {
    * Đăng ký tài khoản người dùng mới
    */
   async register(data: Partial<IUser>): Promise<IUser> {
+    assertSafeProfileText(data);
     const emailLower = data.email.toLowerCase().trim();
     const existingUser = await UserModel.findOne({ email: emailLower });
 
@@ -93,7 +82,7 @@ export const authService = {
       email: emailLower,
       password: hashedPassword,
       displayName: data.displayName,
-      photoURL: data.photoURL,
+      photoURL: "",
       phone: data.phone,
       companyName: data.companyName?.trim(),
       industry: data.industry?.trim(),
@@ -101,7 +90,9 @@ export const authService = {
       role: "user",
     });
 
-    return await newUser.save();
+    await newUser.save();
+    if (data.photoURL) await queueProfileMedia(String(newUser._id), { photoURL: data.photoURL });
+    return newUser;
   },
 
   /**
@@ -164,7 +155,7 @@ export const authService = {
    * Lấy thông tin tài khoản hiện tại
    */
   async getMe(id: string): Promise<IUser | null> {
-    return await UserModel.findById(id).select("-password");
+    return ownProfilePreview(await UserModel.findById(id).select("-password +pendingProfileMedia"));
   },
 
   /**
@@ -174,6 +165,7 @@ export const authService = {
    */
   async updateProfile(id: string, updateData: Partial<IUser>): Promise<IUser | null> {
     const safeUpdateData = pickSelfServiceProfileUpdate(updateData);
+    assertSafeProfileText(safeUpdateData);
     if (typeof safeUpdateData.email === "string") {
       const normalizedEmail = safeUpdateData.email.trim().toLowerCase();
       const existingUser = await UserModel.exists({ email: normalizedEmail, _id: { $ne: id } });
@@ -186,7 +178,20 @@ export const authService = {
       safeUpdateData.birthDate = normalizeBirthDate(safeUpdateData.birthDate);
     }
     safeUpdateData.updatedAt = new Date();
-    return await UserModel.findByIdAndUpdate(id, { $set: safeUpdateData }, { returnDocument: 'after' }).select("-password");
+    const current = await UserModel.findById(id).select("+pendingProfileMedia");
+    if (!current) return null;
+    const media: NonNullable<IUser["pendingProfileMedia"]>["values"] = {};
+    if (typeof safeUpdateData.photoURL === "string" && safeUpdateData.photoURL !== (current.pendingProfileMedia?.values.photoURL ?? current.photoURL)) media.photoURL = safeUpdateData.photoURL;
+    if (typeof safeUpdateData.coverImage === "string" && safeUpdateData.coverImage !== (current.pendingProfileMedia?.values.coverImage ?? current.coverImage)) media.coverImage = safeUpdateData.coverImage;
+    if (Array.isArray(safeUpdateData.galleryImages) && JSON.stringify(safeUpdateData.galleryImages) !== JSON.stringify(current.pendingProfileMedia?.values.galleryImages ?? current.galleryImages)) media.galleryImages = safeUpdateData.galleryImages;
+    delete safeUpdateData.photoURL;
+    delete safeUpdateData.coverImage;
+    delete safeUpdateData.galleryImages;
+    if (Object.keys(media).length) {
+      const tokens = updateData as Partial<IUser> & NonNullable<NonNullable<IUser["pendingProfileMedia"]>["uploads"]>;
+      await queueProfileMedia(id, media, { photoUploadToken: tokens.photoUploadToken, coverUploadToken: tokens.coverUploadToken, galleryUploadTokens: tokens.galleryUploadTokens });
+    }
+    return ownProfilePreview(await UserModel.findByIdAndUpdate(id, { $set: safeUpdateData }, { returnDocument: 'after' }).select("-password +pendingProfileMedia"));
   },
 
   /**
@@ -470,6 +475,7 @@ export const authService = {
    * Cập nhật thông tin chi tiết một nhân sự (Admin)
    */
   async updateUser(userId: string, updateData: Partial<IUser>, callerCompanyCode: string, callerRole: string, callerId?: string): Promise<IUser | null> {
+    assertSafeProfileText(updateData);
     const user = await UserModel.findById(userId);
     if (!user) {
       throw new Error("Không tìm thấy người dùng");
@@ -549,7 +555,16 @@ export const authService = {
       }
     }
 
-    return await UserModel.findByIdAndUpdate(userId, { $set: updateData }, { returnDocument: 'after' }).select("-password");
+    if (isSelf && callerRole !== "admin") {
+      const media: NonNullable<IUser["pendingProfileMedia"]>["values"] = {};
+      if (updateData.photoURL !== undefined) media.photoURL = updateData.photoURL;
+      if (updateData.coverImage !== undefined) media.coverImage = updateData.coverImage;
+      if (updateData.galleryImages !== undefined) media.galleryImages = updateData.galleryImages;
+      delete updateData.photoURL; delete updateData.coverImage; delete updateData.galleryImages;
+      if (Object.keys(media).length) await queueProfileMedia(userId, media);
+    }
+    const updated = await UserModel.findByIdAndUpdate(userId, { $set: updateData }, { returnDocument: 'after' }).select("-password" + (isSelf ? " +pendingProfileMedia" : ""));
+    return isSelf ? ownProfilePreview(updated) : updated;
   },
 
   /**
@@ -619,6 +634,7 @@ export const authService = {
     if (user.companyCode !== callerCompanyCode) {
       throw new Error("Bạn không có quyền xóa nhân sự của doanh nghiệp khác.");
     }
+    if (user.deletionRequestedAt) throw new Error("Tài khoản đang được xử lý xóa dữ liệu. Vui lòng chờ tiến trình hoàn tất.");
     if (user.role === "admin") {
       throw new Error("Không thể xóa tài khoản Quản trị viên.");
     }

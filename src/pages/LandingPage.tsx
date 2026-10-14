@@ -845,7 +845,7 @@ export default function LandingPage() {
                 </li>
                 <li>
                   <a href={LUCKY_DRAW_RULES_URL} className="hover:text-white transition-colors flex items-center gap-1.5 font-semibold text-slate-300">
-                    <ChevronRight className="h-3 w-3 text-slate-600" /> Lucky Draw Rules (Thể lệ vòng quay)
+                    <ChevronRight className="h-3 w-3 text-slate-600" /> Wheel Selection Guide (Hướng dẫn vòng quay)
                   </a>
                 </li>
                 <li>

@@ -20,6 +20,9 @@ it("loads the chosen month and uses Vietnam dates and times", async () => {
  expect(screen.queryByRole("dialog",{name:"Lịch ngày 02/01/2030"})).toBeNull();
  p.onOpen.mockClear();
  fireEvent.click(screen.getByRole("button",{name:"Xem lịch ngày 02/01/2030"}));
+ const dialog=screen.getByRole("dialog",{name:"Lịch ngày 02/01/2030"});
+ expect(p.onOpen).not.toHaveBeenCalled();
+ fireEvent.click(within(dialog).getByRole("button",{name:/00:30 · Họp tuần/}));
  expect(p.onOpen).toHaveBeenCalledWith(meeting);
 });
 it("shows cancelled occurrences and hides management actions from members", async () => {
@@ -27,6 +30,11 @@ it("shows cancelled occurrences and hides management actions from members", asyn
  render(<MeetingCalendar {...p} canManage={false}/>);
  await screen.findByText("Đã hủy · 00:30 · Họp tuần");
  fireEvent.click(screen.getByRole("button",{name:"Xem lịch ngày 02/01/2030"}));
+ const dialog=screen.getByRole("dialog",{name:"Lịch ngày 02/01/2030"});
+ expect(within(dialog).queryByRole("button",{name:"Hủy"})).toBeNull();
+ expect(within(dialog).queryByRole("button",{name:"Dời lịch"})).toBeNull();
+ expect(within(dialog).queryByRole("button",{name:"Xóa cuộc họp"})).toBeNull();
+ fireEvent.click(within(dialog).getByRole("button",{name:/00:30 · Họp tuần/}));
  expect(p.onOpen).toHaveBeenCalledWith({...meeting,status:"cancelled"});
  expect(screen.queryByRole("dialog")).toBeNull();expect(screen.queryByRole("button",{name:"Hủy"})).toBeNull();
  expect(screen.queryByRole("button",{name:"Dời lịch"})).toBeNull();

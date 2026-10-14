@@ -3,7 +3,6 @@ import { useMemo } from "react";
 import { Crown, Trophy, Users } from "lucide-react";
 import type { UserProfile } from "../../types/common";
 import type { Meeting } from "../../services/meetingService";
-import { UserAvatar } from "../meetings/SpeakerAvatar";
 
 export function ActiveMemberLeaderboard({ members: chapterMembers, meetings: filteredMeetings, loading }: {
   members: UserProfile[];

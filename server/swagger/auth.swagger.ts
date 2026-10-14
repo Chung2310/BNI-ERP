@@ -177,7 +177,7 @@ export const authSwagger = {
       },
       delete: {
         summary: "Xóa tài khoản đang đăng nhập",
-        description: "Yêu cầu mật khẩu hiện tại và chuỗi xác nhận chính xác. Tài khoản quản trị viên không thể tự xóa.",
+        description: "Xóa tài khoản và dữ liệu cá nhân qua tiến trình tự động. Quản trị viên có thành viên khác cần chọn successorId cùng Chapter. Mã theo dõi cho phép xem tiến trình sau khi đăng xuất.",
         tags: ["Xác thực (Auth)"],
         security: [{ BearerAuth: [] }],
         requestBody: {
@@ -189,6 +189,7 @@ export const authSwagger = {
                 properties: {
                   password: { type: "string", example: "current-password" },
                   confirmation: { type: "string", enum: ["XÓA TÀI KHOẢN"] },
+                  successorId: { type: "string", description: "ID thành viên nhận quyền quản trị, chỉ gửi khi deletion-options yêu cầu" },
                 },
                 required: ["password", "confirmation"],
               },
@@ -196,11 +197,26 @@ export const authSwagger = {
           },
         },
         responses: {
-          200: { description: "Đã xóa tài khoản và cookie refresh token" },
+          202: { description: "Đã tiếp nhận yêu cầu; data.receiptToken dùng với header X-Deletion-Token để tra cứu tiến trình" },
           400: { description: "Mật khẩu hoặc xác nhận không hợp lệ; hoặc tài khoản không được tự xóa" },
           401: { description: "Chưa đăng nhập hoặc access token không hợp lệ" },
           429: { description: "Vượt giới hạn số lần yêu cầu" },
         },
+      },
+    },
+    "/api/v1/auth/me/deletion-options": {
+      get: {
+        summary: "Lấy yêu cầu chuyển quyền trước khi xóa tài khoản",
+        tags: ["Xác thực (Auth)"], security: [{ BearerAuth: [] }],
+        responses: { 200: { description: "data.requiresTransfer, data.archivesChapter và data.successors (id, name, role)" }, 401: { description: "Chưa đăng nhập" } },
+      },
+    },
+    "/api/v1/auth/account-deletion-status": {
+      get: {
+        summary: "Theo dõi xóa tài khoản sau khi đăng xuất",
+        tags: ["Xác thực (Auth)"],
+        parameters: [{ in: "header", name: "X-Deletion-Token", required: true, schema: { type: "string", pattern: "^[a-f0-9]{64}$" }, description: "Mã riêng nhận khi DELETE /auth/me được tiếp nhận; không đưa mã vào URL" }],
+        responses: { 200: { description: "data.state (pending/processing/completed), requestedAt, completedAt; mã hết hạn 30 ngày sau hoàn tất" }, 404: { description: "Mã sai hoặc đã hết hạn" }, 429: { description: "Vượt giới hạn số lần tra cứu" } },
       },
     },
     "/api/v1/auth/register-company": {

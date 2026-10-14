@@ -188,6 +188,7 @@ export async function initSocketServer(httpServer: HTTPServer) {
       if (!user) {
         return next(new Error("Authentication error: User not found"));
       }
+      if (user.deletionRequestedAt) return next(new Error("Authentication error: Account deletion pending"));
 
       socket.data.user = user;
       socket.data.sessionId = decoded.sid;
@@ -307,9 +308,14 @@ export async function initSocketServer(httpServer: HTTPServer) {
         const room = await ChatRoomModel.findOne({ _id: data.roomId, companyCode: user.companyCode || "SYSTEM", "members.userId": user._id });
         if (!room) return;
         assertChatNotBlocked(room);
-        socket.to(`chat_room:${data.roomId}`).emit("internal_typing_status", {
-          roomId: data.roomId, userId: user._id.toString(), displayName: user.displayName, isTyping: data.isTyping,
-        });
+        const { blockedChatPeers } = await import("./service/chat-safety.service");
+        const peers = await blockedChatPeers(String(user._id), user.companyCode || "SYSTEM");
+        for (const member of room.members) {
+          const recipient = String(member.userId);
+          if (recipient !== String(user._id) && !peers.includes(recipient)) emitToUser(recipient, "internal_typing_status", {
+            roomId: data.roomId, userId: user._id.toString(), displayName: user.displayName, isTyping: data.isTyping,
+          });
+        }
       } catch {
         // Invalid, inaccessible, or blocked conversations must not emit typing events.
       }

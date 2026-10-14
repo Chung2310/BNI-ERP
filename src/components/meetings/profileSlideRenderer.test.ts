@@ -13,7 +13,7 @@ it.each(["guest", "member"] as const)("fills the template with %s data and hides
   const ctx = { font: "", fillText: vi.fn(), drawImage: vi.fn(), fillRect: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), fill: vi.fn(),
     rect: vi.fn(), createLinearGradient: () => ({ addColorStop: vi.fn() }),
     moveTo: vi.fn(), lineTo: vi.fn(), closePath: vi.fn(), save: vi.fn(), restore: vi.fn(), arc: vi.fn(), clip: vi.fn(), measureText: (text: string) => ({ width: text.length * 12 }) };
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(ctx as any);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
   const slide: ProfileSlide = { id: kind, kind, name: "Nguyễn An", company: "ACME", industry: "Thiết kế", phone: "0901234567", bio: "", photoURL: "/avatar.png", coverImage: "", address: "Bắc Ninh", targetMarket: "Doanh nghiệp", galleryImages: Array.from({ length: 6 }, (_, i) => `/product-${i}.png`) };
   const { canvas, warnings } = await renderProfileSlide(slide);
   expect([canvas.width, canvas.height]).toEqual([1920, 1080]);

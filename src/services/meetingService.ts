@@ -11,6 +11,7 @@ function getAuthHeaders() {
 }
 
 export interface Speaker {
+  deletedAccount?: boolean;
   company?: string;
   industry?: string;
   phone?: string;

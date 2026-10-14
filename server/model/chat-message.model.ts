@@ -35,9 +35,11 @@ const ChatMessageSchema = new Schema<IChatMessage>(
     },
     replyTo: { type: Schema.Types.ObjectId, ref: "ChatMessage" },
     isDeleted: { type: Boolean, default: false },
+    awaitingReview: { type: Boolean, default: false },
     editedAt: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now, index: true },
-  }
+  },
+  { optimisticConcurrency: true }
 );
 
 // Compound index for fast message loading sorted by date in a room
