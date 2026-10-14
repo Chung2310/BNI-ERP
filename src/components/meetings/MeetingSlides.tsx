@@ -6,6 +6,7 @@ import { getSlideTimer, type SlideTimerMeeting } from "./slideTimer";
 import { SpeechesCompleteMessage } from "./SpeechesCompleteDialog";
 import { SpeakerPresentationFrame } from "./SpeakerPresentationFrame";
 import type { ProfileSlide, SlideDeck } from "./slideTypes";
+import { ConfirmDialog } from "../common/ConfirmDialog";
 
 type Props = {
   meeting: SlideTimerMeeting & { _id: string; __v: number };
@@ -24,11 +25,13 @@ type Props = {
   onReloadData?: () => void | Promise<void>;
   api: (path: string, method?: string, body?: unknown) => Promise<SlideDeck>;
   onTogglePause?: () => void | Promise<void>;
+  onResetCurrentSpeaker?: () => Promise<void>;
+  onRestartSpeakers?: () => Promise<void>;
 };
 const button = "inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition disabled:opacity-40 cursor-pointer";
 const fieldClass = "w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-cyan-500 focus:outline-none transition";
 
-export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, onReloadData, autoAdvance = false, onAutoAdvanceChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker, onTogglePause }: Props) {
+export function MeetingSlides({ meeting, canManage, api, startFromFirst = false, onPresentationStarted, onPresentationClosed, onReloadData, autoAdvance = false, onAutoAdvanceChange, fullscreenRequest, onStartPresentation, onMoveSpeaker, controlBusy = false, initialSpeakerId, onDeferSpeaker, onTogglePause, onResetCurrentSpeaker, onRestartSpeakers }: Props) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (meeting.status !== "live" || !meeting.speakerStartedAt) return;
@@ -55,6 +58,7 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
   const [draft, setDraft] = useState<ProfileSlide | null>(null);
   const [saving, setSaving] = useState(false);
   const [startingSpeech, setStartingSpeech] = useState(false);
+  const [restartSpeakersRequested, setRestartSpeakersRequested] = useState(false);
   const speechRequest = useRef(false);
   const [drawing, setDrawing] = useState(true);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -364,6 +368,26 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
           <Play size={14} /> {meeting.status === "ended" ? "Xem toàn màn hình" : "Bắt đầu thuyết trình"}
         </button>
       )}
+      {canManage && onResetCurrentSpeaker && currentSpeakerId && (meeting.speakerStartedAt || meeting.elapsedSeconds > 0) && (
+        <button
+          type="button"
+          className={button}
+          disabled={navigationBusy}
+          onClick={() => void onResetCurrentSpeaker().catch(error => setError(error instanceof Error ? error.message : "Không đặt lại được đồng hồ."))}
+        >
+          <RotateCcw size={14} /> Đặt lại người này
+        </button>
+      )}
+      {canManage && onRestartSpeakers && ["live", "paused"].includes(meeting.status) && meeting.speakers.length > 0 && (
+        <button
+          type="button"
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-40"
+          disabled={navigationBusy}
+          onClick={() => setRestartSpeakersRequested(true)}
+        >
+          <RotateCcw size={14} /> Chạy lại từ đầu
+        </button>
+      )}
     </div>
     <p className="text-[11px] text-slate-400">Toàn màn hình: phím ← → chuyển lượt (thủ công) · phím P tạm dừng · Esc thoát</p>
     {error && <p role="alert" className="rounded-xl bg-red-50 border border-red-200/80 p-3 text-xs text-red-700">{error} <button type="button" className="underline hover:text-red-900 transition cursor-pointer" onClick={() => void reloadData()}>Tải lại dữ liệu</button></p>}
@@ -526,6 +550,27 @@ export function MeetingSlides({ meeting, canManage, api, startFromFirst = false,
         </form>}
       </div>
     </div>
+    <ConfirmDialog
+      isOpen={restartSpeakersRequested}
+      title="Chạy lại toàn bộ lượt phát biểu?"
+      description="Toàn bộ tiến trình và thời gian thuyết trình sẽ được đặt lại từ đầu. Tiếp tục?"
+      confirmLabel="Chạy lại từ đầu"
+      tone="warning"
+      isSubmitting={controlBusy}
+      onClose={() => setRestartSpeakersRequested(false)}
+      onConfirm={async () => {
+        if (!onRestartSpeakers) return;
+        try {
+          await onRestartSpeakers();
+          setSelectedId("");
+          setCheckedSpeakerIds([]);
+          setRestartSpeakersRequested(false);
+          setError("");
+        } catch (error) {
+          setError(error instanceof Error ? error.message : "Không chạy lại được lượt phát biểu.");
+        }
+      }}
+    />
     {presenting && createPortal(<div ref={presentationDialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Trình chiếu hồ sơ" className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-100" style={{ cursor: "none", outline: "none" }}>
       <div className="relative h-full w-full">
         <SpeakerPresentationFrame meeting={meeting} slides={deck.slides} speakerId={active?.id} now={now} fill>

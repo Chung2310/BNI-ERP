@@ -57,6 +57,25 @@ beforeEach(() => {
   }));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+it("confirms before restarting the entire speaking queue", async () => {
+  snapshot.meeting.currentIndex = snapshot.meeting.speakers.length;
+  snapshot.meeting.speechesCompletedAt = new Date().toISOString();
+  render(<RemoteMeetingRoom meetingId="m" mode="control" />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Bắt đầu lại lượt phát biểu" }));
+  expect(screen.getByRole("dialog", { name: "Bắt đầu lại lượt phát biểu?" })).toBeTruthy();
+  expect(vi.mocked(fetch).mock.calls.some(([url, options]) => String(url).endsWith("/control") && options?.method === "POST")).toBe(false);
+
+  fireEvent.click(screen.getByRole("button", { name: "Bắt đầu lại" }));
+  await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url, options]) =>
+    String(url).endsWith("/control") && JSON.parse(String(options?.body)).action === "restart_speakers")).toBe(true));
+});
+it("resets the current speaker clock separately from restarting the queue", async () => {
+  render(<RemoteMeetingRoom meetingId="m" mode="control" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Đặt lại đồng hồ" }));
+  await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url, options]) =>
+    String(url).endsWith("/control") && JSON.parse(String(options?.body)).action === "reset_speaker")).toBe(true));
+});
 it("controls the question, QR, timer and results sequence from the website", async () => {
   snapshot.meeting.presentation.view = "audienceResponses";
   snapshot.meeting.presentation.audienceResponsePanel = "questions";

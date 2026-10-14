@@ -616,6 +616,18 @@ export async function controlMeeting(item: MeetingDocument, action: string, now 
   } else if (action === 'reset_speaker' && ['live', 'paused'].includes(status)) {
     item.speakerStartedAt = undefined;
     item.elapsedSeconds = 0;
+  } else if (action === 'restart_speakers' && ['live', 'paused'].includes(status)) {
+    if (!item.speakers.length) throw new MeetingError(409, 'Chưa có người check-in để bắt đầu lại lượt phát biểu.');
+    item.currentIndex = 0;
+    item.speakerStartedAt = undefined;
+    item.speechesCompletedAt = undefined;
+    item.elapsedSeconds = 0;
+    item.status = 'paused';
+    for (const speaker of item.speakers) {
+      speaker.spokenSeconds = undefined;
+      speaker.deferred = undefined;
+    }
+    item.set('presentation', { ...item.toObject().presentation, view: 'speaker', speakerTimerPausedByView: false });
   } else if (action === 'pause' && status === 'live') {
     item.elapsedSeconds = elapsedSeconds(item, now);
     item.speakerStartedAt = undefined;
