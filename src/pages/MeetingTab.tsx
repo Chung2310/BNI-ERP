@@ -136,6 +136,14 @@ const dateText = (s: string) => {
   }
 };
 
+const checkInTimeText = (value?: string) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const [day, time] = vietnamDateTime(date).split("T");
+  return `${time} ${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(0, 4)}`;
+};
+
 function defaultEnd(value: string) {
   return value ? vietnamDateTime(new Date(new Date(value + ":00+07:00").getTime() + 2 * 60 * 60 * 1000)) : "";
 }
@@ -1497,6 +1505,7 @@ function MeetingWorkspace() {
                           const i = p.originalIndex;
                           const isSpeaking = i === activeMeeting.currentIndex && ["live", "paused"].includes(activeMeeting.status);
                           const isGuest = !p.userId;
+                          const checkInTime = checkInTimeText(p.checkedInAt);
                           return (
                             <div
                               key={p.id}
@@ -1546,10 +1555,16 @@ function MeetingWorkspace() {
                                     </span>
                                   )}
                                 </div>
-                                <span className="text-[11px] text-slate-500">
+                                <span className="block truncate text-[11px] text-slate-500">
                                   {p.email || (isGuest ? "Khách mời" : "")} • {p.seconds} giây
                                 </span>
                               </div>
+
+                              {checkInTime && (
+                                <time dateTime={p.checkedInAt} className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap text-right text-[11px] text-slate-500">
+                                  <Clock3 className="h-3 w-3 shrink-0" /> Check-in: {checkInTime}
+                                </time>
+                              )}
 
                               {isSpeaking && (
                                 <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
