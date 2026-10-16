@@ -20,6 +20,7 @@ import {
   updateMeeting,
   bulkUpdateMeetingSeries,
   deleteMeeting,
+  deleteMeetings,
   getMeeting,
   updateLuckyDrawConfig,
   addOrUpdatePrize,
@@ -276,6 +277,13 @@ meetingRouter.put('/:id/series', manage, async (req, res) => {
   try {
     res.json({ data: await bulkUpdateMeetingSeries(company(req), req.params.id, value) });
   } catch (e) { sendError(res, e); }
+});
+
+meetingRouter.delete('/bulk', manage, async (req, res) => {
+  const { error, value } = Joi.object({ ids: Joi.array().items(Joi.string().pattern(/^[0-9a-fA-F]{24}$/)).min(1).max(5000).unique().required() }).validate(req.body);
+  if (error) return res.status(400).json({ message: 'Danh sách cuộc họp cần xóa không hợp lệ.' });
+  try { res.json({ data: await deleteMeetings(company(req), value.ids) }); }
+  catch (e) { sendError(res, e); }
 });
 
 meetingRouter.delete('/:id', manage, async (req, res) => {

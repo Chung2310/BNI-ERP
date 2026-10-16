@@ -1,10 +1,11 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 
-export function VietnameseMonthPicker({ value, onChange, currentMonth }: {
+export function VietnameseMonthPicker({ value, onChange, currentMonth, ariaLabel = "Tháng xem lịch" }: {
   value: string;
   onChange: (value: string) => void;
   currentMonth: string;
+  ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [year, setYear] = useState(Number(value.slice(0, 4)));
@@ -38,7 +39,7 @@ export function VietnameseMonthPicker({ value, onChange, currentMonth }: {
       setOpen(false); trigger.current?.focus();
     }
   }}>
-    <button ref={trigger} type="button" aria-label="Tháng xem lịch" aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? panelId : undefined}
+    <button ref={trigger} type="button" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? panelId : undefined}
       onClick={() => { setYear(Number(value.slice(0, 4))); setOpen(previous => !previous); }}
       className="flex h-8 items-center gap-3 rounded-lg border border-cyan-200/70 bg-white px-2.5 text-xs font-normal text-slate-700 hover:bg-cyan-50 focus-visible:outline-2 focus-visible:outline-cyan-500 cursor-pointer">
       <span>Tháng {Number(value.slice(5, 7))}, {value.slice(0, 4)}</span>
