@@ -30,6 +30,9 @@ export function allocateSpeakers<T extends Speaker>(people: T[], tiers: Speaking
   const allocations = new Map(arrival.map((person, rank) => [person.index, speakingSeconds(people[person.index].checkedInAt, tiers, fallbackSeconds, rank)]));
   return people.map((person, index) => ({ ...person, seconds: allocations.get(index)! }));
 }
+export function membersBeforeGuests<T extends Pick<Speaker, 'userId'>>(people: T[]): T[] {
+  return [...people.filter(person => Boolean(person.userId)), ...people.filter(person => !person.userId)];
+}
 export function elapsedSeconds(meeting: { elapsedSeconds?: number; speakerStartedAt?: Date | string | null; status: string }, now = new Date()) {
   return (meeting.elapsedSeconds || 0) + (meeting.status === 'live' && meeting.speakerStartedAt ? Math.max(0, (now.getTime() - new Date(meeting.speakerStartedAt).getTime()) / 1000) : 0);
 }

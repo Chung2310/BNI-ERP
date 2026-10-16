@@ -139,7 +139,44 @@ it("uses the same server timestamp for guests and members, regardless of attende
   vi.setSystemTime(new Date("2030-01-02T01:00:00Z"));
   await checkInFromModule(item, { latitude: 10, longitude: 106 }, "member", false);
   expect(item.speakers.filter(person => person.userId === "member")).toHaveLength(1);
+  expect(item.speakers[0].userId).toBe("member");
   expect(item.speakers.at(-1)?.seconds).toBe(30);
   await checkIn(item, { name: "Guest at eight" }, "admin", true);
   expect(item.speakers.at(-1)?.seconds).toBe(20);
+});
+
+it("puts a late member before an early guest without changing either speaking time", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  const item = meeting();
+  item.set("speakers", []);
+  item.set("tiers", [{ startTime: "07:00", endTime: "08:00", seconds: 20 }]);
+  item.fallbackSeconds = 10;
+  vi.setSystemTime(new Date("2030-01-02T00:30:00Z"));
+  await checkIn(item, { name: "Early guest" }, "admin", true);
+  vi.spyOn(UserModel, "findOne").mockReturnValue({ select: () => ({ lean: async () => ({ displayName: "Late member", email: "member@test.com" }) }) } as unknown as ReturnType<typeof UserModel.findOne>);
+  vi.setSystemTime(new Date("2030-01-02T01:30:00Z"));
+  await checkIn(item, { userId: "member" }, "admin", true);
+  expect(item.speakers.map(person => [person.name, person.seconds])).toEqual([["Late member", 10], ["Early guest", 20]]);
+
+  await controlMeeting(item, "start", new Date());
+  expect(item.speakers.map(person => [person.name, person.seconds])).toEqual([["Late member", 10], ["Early guest", 20]]);
+});
+
+it("inserts a late member ahead of waiting guests without interrupting the active guest", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2030-01-02T01:30:00Z"));
+  const item = meeting();
+  item.status = "live";
+  item.currentIndex = 0;
+  item.speakerStartedAt = new Date("2030-01-02T01:29:50Z");
+  item.set("speakers", [
+    { id: "active", name: "Active guest", checkedInAt: new Date("2030-01-02T00:30:00Z"), seconds: 20 },
+    { id: "waiting", name: "Waiting guest", checkedInAt: new Date("2030-01-02T00:40:00Z"), seconds: 20 },
+  ]);
+  vi.spyOn(UserModel, "findOne").mockReturnValue({ select: () => ({ lean: async () => ({ displayName: "Late member", email: "member@test.com" }) }) } as unknown as ReturnType<typeof UserModel.findOne>);
+  await checkIn(item, { userId: "member" }, "admin", true);
+  expect(item.speakers.map(person => person.name)).toEqual(["Active guest", "Late member", "Waiting guest"]);
+  expect(item.speakers.map(person => person.seconds)).toEqual([20, 20, 20]);
+  expect(item.currentIndex).toBe(0);
+  expect(item.speakerStartedAt?.toISOString()).toBe("2030-01-02T01:29:50.000Z");
 });

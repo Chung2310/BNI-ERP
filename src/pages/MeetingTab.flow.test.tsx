@@ -43,6 +43,37 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+it("shows the nearest scheduled meeting first in All and Scheduled lists", async () => {
+  const meetings = [
+    { ...meeting, _id: "far", title: "Later meeting", startsAt: "2030-11-04T00:00:00Z" },
+    { ...meeting, _id: "cancelled", title: "Cancelled meeting", status: "cancelled", startsAt: "2030-10-28T00:00:00Z" },
+    { ...meeting, _id: "near", title: "Next meeting", startsAt: "2030-10-22T00:00:00Z" },
+    { ...meeting, _id: "ended", title: "Ended meeting", status: "ended", startsAt: "2030-10-14T00:00:00Z" },
+  ];
+  stubMeetingFetch(vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: meetings }) }));
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+  await screen.findByText("Next meeting");
+  const cardTitles = () => Array.from(document.querySelectorAll("#meeting_tab_view .grid h3"), element => element.textContent);
+  expect(cardTitles()).toEqual(["Next meeting", "Later meeting", "Cancelled meeting", "Ended meeting"]);
+
+  fireEvent.click(screen.getByRole("button", { name: /Sắp diễn ra \(2\)/ }));
+  expect(cardTitles()).toEqual(["Next meeting", "Later meeting"]);
+});
+
+it("opens bulk deletion from the meeting toolbar and sends selected IDs only after confirmation", async () => {
+  const currentMeeting = { ...meeting, startsAt: new Date().toISOString() };
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [currentMeeting] }) });
+  stubMeetingFetch(fetchMock);
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Xóa hàng loạt" }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: `Chọn ${meeting.title}` }));
+  fireEvent.click(screen.getByRole("button", { name: "Xóa 1 cuộc họp" }));
+  expect(fetchMock.mock.calls.some(([url, options]) => String(url).endsWith("/bulk") && options?.method === "DELETE")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Xóa 1 cuộc họp" }));
+  await waitFor(() => expect(fetchMock.mock.calls.some(([url, options]) => String(url).endsWith("/bulk") && options?.method === "DELETE" && JSON.parse(options.body).ids[0] === "a")).toBe(true));
+});
+
 it("hides manual guest check-in in reception and presentation", async () => {
   stubMeetingFetch(vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, status: "live", startsAt: new Date(Date.now() - 60000).toISOString() }] }) }));
   render(<MeetingTab />);

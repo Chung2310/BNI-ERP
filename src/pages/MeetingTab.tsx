@@ -19,6 +19,7 @@ import { CompanyCheckInQrDialog } from "../components/meetings/CompanyCheckInQrD
 import { MeetingLocationFields } from "../components/meetings/MeetingLocationFields";
 import { MeetingCoverImageField } from "../components/meetings/MeetingCoverImageField";
 import { MeetingDateTimePicker } from "../components/meetings/MeetingDateTimePicker";
+import { MeetingBulkDeleteDialog } from "../components/meetings/MeetingBulkDeleteDialog";
 import {
   CalendarDays,
   QrCode,
@@ -118,6 +119,9 @@ async function api(path: string, method = "GET", body?: unknown) {
   return data.data;
 }
 
+const loadAllMeetings = (): Promise<Meeting[]> => api("?history=all");
+const removeMeetings = async (ids: string[]) => { await api("/bulk", "DELETE", { ids }); };
+
 const fmt = (s: number) =>
   `${Math.floor(Math.max(0, s) / 60)
     .toString()
@@ -161,6 +165,7 @@ function MeetingWorkspace() {
   const canManage = hasPermission("meetings:manage") || hasPermission("access:manage");
 
   const [showSharedQr, setShowSharedQr] = useState(false);
+  const [showBulkDelete, setShowBulkDelete] = useState(false);
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [calendarMonth, setCalendarMonth] = useState(() => vietnamDateTime(new Date()).slice(0, 7));
   const [calendarRevision, setCalendarRevision] = useState(0);
@@ -817,7 +822,12 @@ function MeetingWorkspace() {
     if (statusFilter === "cancelled") return m.status === "cancelled";
     return true;
   };
-  const filteredItems = items.filter(matchesMeetingFilter);
+  const filteredItems = items.filter(matchesMeetingFilter).sort((a, b) => {
+    if (a.status === "scheduled" && b.status !== "scheduled") return -1;
+    if (b.status === "scheduled" && a.status !== "scheduled") return 1;
+    if (a.status === "scheduled") return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+    return 0;
+  });
 
   return (
     <div className={`@container w-full px-0.5 text-left sm:pr-2 ${view === "calendar" ? "flex flex-col sm:h-full sm:min-h-0" : "max-h-[85vh] overflow-y-auto pb-5"}`} id="meeting_tab_view">
@@ -869,6 +879,10 @@ function MeetingWorkspace() {
                 >
                   <CalendarDays className="h-4 w-4" />
                   <span>Tạo lịch định kỳ</span>
+                </button>
+                <button type="button" onClick={() => setShowBulkDelete(true)} className="inline-flex items-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100">
+                  <Trash2 className="h-4 w-4" />
+                  <span>Xóa hàng loạt</span>
                 </button>
               </>
             )}
@@ -977,6 +991,11 @@ function MeetingWorkspace() {
         </button>
       </div>
       {canManage && showSharedQr && <CompanyCheckInQrDialog api={api} companyCode={userProfile?.companyCode} onClose={() => setShowSharedQr(false)} />}
+      {canManage && showBulkDelete && <MeetingBulkDeleteDialog initialMonth={calendarMonth} load={loadAllMeetings} remove={removeMeetings} onClose={() => setShowBulkDelete(false)} onDeleted={count => {
+        setShowBulkDelete(false);
+        setDetailMeetingId(null);
+        void refresh().then(() => toast.success(`Đã xóa ${count} cuộc họp.`));
+      }} />}
       {/* Grid of Meeting Cards (Dạng danh sách / Thẻ hiển thị) */}
       {view === "calendar" ? <MeetingCalendar<Meeting> month={calendarMonth} onMonthChange={setCalendarMonth} revision={calendarRevision} tick={tick} flowStepLabel={meetingId => MEETING_FLOW_META[getMeetingFlowStep(meetingId)].label} load={api} canManage={canManage} filter={matchesMeetingFilter}
         onOpen={meeting => { setItems(previous => [...previous.filter(item => item._id !== meeting._id), meeting]); setDetailMeetingId(meeting._id); openMeetingFlow(meeting); }}
