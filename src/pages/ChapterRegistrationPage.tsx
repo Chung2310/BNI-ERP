@@ -12,13 +12,13 @@ type RegistrationForm = {
 };
 type Field = keyof RegistrationForm;
 
-const fields: Array<{ key: Field; label: string; type?: string }> = [
-  { key: "displayName", label: "Họ và tên" },
-  { key: "email", label: "Email", type: "email" },
-  { key: "phone", label: "Số điện thoại", type: "tel" },
-  { key: "companyName", label: "Công ty" },
-  { key: "industry", label: "Lĩnh vực" },
-  { key: "password", label: "Mật khẩu", type: "password" },
+const fields: Array<{ key: Field; label: string; type?: string; placeholder: string }> = [
+  { key: "displayName", label: "Họ và tên", placeholder: "Ví dụ: Nguyễn Văn A" },
+  { key: "email", label: "Email", type: "email", placeholder: "ten@congty.com" },
+  { key: "phone", label: "Số điện thoại", type: "tel", placeholder: "0987654321" },
+  { key: "companyName", label: "Công ty", placeholder: "Tên công ty của bạn" },
+  { key: "industry", label: "Lĩnh vực", placeholder: "Ví dụ: Công nghệ, tư vấn, bất động sản" },
+  { key: "password", label: "Mật khẩu", type: "password", placeholder: "Tối thiểu 8 ký tự" },
 ];
 
 function validateField(key: Field, value: string): string {
@@ -83,9 +83,9 @@ export default function ChapterRegistrationPage() {
         <a href="/dang-nhap" className="text-sm font-medium text-sky-700 hover:underline">← Đăng nhập</a>
       </div>
       <div><h1 className="text-2xl font-bold">Tạo tài khoản BNI</h1><p className="mt-2 text-sm text-slate-600">Sau khi tạo tài khoản, bạn có thể chọn chapter và gửi đơn gia nhập.</p></div>
-      {fields.map(({ key, label, type }) => <div key={key}>
+      {fields.map(({ key, label, type, placeholder }) => <div key={key}>
         <label htmlFor={key} className="block text-sm font-medium">{label} *</label>
-        <input id={key} name={key} required type={type || "text"} minLength={key === "password" ? 8 : undefined} maxLength={key === "password" ? 128 : 150}
+        <input id={key} name={key} required type={type || "text"} placeholder={placeholder} minLength={key === "password" ? 8 : undefined} maxLength={key === "password" ? 128 : 150}
           inputMode={key === "phone" ? "tel" : undefined}
           aria-invalid={Boolean(fieldErrors[key])} aria-describedby={fieldErrors[key] ? `${key}-error` : undefined}
           value={form[key]}

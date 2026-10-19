@@ -1,5 +1,5 @@
 export const privacyPolicy = {
-  updatedAt: "14/10/2026",
+  updatedAt: "19/10/2026",
   intro: "Chính sách này mô tả cách iGen Connect xử lý thông tin khi bạn sử dụng ứng dụng mobile và website, quản lý tài khoản, tham gia Chapter, cuộc họp và trò chuyện.",
   sections: [
     {
@@ -13,8 +13,8 @@ export const privacyPolicy = {
     {
       title: "2. Tài khoản, hồ sơ và hoạt động",
       paragraphs: [
-        "Chúng tôi xử lý thông tin bạn cung cấp như họ tên, email, số điện thoại, thông tin công ty/lĩnh vực, ảnh đại diện, ảnh bìa, thông tin hồ sơ và dữ liệu đăng nhập để tạo tài khoản, xác thực và hiển thị hồ sơ.",
-        "Khi tự tạo tài khoản trên mobile, họ tên, email và mật khẩu là các trường bắt buộc. Số điện thoại, công ty, lĩnh vực và ảnh đại diện là tùy chọn ở bước này. Hồ sơ hoặc thủ tục gia nhập Chapter có thể cần thông tin bổ sung phù hợp với chức năng bạn sử dụng.",
+        "Chúng tôi xử lý thông tin bạn cung cấp như họ tên, email, số điện thoại, thông tin công ty/lĩnh vực, ảnh đại diện, ảnh bìa, ngày sinh, giới tính, địa chỉ và thị trường mục tiêu nếu bạn bổ sung trong hồ sơ, cùng dữ liệu đăng nhập để tạo tài khoản, xác thực và hiển thị hồ sơ.",
+        "Khi tự tạo tài khoản trên mobile, họ tên, email và mật khẩu là các trường bắt buộc. Số điện thoại, công ty, lĩnh vực và ảnh đại diện là tùy chọn ở bước này. Sau đó, bạn có thể chủ động bổ sung địa chỉ, ngày sinh, giới tính và thị trường mục tiêu trong hồ sơ; các trường này không bắt buộc để tạo tài khoản. Thủ tục gia nhập Chapter có thể cần thêm thông tin phù hợp với chức năng bạn sử dụng.",
         "Dữ liệu tham gia Chapter, đơn đăng ký, cuộc họp, điểm danh, câu trả lời tương tác và kết quả vòng quay được xử lý để cung cấp các chức năng bạn sử dụng. Thành viên và quản trị viên có thể xem thông tin trong phạm vi được phân quyền.",
         "Ứng dụng lưu phiên đăng nhập và một số tùy chọn trên thiết bị. Ảnh, video hoặc tệp đã mở có thể được lưu tạm trên thiết bị để hiển thị và giảm việc tải lại.",
         "Mã phiên, hồ sơ đã đăng nhập và tùy chọn sinh trắc học được lưu bằng cơ chế lưu trữ bảo mật của hệ điều hành thông qua ứng dụng. Mã thiết bị được dùng để quản lý phiên. Bạn cần bảo vệ thiết bị và không chia sẻ thông tin đăng nhập, mã xác thực hoặc mã theo dõi yêu cầu xóa tài khoản.",
@@ -83,7 +83,7 @@ export const privacyPolicy = {
       paragraphs: [
         "Bạn có thể chỉnh sửa hồ sơ trong ứng dụng, tắt sinh trắc học, thay đổi quyền camera/micro/ảnh/vị trí/thông báo trong cài đặt thiết bị và yêu cầu truy cập, sửa hoặc xử lý dữ liệu qua igen.work99@gmail.com. Việc thu hồi quyền có thể làm ngừng chức năng cần quyền đó.",
         "Để gửi yêu cầu hỗ trợ, nêu tài khoản hoặc Chapter liên quan, loại dữ liệu và nội dung cần xử lý. Có thể cần xác minh rằng yêu cầu thuộc tài khoản của bạn trước khi cung cấp hoặc thay đổi dữ liệu. Không gửi mật khẩu hoặc mã xác thực; mã theo dõi yêu cầu xóa chỉ nên cung cấp riêng khi cần hỗ trợ tra cứu.",
-        "Chính sách có thể được cập nhật khi cách xử lý dữ liệu hoặc tính năng thay đổi. Ngày cập nhật được hiển thị ở đầu chính sách. Bản công khai có tại https://erp.igentechnology.net/privacy-policy.",
+        "Chính sách có thể được cập nhật khi cách xử lý dữ liệu hoặc tính năng thay đổi. Ngày cập nhật được hiển thị ở đầu chính sách. Bản công khai có tại https://bni.igentechnology.net/privacy-policy.",
       ],
     },
   ],
