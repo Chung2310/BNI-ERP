@@ -51,23 +51,16 @@ type MemberGalleryImage = { url: string; uploadToken?: string };
 const MAX_MEMBER_GALLERY_IMAGES = 5;
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-const renderAvatar = (avatar: string, sizeClasses: string = "w-8 h-8", textClass: string = "text-base", nameFallback?: string) => {
-  if (isUrl(avatar)) {
+function MemberAvatar({ avatar, sizeClasses, textClass, nameFallback }: { avatar: string; sizeClasses: string; textClass: string; nameFallback?: string }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (isUrl(avatar) && failedUrl !== avatar) {
     return (
       <div className={`${sizeClasses} rounded-full overflow-hidden shrink-0 flex items-center justify-center border-2 border-white shadow-xs bg-slate-100`}>
         <img
           src={avatar}
           className="w-full h-full object-cover"
           alt={nameFallback || "Avatar thành viên"}
-          onError={(e) => {
-            const target = e.currentTarget;
-            target.style.display = "none";
-            const parent = target.parentElement;
-            if (parent) {
-              parent.classList.add("bg-gradient-to-tr", "from-blue-600", "to-indigo-500", "text-white", "font-bold");
-              parent.innerText = nameFallback ? nameFallback.trim().charAt(0).toUpperCase() : "👤";
-            }
-          }}
+          onError={() => setFailedUrl(avatar)}
         />
       </div>
     );
@@ -77,7 +70,10 @@ const renderAvatar = (avatar: string, sizeClasses: string = "w-8 h-8", textClass
       <span className={textClass}>{nameFallback ? nameFallback.trim().charAt(0).toUpperCase() : (avatar || "👤")}</span>
     </div>
   );
-};
+}
+
+const renderAvatar = (avatar: string, sizeClasses: string = "w-8 h-8", textClass: string = "text-base", nameFallback?: string) =>
+  <MemberAvatar avatar={avatar} sizeClasses={sizeClasses} textClass={textClass} nameFallback={nameFallback} />;
 
 
 export default function OrgChartTab({
@@ -172,7 +168,9 @@ export default function OrgChartTab({
   const [addParentId, setAddParentId] = useState("");
   const [addRole, setAddRole] = useState<"user" | "manager" | "branch_owner" | "admin">("user");
   const [addPhotoURL, setAddPhotoURL] = useState("");
+  const [addPhotoUploadToken, setAddPhotoUploadToken] = useState("");
   const [addCoverImage, setAddCoverImage] = useState("");
+  const [addCoverUploadToken, setAddCoverUploadToken] = useState("");
   const [addGalleryImages, setAddGalleryImages] = useState<MemberGalleryImage[]>([]);
   const [uploadingAddAvatar, setUploadingAddAvatar] = useState(false);
   const [uploadingAddCover, setUploadingAddCover] = useState(false);
@@ -193,7 +191,9 @@ export default function OrgChartTab({
   const [editAddress, setEditAddress] = useState("");
   const [editTargetMarket, setEditTargetMarket] = useState("");
   const [editPhotoURL, setEditPhotoURL] = useState("");
+  const [editPhotoUploadToken, setEditPhotoUploadToken] = useState("");
   const [editCoverImage, setEditCoverImage] = useState("");
+  const [editCoverUploadToken, setEditCoverUploadToken] = useState("");
   const [editGalleryImages, setEditGalleryImages] = useState<MemberGalleryImage[]>([]);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingEditCover, setUploadingEditCover] = useState(false);
@@ -223,7 +223,9 @@ export default function OrgChartTab({
     setEditEmail(raw?.email || selectedEmp.email || "");
     setEditPhone(raw?.phone && raw.phone !== "Chưa cập nhật" ? raw.phone : (selectedEmp.phone && selectedEmp.phone !== "Chưa cập nhật" ? selectedEmp.phone : ""));
     setEditPhotoURL(raw?.photoURL || selectedEmp.avatar || "");
+    setEditPhotoUploadToken("");
     setEditCoverImage(raw?.coverImage || selectedEmp.coverImage || "");
+    setEditCoverUploadToken("");
     setEditGalleryImages((raw?.galleryImages || selectedEmp.galleryImages || []).slice(0, MAX_MEMBER_GALLERY_IMAGES).map(url => ({ url })));
     setEditBirthDate(
       raw?.birthDate
@@ -247,6 +249,7 @@ export default function OrgChartTab({
         compCode === "SYSTEM" ? undefined : compCode
       );
       setEditPhotoURL(res.url);
+      setEditPhotoUploadToken(res.uploadToken);
       toast.success("Đã tải lên ảnh đại diện.");
     } catch (err) {
       toast.error(err?.message || "Không thể tải lên ảnh đại diện.");
@@ -269,6 +272,7 @@ export default function OrgChartTab({
         compCode === "SYSTEM" ? undefined : compCode
       );
       setEditCoverImage(res.url);
+      setEditCoverUploadToken(res.uploadToken);
       toast.success("Đã tải lên ảnh bìa thành công.");
     } catch (err) {
       toast.error(err?.message || "Không thể tải lên ảnh bìa.");
@@ -341,6 +345,7 @@ export default function OrgChartTab({
         compCode === "SYSTEM" ? undefined : compCode
       );
       setAddPhotoURL(res.url);
+      setAddPhotoUploadToken(res.uploadToken);
       toast.success("Đã tải lên ảnh đại diện.");
     } catch (err) {
       toast.error(err?.message || "Không thể tải lên ảnh đại diện.");
@@ -363,6 +368,7 @@ export default function OrgChartTab({
         compCode === "SYSTEM" ? undefined : compCode
       );
       setAddCoverImage(res.url);
+      setAddCoverUploadToken(res.uploadToken);
       toast.success("Đã tải lên ảnh bìa thành công.");
     } catch (err) {
       toast.error(err?.message || "Không thể tải lên ảnh bìa.");
@@ -411,7 +417,9 @@ export default function OrgChartTab({
         industry: editIndustry.trim(),
         phone: editPhone.trim() || "",
         photoURL: editPhotoURL.trim() || "",
+        ...(editPhotoUploadToken ? { photoUploadToken: editPhotoUploadToken } : {}),
         coverImage: editCoverImage.trim() || "",
+        ...(editCoverUploadToken ? { coverUploadToken: editCoverUploadToken } : {}),
         galleryImages: editGalleryImages.map(image => image.url),
         galleryUploadTokens: editGalleryImages.flatMap((image, index) => image.uploadToken ? [{ index, uploadToken: image.uploadToken }] : []),
         birthDate: editBirthDate || undefined,
@@ -691,7 +699,9 @@ export default function OrgChartTab({
         ...{
           industry: addIndustry.trim() || undefined,
           photoURL: addPhotoURL.trim() || undefined,
+          ...(addPhotoUploadToken ? { photoUploadToken: addPhotoUploadToken } : {}),
           coverImage: addCoverImage.trim() || undefined,
+          ...(addCoverUploadToken ? { coverUploadToken: addCoverUploadToken } : {}),
           galleryImages: addGalleryImages.map(image => image.url),
           galleryUploadTokens: addGalleryImages.flatMap((image, index) => image.uploadToken ? [{ index, uploadToken: image.uploadToken }] : []),
         }
@@ -716,7 +726,9 @@ export default function OrgChartTab({
       setAddAddress("");
       setAddTargetMarket("");
       setAddPhotoURL("");
+      setAddPhotoUploadToken("");
       setAddCoverImage("");
+      setAddCoverUploadToken("");
       setAddGalleryImages([]);
       setAddParentId("");
       setAddRole("user");
@@ -1022,7 +1034,7 @@ export default function OrgChartTab({
                         {editCoverImage && (
                           <button
                             type="button"
-                            onClick={() => setEditCoverImage("")}
+                            onClick={() => { setEditCoverImage(""); setEditCoverUploadToken(""); }}
                             title="Xóa ảnh bìa"
                             className="p-1.5 bg-black/60 hover:bg-red-600 backdrop-blur-md text-white rounded-xl transition cursor-pointer"
                           >
@@ -1075,7 +1087,7 @@ export default function OrgChartTab({
                         {editPhotoURL && (
                           <button
                             type="button"
-                            onClick={() => setEditPhotoURL("")}
+                            onClick={() => { setEditPhotoURL(""); setEditPhotoUploadToken(""); }}
                             title="Xóa avatar"
                             className="p-1.5 border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl transition cursor-pointer"
                           >
@@ -1522,7 +1534,7 @@ export default function OrgChartTab({
                     {addCoverImage && (
                       <button
                         type="button"
-                        onClick={() => setAddCoverImage("")}
+                        onClick={() => { setAddCoverImage(""); setAddCoverUploadToken(""); }}
                         title="Xóa ảnh bìa"
                         className="p-1.5 bg-black/60 hover:bg-red-600 backdrop-blur-md text-white rounded-xl transition cursor-pointer"
                       >
@@ -1575,7 +1587,7 @@ export default function OrgChartTab({
                     {addPhotoURL && (
                       <button
                         type="button"
-                        onClick={() => setAddPhotoURL("")}
+                        onClick={() => { setAddPhotoURL(""); setAddPhotoUploadToken(""); }}
                         title="Xóa avatar"
                         className="p-1.5 border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl transition cursor-pointer"
                       >

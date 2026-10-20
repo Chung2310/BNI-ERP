@@ -32,6 +32,7 @@ import { tabToPath } from "../../seo/seo-config";
 import { meetingLiveApi, meetingRoomUrl } from "../../services/meetingLiveService";
 import { meetingService } from "../../services/meetingService";
 import { presentationState, type DrawFilter, type MeetingPresentationState, type PresentationView } from "../../utils/meetingPresentation";
+import { isMeetingScheduledForToday } from "../../utils/meetingRecurrence";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { MeetingStage, SpeakerStage } from "./MeetingStage";
 import { AudienceResponseRemote } from "./AudienceResponseRemote";
@@ -430,7 +431,9 @@ function MeetingRoom({ meetingId, mode }: Props) {
                 {meeting.status === "scheduled" && (
                   <button
                     type="button"
-                    className="col-span-2 flex items-center justify-center gap-2 min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm shadow-emerald-600/20 transition cursor-pointer"
+                    className="col-span-2 flex items-center justify-center gap-2 min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm shadow-emerald-600/20 transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!isMeetingScheduledForToday(meeting.startsAt, now)}
+                    title={!isMeetingScheduledForToday(meeting.startsAt, now) ? "Chỉ có thể bắt đầu vào đúng ngày diễn ra cuộc họp (giờ Việt Nam)" : undefined}
                     onClick={() => void control("start")}
                   >
                     <Play className="h-4 w-4 fill-current" />

@@ -31,10 +31,12 @@ import {
 import { toast } from "../../pages/Toast";
 import { playTickSound, playWinFanfare, playSuspenseSound } from "../../utils/soundEffects";
 import { launchConfetti } from "../../utils/confetti";
+import { checkedInBeforeSeven } from "../../utils/earlyCheckIn";
 
 interface LuckyDrawTabProps {
   meeting: Meeting;
   canManage: boolean;
+  canStartMeeting?: boolean;
   onRefreshMeeting: () => Promise<void>;
   onStartMeeting?: () => Promise<void>;
 }
@@ -42,6 +44,7 @@ interface LuckyDrawTabProps {
 export function LuckyDrawTab({
   meeting,
   canManage: hasManagementPermission,
+  canStartMeeting = true,
   onRefreshMeeting,
   onStartMeeting,
 }: LuckyDrawTabProps) {
@@ -292,8 +295,12 @@ export function LuckyDrawTab({
       }
     }
 
-    const candidatePool = speakers.filter((s) => !previousWinnerIds.has(String(s.id)));
-    if (luckyConfig.drawMode === "attendees" && !candidatePool.length) {
+    const candidatePool = speakers.filter((s) => !s.deletedAccount && checkedInBeforeSeven(s.checkedInAt) && !previousWinnerIds.has(String(s.id)));
+    const eligibleNumbers = speakers.flatMap((speaker, index) =>
+      index + 1 >= (luckyConfig.numberMin || 1) && index + 1 <= (luckyConfig.numberMax || 100) &&
+      !speaker.deletedAccount && checkedInBeforeSeven(speaker.checkedInAt) && !previousWinnerIds.has(String(speaker.id))
+        ? [index + 1] : []);
+    if (luckyConfig.drawMode === "attendees" ? !candidatePool.length : !eligibleNumbers.length) {
       toast.error("Không còn người tham gia hợp lệ nào chưa được chọn để quay tiếp!");
       return;
     }
@@ -322,9 +329,7 @@ export function LuckyDrawTab({
         const dummy = candidatePool[rollIndex % candidatePool.length];
         setSpinningDisplay(dummy ? dummy.name : `Ticket #${rollIndex % 100}`);
       } else {
-        const min = luckyConfig.numberMin || 1;
-        const max = luckyConfig.numberMax || 100;
-        const randomNum = Math.floor(Math.random() * (max - min + 1)) + min;
+        const randomNum = eligibleNumbers[Math.floor(Math.random() * eligibleNumbers.length)];
         setSpinningDisplay(`LUCKY #${randomNum.toString().padStart(3, "0")}`);
       }
 
@@ -462,7 +467,7 @@ export function LuckyDrawTab({
                 Quay chọn người đang tạm khóa
               </h4>
               <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
-                Chức năng quay chọn người chỉ kích hoạt khi cuộc họp đã bắt đầu.{canManage ? " Nhấn nút bên cạnh để bắt đầu." : ""}
+                Chức năng quay chọn người chỉ kích hoạt khi cuộc họp đã bắt đầu.{canManage ? canStartMeeting ? " Nhấn nút bên cạnh để bắt đầu." : " Chỉ có thể bắt đầu cuộc họp vào đúng ngày diễn ra (giờ Việt Nam)." : ""}
               </p>
             </div>
           </div>
@@ -471,7 +476,9 @@ export function LuckyDrawTab({
             <button
               type="button"
               onClick={onStartMeeting}
-              className="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
+              disabled={!canStartMeeting}
+              title={!canStartMeeting ? "Chỉ có thể bắt đầu vào đúng ngày diễn ra cuộc họp (giờ Việt Nam)" : undefined}
+              className="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium shadow-sm transition flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
               <CheckCircle2 className="h-4 w-4" />
               Bắt đầu cuộc họp
@@ -600,7 +607,7 @@ export function LuckyDrawTab({
           {/* Digital Display */}
           <div className="my-4 rounded-xl border border-slate-200 bg-white p-5 text-center">
             <div className="text-[11px] text-slate-400 mb-2">
-              {luckyConfig.drawMode === "attendees" ? "Thành viên & Khách mời" : "Số thứ tự"} · {meeting.speakers?.length || 0} ứng viên
+              {luckyConfig.drawMode === "attendees" ? "Thành viên & Khách mời" : "Số thứ tự"} · {(meeting.speakers || []).filter(speaker => !speaker.deletedAccount && checkedInBeforeSeven(speaker.checkedInAt)).length} ứng viên check-in đến hết 07:00
             </div>
 
             <div

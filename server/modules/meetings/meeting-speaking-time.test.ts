@@ -105,6 +105,7 @@ it("stores time slots through Mongoose serialization and supplies them by defaul
 it.each(["manual", "automatic", "presentation"])("recalculates checked-in people by timestamp on %s start", async mode => {
   const item = meeting();
   const now = new Date("2030-01-02T02:00:00Z");
+  vi.spyOn(MeetingModel, "findOne").mockResolvedValue(null);
   if (mode === "manual") await controlMeeting(item, "start", now);
   else if (mode === "automatic") {
     vi.spyOn(MeetingModel, "find").mockResolvedValue([item]);
@@ -112,6 +113,16 @@ it.each(["manual", "automatic", "presentation"])("recalculates checked-in people
   } else await startMeetingPresentation(item, "early", now);
   expect(item.speakers.map(person => person.id)).toEqual(["late", "early"]);
   expect(item.speakers.map(person => person.seconds)).toEqual([20, 30]);
+});
+
+it.each([
+  "2030-01-01T16:59:59Z", // 23:59 on the previous day in Vietnam
+  "2030-01-02T17:00:00Z", // 00:00 on the next day in Vietnam
+])("rejects manual start outside the scheduled Vietnam date (%s)", async timestamp => {
+  const item = meeting();
+  await expect(controlMeeting(item, "start", new Date(timestamp))).rejects.toMatchObject({ status: 409 });
+  expect(item.status).toBe("scheduled");
+  expect(item.save).not.toHaveBeenCalled();
 });
 
 it("saving a scheduled meeting recalculates existing arrivals with the new slots", async () => {
@@ -158,6 +169,7 @@ it("puts a late member before an early guest without changing either speaking ti
   await checkIn(item, { userId: "member" }, "admin", true);
   expect(item.speakers.map(person => [person.name, person.seconds])).toEqual([["Late member", 10], ["Early guest", 20]]);
 
+  vi.spyOn(MeetingModel, "findOne").mockResolvedValue(null);
   await controlMeeting(item, "start", new Date());
   expect(item.speakers.map(person => [person.name, person.seconds])).toEqual([["Late member", 10], ["Early guest", 20]]);
 });

@@ -19,6 +19,7 @@ describe("ProfileResourceService", () => {
         entityId: "user-1",
         entityLabel: "Nguyen A",
         sourceRecordId: "user-1",
+        expectedSourceType: "profile.avatar",
         uploads: [{ uploadToken: "avatar-token", sourceField: "photoURL" }],
       },
     );

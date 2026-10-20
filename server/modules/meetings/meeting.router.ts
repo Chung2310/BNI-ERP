@@ -58,6 +58,7 @@ const read = requirePermission(['meetings:read', 'meetings:manage', 'access:read
 const sendError = (res: import("express").Response, error: unknown) =>
   res.status(error instanceof MeetingError ? error.status : 500).json({
     message: (error instanceof Error ? error.message : '') || 'Không thể xử lý cuộc họp.',
+    ...(error instanceof MeetingError && error.code ? { code: error.code, activeMeeting: error.activeMeeting } : {}),
   });
 
 meetingRouter.get('/', read, async (req, res) => {

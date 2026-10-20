@@ -398,6 +398,7 @@ export const authService = {
     companyCode: string; companyName: string; parentId?: string; phone?: string;
     jobDescriptionLink?: string; branchId?: string; birthDate?: string; monthlySalary?: number;
     jobDescriptionUploadToken?: string; industry?: string; photoURL?: string; coverImage?: string;
+    photoUploadToken?: string; coverUploadToken?: string;
     gender?: "male" | "female" | "other"; address?: string; targetMarket?: string;
     galleryImages?: string[]; galleryUploadTokens?: Array<{ index: number; uploadToken: string }>;
   }): Promise<string> {
