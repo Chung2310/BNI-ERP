@@ -9,7 +9,7 @@ import { MeetingModel, MeetingCheckInQrModel } from './meeting.model';
 import { DEFAULT_MEETING_DURATION_MS, meetingEndsAt } from './meeting-qr.rules';
 import { cloudinaryService, type PublicMediaAsset } from '../../service/cloudinary.service';
 import { guestAvatarError, type GuestAvatarFile } from './meeting-guest-avatar';
-import { allocateSpeakers, elapsedSeconds, reminderDueAt, speakingSeconds } from './meeting.rules';
+import { allocateSpeakers, elapsedSeconds, membersBeforeGuests, reminderDueAt, speakingSeconds } from './meeting.rules';
 import { UserModel } from '../../model/user.model';
 import { notificationService } from '../../service/notification.service';
 import { emitToCompany } from '../../socket';
@@ -323,6 +323,19 @@ export async function deleteMeeting(companyCode: string, id: string) {
   return { success: true };
 }
 
+export async function deleteMeetings(companyCode: string, ids: string[]) {
+  const filter = { _id: { $in: ids }, companyCode };
+  if (await MeetingModel.countDocuments(filter) !== ids.length) {
+    throw new MeetingError(409, 'Danh sách cuộc họp đã thay đổi. Vui lòng tải lại trước khi xóa.');
+  }
+  const result = await MeetingModel.deleteMany(filter);
+  emitToCompany(companyCode, 'meeting_updated', { deleted: true });
+  if (result.deletedCount !== ids.length) {
+    throw new MeetingError(409, 'Một số cuộc họp đã thay đổi trong lúc xóa. Vui lòng tải lại danh sách.');
+  }
+  return { deletedCount: result.deletedCount };
+}
+
 
 export async function checkInFromModule(item: MeetingDocument, input: CheckInInput, actorId: string, canManage: boolean) {
   if (!canManage) validateCheckInLocation(item, input);
@@ -380,6 +393,12 @@ export async function checkIn(item: MeetingDocument, input: CheckInInput, actorI
     checkedInAt,
     seconds: speakingSeconds(checkedInAt, item.tiers.map(tier => ({ ...(typeof tier.toObject === 'function' ? tier.toObject() : tier), seconds: tier.seconds ?? item.fallbackSeconds })), item.fallbackSeconds, item.speakers.length),
   });
+  const pendingStart = item.status === 'scheduled' ? 0 : Math.max(0,
+    item.currentIndex + (item.speakerStartedAt || item.elapsedSeconds > 0 ? 1 : 0));
+  item.set('speakers', [
+    ...item.speakers.slice(0, pendingStart),
+    ...membersBeforeGuests(item.speakers.slice(pendingStart)),
+  ]);
   if (['live', 'paused'].includes(item.status) && (item.currentIndex === -1 || item.speechesCompletedAt)) {
     item.currentIndex = item.speechesCompletedAt ? item.speakers.length - 1 : 0;
     item.speechesCompletedAt = undefined;
@@ -397,11 +416,11 @@ export async function autoStartDueMeetings(now = new Date()) {
   });
   for (const item of dueMeetings) {
     if (item.speakers && item.speakers.length > 0) {
-      item.set('speakers', allocateSpeakers(
+      item.set('speakers', membersBeforeGuests(allocateSpeakers(
         item.speakers.map(p => p.toObject()),
         item.tiers.map(t => ({ startTime: t.startTime, endTime: t.endTime, count: t.count, seconds: t.seconds ?? item.fallbackSeconds })),
         item.fallbackSeconds
-      ));
+      )));
       item.currentIndex = 0;
       item.speakerStartedAt = undefined;
       item.elapsedSeconds = 0;
@@ -532,19 +551,19 @@ export async function startMeetingPresentation(
   const sameSpeaker = item.status !== 'scheduled' && item.currentIndex === index;
   if (item.status === 'scheduled') {
     item.startedAt = now;
-    item.set('speakers', allocateSpeakers(item.speakers.map((person) => person.toObject()), item.tiers.map(tier => ({ ...tier.toObject(), seconds: tier.seconds ?? item.fallbackSeconds })), item.fallbackSeconds));
+    item.set('speakers', membersBeforeGuests(allocateSpeakers(item.speakers.map((person) => person.toObject()), item.tiers.map(tier => ({ ...tier.toObject(), seconds: tier.seconds ?? item.fallbackSeconds })), item.fallbackSeconds)));
   }
   if (!sameSpeaker) {
     if (item.status !== 'scheduled' && item.speakers[item.currentIndex]) item.speakers[item.currentIndex].spokenSeconds = completedSpeakingSeconds(item, now);
-    item.currentIndex = index;
+    item.currentIndex = item.speakers.findIndex((speaker) => speaker.id === speakerId);
     item.elapsedSeconds = 0;
-    item.speakers[index].spokenSeconds = undefined;
+    item.speakers[item.currentIndex].spokenSeconds = undefined;
     item.speakerStartedAt = now;
   } else if (item.status === 'paused' || !item.speakerStartedAt) {
     item.speakerStartedAt = now;
   }
   item.status = 'live';
-  item.speakers[index].deferred = false;
+  item.speakers[item.currentIndex].deferred = false;
   item.set('presentation', {
     ...item.toObject().presentation,
     view: 'speaker',
@@ -593,11 +612,11 @@ export async function controlMeeting(item: MeetingDocument, action: string, now 
   if (action === 'start' && status === 'scheduled') {
     item.startedAt = now;
     if (item.speakers && item.speakers.length > 0) {
-      item.set('speakers', allocateSpeakers(
+      item.set('speakers', membersBeforeGuests(allocateSpeakers(
         item.speakers.map((p) => (p.toObject ? p.toObject() : p)),
         item.tiers.map(tier => ({ ...tier.toObject(), seconds: tier.seconds ?? item.fallbackSeconds })),
         item.fallbackSeconds
-      ));
+      )));
       item.currentIndex = 0;
       item.speakerStartedAt = undefined;
       item.elapsedSeconds = 0;

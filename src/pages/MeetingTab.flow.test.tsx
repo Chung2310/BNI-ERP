@@ -43,6 +43,37 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+it("shows the nearest scheduled meeting first in All and Scheduled lists", async () => {
+  const meetings = [
+    { ...meeting, _id: "far", title: "Later meeting", startsAt: "2030-11-04T00:00:00Z" },
+    { ...meeting, _id: "cancelled", title: "Cancelled meeting", status: "cancelled", startsAt: "2030-10-28T00:00:00Z" },
+    { ...meeting, _id: "near", title: "Next meeting", startsAt: "2030-10-22T00:00:00Z" },
+    { ...meeting, _id: "ended", title: "Ended meeting", status: "ended", startsAt: "2030-10-14T00:00:00Z" },
+  ];
+  stubMeetingFetch(vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: meetings }) }));
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+  await screen.findByText("Next meeting");
+  const cardTitles = () => Array.from(document.querySelectorAll("#meeting_tab_view .grid h3"), element => element.textContent);
+  expect(cardTitles()).toEqual(["Next meeting", "Later meeting", "Cancelled meeting", "Ended meeting"]);
+
+  fireEvent.click(screen.getByRole("button", { name: /Sắp diễn ra \(2\)/ }));
+  expect(cardTitles()).toEqual(["Next meeting", "Later meeting"]);
+});
+
+it("opens bulk deletion from the meeting toolbar and sends selected IDs only after confirmation", async () => {
+  const currentMeeting = { ...meeting, startsAt: new Date().toISOString() };
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [currentMeeting] }) });
+  stubMeetingFetch(fetchMock);
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Xóa hàng loạt" }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: `Chọn ${meeting.title}` }));
+  fireEvent.click(screen.getByRole("button", { name: "Xóa 1 cuộc họp" }));
+  expect(fetchMock.mock.calls.some(([url, options]) => String(url).endsWith("/bulk") && options?.method === "DELETE")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Xóa 1 cuộc họp" }));
+  await waitFor(() => expect(fetchMock.mock.calls.some(([url, options]) => String(url).endsWith("/bulk") && options?.method === "DELETE" && JSON.parse(options.body).ids[0] === "a")).toBe(true));
+});
+
 it("hides manual guest check-in in reception and presentation", async () => {
   stubMeetingFetch(vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, status: "live", startsAt: new Date(Date.now() - 60000).toISOString() }] }) }));
   render(<MeetingTab />);
@@ -542,6 +573,29 @@ it.each(["live", "paused"])("shows the check-in list and explains unavailable pr
   expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/order"))).toBe(false);
 });
 
+it("shows each speaker's check-in time in Vietnam time on the check-in list", async () => {
+  const item = { ...meeting, status: "ended", speakers: [
+    { id: "a", name: "An", seconds: 30, checkedInAt: "2026-10-10T00:05:00Z" },
+    { id: "b", name: "Bình", seconds: 20, checkedInAt: "2026-10-10T01:10:00Z" },
+    { id: "c", name: "Cường", seconds: 20 },
+  ] };
+  stubMeetingFetch(vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [item] }) }));
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Xem buổi họp" }));
+  const anInfo = screen.getByRole("button", { name: "Bắt đầu từ An" }).parentElement?.parentElement;
+  const binhInfo = screen.getByRole("button", { name: "Bắt đầu từ Bình" }).parentElement?.parentElement;
+  const cuongInfo = screen.getByRole("button", { name: "Bắt đầu từ Cường" }).parentElement?.parentElement;
+  const anTime = anInfo?.parentElement?.querySelector("time");
+  const binhTime = binhInfo?.parentElement?.querySelector("time");
+  const cuongTime = cuongInfo?.parentElement?.querySelector("time");
+  expect(anInfo?.contains(anTime ?? null)).toBe(false);
+  expect(anTime?.textContent).toContain("Check-in: 07:05 10/10/2026");
+  expect(anTime?.getAttribute("dateTime")).toBe("2026-10-10T00:05:00Z");
+  expect(binhTime?.textContent).toContain("Check-in: 08:10 10/10/2026");
+  expect(cuongTime).toBeNull();
+});
+
 
 it("does not expose a slide delay or create a second browser auto-advance timer", async () => {
   vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
@@ -838,17 +892,23 @@ it("edits time slots, blocks overlaps and saves the configured fallback", async 
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click((await screen.findAllByTitle("Sửa cuộc họp"))[0]);
   expect(screen.queryByText("Số lượng người:")).toBeNull();
-  const start = screen.getByLabelText("Từ giờ — khung 1") as HTMLInputElement;
-  expect(start.value).toBe("06:30");
+  const chooseTime = (label: string, hour: string, minute: string) => {
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    const picker = within(screen.getByRole("dialog", { name: "Chọn giờ" }));
+    fireEvent.click(within(picker.getByRole("group", { name: "Giờ" })).getByRole("button", { name: hour }));
+    fireEvent.click(within(picker.getByRole("group", { name: "Phút" })).getByRole("button", { name: minute }));
+  };
+  const start = screen.getByRole("button", { name: "Từ giờ — khung 1" });
+  expect(start.textContent).toBe("06:30");
   expect((screen.getByLabelText("Số giây phát biểu — khung 1") as HTMLInputElement).value).toBe("45");
-  fireEvent.change(screen.getByLabelText("Đến giờ — khung 1"), { target: { value: "08:00" } });
+  chooseTime("Đến giờ — khung 1", "08", "00");
   fireEvent.submit(start.closest("form")!);
   expect(screen.getByRole("alert").textContent).toContain("không được chồng nhau");
   expect(fetchMock.mock.calls.some(([, options]) => options?.method === "PUT")).toBe(false);
-  fireEvent.change(screen.getByLabelText("Đến giờ — khung 1"), { target: { value: "07:30" } });
+  chooseTime("Đến giờ — khung 1", "07", "30");
   fireEvent.click(screen.getByRole("button", { name: "Thêm khung giờ" }));
-  expect((screen.getByLabelText("Từ giờ — khung 3") as HTMLInputElement).value).toBe("08:30");
-  fireEvent.change(screen.getByLabelText("Đến giờ — khung 3"), { target: { value: "09:00" } });
+  expect(screen.getByRole("button", { name: "Từ giờ — khung 3" }).textContent).toBe("08:30");
+  chooseTime("Đến giờ — khung 3", "09", "00");
   fireEvent.change(screen.getByLabelText("Số giây phát biểu — khung 3"), { target: { value: "15" } });
   fireEvent.click(screen.getByRole("button", { name: "Xóa khung giờ 2" }));
   fireEvent.change(screen.getByLabelText(/Ngoài khung giờ/), { target: { value: "10" } });

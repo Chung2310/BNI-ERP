@@ -43,10 +43,10 @@ export function MeetingLocationFields({ value, onChange, radius, onRadiusChange 
       )}
     </button>
     <div className="grid grid-cols-2 gap-3">
-      <label className="text-xs">Vĩ độ<input type="number" step="any" min="-90" max="90" value={draft.latitude} required={draft.longitude !== ""} onChange={e => updatePoint("latitude", e.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2" /></label>
-      <label className="text-xs">Kinh độ<input type="number" step="any" min="-180" max="180" value={draft.longitude} required={draft.latitude !== ""} onChange={e => updatePoint("longitude", e.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2" /></label>
+      <label className="text-xs">Vĩ độ<input type="number" step="any" min="-90" max="90" value={draft.latitude} required={draft.longitude !== ""} onChange={e => updatePoint("latitude", e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-100" /></label>
+      <label className="text-xs">Kinh độ<input type="number" step="any" min="-180" max="180" value={draft.longitude} required={draft.latitude !== ""} onChange={e => updatePoint("longitude", e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-100" /></label>
     </div>
-    <label className="block text-xs">Bán kính cho phép (m)<input required type="text" inputMode="numeric" pattern="(?:[5-9][0-9]|[1-9][0-9]{2}|[1-4][0-9]{3}|5000)" title="Nhập bán kính từ 50 đến 5000 mét" value={radiusDraft} onChange={e => { const text = e.target.value; if (!/^[0-9]*$/.test(text)) return; setRadiusDraft(text); if (text !== "") onRadiusChange(Number(text)); }} onBlur={() => { if (radiusDraft === "") setRadiusDraft(radius.toString()); }} className="mt-1 w-full rounded-lg border bg-white p-2" /></label>
+    <label className="block text-xs">Bán kính cho phép (m)<input required type="text" inputMode="numeric" pattern="(?:[5-9][0-9]|[1-9][0-9]{2}|[1-4][0-9]{3}|5000)" title="Nhập bán kính từ 50 đến 5000 mét" value={radiusDraft} onChange={e => { const text = e.target.value; if (!/^[0-9]*$/.test(text)) return; setRadiusDraft(text); if (text !== "") onRadiusChange(Number(text)); }} onBlur={() => { if (radiusDraft === "") setRadiusDraft(radius.toString()); }} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-100" /></label>
     {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
   </fieldset>;
 }
