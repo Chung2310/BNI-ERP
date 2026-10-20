@@ -115,37 +115,38 @@ it("draws only from the participant IDs chosen by the controller", async () => {
   expect(item.presentation.drawParticipantIds).toEqual(["second"]);
 });
 
-it("does not draw absent members without a qualifying check-in", async () => {
+it("allows the absent-members filter without a check-in", async () => {
   const item = meeting();
   item.set("luckyDraw", { drawMode: "attendees", allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
   vi.spyOn(UserModel, "find").mockReturnValue({ select: () => ({ lean: async () => [
     { _id: "member-present", displayName: "An", email: "an@example.com" },
     { _id: "member-absent", displayName: "Bao", email: "bao@example.com" },
   ] }) } as unknown as ReturnType<typeof UserModel.find>);
-  await expect(spinLuckyDraw(item, "prize", "organizer", true, "absent_members")).rejects.toMatchObject({ status: 400 });
+  const result = await spinLuckyDraw(item, "prize", "organizer", true, "absent_members");
+  expect(result.winner.winnerId).toBe("member-absent");
 });
 
 it("accepts the absent-only presentation filter", () => {
   expect(presentationStateInput.validate({ version: 0, drawFilter: "absent_members" }).error).toBeUndefined();
 });
 
-it("excludes late check-ins even when the draw filter is all", async () => {
+it("allows late check-ins when selected for the draw", async () => {
   const item = meeting();
   item.speakers[0].checkedInAt = new Date("2026-10-20T07:00:59+07:00");
   item.speakers[1].checkedInAt = new Date("2026-10-20T07:01:00+07:00");
   item.set("luckyDraw", { drawMode: "attendees", allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
   vi.spyOn(UserModel, "find").mockReturnValue({ select: () => ({ lean: async () => [] }) } as unknown as ReturnType<typeof UserModel.find>);
-  const result = await spinLuckyDraw(item, "prize", "organizer", true, "all");
-  expect(result.winner.winnerId).toBe("first");
+  const result = await spinLuckyDraw(item, "prize", "organizer", true, "all", ["second"]);
+  expect(result.winner.winnerId).toBe("second");
 });
 
-it("excludes late and missing check-ins from numbered draws", async () => {
+it("allows late check-ins in numbered draws", async () => {
   const item = meeting();
   item.speakers[0].checkedInAt = new Date("2026-10-20T07:00:59+07:00");
   item.speakers[1].checkedInAt = new Date("2026-10-20T07:01:00+07:00");
-  item.set("luckyDraw", { drawMode: "numbers", numberMin: 1, numberMax: 3, allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
+  item.set("luckyDraw", { drawMode: "numbers", numberMin: 2, numberMax: 2, allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
   const result = await spinLuckyDraw(item, "prize", "organizer", true, "all");
-  expect(result.winner.ticketNumber).toBe(1);
+  expect(result.winner.ticketNumber).toBe(2);
 });
 
 it("rejects malformed states and prevents clients from setting draw results", () => {
