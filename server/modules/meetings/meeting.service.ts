@@ -1,4 +1,4 @@
-import { recurringMeetingDates } from "../../../src/utils/meetingRecurrence";
+import { isMeetingScheduledForToday, recurringMeetingDates } from "../../../src/utils/meetingRecurrence";
 import { normalizeLoginIdentifier } from "../../../src/utils/loginIdentifier";
 import { reserveMeetingNumbers } from "./meeting-sequence";
 import { randomBytes, randomInt, randomUUID, createHash } from 'node:crypto';
@@ -14,6 +14,7 @@ import { UserModel } from '../../model/user.model';
 import { notificationService } from '../../service/notification.service';
 import { emitToCompany } from '../../socket';
 import type { DrawFilter, MeetingPresentationState, PresentationView } from '../../../src/utils/meetingPresentation';
+import { checkedInBeforeSeven } from '../../../src/utils/earlyCheckIn';
 
 export type MeetingDocument = ReturnType<typeof MeetingModel.hydrate>;
 export type CheckInInput = {
@@ -28,9 +29,28 @@ export type MeetingInput = {
 type PrizeInput = { id?: string; name?: string; reward?: string; quantity?: number; order?: number; imageUrl?: string; color?: string };
 type WinnerInput = { id: string; winnerId: string; source: 'wheel' | 'bingo'; name: string; prizeName: string; photoURL?: string; ticketNumber?: number; wonAt: Date };
 export class MeetingError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public code?: string, public activeMeeting?: { id: string; title: string }) {
     super(message);
   }
+}
+
+async function activeMeetingConflict(companyCode: string, excludedId: string) {
+  const active = await MeetingModel.findOne({
+    companyCode,
+    status: { $in: ['live', 'paused'] },
+    _id: { $ne: excludedId },
+  });
+  return active && new MeetingError(
+    409,
+    `Đang có cuộc họp "${active.title}" diễn ra. Vui lòng kết thúc cuộc họp này trước khi bắt đầu cuộc họp khác.`,
+    'MEETING_ALREADY_IN_PROGRESS',
+    { id: String(active._id), title: active.title },
+  );
+}
+
+async function assertNoOtherActiveMeeting(item: MeetingDocument) {
+  const conflict = await activeMeetingConflict(item.companyCode, String(item._id));
+  if (conflict) throw conflict;
 }
 
 type MeetingSlot = { startsAt: Date; endsAt: Date };
@@ -73,6 +93,10 @@ export async function saveMeeting(item: MeetingDocument) {
   } catch (error) {
     if (error.name === 'VersionError') {
       throw new MeetingError(409, 'Có người vừa cập nhật cuộc họp. Vui lòng thử lại.');
+    }
+    if (error.code === 11000 && error.keyPattern?.companyCode && ['live', 'paused'].includes(item.status)) {
+      const conflict = await activeMeetingConflict(item.companyCode, String(item._id));
+      if (conflict) throw conflict;
     }
     throw error;
   }
@@ -414,7 +438,9 @@ export async function autoStartDueMeetings(now = new Date()) {
     status: 'scheduled',
     startsAt: { $lte: now },
   });
+  let started = 0;
   for (const item of dueMeetings) {
+    if (await activeMeetingConflict(item.companyCode, String(item._id))) continue;
     if (item.speakers && item.speakers.length > 0) {
       item.set('speakers', membersBeforeGuests(allocateSpeakers(
         item.speakers.map(p => p.toObject()),
@@ -431,9 +457,14 @@ export async function autoStartDueMeetings(now = new Date()) {
     }
     item.startedAt = now;
     item.status = 'live';
-    await saveMeeting(item);
+    try {
+      await saveMeeting(item);
+      started++;
+    } catch (error) {
+      if (!(error instanceof MeetingError && error.code === 'MEETING_ALREADY_IN_PROGRESS')) throw error;
+    }
   }
-  return dueMeetings.length;
+  return started;
 }
 
 const AUTO_END_GRACE_MS = 3 * 60 * 60 * 1000;
@@ -610,6 +641,10 @@ export async function controlMeeting(item: MeetingDocument, action: string, now 
     throw new MeetingError(409, 'Không có người đang chờ phát biểu.');
   }
   if (action === 'start' && status === 'scheduled') {
+    if (!isMeetingScheduledForToday(item.startsAt, now)) {
+      throw new MeetingError(409, 'Chỉ có thể bắt đầu cuộc họp vào đúng ngày diễn ra (giờ Việt Nam).');
+    }
+    await assertNoOtherActiveMeeting(item);
     item.startedAt = now;
     if (item.speakers && item.speakers.length > 0) {
       item.set('speakers', membersBeforeGuests(allocateSpeakers(
@@ -862,7 +897,9 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
               ticketNumber: item.speakers.indexOf(attendee) + 1,
             }))
           : [...memberCandidates, ...presentCandidates];
-    const selectedCandidates = drawParticipantIds == null ? candidates : candidates.filter(candidate => drawParticipantIds.includes(String(candidate.id)));
+    const onTimeIds = new Set(attendees.filter(attendee => checkedInBeforeSeven(attendee.checkedInAt)).map(attendee => String(attendee.id)));
+    const selectedCandidates = candidates.filter(candidate => onTimeIds.has(String(candidate.id)) &&
+      (drawParticipantIds == null || drawParticipantIds.includes(String(candidate.id))));
     const eligibleAttendees = selectedCandidates.filter(candidate =>
       !previousWinnerIds.has(String(candidate.id)) && (!candidate.userId || !previousWinnerIds.has(String(candidate.userId))));
     if (!eligibleAttendees.length) {
@@ -887,7 +924,8 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
     const max = item.luckyDraw.numberMax || 100;
     const allNumbers: number[] = [];
     for (let i = min; i <= max; i++) {
-      if (!previousWinnerIds.has(`num:${i}`)) {
+      const speaker = (item.speakers || [])[i - 1];
+      if (speaker && !speaker.deletedAccount && checkedInBeforeSeven(speaker.checkedInAt) && !previousWinnerIds.has(`num:${i}`)) {
         allNumbers.push(i);
       }
     }

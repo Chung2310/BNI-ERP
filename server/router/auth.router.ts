@@ -276,6 +276,8 @@ const registerUserSchema = {
     industry: Joi.string().optional().allow(""),
     photoURL: Joi.string().optional().allow(""),
     coverImage: Joi.string().optional().allow(""),
+    photoUploadToken: Joi.string().trim().optional(),
+    coverUploadToken: Joi.string().trim().optional(),
     galleryImages: Joi.array().items(Joi.string().uri()).max(5).optional(),
     galleryUploadTokens: Joi.array().items(Joi.object({
       index: Joi.number().integer().min(0).max(4).required(),
@@ -399,6 +401,8 @@ const updateUserSchema = {
     industry: Joi.string().optional().allow(""),
     photoURL: Joi.string().optional().allow(""),
     coverImage: Joi.string().optional().allow(""),
+    photoUploadToken: Joi.string().trim().optional(),
+    coverUploadToken: Joi.string().trim().optional(),
     galleryImages: Joi.array().items(Joi.string().uri()).max(5).optional(),
     galleryUploadTokens: Joi.array().items(Joi.object({
       index: Joi.number().integer().min(0).max(4).required(),

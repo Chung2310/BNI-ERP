@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildMeetingParticipants, matchesFilterCategory } from "./WheelOfNamesPage";
+import { buildMeetingParticipants, matchesFilterCategory, meetingDrawParticipants } from "./WheelOfNamesPage";
 import type { Speaker } from "../services/meetingService";
 import type { UserProfile } from "../types";
 
@@ -53,6 +53,15 @@ describe("WheelOfNamesPage participant filtering logic", () => {
     expect(matchesFilterCategory(memberPresent, "guests")).toBe(false);
     expect(matchesFilterCategory(memberAbsent, "guests")).toBe(false);
     expect(matchesFilterCategory(guestAttendee, "guests")).toBe(true);
+  });
+
+  it("keeps late arrivals off the meeting wheel even with the all filter", () => {
+    const candidates = [
+      { ...memberPresent, checkedInAt: "2026-10-20T07:00:59+07:00" },
+      { ...guestAttendee, checkedInAt: "2026-10-20T07:01:00+07:00" },
+      memberAbsent,
+    ];
+    expect(meetingDrawParticipants(candidates).filter(person => matchesFilterCategory(person, "all")).map(person => person.id)).toEqual(["m-1"]);
   });
 });
 

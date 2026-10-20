@@ -1,6 +1,10 @@
 // Nạp biến môi trường sớm nhất có thể. Module này phải là import ĐẦU TIÊN của server.ts
 // để đảm bảo mọi module khác đọc process.env đều nhận được giá trị từ .env.
 import "dotenv/config";
+import { config } from "dotenv";
+
+// Load local-only values after .env without replacing variables already set by the environment.
+config({ path: ".env.local" });
 
 // Các giá trị placeholder từng ship trong .env.example — coi như chưa cấu hình.
 const PLACEHOLDER_PATTERN = /your_jwt/i;

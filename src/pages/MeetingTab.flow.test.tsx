@@ -43,22 +43,27 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-it("shows the nearest scheduled meeting first in All and Scheduled lists", async () => {
+it("orders meetings by status, then shows the nearest scheduled meeting first", async () => {
   const meetings = [
     { ...meeting, _id: "far", title: "Later meeting", startsAt: "2030-11-04T00:00:00Z" },
-    { ...meeting, _id: "cancelled", title: "Cancelled meeting", status: "cancelled", startsAt: "2030-10-28T00:00:00Z" },
-    { ...meeting, _id: "near", title: "Next meeting", startsAt: "2030-10-22T00:00:00Z" },
     { ...meeting, _id: "ended", title: "Ended meeting", status: "ended", startsAt: "2030-10-14T00:00:00Z" },
+    { ...meeting, _id: "near", title: "Next meeting", startsAt: "2030-10-22T00:00:00Z" },
+    { ...meeting, _id: "cancelled", title: "Cancelled meeting", status: "cancelled", startsAt: "2030-10-28T00:00:00Z" },
+    { ...meeting, _id: "paused", title: "Paused meeting", status: "paused", startsAt: "2030-10-20T00:00:00Z" },
+    { ...meeting, _id: "live", title: "Live meeting", status: "live", startsAt: "2030-10-21T00:00:00Z" },
   ];
   stubMeetingFetch(vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: meetings }) }));
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   await screen.findByText("Next meeting");
   const cardTitles = () => Array.from(document.querySelectorAll("#meeting_tab_view .grid h3"), element => element.textContent);
-  expect(cardTitles()).toEqual(["Next meeting", "Later meeting", "Cancelled meeting", "Ended meeting"]);
+  expect(cardTitles()).toEqual(["Paused meeting", "Live meeting", "Next meeting", "Later meeting", "Cancelled meeting", "Ended meeting"]);
 
   fireEvent.click(screen.getByRole("button", { name: /Sắp diễn ra \(2\)/ }));
   expect(cardTitles()).toEqual(["Next meeting", "Later meeting"]);
+
+  fireEvent.click(screen.getByRole("button", { name: /Đang diễn ra \(2\)/ }));
+  expect(cardTitles()).toEqual(["Paused meeting", "Live meeting"]);
 });
 
 it("opens bulk deletion from the meeting toolbar and sends selected IDs only after confirmation", async () => {
@@ -365,6 +370,7 @@ it("disables end meeting button when scheduled and allows ending when live with 
 });
 
 it("allows starting scheduled meeting with confirmation popup", async () => {
+  stubMeetingFetch(vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, startsAt: new Date().toISOString() }] }) }));
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   const startButtons = await screen.findAllByRole("button", { name: "Bắt đầu" });
@@ -372,6 +378,15 @@ it("allows starting scheduled meeting with confirmation popup", async () => {
   fireEvent.click(startButtons[0]);
   expect(screen.getByText("Bắt đầu cuộc họp?")).toBeTruthy();
   expect(screen.getByText(/Cuộc họp "Buổi họp A" hiện chưa có người check-in/)).toBeTruthy();
+});
+
+it("disables starting a meeting scheduled for another day", async () => {
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  stubMeetingFetch(vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [{ ...meeting, startsAt: tomorrow.toISOString() }] }) }));
+  render(<MeetingTab />);
+  fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
+  const startButton = (await screen.findAllByRole("button", { name: "Bắt đầu" }))[0] as HTMLButtonElement;
+  expect(startButton.disabled).toBe(true);
 });
 
 
