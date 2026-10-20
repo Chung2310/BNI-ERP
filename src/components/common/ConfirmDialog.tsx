@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 
 type ConfirmDialogProps = {
+  alertOnly?: boolean;
   cancelLabel?: string;
   confirmLabel?: string;
   description: string;
@@ -25,6 +26,7 @@ const toneStyles = {
 };
 
 export function ConfirmDialog({
+  alertOnly = false,
   cancelLabel = "Hủy",
   confirmLabel = "Xác nhận",
   description,
@@ -99,15 +101,15 @@ export function ConfirmDialog({
         </div>
 
         {/* Action Buttons - Centered and Balanced */}
-        <div className="mt-6 grid grid-cols-2 gap-3 pt-1">
-          <button
+        <div className={`mt-6 grid gap-3 pt-1 ${alertOnly ? "grid-cols-1" : "grid-cols-2"}`}>
+          {!alertOnly && <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
             className="w-full rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 py-2.5 px-4 text-xs font-bold transition shadow-2xs cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelLabel}
-          </button>
+          </button>}
           <button
             type="button"
             onClick={() => void onConfirm()}

@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const deps = vi.hoisted(() => ({ getMe: vi.fn(), updateProfile: vi.fn(), findCompany: vi.fn(), permissions: vi.fn(), finalizeCover: vi.fn(), finalizeGallery: vi.fn() }));
-vi.mock("../service/auth.service", () => ({ authService: { getMe: deps.getMe, updateProfile: deps.updateProfile } }));
+const deps = vi.hoisted(() => ({ getMe: vi.fn(), updateProfile: vi.fn(), updateUser: vi.fn(), registerUserForCompany: vi.fn(), findCompany: vi.fn(), permissions: vi.fn(), finalizeAvatar: vi.fn(), finalizeCover: vi.fn(), finalizeGallery: vi.fn() }));
+vi.mock("../service/auth.service", () => ({ authService: { getMe: deps.getMe, updateProfile: deps.updateProfile, updateUser: deps.updateUser, registerUserForCompany: deps.registerUserForCompany } }));
 vi.mock("../model/user.model", () => ({ UserModel: {} }));
 vi.mock("../model/company.model", () => ({ CompanyModel: { findOne: deps.findCompany } }));
 vi.mock("../middleware/auth", () => ({ getEffectivePermissions: deps.permissions }));
@@ -8,7 +8,7 @@ vi.mock("../service/google-oauth.service", () => ({ googleOAuthService: {} }));
 vi.mock("../middleware/user-activity", () => ({ recordUserActivity: vi.fn() }));
 vi.mock("../middleware/require-module", () => ({ clearModuleCache: vi.fn() }));
 vi.mock("../service/company-module-notify", () => ({ notifyCompanyModulesChanged: vi.fn() }));
-vi.mock("../service/profile-resource.service", () => ({ profileResourceService: { finalizeCover: deps.finalizeCover, finalizeGallery: deps.finalizeGallery } }));
+vi.mock("../service/profile-resource.service", () => ({ profileResourceService: { finalizeAvatar: deps.finalizeAvatar, finalizeCover: deps.finalizeCover, finalizeGallery: deps.finalizeGallery } }));
 vi.mock("../service/employee-document-resource.service", () => ({ employeeDocumentResourceService: {} }));
 vi.mock("../service/resource-indexing.service", () => ({ resourceIndexingService: {} }));
 import { authController } from "./auth.controller";
@@ -90,4 +90,27 @@ it("finalizes gallery uploads for the authenticated member", async () => {
     expect.objectContaining({ _id: "member-1" }),
     body.galleryUploadTokens,
   );
+});
+
+it("finalizes a member avatar after an admin updates the profile", async () => {
+  const updatedUser = { _id: "member-2", companyCode: "BNI", displayName: "An" };
+  deps.updateUser.mockResolvedValueOnce(updatedUser);
+  const res = response();
+  await authController.updateUser(({ params: { id: "member-2" }, user: { id: "admin-1", email: "admin@example.test", role: "admin", companyCode: "BNI" }, body: {
+    photoURL: "https://example.test/avatar.png", photoUploadToken: "avatar-token",
+  } } as unknown as Parameters<typeof authController.updateUser>[0]), res as unknown as Parameters<typeof authController.updateUser>[1]);
+  expect(deps.updateUser).toHaveBeenCalledWith("member-2", { photoURL: "https://example.test/avatar.png" }, "BNI", "admin", "admin-1", { photoUploadToken: "avatar-token", coverUploadToken: undefined });
+  expect(deps.finalizeAvatar).toHaveBeenCalledWith(expect.objectContaining({ actorId: "admin-1", companyCode: "BNI" }), updatedUser, "avatar-token");
+  expect(res.status).toHaveBeenCalledWith(200);
+});
+
+it("finalizes a member avatar after an admin creates the profile", async () => {
+  const user = { _id: "member-2", companyCode: "BNI", displayName: "An" };
+  deps.registerUserForCompany.mockResolvedValueOnce({ toObject: () => ({ ...user }) });
+  const res = response();
+  await authController.registerUser(({ user: { id: "admin-1", email: "admin@example.test", role: "admin", companyCode: "BNI" }, body: {
+    displayName: "An", photoURL: "https://example.test/avatar.png", photoUploadToken: "avatar-token",
+  } } as unknown as Parameters<typeof authController.registerUser>[0]), res as unknown as Parameters<typeof authController.registerUser>[1]);
+  expect(deps.finalizeAvatar).toHaveBeenCalledWith(expect.objectContaining({ actorId: "admin-1", companyCode: "BNI" }), expect.objectContaining(user), "avatar-token");
+  expect(res.status).toHaveBeenCalledWith(201);
 });

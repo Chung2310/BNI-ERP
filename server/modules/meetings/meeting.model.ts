@@ -154,6 +154,11 @@ const meeting = new Schema(
 );
 
 meeting.index({ companyCode: 1, startsAt: -1 });
+meeting.index({ companyCode: 1 }, {
+  unique: true,
+  partialFilterExpression: { status: { $in: ['live', 'paused'] } },
+  name: 'one_active_meeting_per_company',
+});
 meeting.index({ companyCode: 1, seriesId: 1 });
 meeting.index({ status: 1, reminderAt: 1 });
 meeting.index({ status: 1, endsAt: 1 });

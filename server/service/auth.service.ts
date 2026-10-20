@@ -474,7 +474,8 @@ export const authService = {
   /**
    * Cập nhật thông tin chi tiết một nhân sự (Admin)
    */
-  async updateUser(userId: string, updateData: Partial<IUser>, callerCompanyCode: string, callerRole: string, callerId?: string): Promise<IUser | null> {
+  async updateUser(userId: string, updateData: Partial<IUser>, callerCompanyCode: string, callerRole: string, callerId?: string,
+    mediaUploads?: { photoUploadToken?: string; coverUploadToken?: string }): Promise<IUser | null> {
     assertSafeProfileText(updateData);
     const user = await UserModel.findById(userId);
     if (!user) {
@@ -561,7 +562,7 @@ export const authService = {
       if (updateData.coverImage !== undefined) media.coverImage = updateData.coverImage;
       if (updateData.galleryImages !== undefined) media.galleryImages = updateData.galleryImages;
       delete updateData.photoURL; delete updateData.coverImage; delete updateData.galleryImages;
-      if (Object.keys(media).length) await queueProfileMedia(userId, media);
+      if (Object.keys(media).length) await queueProfileMedia(userId, media, mediaUploads);
     }
     const updated = await UserModel.findByIdAndUpdate(userId, { $set: updateData }, { returnDocument: 'after' }).select("-password" + (isSelf ? " +pendingProfileMedia" : ""));
     return isSelf ? ownProfilePreview(updated) : updated;
