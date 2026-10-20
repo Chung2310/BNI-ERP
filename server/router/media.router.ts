@@ -78,7 +78,7 @@ const uploadSchema = {
 mediaRouter.post(
   "/upload",
   requireAuth as RequestHandler,
-  ((req, res, next) => requirePermission(permissionForMediaUpload(req.body?.sourceType))(req, res, next)) as RequestHandler,
+  ((req, res, next) => requirePermission(permissionForMediaUpload(req.body?.sourceType, req.body?.folder))(req, res, next)) as RequestHandler,
   validateRequest(uploadSchema),
   mediaController.upload as RequestHandler
 );
