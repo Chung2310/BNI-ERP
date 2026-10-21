@@ -78,7 +78,7 @@ it("shows the normal-draw result from the spin response even when refresh return
   const refresh = vi.fn().mockResolvedValue(undefined);
 
   render(<LuckyDrawTab meeting={meeting} canManage onRefreshMeeting={refresh} />);
-  fireEvent.click(screen.getByRole("button", { name: /Quay chọn người/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Quay thưởng/ }));
 
   await act(async () => {
     await Promise.resolve();

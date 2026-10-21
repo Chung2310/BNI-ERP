@@ -776,7 +776,7 @@ export async function controlMeeting(item: MeetingDocument, action: string, now 
 }
 
 // ==========================================
-// LUCKY DRAW (QUAY CHỌN NGƯỜI GIỐNG RANDOM.ORG)
+// LUCKY DRAW (QUAY MAY MẮN GIỐNG RANDOM.ORG)
 // ==========================================
 
 export async function updateLuckyDrawConfig(item: MeetingDocument, config: { enabled?: boolean; allowRepeatWinners?: boolean; drawMode?: 'attendees' | 'numbers'; numberMin?: number; numberMax?: number; checkInCutoffTime?: string }) {
@@ -808,7 +808,7 @@ export async function updateLuckyDrawConfig(item: MeetingDocument, config: { ena
 
 export async function addOrUpdatePrize(item: MeetingDocument, prizeInput: PrizeInput) {
   assertMeetingEditable(item);
-  if (prizeInput.reward?.trim() || prizeInput.imageUrl?.trim()) throw new MeetingError(400, "Vòng quay chọn người chỉ hỗ trợ tên lượt chọn và số người cần chọn.");
+  if (prizeInput.reward?.trim() || prizeInput.imageUrl?.trim()) throw new MeetingError(400, "Vòng quay may mắn chỉ hỗ trợ tên lượt quay và số người cần chọn.");
   if (!item.luckyDraw) {
     item.set('luckyDraw', {
       enabled: true,
@@ -860,7 +860,7 @@ export async function deletePrize(item: MeetingDocument, prizeId: string) {
 }
 
 /**
- * QUAY CHỌN NGƯỜI: Chức năng quay ngẫu nhiên công bằng giống Random.org
+ * QUAY MAY MẮN: Chức năng quay ngẫu nhiên công bằng giống Random.org
  * Quay trên màn hình trình chiếu có thể bắt đầu trước phần phát biểu của cuộc họp.
  */
 export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, actorId: string, broadcast = false, _drawFilter: DrawFilter = 'present_members', drawParticipantIds: string[] | null = null) {
@@ -869,25 +869,25 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
   if (item.status === 'scheduled' && !broadcast) {
     throw new MeetingError(
       400,
-      'Cuộc họp chưa bắt đầu! Tính năng quay chọn người chỉ được phép kích hoạt sau khi cuộc họp đã bắt đầu.'
+      'Cuộc họp chưa bắt đầu! Tính năng quay may mắn chỉ được phép kích hoạt sau khi cuộc họp đã bắt đầu.'
     );
   }
 
   if (item.status === 'cancelled') {
-    throw new MeetingError(400, 'Cuộc họp đã bị hủy. Không thể quay chọn người.');
+    throw new MeetingError(400, 'Cuộc họp đã bị hủy. Không thể quay may mắn.');
   }
 
   if (!item.luckyDraw?.prizes?.length) {
-    throw new MeetingError(400, 'Chưa có cấu hình lượt chọn nào để quay!');
+    throw new MeetingError(400, 'Chưa có cấu hình lượt quay nào để quay!');
   }
 
   const prize = item.luckyDraw.prizes.find((p) => p.id === prizeId);
   if (!prize) {
-    throw new MeetingError(404, 'Không tìm thấy lượt chọn đã chọn.');
+    throw new MeetingError(404, 'Không tìm thấy lượt quay đã chọn.');
   }
 
   if (prize.winners.length >= prize.quantity) {
-    throw new MeetingError(400, `Lượt chọn "${prize.name}" đã đủ số lượng (${prize.quantity}/${prize.quantity}).`);
+    throw new MeetingError(400, `Lượt quay "${prize.name}" đã đủ số lượng (${prize.quantity}/${prize.quantity}).`);
   }
 
   const allowRepeat = Boolean(item.luckyDraw.allowRepeatWinners);
@@ -942,7 +942,7 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
     }
 
     if (!allNumbers.length) {
-      throw new MeetingError(400, 'Không còn số thứ tự hợp lệ nào trong khoảng để quay chọn người.');
+      throw new MeetingError(400, 'Không còn số thứ tự hợp lệ nào trong khoảng để quay may mắn.');
     }
 
     const randomIndex = randomInt(0, allNumbers.length);
@@ -1020,9 +1020,9 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
 
 export async function redrawPrizeWinner(item: MeetingDocument, prizeId: string, winnerRecordId: string) {
   assertMeetingEditable(item);
-  if (!item.luckyDraw?.prizes) throw new MeetingError(404, 'Không có cấu hình lượt chọn.');
+  if (!item.luckyDraw?.prizes) throw new MeetingError(404, 'Không có cấu hình lượt quay.');
   const prize = item.luckyDraw.prizes.find((p) => p.id === prizeId);
-  if (!prize) throw new MeetingError(404, 'Không tìm thấy lượt chọn.');
+  if (!prize) throw new MeetingError(404, 'Không tìm thấy lượt quay.');
 
   prize.set('winners', (prize.winners || []).filter((w) => w.id !== winnerRecordId));
   await saveMeeting(item);
