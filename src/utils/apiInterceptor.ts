@@ -42,16 +42,12 @@ window.fetch = async function (input, init) {
   // 2. Check if the response indicates unauthorized/token expired (401)
   if (response.status === 401) {
     const urlString = typeof input === "string" ? input : (input as Request).url;
-    const requestUrl = new URL(urlString, window.location.origin);
 
-    // These endpoints handle their own 401 responses.
+    // Avoid infinite loop if the refresh-token or login/register endpoint itself fails with 401
     if (
       urlString.includes("/auth/refresh-token") ||
       urlString.includes("/auth/login") ||
-      urlString.includes("/auth/register") ||
-      // Public QR check-in uses 401 for invalid member credentials. Let the page
-      // show that response instead of refreshing the app and reloading the form.
-      (requestUrl.origin === window.location.origin && requestUrl.pathname.startsWith("/api/v1/meeting-checkin/"))
+      urlString.includes("/auth/register")
     ) {
       return response;
     }
