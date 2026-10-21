@@ -32,6 +32,20 @@ it("emits realtime and mobile push after persisting a notification", async () =>
   }));
 });
 
+it("shows meeting details in push only when the trusted event opts in", async () => {
+  vi.spyOn(NotificationModel.prototype, "save").mockResolvedValue(undefined as never);
+  dependencies.sendToUser.mockResolvedValue(undefined);
+  const notice = await notificationService.createNotification({
+    title: "Bạn đã trúng thưởng", body: "Giải nhất trong cuộc họp A",
+    type: "he-thong", companyCode: "ACME", recipientUid: "winner",
+  }, { showDetailsInPush: true, route: "/meeting/meeting-id/game-results" });
+  expect(dependencies.sendToUser).toHaveBeenCalledWith("winner", expect.objectContaining({
+    title: "Bạn đã trúng thưởng", body: "Giải nhất trong cuộc họp A",
+    notificationId: notice._id.toString(), route: "/meeting/meeting-id/game-results",
+    showDetails: true,
+  }));
+});
+
 it("marks only the signed-in recipient's notification as read", async () => {
   const notification = { read: true };
   const update = vi.spyOn(NotificationModel, "findOneAndUpdate").mockResolvedValue(notification as never);

@@ -16,6 +16,7 @@ export type MobilePushPayload = {
   notificationId: string;
   type: string;
   route?: string;
+  showDetails?: boolean;
 };
 
 type MobilePushProvider = "fcm" | "expo";
@@ -170,7 +171,7 @@ export const mobilePushService = {
   },
 
   async sendToUser(uid: string, payload: MobilePushPayload): Promise<void> {
-    payload = { ...payload, ...privatePushContent(payload.type === "chat") };
+    if (!payload.showDetails) payload = { ...payload, ...privatePushContent(payload.type === "chat") };
     const devices = await MobilePushTokenModel.find({ uid }).select("token provider platform").lean() as MobilePushDevice[];
     if (devices.length === 0) return;
 

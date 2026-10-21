@@ -5,8 +5,10 @@ setRateLimitRedisClientForTesting({ eval: async () => [1, 1000], decr: async () 
 const { recordGameWinner } = await import('./meeting.service');
 import { MeetingModel } from './meeting.model';
 import { gameWinnerInput } from './meeting.validation';
+import { notificationService } from '../../service/notification.service';
 
-test('wheel and bingo results survive serialization and retry without duplicates', async () => {
+test('wheel and bingo results survive serialization and notify only the member winner once', async (t) => {
+  const createNotification = t.mock.method(notificationService, 'createNotification', async () => ({}) as never);
   const item = new MeetingModel({ companyCode: 'TEST', title: 'Meeting', startsAt: new Date(),
     speakers: [
       { id: 'member', userId: 'member-user', name: 'Member', email: 'member@example.com', checkedInAt: new Date('2030-01-01T06:30:00+07:00'), seconds: 30 },
@@ -30,6 +32,10 @@ test('wheel and bingo results survive serialization and retry without duplicates
   assert.equal(restored.gameWinners[0].email, 'member@example.com');
   assert.equal(restored.gameWinners[0].reward, '');
   assert.equal(restored.gameWinners[0].drawnBy, 'operator');
+  await new Promise(setImmediate);
+  assert.equal(createNotification.mock.callCount(), 1);
+  assert.equal(createNotification.mock.calls[0].arguments[0].recipientUid, 'member-user');
+  assert.match(createNotification.mock.calls[0].arguments[0].body!, /Meeting/);
 });
 
 test('wheel result rejects guests and members checked in after 07:00', async () => {
@@ -46,7 +52,8 @@ test('wheel result rejects guests and members checked in after 07:00', async () 
   assert.equal(item.gameWinners.length, 0);
 });
 
-test('wheel result follows the meeting-specific cutoff', async () => {
+test('wheel result follows the meeting-specific cutoff', async (t) => {
+  t.mock.method(notificationService, 'createNotification', async () => ({}) as never);
   const item = new MeetingModel({ companyCode: 'TEST', title: 'Meeting', startsAt: new Date(),
     luckyDraw: { checkInCutoffTime: '07:15' },
     speakers: [

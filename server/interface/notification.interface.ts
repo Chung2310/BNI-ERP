@@ -14,6 +14,9 @@ export interface INotification extends Document {
     tab: string;
     subTab?: string;
     feeId?: string;
+    meetingId?: string;
+    applicationId?: string;
+    kind?: "meeting_started" | "draw_winner" | "chapter_approved";
   };
   createdAt: Date;
 }

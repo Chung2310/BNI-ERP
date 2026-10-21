@@ -125,6 +125,11 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       "/api/v1/auth/profile/avatar",
       "/api/v1/auth/profile/image",
     ]);
+    const personalNotificationPath =
+      (req.method === "GET" && path === "/api/v1/notifications") ||
+      (req.method === "PATCH" && (path === "/api/v1/notifications/read-all" || /^\/api\/v1\/notifications\/[0-9a-f]{24}\/read$/i.test(path))) ||
+      (req.method === "DELETE" && /^\/api\/v1\/notifications\/[0-9a-f]{24}$/i.test(path));
+    const ownPushDevicePath = req.method === "POST" && /^\/api\/v1\/push\/mobile\/(subscribe|unsubscribe)$/.test(path);
     const superadminCompanyCreation = currentRole === "superadmin" && req.method.toUpperCase() === "POST" && path === "/api/v1/auth/register-company";
     if (currentRole === "superadmin" && (path.startsWith("/api/v1/member-fees") || path.startsWith("/api/v1/company-email/celebration"))) {
       return res.status(403).json({ status: "error", message: "Superadmin không có quyền xem phí thường niên hoặc email chúc mừng." });
@@ -143,7 +148,7 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     })) {
       return res.status(403).json({ status: "error", message: "Chapter đã ngừng hoạt động." });
     }
-    if (!currentCompanyCode && !accountOnlyPaths.has(path) && !path.startsWith("/api/v1/chapters") && !superadminCompanyCreation) {
+    if (!currentCompanyCode && !accountOnlyPaths.has(path) && !personalNotificationPath && !ownPushDevicePath && !path.startsWith("/api/v1/chapters") && !superadminCompanyCreation) {
       return res.status(403).json({ status: "error", message: "Tài khoản chưa là thành viên chapter. Vui lòng nộp đơn và chờ duyệt." });
     }
 
