@@ -33,6 +33,9 @@ import { playTickSound, playWinFanfare, playSuspenseSound } from "../../utils/so
 import { launchConfetti } from "../../utils/confetti";
 import { checkedInByCutoff, DEFAULT_DRAW_CUTOFF_TIME } from "../../utils/earlyCheckIn";
 
+const DRAW_HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+const DRAW_MINUTES = Array.from({ length: 60 }, (_, minute) => String(minute).padStart(2, "0"));
+
 interface LuckyDrawTabProps {
   meeting: Meeting;
   canManage: boolean;
@@ -60,6 +63,14 @@ export function LuckyDrawTab({
       prizes: [],
     }
   );
+  const incomingCutoff = meeting.luckyDraw?.checkInCutoffTime || DEFAULT_DRAW_CUTOFF_TIME;
+  const [cutoffDraft, setCutoffDraft] = useState(incomingCutoff);
+  const [previousCutoff, setPreviousCutoff] = useState(incomingCutoff);
+  const [savingCutoff, setSavingCutoff] = useState(false);
+  if (previousCutoff !== incomingCutoff) {
+    setPreviousCutoff(incomingCutoff);
+    setCutoffDraft(incomingCutoff);
+  }
 
   const [selectedPrizeId, setSelectedPrizeId] = useState<string>("");
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -260,6 +271,16 @@ export function LuckyDrawTab({
       await onRefreshMeeting();
     } catch (err) {
       toast.error(err.message || "Không thể cập nhật cấu hình.");
+    }
+  };
+
+  const handleSaveCutoff = async () => {
+    if (savingCutoff) return;
+    setSavingCutoff(true);
+    try {
+      await handleSaveSettings({ checkInCutoffTime: cutoffDraft });
+    } finally {
+      setSavingCutoff(false);
     }
   };
 
@@ -718,16 +739,43 @@ export function LuckyDrawTab({
             </h5>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              <label className="space-y-1 block">
-                <span className="font-semibold text-slate-700">Check-in đến hết giờ nào được quay?</span>
-                <input
-                  type="time"
-                  value={luckyConfig.checkInCutoffTime || DEFAULT_DRAW_CUTOFF_TIME}
-                  onChange={(e) => { if (e.target.value) void handleSaveSettings({ checkInCutoffTime: e.target.value }); }}
-                  className="w-full p-2 border border-slate-200 rounded-xl bg-white outline-none"
-                />
-                <span className="block text-[11px] text-slate-500">Giờ Việt Nam · mặc định 07:00. Áp dụng cho thành viên đã check-in.</span>
-              </label>
+              <div className="space-y-1">
+                <span className="block font-semibold text-slate-700">Giờ giới hạn check-in</span>
+                <div className="flex items-end gap-2">
+                  <label className="min-w-0 flex-1 space-y-1">
+                    <span className="block text-[11px] text-slate-500">Giờ</span>
+                    <select
+                      aria-label="Giờ giới hạn check-in"
+                      value={cutoffDraft.slice(0, 2)}
+                      onChange={(e) => setCutoffDraft(`${e.target.value}:${cutoffDraft.slice(3, 5)}`)}
+                      className="w-full p-2 border border-slate-200 rounded-xl bg-white outline-none"
+                    >
+                      {DRAW_HOURS.map(hour => <option key={hour} value={hour}>{hour}</option>)}
+                    </select>
+                  </label>
+                  <span className="pb-2 font-bold text-slate-500">:</span>
+                  <label className="min-w-0 flex-1 space-y-1">
+                    <span className="block text-[11px] text-slate-500">Phút</span>
+                    <select
+                      aria-label="Phút giới hạn check-in"
+                      value={cutoffDraft.slice(3, 5)}
+                      onChange={(e) => setCutoffDraft(`${cutoffDraft.slice(0, 2)}:${e.target.value}`)}
+                      className="w-full p-2 border border-slate-200 rounded-xl bg-white outline-none"
+                    >
+                      {DRAW_MINUTES.map(minute => <option key={minute} value={minute}>{minute}</option>)}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={savingCutoff || cutoffDraft === (luckyConfig.checkInCutoffTime || DEFAULT_DRAW_CUTOFF_TIME)}
+                    onClick={() => void handleSaveCutoff()}
+                    className="rounded-xl bg-[#cf142b] px-3 py-2 text-white font-semibold disabled:opacity-40"
+                  >
+                    Lưu
+                  </button>
+                </div>
+                <span className="block text-[11px] text-slate-500">Giờ Việt Nam (24 giờ) · mặc định 07:00.</span>
+              </div>
               <label className="space-y-1 block">
                 <span className="font-semibold text-slate-700">Chế độ quay:</span>
                 <select
