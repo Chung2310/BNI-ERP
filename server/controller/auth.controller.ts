@@ -445,6 +445,22 @@ export const authController = {
       const newUser = await authService.registerUserForCompany(req.body, callerCompanyCode, callerRole);
       const userObj = newUser.toObject();
       delete userObj.password;
+      if (req.body.photoUploadToken) {
+        await profileResourceService.finalizeAvatar({
+          companyCode: userObj.companyCode,
+          branchId: userObj.branchId,
+          actorId: req.user!.id,
+          actorName: req.user!.email,
+        }, userObj, req.body.photoUploadToken);
+      }
+      if (req.body.coverUploadToken) {
+        await profileResourceService.finalizeCover({
+          companyCode: userObj.companyCode,
+          branchId: userObj.branchId,
+          actorId: req.user!.id,
+          actorName: req.user!.email,
+        }, userObj, req.body.coverUploadToken);
+      }
       if (req.body.jobDescriptionUploadToken) {
         await employeeDocumentResourceService.finalizeJobDescription({
           companyCode: userObj.companyCode,
@@ -645,8 +661,25 @@ export const authController = {
       const callerRole = req.user?.role;
       const callerCompanyCode = req.user?.companyCode;
 
-      const { galleryUploadTokens = [], ...updateData } = req.body;
-      const updatedUser = await authService.updateUser(id, updateData, callerCompanyCode!, callerRole!, req.user?.id);
+      const { galleryUploadTokens = [], photoUploadToken, coverUploadToken, ...updateData } = req.body;
+      const updatedUser = await authService.updateUser(id, updateData, callerCompanyCode!, callerRole!, req.user?.id,
+        { photoUploadToken, coverUploadToken });
+      if (updatedUser && !updatedUser.pendingProfileMedia && photoUploadToken) {
+        await profileResourceService.finalizeAvatar({
+          companyCode: updatedUser.companyCode,
+          branchId: updatedUser.branchId,
+          actorId: req.user!.id,
+          actorName: req.user!.email,
+        }, updatedUser, photoUploadToken);
+      }
+      if (updatedUser && !updatedUser.pendingProfileMedia && coverUploadToken) {
+        await profileResourceService.finalizeCover({
+          companyCode: updatedUser.companyCode,
+          branchId: updatedUser.branchId,
+          actorId: req.user!.id,
+          actorName: req.user!.email,
+        }, updatedUser, coverUploadToken);
+      }
       if (updatedUser && Array.isArray(galleryUploadTokens) && galleryUploadTokens.length > 0) {
         await profileResourceService.finalizeGallery({
           companyCode: updatedUser.companyCode,

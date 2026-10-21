@@ -28,10 +28,12 @@ import {
   Plus,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { WHEEL_SELECTION_NAME, wheelDisplayName } from "../../config/wheel-selection-guide";
 import { tabToPath } from "../../seo/seo-config";
 import { meetingLiveApi, meetingRoomUrl } from "../../services/meetingLiveService";
 import { meetingService } from "../../services/meetingService";
-import { presentationState, type DrawFilter, type MeetingPresentationState, type PresentationView } from "../../utils/meetingPresentation";
+import { presentationState, type MeetingPresentationState, type PresentationView } from "../../utils/meetingPresentation";
+import { isMeetingScheduledForToday } from "../../utils/meetingRecurrence";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { MeetingStage, SpeakerStage } from "./MeetingStage";
 import { AudienceResponseRemote } from "./AudienceResponseRemote";
@@ -41,7 +43,7 @@ import { useMeetingLive } from "./useMeetingLive";
 const views: { value: PresentationView; label: string; icon: typeof Tv }[] = [
   { value: "checkin", label: "QR check-in", icon: QrIcon },
   { value: "speaker", label: "Người phát biểu", icon: Users },
-  { value: "luckyDraw", label: "Quay chọn người", icon: Gift },
+  { value: "luckyDraw", label: "Vòng quay", icon: Gift },
   { value: "audienceResponses", label: "Câu trả lời", icon: MessageSquareText },
   { value: "activeMembers", label: "Xếp hạng", icon: Trophy },
   { value: "waiting", label: "Màn hình chờ", icon: Monitor },
@@ -127,10 +129,9 @@ function MeetingRoom({ meetingId, mode }: Props) {
   const [selectedPrize, setSelectedPrize] = useState("");
   const [dismissedDrawWinnerId, setDismissedDrawWinnerId] = useState("");
   const [resultPrizeFilter, setResultPrizeFilter] = useState("");
-  const [showDrawFilter, setShowDrawFilter] = useState(false);
   const [showWinners, setShowWinners] = useState(false);
   const [quickPrizeOpen, setQuickPrizeOpen] = useState(false);
-  const [quickPrizeName, setQuickPrizeName] = useState("Chọn người tham gia");
+  const [quickPrizeName, setQuickPrizeName] = useState(WHEEL_SELECTION_NAME);
   const [quickPrizeQuantity, setQuickPrizeQuantity] = useState(1);
   const [creatingPrize, setCreatingPrize] = useState(false);
   const [quickPrizeError, setQuickPrizeError] = useState("");
@@ -187,7 +188,6 @@ function MeetingRoom({ meetingId, mode }: Props) {
   const timer = meeting && getSlideTimer(meeting, current?.id, now);
   const drawing = now < Date.parse(state.drawRevealsAt || "");
   const activePrize = meeting?.luckyDraw?.prizes.find(prize => prize.id === selectedPrize);
-  const drawFilter: DrawFilter = state.drawFilter || "all";
   const currentDrawWinner = meeting?.luckyDraw?.prizes.flatMap(prize => prize.winners || [])
     .find(winner => winner.id === state.drawWinnerId);
   const prizeWinners = meeting?.luckyDraw?.prizes.flatMap(prize =>
@@ -197,7 +197,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
     ...prizeWinners,
     ...(meeting?.gameWinners || [])
       .filter(winner => !prizeWinnerIds.has(winner.id))
-      .map(winner => ({ winner, prizeName: winner.prizeName || "Chọn người tham gia" })),
+      .map(winner => ({ winner, prizeName: winner.prizeName || WHEEL_SELECTION_NAME })),
   ].sort((a, b) => Date.parse(b.winner.wonAt) - Date.parse(a.winner.wonAt));
   const visibleWinnerRows = resultPrizeFilter
     ? winnerRows.filter(row => row.winner.prizeId === resultPrizeFilter)
@@ -236,10 +236,10 @@ function MeetingRoom({ meetingId, mode }: Props) {
       await refresh();
       if (created) setSelectedPrize(created.id);
       setQuickPrizeOpen(false);
-      setQuickPrizeName("Chọn người tham gia");
+      setQuickPrizeName(WHEEL_SELECTION_NAME);
       setQuickPrizeQuantity(1);
     } catch (error) {
-      setQuickPrizeError(error instanceof Error ? error.message : "Không thể tạo lượt chọn.");
+      setQuickPrizeError(error instanceof Error ? error.message : "Không thể tạo lượt quay.");
     } finally {
       setCreatingPrize(false);
     }
@@ -430,7 +430,9 @@ function MeetingRoom({ meetingId, mode }: Props) {
                 {meeting.status === "scheduled" && (
                   <button
                     type="button"
-                    className="col-span-2 flex items-center justify-center gap-2 min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm shadow-emerald-600/20 transition cursor-pointer"
+                    className="col-span-2 flex items-center justify-center gap-2 min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm shadow-emerald-600/20 transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!isMeetingScheduledForToday(meeting.startsAt, now)}
+                    title={!isMeetingScheduledForToday(meeting.startsAt, now) ? "Chỉ có thể bắt đầu vào đúng ngày diễn ra cuộc họp (giờ Việt Nam)" : undefined}
                     onClick={() => void control("start")}
                   >
                     <Play className="h-4 w-4 fill-current" />
@@ -588,12 +590,12 @@ function MeetingRoom({ meetingId, mode }: Props) {
             <div className="space-y-4 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
               <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
                 <Gift className="h-4 w-4 text-cyan-600" />
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">Quay chọn người trên màn hình lớn</h2>
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">Vòng quay trên màn hình lớn</h2>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {meeting.luckyDraw?.drawMode !== "numbers" && <button type="button" aria-expanded={showDrawFilter} onClick={() => setShowDrawFilter(open => !open)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 px-2 text-xs font-bold text-cyan-800 hover:bg-cyan-100">
-                  <SlidersHorizontal className="h-4 w-4" /> Chọn bộ lọc quay
-                </button>}
+                <div className="flex min-h-11 items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50 px-2 text-xs font-bold text-cyan-800">
+                  Thành viên có mặt
+                </div>
                 <button type="button" aria-expanded={showWinners} onClick={() => {
                   const open = !showWinners;
                   setShowWinners(open);
@@ -603,39 +605,21 @@ function MeetingRoom({ meetingId, mode }: Props) {
                 </button>
               </div>
               <select
-                aria-label="Lượt chọn"
+                aria-label="Lượt quay"
                 value={selectedPrize}
                 onChange={event => setSelectedPrize(event.target.value)}
                 className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs font-medium text-slate-800 focus:bg-white focus:border-cyan-500 focus:outline-none transition shadow-2xs"
               >
-                <option value="">Chọn lượt chọn</option>
+                <option value="">Chọn lượt quay</option>
                 {meeting.luckyDraw?.prizes.map(prize => (
                   <option key={prize.id} value={prize.id}>
-                    {prize.name} · {prize.winners.length}/{prize.quantity}
+                    {wheelDisplayName(prize.name)} · {prize.winners.length}/{prize.quantity}
                   </option>
                 ))}
               </select>
-              {showDrawFilter && meeting.luckyDraw?.drawMode !== "numbers" && (
-                <label className="block space-y-1 text-xs font-semibold text-slate-700">
-                  <span>Chọn người tham gia vòng quay</span>
-                  <select
-                    aria-label="Bộ lọc người quay chọn người"
-                    value={drawFilter}
-                    disabled={disabled || drawing}
-                    onChange={event => void command("/presentation-state", { drawFilter: event.target.value, drawParticipantIds: null }, "PATCH")}
-                    className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs font-medium text-slate-800 disabled:opacity-40"
-                  >
-                    <option value="all">Tất cả thành viên và khách mời</option>
-                    <option value="all_members">Tất cả thành viên, kể cả vắng mặt</option>
-                    <option value="present_members">Người đã check-in</option>
-                    <option value="absent_members">Thành viên vắng mặt</option>
-                    <option value="guests">Khách mời đã check-in</option>
-                  </select>
-                </label>
-              )}
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-slate-500">
-                  {meeting.luckyDraw?.prizes.length ? "Có thể tạo thêm lượt chọn ngay tại đây." : "Chưa có lượt chọn để quay."}
+                  {meeting.luckyDraw?.prizes.length ? "Có thể tạo thêm lượt quay ngay tại đây." : "Chưa có lượt quay để quay."}
                 </p>
                 <button
                   type="button"
@@ -644,17 +628,17 @@ function MeetingRoom({ meetingId, mode }: Props) {
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 transition hover:bg-amber-100 disabled:opacity-40"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  Tạo lượt chọn
+                  Tạo lượt quay
                 </button>
               </div>
               {quickPrizeOpen && (
                 <form onSubmit={createQuickPrize} className="grid grid-cols-[1fr_5.5rem] gap-2 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
                   <label className="text-[11px] font-semibold text-slate-600">
-                    Tên lượt chọn
+                    Tên lượt quay
                     <input
                       required
                       autoFocus
-                      value={quickPrizeName}
+                      value={wheelDisplayName(quickPrizeName)}
                       onChange={event => setQuickPrizeName(event.target.value)}
                       className="mt-1 min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-amber-400"
                     />
@@ -678,7 +662,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
                     disabled={creatingPrize || !quickPrizeName.trim()}
                     className="col-span-2 min-h-10 rounded-lg bg-amber-600 px-3 text-xs font-bold text-white transition hover:bg-amber-700 disabled:opacity-40"
                   >
-                    {creatingPrize ? "Đang tạo…" : "Tạo và dùng lượt chọn"}
+                    {creatingPrize ? "Đang tạo…" : "Tạo và dùng lượt quay"}
                   </button>
                 </form>
               )}
@@ -686,7 +670,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
                 type="button"
                 className="w-full flex items-center justify-center gap-2 min-h-11 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold shadow-sm shadow-amber-500/20 transition cursor-pointer disabled:opacity-40"
                 disabled={disabled || drawing || !activePrize || activePrize.winners.length >= activePrize.quantity}
-                onClick={() => void command("/presentation-draw", { prizeId: selectedPrize, drawFilter })}
+                onClick={() => void command("/presentation-draw", { prizeId: selectedPrize, drawFilter: "present_members" })}
               >
                 <Sparkles className="h-4 w-4" />
                 <span>{drawing ? "Đang quay…" : "Bắt đầu quay"}</span>
@@ -699,7 +683,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
                     <div>
                       <p className="text-[11px] font-bold uppercase text-amber-700">Kết quả vừa quay</p>
                       <p className="mt-1 text-base font-bold text-slate-900">{currentDrawWinner.name}</p>
-                      <p className="text-xs text-slate-600">{currentDrawWinner.prizeName}</p>
+                      <p className="text-xs text-slate-600">{wheelDisplayName(currentDrawWinner.prizeName)}</p>
                     </div>
                     <button type="button" aria-label="Giữ người được chọn và đóng thông báo" disabled={disabled} onClick={() => void decideWinner(true)} className="rounded-lg p-1 text-slate-500 hover:bg-white disabled:opacity-40"><X className="h-4 w-4" /></button>
                   </div>
@@ -717,15 +701,15 @@ function MeetingRoom({ meetingId, mode }: Props) {
                   Danh sách người được chọn ({winnerRows.length})
                 </h3>
                 {winnerRows.length > 0 && (
-                  <select aria-label="Lọc kết quả theo lượt chọn" value={resultPrizeFilter} onChange={event => setResultPrizeFilter(event.target.value)} className="mb-3 min-h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700">
-                    <option value="">Tất cả lượt chọn</option>
-                    {(meeting.luckyDraw?.prizes || []).map(prize => <option key={prize.id} value={prize.id}>{prize.name}</option>)}
+                  <select aria-label="Lọc kết quả theo lượt quay" value={resultPrizeFilter} onChange={event => setResultPrizeFilter(event.target.value)} className="mb-3 min-h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700">
+                    <option value="">Tất cả lượt quay</option>
+                    {(meeting.luckyDraw?.prizes || []).map(prize => <option key={prize.id} value={prize.id}>{wheelDisplayName(prize.name)}</option>)}
                   </select>
                 )}
                 {winnerRows.length === 0 ? (
                   <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">Chưa có người được chọn.</p>
                 ) : visibleWinnerRows.length === 0 ? (
-                  <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">Lượt chọn này chưa có người được chọn.</p>
+                  <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">Lượt quay này chưa có người được chọn.</p>
                 ) : (
                   <ol className="max-h-72 space-y-2 overflow-y-auto" aria-label="Danh sách người được chọn">
                     {visibleWinnerRows.map(({ winner, prizeName }) => (
@@ -735,7 +719,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-bold text-slate-800">{winner.name}</p>
-                          <p className="truncate text-xs text-slate-600">{prizeName}{winner.ticketNumber != null ? ` · Số #${winner.ticketNumber}` : ""}</p>
+                          <p className="truncate text-xs text-slate-600">{wheelDisplayName(prizeName)}{winner.ticketNumber != null ? ` · Số #${winner.ticketNumber}` : ""}</p>
                           {winner.repeatEligible != null && <p className="text-[11px] text-slate-500">{winner.repeatEligible ? "Được tham gia lượt sau" : "Đã loại khỏi lượt sau"}</p>}
                         </div>
                         <time className="shrink-0 text-[11px] text-slate-500" dateTime={winner.wonAt}>

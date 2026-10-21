@@ -76,6 +76,7 @@ const luckyDrawConfig = new Schema(
     drawMode: { type: String, enum: ['attendees', 'numbers'], default: 'attendees' },
     numberMin: { type: Number, default: 1 },
     numberMax: { type: Number, default: 100 },
+    checkInCutoffTime: { type: String, default: '07:00' },
     prizes: { type: [luckyDrawPrize], default: [] },
   },
   { _id: false }
@@ -123,7 +124,7 @@ const meeting = new Schema(
         autoAdvanceDelay: { type: Number, default: 3, min: 0, max: 3600 },
         speakerTimerPausedByView: { type: Boolean, default: false },
         drawWinnerId: String, drawStartedAt: Date, drawRevealsAt: Date,
-        drawFilter: { type: String, enum: ['all', 'all_members', 'present_members', 'absent_members', 'guests'], default: 'all' },
+        drawFilter: { type: String, enum: ['all', 'all_members', 'present_members', 'absent_members', 'guests'], default: 'present_members' },
         drawParticipantIds: { type: [String], default: undefined },
         drawPanel: { type: String, enum: ['participants', 'winners'], default: 'participants' },
         drawResultVisible: { type: Boolean, default: true },
@@ -146,6 +147,7 @@ const meeting = new Schema(
         drawMode: 'attendees',
         numberMin: 1,
         numberMax: 100,
+        checkInCutoffTime: '07:00',
         prizes: [],
       }),
     },
@@ -154,6 +156,11 @@ const meeting = new Schema(
 );
 
 meeting.index({ companyCode: 1, startsAt: -1 });
+meeting.index({ companyCode: 1 }, {
+  unique: true,
+  partialFilterExpression: { status: { $in: ['live', 'paused'] } },
+  name: 'one_active_meeting_per_company',
+});
 meeting.index({ companyCode: 1, seriesId: 1 });
 meeting.index({ status: 1, reminderAt: 1 });
 meeting.index({ status: 1, endsAt: 1 });

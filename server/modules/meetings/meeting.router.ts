@@ -58,6 +58,7 @@ const read = requirePermission(['meetings:read', 'meetings:manage', 'access:read
 const sendError = (res: import("express").Response, error: unknown) =>
   res.status(error instanceof MeetingError ? error.status : 500).json({
     message: (error instanceof Error ? error.message : '') || 'Không thể xử lý cuộc họp.',
+    ...(error instanceof MeetingError && error.code ? { code: error.code, activeMeeting: error.activeMeeting } : {}),
   });
 
 meetingRouter.get('/', read, async (req, res) => {
@@ -157,7 +158,7 @@ meetingRouter.post('/:id/presentation-draw', manage, async (req: import("express
     const item = await getMeeting(company(req), req.params.id);
     assertVersion(item, value.version);
     if (item.presentation?.drawRevealsAt && +item.presentation.drawRevealsAt > Date.now()) {
-      throw new MeetingError(409, 'Đang quay chọn người. Vui lòng chờ công bố kết quả.');
+      throw new MeetingError(409, 'Đang quay may mắn. Vui lòng chờ công bố kết quả.');
     }
     res.json({ data: await spinLuckyDraw(item, value.prizeId, req.user.id, true, value.drawFilter || item.presentation?.drawFilter || 'all',
       value.drawParticipantIds ?? item.presentation?.drawParticipantIds ?? null) });
@@ -176,7 +177,7 @@ meetingRouter.patch('/:id/lucky-draw/winners/:winnerId/repeat', manage, async (r
     assertVersion(item, value.version);
     assertMeetingEditable(item);
     const winner = item.luckyDraw?.prizes.flatMap(prize => prize.winners || []).find(record => record.id === req.params.winnerId);
-    if (!winner) throw new MeetingError(404, 'Không tìm thấy kết quả quay chọn người.');
+    if (!winner) throw new MeetingError(404, 'Không tìm thấy kết quả quay may mắn.');
     winner.repeatEligible = value.repeatEligible;
     if (item.presentation?.drawWinnerId === winner.id) item.presentation.drawResultVisible = false;
     await saveMeeting(item);
@@ -352,7 +353,7 @@ meetingRouter.put('/:id/order', manage, async (req, res) => {
 });
 
 // ==========================================
-// LUCKY DRAW (QUAY CHỌN NGƯỜI) ROUTES
+// LUCKY DRAW (QUAY MAY MẮN) ROUTES
 // ==========================================
 
 meetingRouter.get('/:id/lucky-draw', read, async (req, res) => {
@@ -371,6 +372,7 @@ meetingRouter.get('/:id/lucky-draw', read, async (req, res) => {
           drawMode: 'attendees',
           numberMin: 1,
           numberMax: 100,
+          checkInCutoffTime: '07:00',
           prizes: [],
         },
       },
@@ -411,7 +413,7 @@ meetingRouter.delete('/:id/lucky-draw/prizes/:prizeId', manage, async (req, res)
 });
 
 /**
- * QUAY CHỌN NGƯỜI: Yêu cầu bắt buộc cuộc họp đã bắt đầu!
+ * QUAY MAY MẮN: Yêu cầu bắt buộc cuộc họp đã bắt đầu!
  */
 meetingRouter.post('/:id/lucky-draw/results', manage, async (req, res) => {
   try {
@@ -427,7 +429,7 @@ meetingRouter.post('/:id/lucky-draw/spin', manage, async (req, res) => {
     const item = await getMeeting(company(req), req.params.id);
     const { prizeId } = req.body;
     if (!prizeId) {
-      return res.status(400).json({ message: 'Vui lòng chọn lượt chọn cần quay.' });
+      return res.status(400).json({ message: 'Vui lòng chọn lượt quay.' });
     }
     const result = await spinLuckyDraw(item, prizeId, req.user.id);
     res.json({ data: result });
@@ -441,7 +443,7 @@ meetingRouter.post('/:id/lucky-draw/redraw', manage, async (req, res) => {
     const item = await getMeeting(company(req), req.params.id);
     const { prizeId, winnerRecordId } = req.body;
     if (!prizeId || !winnerRecordId) {
-      return res.status(400).json({ message: 'Thiếu thông tin lượt chọn hoặc người được chọn.' });
+      return res.status(400).json({ message: 'Thiếu thông tin lượt quay hoặc người được chọn.' });
     }
     const result = await redrawPrizeWinner(item, prizeId, winnerRecordId);
     res.json({ data: result });

@@ -8,7 +8,7 @@ import { MeetingScheduleActions } from "../components/meetings/MeetingScheduleAc
 import { RescheduleMeetingDialog } from "../components/meetings/RescheduleMeetingDialog";
 import { MeetingRecurrenceFields } from "../components/meetings/MeetingRecurrenceFields";
 import { MeetingSeriesBulkEditDialog, type MeetingSeriesBulkEditSeed, type MeetingSeriesChanges } from "../components/meetings/MeetingSeriesBulkEditDialog";
-import { vietnamDateTime, type MeetingRecurrence } from "../utils/meetingRecurrence";
+import { isMeetingScheduledForToday, vietnamDateTime, type MeetingRecurrence } from "../utils/meetingRecurrence";
 import { meetingElapsedLabel } from "../components/meetings/meetingElapsedLabel";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MemberMeetingDetail, { memberAttendance, memberAttendanceLabel } from "../components/meetings/MemberMeetingDetail";
@@ -118,8 +118,9 @@ async function api(path: string, method = "GET", body?: unknown) {
   });
   const data = await response.json();
   if (!response.ok) {
-    const error = new Error(data.message || "Không thể kết nối máy chủ.") as Error & { status: number };
+    const error = new Error(data.message || "Không thể kết nối máy chủ.") as Error & { status: number; code?: string };
     error.status = response.status;
+    error.code = data.code;
     throw error;
   }
   return data.data;
@@ -330,6 +331,7 @@ function MeetingWorkspace() {
 
   // Start Meeting Confirmation Dialog state
   const [startingMeeting, setStartingMeeting] = useState<Meeting | null>(null);
+  const [activeMeetingWarning, setActiveMeetingWarning] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
   // Guest Checkin state inside detail modal
@@ -722,6 +724,11 @@ function MeetingWorkspace() {
 
   const handleStartMeeting = async () => {
     if (!startingMeeting) return;
+    if (!isMeetingScheduledForToday(startingMeeting.startsAt)) {
+      toast.error("Chỉ có thể bắt đầu cuộc họp vào đúng ngày diễn ra (giờ Việt Nam).");
+      setStartingMeeting(null);
+      return;
+    }
     setIsStarting(true);
     try {
       await api(`/${startingMeeting._id}/control`, "POST", { action: "start", version: startingMeeting.__v });
@@ -729,7 +736,14 @@ function MeetingWorkspace() {
       setStartingMeeting(null);
       await refresh();
     } catch (e) {
-      toast.error(e.message || "Không thể bắt đầu cuộc họp.");
+      const error = e as Error & { code?: string };
+      if (error.code === "MEETING_ALREADY_IN_PROGRESS") {
+        setStartingMeeting(null);
+        setActiveMeetingWarning(error.message);
+        await refresh();
+      } else {
+        toast.error(error.message || "Không thể bắt đầu cuộc họp.");
+      }
     } finally {
       setIsStarting(false);
     }
@@ -765,6 +779,10 @@ function MeetingWorkspace() {
 
   const control = async (action: string): Promise<void> => {
     if (!activeMeeting) return;
+    if (action === "start" && !isMeetingScheduledForToday(activeMeeting.startsAt)) {
+      toast.error("Chỉ có thể bắt đầu cuộc họp vào đúng ngày diễn ra (giờ Việt Nam).");
+      return;
+    }
     const actionLabels: Record<string, string> = {
       start: "Bắt đầu cuộc họp",
       start_speaker: "Bắt đầu tính giờ phát biểu",
@@ -884,9 +902,12 @@ function MeetingWorkspace() {
     return true;
   };
   const filteredItems = items.filter(matchesMeetingFilter).sort((a, b) => {
-    if (a.status === "scheduled" && b.status !== "scheduled") return -1;
-    if (b.status === "scheduled" && a.status !== "scheduled") return 1;
-    if (a.status === "scheduled") return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+    const priority: Record<Meeting["status"], number> = { live: 0, paused: 0, scheduled: 1, cancelled: 2, ended: 3 };
+    const statusOrder = priority[a.status] - priority[b.status];
+    if (statusOrder !== 0) return statusOrder;
+    if (a.status === "scheduled" && b.status === "scheduled") {
+      return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+    }
     return 0;
   });
 
@@ -988,17 +1009,6 @@ function MeetingWorkspace() {
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter("ended")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer ${statusFilter === "ended"
-                ? "bg-cyan-600 text-white shadow-xs"
-                : "bg-slate-50 border border-slate-200/80 text-slate-600 hover:bg-cyan-50 hover:text-cyan-700 hover:border-cyan-200"
-                }`}
-            >
-              <span className="h-2 w-2 rounded-full bg-slate-400" />
-              Đã kết thúc {view === "list" && "(" + items.filter((m) => m.status === "ended").length + ")"}
-            </button>
-            <button
-              type="button"
               onClick={() => setStatusFilter("cancelled")}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer ${statusFilter === "cancelled"
                 ? "bg-cyan-600 text-white shadow-xs"
@@ -1007,6 +1017,17 @@ function MeetingWorkspace() {
             >
               <span className="h-2 w-2 rounded-full bg-rose-400" />
               Đã hủy {view === "list" && "(" + items.filter((m) => m.status === "cancelled").length + ")"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("ended")}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer ${statusFilter === "ended"
+                ? "bg-cyan-600 text-white shadow-xs"
+                : "bg-slate-50 border border-slate-200/80 text-slate-600 hover:bg-cyan-50 hover:text-cyan-700 hover:border-cyan-200"
+                }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-slate-400" />
+              Đã kết thúc {view === "list" && "(" + items.filter((m) => m.status === "ended").length + ")"}
             </button>
           </div>
 
@@ -1218,12 +1239,13 @@ function MeetingWorkspace() {
                   {canManage && m.status === "scheduled" && (
                     <button
                       type="button"
-                      title="Bắt đầu cuộc họp ngay"
+                      title={isMeetingScheduledForToday(m.startsAt, tick) ? "Bắt đầu cuộc họp ngay" : "Chỉ có thể bắt đầu vào đúng ngày diễn ra cuộc họp (giờ Việt Nam)"}
+                      disabled={!isMeetingScheduledForToday(m.startsAt, tick)}
                       onClick={(e) => {
                         e.stopPropagation();
                         setStartingMeeting(m);
                       }}
-                      className="flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 shrink-0 cursor-pointer shadow-xs whitespace-nowrap"
+                      className="flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white px-3 py-2 text-xs font-bold transition-all duration-200 shrink-0 cursor-pointer shadow-xs whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Play className="h-3.5 w-3.5 fill-current" />
                       <span>Bắt đầu</span>
@@ -2106,11 +2128,12 @@ function MeetingWorkspace() {
 
               {flowStep === "interaction" && <MeetingInteractionTab meeting={activeMeeting} canManage={canModifyActiveMeeting} onRefreshMeeting={refresh} />}
 
-              {/* SUBTAB 2: VÒNG QUAY CHỌN NGƯỜI (RANDOM.ORG) */}
+              {/* SUBTAB 2: VÒNG QUAY MAY MẮN (RANDOM.ORG) */}
               {flowStep === "luckyDraw" && (
                 <LuckyDrawTab
                   meeting={activeMeeting}
                   canManage={canModifyActiveMeeting}
+                  canStartMeeting={isMeetingScheduledForToday(activeMeeting.startsAt, tick)}
                   onRefreshMeeting={refresh}
                   onStartMeeting={() => control("start")}
                 />
@@ -2384,6 +2407,15 @@ function MeetingWorkspace() {
       />
       {/* POPUP XÁC NHẬN BẮT ĐẦU CUỘC HỌP */}
       <ConfirmDialog
+        isOpen={!!activeMeetingWarning}
+        alertOnly
+        title="Đang có cuộc họp diễn ra"
+        description={activeMeetingWarning || ""}
+        confirmLabel="Đóng"
+        onConfirm={() => setActiveMeetingWarning(null)}
+        onClose={() => setActiveMeetingWarning(null)}
+      />
+      <ConfirmDialog
         isOpen={!!startingMeeting}
         title="Bắt đầu cuộc họp?"
         description={
@@ -2431,7 +2463,7 @@ function MeetingWorkspace() {
       <ConfirmDialog
         isOpen={!!deletingMeeting}
         title="Xác nhận xóa cuộc họp"
-        description={`Bạn có chắc chắn muốn xóa cuộc họp "${deletingMeeting?.title}"? Toàn bộ danh sách diễn giả check-in và dữ liệu quay chọn người của cuộc họp này sẽ bị xóa hoàn toàn.`}
+        description={`Bạn có chắc chắn muốn xóa cuộc họp "${deletingMeeting?.title}"? Toàn bộ danh sách diễn giả check-in và dữ liệu quay may mắn của cuộc họp này sẽ bị xóa hoàn toàn.`}
         tone="danger"
         confirmLabel="Xóa cuộc họp"
         cancelLabel="Hủy"

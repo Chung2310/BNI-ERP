@@ -13,10 +13,10 @@ export const notificationController = {
       const recipientUid = req.user?.id;
       const companyCode = req.user?.companyCode;
 
-      if (!recipientUid || !companyCode) {
+      if (!recipientUid) {
         return res.status(401).json({
           status: "error",
-          message: "Người dùng chưa xác thực hoặc thiếu mã công ty.",
+          message: "Người dùng chưa xác thực.",
         });
       }
 
@@ -59,7 +59,7 @@ export const notificationController = {
       if (!companyCode) {
         return res.status(401).json({
           status: "error",
-          message: "Người dùng chưa xác thực hoặc thiếu mã công ty.",
+          message: "Người dùng chưa xác thực.",
         });
       }
 
@@ -132,7 +132,7 @@ export const notificationController = {
       const recipientUid = req.user?.id;
       const companyCode = req.user?.companyCode;
 
-      if (!recipientUid || !companyCode) {
+      if (!recipientUid) {
         return res.status(401).json({
           status: "error",
           message: "Người dùng chưa xác thực hoặc thiếu mã công ty.",

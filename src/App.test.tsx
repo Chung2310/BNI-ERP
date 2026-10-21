@@ -33,8 +33,8 @@ test("shows the name selection guide to a visitor without signing in", async () 
 
   render(<App />);
 
-  expect(await screen.findByRole("heading", { name: "Hướng dẫn vòng quay chọn người" })).not.toBeNull();
-  expect(screen.getByText(/^Vòng quay chọn người hỗ trợ người điều phối chọn ngẫu nhiên một người/)).not.toBeNull();
+  expect(await screen.findByRole("heading", { name: "Hướng dẫn vòng quay may mắn" })).not.toBeNull();
+  expect(screen.getByText(/^Vòng quay may mắn hỗ trợ người điều phối chọn ngẫu nhiên một người/)).not.toBeNull();
 });
 
 test.each(["/privacy-policy", "/privacy-policy.html"])("makes privacy information and contact links available without an account at %s", async (path) => {

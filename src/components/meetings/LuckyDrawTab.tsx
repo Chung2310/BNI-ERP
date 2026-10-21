@@ -31,10 +31,16 @@ import {
 import { toast } from "../../pages/Toast";
 import { playTickSound, playWinFanfare, playSuspenseSound } from "../../utils/soundEffects";
 import { launchConfetti } from "../../utils/confetti";
+import { checkedInByCutoff, DEFAULT_DRAW_CUTOFF_TIME } from "../../utils/earlyCheckIn";
+import { WHEEL_SELECTION_NAME, wheelDisplayName } from "../../config/wheel-selection-guide";
+
+const DRAW_HOURS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+const DRAW_MINUTES = Array.from({ length: 60 }, (_, minute) => String(minute).padStart(2, "0"));
 
 interface LuckyDrawTabProps {
   meeting: Meeting;
   canManage: boolean;
+  canStartMeeting?: boolean;
   onRefreshMeeting: () => Promise<void>;
   onStartMeeting?: () => Promise<void>;
 }
@@ -42,6 +48,7 @@ interface LuckyDrawTabProps {
 export function LuckyDrawTab({
   meeting,
   canManage: hasManagementPermission,
+  canStartMeeting = true,
   onRefreshMeeting,
   onStartMeeting,
 }: LuckyDrawTabProps) {
@@ -53,9 +60,18 @@ export function LuckyDrawTab({
       drawMode: "attendees",
       numberMin: 1,
       numberMax: 100,
+      checkInCutoffTime: DEFAULT_DRAW_CUTOFF_TIME,
       prizes: [],
     }
   );
+  const incomingCutoff = meeting.luckyDraw?.checkInCutoffTime || DEFAULT_DRAW_CUTOFF_TIME;
+  const [cutoffDraft, setCutoffDraft] = useState(incomingCutoff);
+  const [previousCutoff, setPreviousCutoff] = useState(incomingCutoff);
+  const [savingCutoff, setSavingCutoff] = useState(false);
+  if (previousCutoff !== incomingCutoff) {
+    setPreviousCutoff(incomingCutoff);
+    setCutoffDraft(incomingCutoff);
+  }
 
   const [selectedPrizeId, setSelectedPrizeId] = useState<string>("");
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -137,7 +153,7 @@ export function LuckyDrawTab({
       canRedraw: false,
       prize: {
         id: `game-${winner.id}`,
-        name: winner.prizeName || "Chọn người tham gia",
+        name: winner.prizeName || WHEEL_SELECTION_NAME,
         reward: winner.reward || "",
         quantity: 1,
         order: winnerRows.length + 1,
@@ -153,7 +169,7 @@ export function LuckyDrawTab({
   const handleApplyPresets = async () => {
     if (!canManage) return;
     if (luckyConfig.prizes?.length) {
-      showConfirm("Áp dụng cấu hình mẫu sẽ thêm các lượt chọn chuẩn vào danh sách. Tiếp tục?", async () => {
+      showConfirm("Áp dụng cấu hình mẫu sẽ thêm các lượt quay chuẩn vào danh sách. Tiếp tục?", async () => {
         await doApplyPresets();
       });
       return;
@@ -173,10 +189,10 @@ export function LuckyDrawTab({
       for (const p of presets) {
         await meetingService.addOrUpdatePrize(meeting._id, p);
       }
-      toast.success("Đã thêm bộ lượt chọn mẫu thành công!");
+      toast.success("Đã thêm bộ lượt quay mẫu thành công!");
       await onRefreshMeeting();
     } catch (err) {
-      toast.error(err.message || "Không thể tạo lượt chọn mẫu.");
+      toast.error(err.message || "Không thể tạo lượt quay mẫu.");
     }
   };
 
@@ -205,7 +221,7 @@ export function LuckyDrawTab({
     e.preventDefault();
     if (!canManage) return;
     if (!prizeName.trim()) {
-      toast.warning("Vui lòng nhập tên lượt chọn!");
+      toast.warning("Vui lòng nhập tên lượt quay!");
       return;
     }
 
@@ -220,11 +236,11 @@ export function LuckyDrawTab({
         color: prizeColor,
       });
       setLuckyConfig(updated);
-      toast.success(editingPrize ? "Cập nhật lượt chọn thành công!" : "Thêm lượt chọn mới thành công!");
+      toast.success(editingPrize ? "Cập nhật lượt quay thành công!" : "Thêm lượt quay mới thành công!");
       setIsPrizeModalOpen(false);
       await onRefreshMeeting();
     } catch (err) {
-      toast.error(err.message || "Lỗi lưu lượt chọn.");
+      toast.error(err.message || "Lỗi lưu lượt quay.");
     } finally {
       setSavingPrize(false);
     }
@@ -232,17 +248,17 @@ export function LuckyDrawTab({
 
   // Delete Prize
   const handleDeletePrize = async (prizeId: string) => {
-    showConfirm("Bạn có chắc chắn muốn xóa lượt chọn này?", async () => {
+    showConfirm("Bạn có chắc chắn muốn xóa lượt quay này?", async () => {
       try {
         const updated = await meetingService.deletePrize(meeting._id, prizeId);
         setLuckyConfig(updated);
         if (selectedPrizeId === prizeId) {
           setSelectedPrizeId(updated.prizes?.[0]?.id || "");
         }
-        toast.success("Đã xóa lượt chọn.");
+        toast.success("Đã xóa lượt quay.");
         await onRefreshMeeting();
       } catch (err) {
-        toast.error(err.message || "Xóa lượt chọn thất bại.");
+        toast.error(err.message || "Xóa lượt quay thất bại.");
       }
     });
   };
@@ -252,10 +268,20 @@ export function LuckyDrawTab({
     try {
       const updated = await meetingService.updateLuckyDrawConfig(meeting._id, newConfig);
       setLuckyConfig(updated);
-      toast.success("Đã cập nhật cấu hình quay chọn người.");
+      toast.success("Đã cập nhật cấu hình quay may mắn.");
       await onRefreshMeeting();
     } catch (err) {
       toast.error(err.message || "Không thể cập nhật cấu hình.");
+    }
+  };
+
+  const handleSaveCutoff = async () => {
+    if (savingCutoff) return;
+    setSavingCutoff(true);
+    try {
+      await handleSaveSettings({ checkInCutoffTime: cutoffDraft });
+    } finally {
+      setSavingCutoff(false);
     }
   };
 
@@ -265,17 +291,17 @@ export function LuckyDrawTab({
   const handleSpin = async () => {
     if (!canManage) return;
     if (!isMeetingStarted) {
-      toast.warning("Cuộc họp chưa bắt đầu! Chỉ có thể quay chọn người khi cuộc họp đã bắt đầu.");
+      toast.warning("Cuộc họp chưa bắt đầu! Chỉ có thể quay may mắn khi cuộc họp đã bắt đầu.");
       return;
     }
 
     if (!selectedPrize) {
-      toast.warning("Vui lòng chọn lượt chọn cần quay!");
+      toast.warning("Vui lòng chọn lượt quay!");
       return;
     }
 
     if (selectedPrize.winners.length >= selectedPrize.quantity) {
-      toast.warning(`Lượt chọn "${selectedPrize.name}" đã đủ số lượng người được chọn (${selectedPrize.quantity}/${selectedPrize.quantity})!`);
+      toast.warning(`Lượt quay "${wheelDisplayName(selectedPrize.name)}" đã đủ số lượng người được chọn (${selectedPrize.quantity}/${selectedPrize.quantity})!`);
       return;
     }
 
@@ -292,8 +318,12 @@ export function LuckyDrawTab({
       }
     }
 
-    const candidatePool = speakers.filter((s) => !previousWinnerIds.has(String(s.id)));
-    if (luckyConfig.drawMode === "attendees" && !candidatePool.length) {
+    const candidatePool = speakers.filter((s) => !s.deletedAccount && !!s.userId && checkedInByCutoff(s.checkedInAt, luckyConfig.checkInCutoffTime) && !previousWinnerIds.has(String(s.id)));
+    const eligibleNumbers = speakers.flatMap((speaker, index) =>
+      index + 1 >= (luckyConfig.numberMin || 1) && index + 1 <= (luckyConfig.numberMax || 100) &&
+      !speaker.deletedAccount && !!speaker.userId && checkedInByCutoff(speaker.checkedInAt, luckyConfig.checkInCutoffTime) && !previousWinnerIds.has(String(speaker.id))
+        ? [index + 1] : []);
+    if (luckyConfig.drawMode === "attendees" ? !candidatePool.length : !eligibleNumbers.length) {
       toast.error("Không còn người tham gia hợp lệ nào chưa được chọn để quay tiếp!");
       return;
     }
@@ -307,7 +337,7 @@ export function LuckyDrawTab({
       spinResultPromise = meetingService.spinLuckyDraw(meeting._id, selectedPrize.id);
     } catch (err) {
       setIsSpinning(false);
-      toast.error(err.message || "Không thể kết nối máy chủ quay chọn người.");
+      toast.error(err.message || "Không thể kết nối máy chủ quay may mắn.");
       return;
     }
 
@@ -322,9 +352,7 @@ export function LuckyDrawTab({
         const dummy = candidatePool[rollIndex % candidatePool.length];
         setSpinningDisplay(dummy ? dummy.name : `Ticket #${rollIndex % 100}`);
       } else {
-        const min = luckyConfig.numberMin || 1;
-        const max = luckyConfig.numberMax || 100;
-        const randomNum = Math.floor(Math.random() * (max - min + 1)) + min;
+        const randomNum = eligibleNumbers[Math.floor(Math.random() * eligibleNumbers.length)];
         setSpinningDisplay(`LUCKY #${randomNum.toString().padStart(3, "0")}`);
       }
 
@@ -372,7 +400,7 @@ export function LuckyDrawTab({
       clearInterval(rollingInterval);
       setIsSpinning(false);
       setSpinningDisplay("READY");
-      toast.error(err.message || "Quay chọn người thất bại.");
+      toast.error(err.message || "Quay thưởng thất bại.");
     }
   };
 
@@ -382,7 +410,7 @@ export function LuckyDrawTab({
     showConfirm(`Hủy kết quả của "${winner.name}" và cho phép quay lại?`, async () => {
       try {
         await meetingService.redrawWinner(meeting._id, winner.prizeId, winner.id);
-        toast.success("Đã hủy kết quả. Bạn có thể bấm Quay lại lượt chọn này.");
+        toast.success("Đã hủy kết quả. Bạn có thể bấm Quay lại lượt quay này.");
         setActiveWinnerModal(null);
         await onRefreshMeeting();
       } catch (err) {
@@ -396,7 +424,7 @@ export function LuckyDrawTab({
     if (!canManage) return;
     const confirmMsg = prizeId
       ? "Đặt lại kết quả người được chọn này?"
-      : "Đặt lại toàn bộ kết quả được chọn của tất cả các lượt chọn?";
+      : "Đặt lại toàn bộ kết quả vòng quay của tất cả các lượt quay?";
     showConfirm(confirmMsg, async () => {
       try {
         const updated = await meetingService.resetWinners(meeting._id, prizeId);
@@ -423,15 +451,15 @@ export function LuckyDrawTab({
     }
 
     if (!allWinners.length) {
-      toast.warning("Chưa có kết quả được chọn nào để xuất!");
+      toast.warning("Chưa có kết quả vòng quay nào để xuất!");
       return;
     }
 
     const csvContent =
       "data:text/csv;charset=utf-8,\uFEFF" +
-      ["Lượt chọn,Người được chọn,Email,Thời gian chọn,Mã lượt chọn"]
+      ["Lượt quay,Người được chọn,Email,Thời gian chọn,Mã lượt quay"]
         .concat(
-          allWinners.map((r) => `"${r.prize}","${r.name}","${r.email}","${r.wonAt}","${r.hash}"`)
+          allWinners.map((r) => `"${wheelDisplayName(r.prize)}","${r.name}","${r.email}","${r.wonAt}","${r.hash}"`)
         )
         .join("\n");
 
@@ -459,10 +487,10 @@ export function LuckyDrawTab({
             </div>
             <div>
               <h4 className="text-sm text-amber-900 font-semibold">
-                Quay chọn người đang tạm khóa
+                Vòng quay đang tạm khóa
               </h4>
               <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
-                Chức năng quay chọn người chỉ kích hoạt khi cuộc họp đã bắt đầu.{canManage ? " Nhấn nút bên cạnh để bắt đầu." : ""}
+                Chức năng quay may mắn chỉ kích hoạt khi cuộc họp đã bắt đầu.{canManage ? canStartMeeting ? " Nhấn nút bên cạnh để bắt đầu." : " Chỉ có thể bắt đầu cuộc họp vào đúng ngày diễn ra (giờ Việt Nam)." : ""}
               </p>
             </div>
           </div>
@@ -471,7 +499,9 @@ export function LuckyDrawTab({
             <button
               type="button"
               onClick={onStartMeeting}
-              className="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
+              disabled={!canStartMeeting}
+              title={!canStartMeeting ? "Chỉ có thể bắt đầu vào đúng ngày diễn ra cuộc họp (giờ Việt Nam)" : undefined}
+              className="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium shadow-sm transition flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
               <CheckCircle2 className="h-4 w-4" />
               Bắt đầu cuộc họp
@@ -493,7 +523,7 @@ export function LuckyDrawTab({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-semibold text-slate-900">
-                  Quay chọn người buổi họp
+                  Vòng quay may mắn
                 </h3>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -516,7 +546,7 @@ export function LuckyDrawTab({
 
         {/* Game Options */}
         {canManage && <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Game 1: Vòng quay chọn người */}
+          {/* Game 1: Vòng quay may mắn */}
           <div className="group rounded-xl border border-slate-200 bg-slate-50/50 p-4 transition-all duration-200 hover:border-[#cf142b]/40 hover:shadow-sm flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2.5 mb-3">
@@ -524,7 +554,7 @@ export function LuckyDrawTab({
                   <Disc className="h-4 w-4" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-slate-900 group-hover:text-[#cf142b] transition">Vòng quay chọn người</h4>
+                  <h4 className="text-sm font-semibold text-slate-900 group-hover:text-[#cf142b] transition">Vòng quay may mắn</h4>
                   <p className="text-[11px] text-slate-400">Đĩa quay 3D</p>
                 </div>
               </div>
@@ -590,17 +620,17 @@ export function LuckyDrawTab({
             {selectedPrize ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-[#cf142b] text-xs font-medium ring-1 ring-inset ring-red-200">
                 <Gift className="h-3.5 w-3.5" />
-                {selectedPrize.name} ({selectedPrize.winners.length}/{selectedPrize.quantity})
+                {wheelDisplayName(selectedPrize.name)} ({selectedPrize.winners.length}/{selectedPrize.quantity})
               </span>
             ) : (
-              <span className="text-xs text-slate-400">Chọn lượt chọn bên dưới</span>
+              <span className="text-xs text-slate-400">Chọn lượt quay bên dưới</span>
             )}
           </div>
 
           {/* Digital Display */}
           <div className="my-4 rounded-xl border border-slate-200 bg-white p-5 text-center">
             <div className="text-[11px] text-slate-400 mb-2">
-              {luckyConfig.drawMode === "attendees" ? "Thành viên & Khách mời" : "Số thứ tự"} · {meeting.speakers?.length || 0} ứng viên
+              {luckyConfig.drawMode === "attendees" ? "Thành viên có mặt" : "Số thứ tự"} · {(meeting.speakers || []).filter(speaker => !speaker.deletedAccount && !!speaker.userId && checkedInByCutoff(speaker.checkedInAt, luckyConfig.checkInCutoffTime)).length} ứng viên check-in đến hết {luckyConfig.checkInCutoffTime || DEFAULT_DRAW_CUTOFF_TIME}
             </div>
 
             <div
@@ -647,7 +677,7 @@ export function LuckyDrawTab({
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  <span>Quay chọn người</span>
+                  <span>Quay thưởng</span>
                 </>
               )}
             </button>
@@ -655,16 +685,16 @@ export function LuckyDrawTab({
         </div>}
       </div>
 
-      {/* Danh sách lượt chọn */}
+      {/* Danh sách lượt quay */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
               <Trophy className="h-4 w-4 text-[#cf142b]" />
-              Lượt chọn ({luckyConfig.prizes?.length || 0})
+              Lượt quay ({luckyConfig.prizes?.length || 0})
             </h4>
             <p className="text-xs text-slate-500">
-              Chọn lượt quay hoặc thêm lượt chọn mới.
+              Chọn lượt quay hoặc thêm lượt quay mới.
             </p>
           </div>
 
@@ -677,7 +707,7 @@ export function LuckyDrawTab({
                   className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-xs font-medium transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                  Lượt chọn mẫu
+                  Lượt quay mẫu
                 </button>
               )}
 
@@ -696,7 +726,7 @@ export function LuckyDrawTab({
                 className="px-3 py-1.5 rounded-lg bg-[#cf142b] hover:bg-[#b00f24] text-white text-xs font-medium shadow-sm transition flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" />
-                Thêm lượt chọn
+                Thêm lượt quay
               </button>
             </div>
           )}
@@ -706,10 +736,47 @@ export function LuckyDrawTab({
         {showConfigPanel && canManage && (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5 space-y-4">
             <h5 className="text-xs font-medium text-slate-700 uppercase tracking-wider">
-              Cấu hình quay chọn người
+              Cấu hình quay may mắn
             </h5>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              <div className="space-y-1">
+                <span className="block font-semibold text-slate-700">Giờ giới hạn check-in</span>
+                <div className="flex items-end gap-2">
+                  <label className="min-w-0 flex-1 space-y-1">
+                    <span className="block text-[11px] text-slate-500">Giờ</span>
+                    <select
+                      aria-label="Giờ giới hạn check-in"
+                      value={cutoffDraft.slice(0, 2)}
+                      onChange={(e) => setCutoffDraft(`${e.target.value}:${cutoffDraft.slice(3, 5)}`)}
+                      className="w-full p-2 border border-slate-200 rounded-xl bg-white outline-none"
+                    >
+                      {DRAW_HOURS.map(hour => <option key={hour} value={hour}>{hour}</option>)}
+                    </select>
+                  </label>
+                  <span className="pb-2 font-bold text-slate-500">:</span>
+                  <label className="min-w-0 flex-1 space-y-1">
+                    <span className="block text-[11px] text-slate-500">Phút</span>
+                    <select
+                      aria-label="Phút giới hạn check-in"
+                      value={cutoffDraft.slice(3, 5)}
+                      onChange={(e) => setCutoffDraft(`${cutoffDraft.slice(0, 2)}:${e.target.value}`)}
+                      className="w-full p-2 border border-slate-200 rounded-xl bg-white outline-none"
+                    >
+                      {DRAW_MINUTES.map(minute => <option key={minute} value={minute}>{minute}</option>)}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={savingCutoff || cutoffDraft === (luckyConfig.checkInCutoffTime || DEFAULT_DRAW_CUTOFF_TIME)}
+                    onClick={() => void handleSaveCutoff()}
+                    className="rounded-xl bg-[#cf142b] px-3 py-2 text-white font-semibold disabled:opacity-40"
+                  >
+                    Lưu
+                  </button>
+                </div>
+                <span className="block text-[11px] text-slate-500">Giờ Việt Nam (24 giờ) · mặc định 07:00.</span>
+              </div>
               <label className="space-y-1 block">
                 <span className="font-semibold text-slate-700">Chế độ quay:</span>
                 <select
@@ -788,7 +855,7 @@ export function LuckyDrawTab({
                         {prize.order}
                       </div>
                       <div>
-                        <h5 className="font-bold text-slate-900 text-sm">{prize.name}</h5>
+                        <h5 className="font-bold text-slate-900 text-sm">{wheelDisplayName(prize.name)}</h5>
                       </div>
                     </div>
 
@@ -831,7 +898,7 @@ export function LuckyDrawTab({
                         type="button"
                         onClick={() => openEditPrizeModal(prize)}
                         className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded-lg transition"
-                        title="Chỉnh sửa lượt chọn"
+                        title="Chỉnh sửa lượt quay"
                       >
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
@@ -839,7 +906,7 @@ export function LuckyDrawTab({
                         type="button"
                         onClick={() => handleDeletePrize(prize.id)}
                         className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition"
-                        title="Xóa lượt chọn"
+                        title="Xóa lượt quay"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -852,13 +919,13 @@ export function LuckyDrawTab({
         </div>
       </div>
 
-      {/* Kết quả được chọn */}
+      {/* Kết quả vòng quay */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
             <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
               <Trophy className="h-4 w-4 text-[#cf142b]" />
-              Kết quả được chọn
+              Kết quả vòng quay
             </h4>
             <p className="text-xs text-slate-500">
               Danh sách người được chọn trong buổi họp.
@@ -896,7 +963,7 @@ export function LuckyDrawTab({
           if (!allWinners.length) {
             return (
               <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs italic">
-                Chưa có ai được chọn. Hãy kích hoạt cuộc họp và bấm "QUAY CHỌN NGƯỜI" để tìm người may mắn!
+                Chưa có ai được chọn. Hãy kích hoạt cuộc họp và bấm "QUAY THƯỞNG" để bắt đầu vòng quay!
               </div>
             );
           }
@@ -906,7 +973,7 @@ export function LuckyDrawTab({
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-medium uppercase tracking-wider text-slate-500">
-                    <th className="p-3 pl-4">Lượt chọn</th>
+                    <th className="p-3 pl-4">Lượt quay</th>
                     <th className="p-3">Người được chọn</th>
                     <th className="p-3">Số vé</th>
                     <th className="p-3">Thời gian</th>
@@ -922,7 +989,7 @@ export function LuckyDrawTab({
                           style={{ backgroundColor: prize.color || "#f59e0b" }}
                         >
                           <Trophy className="h-3 w-3" />
-                          {prize.name}
+                          {wheelDisplayName(prize.name)}
                         </span>
                       </td>
 
@@ -964,7 +1031,7 @@ export function LuckyDrawTab({
                               type="button"
                               onClick={() => handleRedraw(winner)}
                               className="px-2.5 py-1 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] transition cursor-pointer"
-                              title="Hủy lượt chọn này để quay lại"
+                              title="Hủy lượt quay này để quay lại"
                             >
                               Quay lại
                             </button>
@@ -995,7 +1062,7 @@ export function LuckyDrawTab({
               Chúc mừng
             </p>
             <h4 className="text-xl font-semibold mt-1 text-slate-900">
-              {activeWinnerModal.prize.name}
+              {wheelDisplayName(activeWinnerModal.prize.name)}
             </h4>
             <p className="text-xs text-slate-500 mt-0.5">
               Người được chọn cho lượt hiện tại
@@ -1064,10 +1131,10 @@ export function LuckyDrawTab({
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-slate-900">
-                    {editingPrize ? "Sửa lượt chọn" : "Thêm lượt chọn mới"}
+                    {editingPrize ? "Sửa lượt quay" : "Thêm lượt quay mới"}
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    {editingPrize ? "Cập nhật thông tin chi tiết lượt chọn" : "Thiết lập lượt chọn mới cho vòng quay"}
+                    {editingPrize ? "Cập nhật thông tin chi tiết lượt quay" : "Thiết lập lượt quay mới cho vòng quay"}
                   </p>
                 </div>
               </div>
@@ -1082,12 +1149,12 @@ export function LuckyDrawTab({
 
             <form onSubmit={handleSavePrize} className="p-5 space-y-4">
               <div className="space-y-1 text-left text-xs">
-                <label className="font-bold text-slate-700 block">Tên lượt chọn *</label>
+                <label className="font-bold text-slate-700 block">Tên lượt quay *</label>
                 <input
                   type="text"
                   required
                   placeholder="Ví dụ: Người phát biểu, Người trình bày..."
-                  value={prizeName}
+                  value={prizeName ? wheelDisplayName(prizeName) : ""}
                   onChange={(e) => setPrizeName(e.target.value)}
                   className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-[#0088A9]"
                 />
@@ -1143,7 +1210,7 @@ export function LuckyDrawTab({
                   disabled={savingPrize}
                   className="px-5 py-2 rounded-xl bg-[#0088A9] hover:bg-[#007490] text-white text-xs font-bold shadow-md shadow-cyan-900/10 cursor-pointer disabled:opacity-50"
                 >
-                  {savingPrize ? "Đang lưu..." : "Lưu lượt chọn"}
+                  {savingPrize ? "Đang lưu..." : "Lưu lượt quay"}
                 </button>
               </div>
             </form>

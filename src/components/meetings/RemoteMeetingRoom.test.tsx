@@ -173,11 +173,11 @@ it("creates and selects a quick prize from the control panel", async () => {
   };
   render(<RemoteMeetingRoom meetingId="m" mode="control" />);
   await screen.findByText("Đang chiếu: speaker");
-  fireEvent.click(screen.getByRole("button", { name: "Tạo lượt chọn" }));
-  fireEvent.change(screen.getByDisplayValue("Chọn người tham gia"), { target: { value: "Giải khách mời" } });
-  fireEvent.click(screen.getByRole("button", { name: "Tạo và dùng lượt chọn" }));
+  fireEvent.click(screen.getByRole("button", { name: "Tạo lượt quay" }));
+  fireEvent.change(screen.getByDisplayValue("Lượt quay"), { target: { value: "Giải khách mời" } });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo và dùng lượt quay" }));
   await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/lucky-draw/prizes"))).toBe(true));
-  const prizeSelect = screen.getByRole("combobox", { name: "Lượt chọn" }) as HTMLSelectElement;
+  const prizeSelect = screen.getByRole("combobox", { name: "Lượt quay" }) as HTMLSelectElement;
   await waitFor(() => expect(prizeSelect.value).toBe("quick-prize"));
   expect(screen.getByRole("option", { name: /Giải khách mời/ })).toBeTruthy();
   await waitFor(() => expect((screen.getByRole("button", { name: "Bắt đầu quay" }) as HTMLButtonElement).disabled).toBe(false));

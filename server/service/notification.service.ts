@@ -12,17 +12,15 @@ export const notificationService = {
    */
   async getNotifications(
     recipientUid: string,
-    companyCode: string,
+    companyCode: string | undefined,
     query: { page?: number; limit?: number; read?: boolean; type?: NotifType }
   ) {
     const page = query.page || 1;
     const limit = query.limit || 20;
     const skip = (page - 1) * limit;
 
-    const filter: Record<string, unknown> = {
-      recipientUid,
-      companyCode,
-    };
+    const filter: Record<string, unknown> = { recipientUid };
+    if (companyCode) filter.companyCode = companyCode;
 
     if (query.read !== undefined) {
       filter.read = query.read;
@@ -39,11 +37,7 @@ export const notificationService = {
       .lean();
 
     const total = await NotificationModel.countDocuments(filter);
-    const unreadCount = await NotificationModel.countDocuments({
-      recipientUid,
-      companyCode,
-      read: false,
-    });
+    const unreadCount = await NotificationModel.countDocuments({ recipientUid, ...(companyCode ? { companyCode } : {}), read: false });
 
     return {
       items,
@@ -57,7 +51,7 @@ export const notificationService = {
   /**
    * Tạo một thông báo mới và phát qua Socket.io
    */
-  async createNotification(data: Partial<INotification>) {
+  async createNotification(data: Partial<INotification>, options: { showDetailsInPush?: boolean; route?: string } = {}) {
     const notification = new NotificationModel(data);
     await notification.save();
 
@@ -70,9 +64,11 @@ export const notificationService = {
         notification.toObject()
       );
       void mobilePushService.sendToUser(recipientUid, {
-        ...privatePushContent(),
+        ...(options.showDetailsInPush ? { title: notification.title, body: notification.body } : privatePushContent()),
         notificationId: notification._id.toString(),
         type: notification.type,
+        route: options.route,
+        showDetails: options.showDetailsInPush,
       }).catch((error) => {
         console.error("[notificationService.createNotification] Mobile push failed:", error);
       });
@@ -99,9 +95,9 @@ export const notificationService = {
   /**
    * Đánh dấu tất cả thông báo của người dùng là đã đọc
    */
-  async markAllAsRead(recipientUid: string, companyCode: string) {
+  async markAllAsRead(recipientUid: string, companyCode?: string) {
     await NotificationModel.updateMany(
-      { recipientUid, companyCode, read: false },
+      { recipientUid, ...(companyCode ? { companyCode } : {}), read: false },
       { read: true }
     );
     return { success: true };

@@ -3,6 +3,12 @@ const DAY = 86400000;
 export function vietnamDateTime(value: string | Date): string {
   return new Date(new Date(value).getTime() + 7 * 3600000).toISOString().slice(0, 16);
 }
+export function isMeetingScheduledForToday(startsAt: string | Date, now: string | Date | number = new Date()): boolean {
+  const meetingTime = new Date(startsAt).getTime();
+  const currentTime = new Date(now).getTime();
+  if (!Number.isFinite(meetingTime) || !Number.isFinite(currentTime)) return false;
+  return vietnamDateTime(new Date(meetingTime)).slice(0, 10) === vietnamDateTime(new Date(currentTime)).slice(0, 10);
+}
 export function recurringMeetingDates(rule: MeetingRecurrence): Date[] {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(rule.startDate) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(rule.time)
     || !Number.isInteger(rule.months) || rule.months < 1 || rule.months > 12

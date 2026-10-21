@@ -23,3 +23,14 @@ it("keeps viewing and editing member profile fields after removing ERP fields", 
   for (const key of ["jobTitle", "department", "division", "level", "qualification", "isLeader"]) expect(mocks.updateUser.mock.calls[0][1]).not.toHaveProperty(key);
   await waitFor(() => expect(mocks.success).toHaveBeenCalled());
 });
+
+it("keeps the edit dialog working when an avatar image fails to load", async () => {
+  const member = { uid: "member-1", displayName: "Nguyễn An", companyCode: "BNI", role: "user" as const,
+    email: "an@example.test", photoURL: "https://example.test/missing-avatar.png", createdAt: "2026-01-01" };
+  const refresh = vi.fn().mockResolvedValue(undefined);
+  render(<OrgChartTab userProfile={({ uid: "admin-1", role: "admin", companyCode: "BNI" } as unknown as React.ComponentProps<typeof OrgChartTab>["userProfile"])} selectedCompanyCode="BNI" usersList={[member]} employees={[{ id: member.uid, name: member.displayName, role: "Thành viên", email: member.email, phone: "", avatar: member.photoURL, status: "offline" }]} fetchUsers={refresh} isManager companies={[]} courses={[]} fetchCourses={refresh} loading={false} />);
+  fireEvent.error(screen.getByAltText("Nguyễn An"));
+  fireEvent.click(screen.getByRole("button", { name: "Xem hồ sơ Nguyễn An" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Chỉnh sửa thông tin" }));
+  expect(screen.getByRole("button", { name: "Lưu thay đổi" })).not.toBeNull();
+});

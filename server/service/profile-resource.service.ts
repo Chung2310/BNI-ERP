@@ -39,6 +39,7 @@ export function createProfileResourceService(finalizer: SourceFinalizer) {
         entityId: userId,
         entityLabel: user.displayName || user.email || userId,
         sourceRecordId: userId,
+        expectedSourceType: "profile.avatar",
         uploads: [{ uploadToken, sourceField: "photoURL" }],
       });
     },

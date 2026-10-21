@@ -1,4 +1,4 @@
-import { recurringMeetingDates } from "../../../src/utils/meetingRecurrence";
+import { isMeetingScheduledForToday, recurringMeetingDates } from "../../../src/utils/meetingRecurrence";
 import { normalizeLoginIdentifier } from "../../../src/utils/loginIdentifier";
 import { reserveMeetingNumbers } from "./meeting-sequence";
 import { randomBytes, randomInt, randomUUID, createHash } from 'node:crypto';
@@ -15,6 +15,7 @@ import { notificationService } from '../../service/notification.service';
 import { emitToCompany } from '../../socket';
 import { cancelMeetingAutoEnd, scheduleMeetingAutoEnd } from './meeting-auto-end.scheduler';
 import type { DrawFilter, MeetingPresentationState, PresentationView } from '../../../src/utils/meetingPresentation';
+import { checkedInByCutoff, DEFAULT_DRAW_CUTOFF_TIME, validDrawCutoffTime } from '../../../src/utils/earlyCheckIn';
 
 export type MeetingDocument = ReturnType<typeof MeetingModel.hydrate>;
 export type CheckInInput = {
@@ -29,9 +30,28 @@ export type MeetingInput = {
 type PrizeInput = { id?: string; name?: string; reward?: string; quantity?: number; order?: number; imageUrl?: string; color?: string };
 type WinnerInput = { id: string; winnerId: string; source: 'wheel' | 'bingo'; name: string; prizeName: string; photoURL?: string; ticketNumber?: number; wonAt: Date };
 export class MeetingError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public code?: string, public activeMeeting?: { id: string; title: string }) {
     super(message);
   }
+}
+
+async function activeMeetingConflict(companyCode: string, excludedId: string) {
+  const active = await MeetingModel.findOne({
+    companyCode,
+    status: { $in: ['live', 'paused'] },
+    _id: { $ne: excludedId },
+  });
+  return active && new MeetingError(
+    409,
+    `Đang có cuộc họp "${active.title}" diễn ra. Vui lòng kết thúc cuộc họp này trước khi bắt đầu cuộc họp khác.`,
+    'MEETING_ALREADY_IN_PROGRESS',
+    { id: String(active._id), title: active.title },
+  );
+}
+
+async function assertNoOtherActiveMeeting(item: MeetingDocument) {
+  const conflict = await activeMeetingConflict(item.companyCode, String(item._id));
+  if (conflict) throw conflict;
 }
 
 type MeetingSlot = { startsAt: Date; endsAt: Date };
@@ -69,11 +89,16 @@ export function assertMeetingEditable(item: { status: string }) {
 }
 
 export async function saveMeeting(item: MeetingDocument) {
+  const meetingJustStarted = item.status === 'live' && item.isModified('status');
   try {
     await item.save();
   } catch (error) {
     if (error.name === 'VersionError') {
       throw new MeetingError(409, 'Có người vừa cập nhật cuộc họp. Vui lòng thử lại.');
+    }
+    if (error.code === 11000 && error.keyPattern?.companyCode && ['live', 'paused'].includes(item.status)) {
+      const conflict = await activeMeetingConflict(item.companyCode, String(item._id));
+      if (conflict) throw conflict;
     }
     throw error;
   }
@@ -112,6 +137,7 @@ export async function saveMeeting(item: MeetingDocument) {
         drawMode: item.luckyDraw.drawMode,
         numberMin: item.luckyDraw.numberMin,
         numberMax: item.luckyDraw.numberMax,
+        checkInCutoffTime: item.luckyDraw.checkInCutoffTime || DEFAULT_DRAW_CUTOFF_TIME,
         prizes: (item.luckyDraw.prizes || []).map((prize) => ({
           id: prize.id, name: prize.name, reward: prize.reward, quantity: prize.quantity,
           order: prize.order, imageUrl: prize.imageUrl, color: prize.color,
@@ -127,7 +153,41 @@ export async function saveMeeting(item: MeetingDocument) {
       __v: item.__v,
     },
   });
+  if (meetingJustStarted) void notifyMeetingStarted(item);
   return item;
+}
+
+async function notifyMeetingStarted(item: MeetingDocument) {
+  try {
+    const members = await UserModel.find({ companyCode: item.companyCode, isActive: { $ne: false }, disabledAt: { $in: [null, undefined] } }).select('_id').lean();
+    await Promise.all(members.map(async (member) => {
+      try {
+        await notificationService.createNotification({
+          companyCode: item.companyCode, recipientUid: String(member._id),
+          idempotencyKey: `meeting:${item._id}:started`,
+          title: 'Cuộc họp đã bắt đầu', body: `Cuộc họp “${item.title}” đã bắt đầu. Mở ứng dụng để xem và tham gia.`,
+          type: 'he-thong', action: { tab: 'CUỘC HỌP', meetingId: String(item._id), kind: 'meeting_started' },
+        }, { showDetailsInPush: true, route: `/meeting/${item._id}` });
+      } catch (error) {
+        if (error?.code !== 11000) console.error('[meeting-start-notification]', error);
+      }
+    }));
+  } catch (error) { console.error('[meeting-start-notification]', error); }
+}
+
+async function notifyDrawWinner(item: MeetingDocument, winner: { id: string; userId?: string; prizeName: string }) {
+  if (!winner.userId) return;
+  try {
+    await notificationService.createNotification({
+      companyCode: item.companyCode, recipientUid: winner.userId,
+      idempotencyKey: `meeting:${item._id}:winner:${winner.id}`,
+      title: 'Bạn đã trúng thưởng',
+      body: `Bạn đã trúng “${winner.prizeName}” trong cuộc họp “${item.title}”.`,
+      type: 'he-thong', action: { tab: 'CUỘC HỌP', meetingId: String(item._id), kind: 'draw_winner' },
+    }, { showDetailsInPush: true, route: `/meeting/${item._id}/game-results` });
+  } catch (error) {
+    if (error?.code !== 11000) console.error('[draw-winner-notification]', error);
+  }
 }
 
 export async function recordGameWinner(item: MeetingDocument, input: WinnerInput, actorId: string) {
@@ -135,6 +195,10 @@ export async function recordGameWinner(item: MeetingDocument, input: WinnerInput
   const existing = (item.gameWinners || []).find((winner) => winner.id === input.id);
   if (existing) return existing;
   const attendee = (item.speakers || []).find((speaker) => speaker.id === input.winnerId || speaker.userId === input.winnerId);
+  const cutoffTime = item.luckyDraw?.checkInCutoffTime || DEFAULT_DRAW_CUTOFF_TIME;
+  if (input.source === 'wheel' && (!attendee || attendee.deletedAccount || !attendee.userId || !checkedInByCutoff(attendee.checkedInAt, cutoffTime))) {
+    throw new MeetingError(400, `Vòng quay chỉ chọn thành viên có mặt đã check-in đến hết ${cutoffTime}.`);
+  }
   const record = { ...input, prizeId: input.id, drawnBy: actorId,
     reward: "",
     name: attendee?.name || input.name, email: attendee?.email,
@@ -142,6 +206,7 @@ export async function recordGameWinner(item: MeetingDocument, input: WinnerInput
   if (!item.gameWinners) item.set('gameWinners', []);
   item.gameWinners.push(record);
   await saveMeeting(item);
+  void notifyDrawWinner(item, record);
   emitToCompany(item.companyCode, 'lucky_draw_spun', { meetingId: String(item._id), winner: record });
   return record;
 }
@@ -443,7 +508,9 @@ export async function autoStartDueMeetings(now = new Date()) {
       { endsAt: null, startsAt: { $gt: new Date(now.getTime() - DEFAULT_MEETING_DURATION_MS) } },
     ],
   });
+  let started = 0;
   for (const item of dueMeetings) {
+    if (await activeMeetingConflict(item.companyCode, String(item._id))) continue;
     if (item.speakers && item.speakers.length > 0) {
       item.set('speakers', membersBeforeGuests(allocateSpeakers(
         item.speakers.map(p => p.toObject()),
@@ -460,9 +527,14 @@ export async function autoStartDueMeetings(now = new Date()) {
     }
     item.startedAt = now;
     item.status = 'live';
-    await saveMeeting(item);
+    try {
+      await saveMeeting(item);
+      started++;
+    } catch (error) {
+      if (!(error instanceof MeetingError && error.code === 'MEETING_ALREADY_IN_PROGRESS')) throw error;
+    }
   }
-  return dueMeetings.length;
+  return started;
 }
 
 export async function autoEndDueMeetings(now = new Date()) {
@@ -662,6 +734,10 @@ export async function controlMeeting(item: MeetingDocument, action: string, now 
     throw new MeetingError(409, 'Không có người đang chờ phát biểu.');
   }
   if (action === 'start' && status === 'scheduled') {
+    if (!isMeetingScheduledForToday(item.startsAt, now)) {
+      throw new MeetingError(409, 'Chỉ có thể bắt đầu cuộc họp vào đúng ngày diễn ra (giờ Việt Nam).');
+    }
+    await assertNoOtherActiveMeeting(item);
     item.startedAt = now;
     if (item.speakers && item.speakers.length > 0) {
       item.set('speakers', membersBeforeGuests(allocateSpeakers(
@@ -752,10 +828,10 @@ export async function controlMeeting(item: MeetingDocument, action: string, now 
 }
 
 // ==========================================
-// LUCKY DRAW (QUAY CHỌN NGƯỜI GIỐNG RANDOM.ORG)
+// LUCKY DRAW (QUAY MAY MẮN GIỐNG RANDOM.ORG)
 // ==========================================
 
-export async function updateLuckyDrawConfig(item: MeetingDocument, config: { enabled?: boolean; allowRepeatWinners?: boolean; drawMode?: 'attendees' | 'numbers'; numberMin?: number; numberMax?: number }) {
+export async function updateLuckyDrawConfig(item: MeetingDocument, config: { enabled?: boolean; allowRepeatWinners?: boolean; drawMode?: 'attendees' | 'numbers'; numberMin?: number; numberMax?: number; checkInCutoffTime?: string }) {
   assertMeetingEditable(item);
   if (!item.luckyDraw) {
     item.set('luckyDraw', {
@@ -764,6 +840,7 @@ export async function updateLuckyDrawConfig(item: MeetingDocument, config: { ena
       drawMode: 'attendees',
       numberMin: 1,
       numberMax: 100,
+      checkInCutoffTime: DEFAULT_DRAW_CUTOFF_TIME,
       prizes: [],
     });
   }
@@ -772,6 +849,10 @@ export async function updateLuckyDrawConfig(item: MeetingDocument, config: { ena
   if (['attendees', 'numbers'].includes(config.drawMode)) item.luckyDraw.drawMode = config.drawMode;
   if (Number.isInteger(config.numberMin) && config.numberMin >= 1) item.luckyDraw.numberMin = config.numberMin;
   if (Number.isInteger(config.numberMax) && config.numberMax >= item.luckyDraw.numberMin) item.luckyDraw.numberMax = config.numberMax;
+  if (config.checkInCutoffTime !== undefined) {
+    if (!validDrawCutoffTime(config.checkInCutoffTime)) throw new MeetingError(400, 'Giờ giới hạn check-in phải theo định dạng HH:mm (00:00–23:59).');
+    item.luckyDraw.checkInCutoffTime = config.checkInCutoffTime;
+  }
 
   await saveMeeting(item);
   return item.luckyDraw;
@@ -779,7 +860,7 @@ export async function updateLuckyDrawConfig(item: MeetingDocument, config: { ena
 
 export async function addOrUpdatePrize(item: MeetingDocument, prizeInput: PrizeInput) {
   assertMeetingEditable(item);
-  if (prizeInput.reward?.trim() || prizeInput.imageUrl?.trim()) throw new MeetingError(400, "Vòng quay chọn người chỉ hỗ trợ tên lượt chọn và số người cần chọn.");
+  if (prizeInput.reward?.trim() || prizeInput.imageUrl?.trim()) throw new MeetingError(400, "Vòng quay may mắn chỉ hỗ trợ tên lượt quay và số người cần chọn.");
   if (!item.luckyDraw) {
     item.set('luckyDraw', {
       enabled: true,
@@ -787,6 +868,7 @@ export async function addOrUpdatePrize(item: MeetingDocument, prizeInput: PrizeI
       drawMode: 'attendees',
       numberMin: 1,
       numberMax: 100,
+      checkInCutoffTime: DEFAULT_DRAW_CUTOFF_TIME,
       prizes: [],
     });
   }
@@ -830,34 +912,34 @@ export async function deletePrize(item: MeetingDocument, prizeId: string) {
 }
 
 /**
- * QUAY CHỌN NGƯỜI: Chức năng quay ngẫu nhiên công bằng giống Random.org
+ * QUAY MAY MẮN: Chức năng quay ngẫu nhiên công bằng giống Random.org
  * Quay trên màn hình trình chiếu có thể bắt đầu trước phần phát biểu của cuộc họp.
  */
-export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, actorId: string, broadcast = false, drawFilter: DrawFilter = 'present_members', drawParticipantIds: string[] | null = null) {
+export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, actorId: string, broadcast = false, _drawFilter: DrawFilter = 'present_members', drawParticipantIds: string[] | null = null) {
   assertMeetingEditable(item);
   // Luồng quay trong tab quản lý vẫn yêu cầu cuộc họp đã bắt đầu.
   if (item.status === 'scheduled' && !broadcast) {
     throw new MeetingError(
       400,
-      'Cuộc họp chưa bắt đầu! Tính năng quay chọn người chỉ được phép kích hoạt sau khi cuộc họp đã bắt đầu.'
+      'Cuộc họp chưa bắt đầu! Tính năng quay may mắn chỉ được phép kích hoạt sau khi cuộc họp đã bắt đầu.'
     );
   }
 
   if (item.status === 'cancelled') {
-    throw new MeetingError(400, 'Cuộc họp đã bị hủy. Không thể quay chọn người.');
+    throw new MeetingError(400, 'Cuộc họp đã bị hủy. Không thể quay may mắn.');
   }
 
   if (!item.luckyDraw?.prizes?.length) {
-    throw new MeetingError(400, 'Chưa có cấu hình lượt chọn nào để quay!');
+    throw new MeetingError(400, 'Chưa có cấu hình lượt quay nào để quay!');
   }
 
   const prize = item.luckyDraw.prizes.find((p) => p.id === prizeId);
   if (!prize) {
-    throw new MeetingError(404, 'Không tìm thấy lượt chọn đã chọn.');
+    throw new MeetingError(404, 'Không tìm thấy lượt quay đã chọn.');
   }
 
   if (prize.winners.length >= prize.quantity) {
-    throw new MeetingError(400, `Lượt chọn "${prize.name}" đã đủ số lượng (${prize.quantity}/${prize.quantity}).`);
+    throw new MeetingError(400, `Lượt quay "${prize.name}" đã đủ số lượng (${prize.quantity}/${prize.quantity}).`);
   }
 
   const allowRepeat = Boolean(item.luckyDraw.allowRepeatWinners);
@@ -877,48 +959,13 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
   let remainingCount = 0;
 
   if (drawMode === 'attendees') {
-    const attendees = (item.speakers || []).filter((speaker) => !speaker.deletedAccount);
-    const normalize = (value?: string) => (value || '').trim().toLocaleLowerCase('vi');
-    const members = drawFilter === 'present_members' ? [] : await UserModel.find({ companyCode: item.companyCode, isActive: { $ne: false } })
-      .select('_id displayName email photoURL coverImage companyName').lean();
-    const matchedSpeakerIds = new Set<string>();
-    const memberCandidates = members.map(member => {
-      const speaker = attendees.find(attendee =>
-        (attendee.userId && String(attendee.userId) === String(member._id)) ||
-        (member.email && normalize(attendee.email) === normalize(member.email)) ||
-        normalize(attendee.name) === normalize(member.displayName));
-      if (speaker) matchedSpeakerIds.add(String(speaker.id));
-      return {
-        id: speaker?.id || String(member._id), userId: String(member._id),
-        name: member.displayName, email: member.email,
-        photoURL: member.photoURL || speaker?.photoURL,
-        coverImage: member.coverImage || speaker?.coverImage,
-        ticketNumber: speaker ? item.speakers.indexOf(speaker) + 1 : undefined,
-      };
-    });
-    const presentCandidates = attendees.filter(attendee => !matchedSpeakerIds.has(String(attendee.id))).map(attendee => ({
-      id: attendee.id, userId: attendee.userId, name: attendee.name, email: attendee.email,
-      photoURL: attendee.photoURL, coverImage: attendee.coverImage,
-      ticketNumber: item.speakers.indexOf(attendee) + 1,
-    }));
-    const candidates = drawFilter === 'all_members'
-      ? [...memberCandidates, ...presentCandidates.filter(candidate => candidate.userId)]
-      : drawFilter === 'absent_members'
-        ? memberCandidates.filter(candidate => candidate.ticketNumber == null)
-      : drawFilter === 'guests'
-        ? presentCandidates.filter(candidate => !candidate.userId)
-        : drawFilter === 'present_members'
-          ? attendees.map(attendee => ({
-              id: attendee.id, userId: attendee.userId, name: attendee.name, email: attendee.email,
-              photoURL: attendee.photoURL, coverImage: attendee.coverImage,
-              ticketNumber: item.speakers.indexOf(attendee) + 1,
-            }))
-          : [...memberCandidates, ...presentCandidates];
-    const selectedCandidates = drawParticipantIds == null ? candidates : candidates.filter(candidate => drawParticipantIds.includes(String(candidate.id)));
-    const eligibleAttendees = selectedCandidates.filter(candidate =>
-      !previousWinnerIds.has(String(candidate.id)) && (!candidate.userId || !previousWinnerIds.has(String(candidate.userId))));
+    // Legacy clients may send another drawFilter; only checked-in members can win.
+    const eligibleAttendees = (item.speakers || []).filter(attendee =>
+      !attendee.deletedAccount && !!attendee.userId && checkedInByCutoff(attendee.checkedInAt, item.luckyDraw.checkInCutoffTime) &&
+      (drawParticipantIds == null || drawParticipantIds.includes(String(attendee.id))) &&
+      !previousWinnerIds.has(String(attendee.id)) && !previousWinnerIds.has(String(attendee.userId)));
     if (!eligibleAttendees.length) {
-      throw new MeetingError(400, 'Không còn người phù hợp với bộ lọc để tiếp tục quay.');
+      throw new MeetingError(400, 'Không còn thành viên có mặt hợp lệ để tiếp tục quay.');
     }
 
     const randomIndex = randomInt(0, eligibleAttendees.length);
@@ -931,7 +978,7 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
       email: selected.email,
       photoURL: selected.photoURL,
       coverImage: selected.coverImage,
-      ticketNumber: selected.ticketNumber,
+      ticketNumber: item.speakers.indexOf(selected) + 1,
     };
     remainingCount = eligibleAttendees.length - 1;
   } else {
@@ -939,13 +986,15 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
     const max = item.luckyDraw.numberMax || 100;
     const allNumbers: number[] = [];
     for (let i = min; i <= max; i++) {
-      if (!previousWinnerIds.has(`num:${i}`)) {
+      const speaker = (item.speakers || [])[i - 1];
+      if (speaker && !speaker.deletedAccount && speaker.userId && checkedInByCutoff(speaker.checkedInAt, item.luckyDraw.checkInCutoffTime) &&
+        !previousWinnerIds.has(`num:${i}`) && !previousWinnerIds.has(String(speaker.id)) && !previousWinnerIds.has(String(speaker.userId))) {
         allNumbers.push(i);
       }
     }
 
     if (!allNumbers.length) {
-      throw new MeetingError(400, 'Không còn số thứ tự hợp lệ nào trong khoảng để quay chọn người.');
+      throw new MeetingError(400, 'Không còn số thứ tự hợp lệ nào trong khoảng để quay may mắn.');
     }
 
     const randomIndex = randomInt(0, allNumbers.length);
@@ -995,10 +1044,12 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
   if (broadcast) {
     setMeetingPresentationView(item, 'luckyDraw', now);
     const state = item.toObject().presentation || {};
-    item.set('presentation', { ...state, view: 'luckyDraw', drawFilter, drawParticipantIds, drawPanel: 'participants', drawResultVisible: true, drawWinnerId: winnerRecord.id,
+    item.set('presentation', { ...state, view: 'luckyDraw', drawFilter: 'present_members', drawParticipantIds, drawPanel: 'participants', drawResultVisible: true, drawWinnerId: winnerRecord.id,
       drawStartedAt: now, drawRevealsAt: new Date(now.getTime() + 5000) });
   }
   await saveMeeting(item);
+
+  void notifyDrawWinner(item, winnerRecord);
 
   emitToCompany(item.companyCode, 'lucky_draw_spun', {
     meetingId: String(item._id),
@@ -1021,9 +1072,9 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
 
 export async function redrawPrizeWinner(item: MeetingDocument, prizeId: string, winnerRecordId: string) {
   assertMeetingEditable(item);
-  if (!item.luckyDraw?.prizes) throw new MeetingError(404, 'Không có cấu hình lượt chọn.');
+  if (!item.luckyDraw?.prizes) throw new MeetingError(404, 'Không có cấu hình lượt quay.');
   const prize = item.luckyDraw.prizes.find((p) => p.id === prizeId);
-  if (!prize) throw new MeetingError(404, 'Không tìm thấy lượt chọn.');
+  if (!prize) throw new MeetingError(404, 'Không tìm thấy lượt quay.');
 
   prize.set('winners', (prize.winners || []).filter((w) => w.id !== winnerRecordId));
   await saveMeeting(item);

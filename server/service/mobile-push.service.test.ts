@@ -116,6 +116,19 @@ describe("mobilePushService", () => {
     });
   });
 
+  it("shows the personal draw result on the winner's device when explicitly allowed", async () => {
+    dependencies.lean.mockResolvedValue([{ token: "winner_device_token_123456789", provider: "fcm", platform: "android" }]);
+    dependencies.sendEachForMulticast.mockResolvedValue({ responses: [{ success: true }] });
+    await mobilePushService.sendToUser("winner", {
+      title: "Bạn đã trúng thưởng", body: "Giải nhất trong cuộc họp A",
+      notificationId: "notice-id", type: "he-thong", showDetails: true,
+    });
+    expect(dependencies.sendEachForMulticast).toHaveBeenCalledWith(expect.objectContaining({
+      tokens: ["winner_device_token_123456789"],
+      notification: { title: "Bạn đã trúng thưởng", body: "Giải nhất trong cuộc họp A" },
+    }));
+  });
+
   it("surfaces Firebase credential failures instead of silently dropping every push", async () => {
     dependencies.lean.mockResolvedValue([{ token: "fcm_registration_token_123456789", provider: "fcm", platform: "android" }]);
     dependencies.sendEachForMulticast.mockResolvedValue({
