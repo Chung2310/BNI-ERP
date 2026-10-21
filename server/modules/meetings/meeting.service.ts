@@ -35,6 +35,37 @@ export class MeetingError extends Error {
   }
 }
 
+export type CheckInFailureMode = 'member' | 'guest' | 'app';
+
+export function emitMeetingCheckInFailure(companyCode: string, meetingId: string, mode: CheckInFailureMode, message: string) {
+  const safeMessage = String(message || 'Không thể check-in. Vui lòng thử lại.').slice(0, 240);
+  emitToCompany(companyCode, 'meeting_checkin_failed', {
+    meetingId: String(meetingId),
+    mode,
+    message: safeMessage,
+    occurredAt: new Date().toISOString(),
+  });
+}
+
+export function emitMeetingCheckInSuccess(companyCode: string, meetingId: string) {
+  emitToCompany(companyCode, 'meeting_checkin_succeeded', { meetingId: String(meetingId) });
+}
+
+export async function reportQrCheckInFailure(token: string, mode: CheckInFailureMode, message: string) {
+  try {
+    const hash = createHash('sha256').update(token).digest('hex');
+    const legacyMeeting = await MeetingModel.findOne({ checkInQrTokenHash: hash });
+    if (legacyMeeting) {
+      emitMeetingCheckInFailure(legacyMeeting.companyCode, String(legacyMeeting._id), mode, message);
+      return;
+    }
+    const { item } = await resolveQrMeeting(token);
+    emitMeetingCheckInFailure(item.companyCode, String(item._id), mode, message);
+  } catch {
+    // Reporting must not change the check-in response when the meeting can no longer be resolved.
+  }
+}
+
 async function activeMeetingConflict(companyCode: string, excludedId: string) {
   const active = await MeetingModel.findOne({
     companyCode,
@@ -458,7 +489,10 @@ export async function checkIn(item: MeetingDocument, input: CheckInInput, actorI
       .select('displayName email photoURL coverImage companyName industry phone')
       .lean();
     if (!person) throw new MeetingError(404, 'Thành viên không thuộc đơn vị hoặc đã ngừng hoạt động.');
-    if (item.speakers.some((p) => p.userId === userId)) return item;
+    if (item.speakers.some((p) => p.userId === userId)) {
+      emitMeetingCheckInSuccess(item.companyCode, String(item._id));
+      return item;
+    }
   } else {
     if (!input.name) throw new MeetingError(400, 'Vui lòng nhập tên khách mời.');
     if (input.email && item.speakers.some((p) => p.email === input.email.toLowerCase())) {
@@ -496,6 +530,7 @@ export async function checkIn(item: MeetingDocument, input: CheckInInput, actorI
     item.elapsedSeconds = 0;
   }
   await saveMeeting(item);
+  emitMeetingCheckInSuccess(item.companyCode, String(item._id));
   return item;
 }
 
