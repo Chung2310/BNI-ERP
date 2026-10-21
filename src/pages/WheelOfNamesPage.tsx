@@ -32,6 +32,7 @@ import { BRAND_NAME, BRAND_LOGO_PATH } from "../config/brand";
 import { useMeetingLive } from "../components/meetings/useMeetingLive";
 import type { ProfileSlide } from "../components/meetings/slideTypes";
 import { meetingLiveApi } from "../services/meetingLiveService";
+import { checkedInBeforeSeven } from "../utils/earlyCheckIn";
 
 async function loadChapterUsers(companyCode?: string): Promise<UserProfile[]> {
   if (companyCode) {
@@ -264,6 +265,9 @@ export const matchesFilterCategory = (p: Participant, category: ParticipantFilte
   }
 };
 
+export const meetingDrawParticipants = (participants: Participant[]): Participant[] =>
+  participants.filter(participant => checkedInBeforeSeven(participant.checkedInAt));
+
 export default function WheelOfNamesPage() {
   const { userProfile, loading: authLoading } = useAuth();
 
@@ -343,7 +347,13 @@ export default function WheelOfNamesPage() {
     progress: number;
   } | null>(null);
 
-  const categoryParticipants = useMemo(() => participants.filter((p) => matchesFilterCategory(p, filterCategory)), [participants, filterCategory]);
+  // Meeting draws use the recorded check-in time for every visible slice.
+  const eligibleParticipants = useMemo(() =>
+    presentationMode || resultMeetingId
+      ? meetingDrawParticipants(participants)
+      : participants,
+    [participants, presentationMode, resultMeetingId]);
+  const categoryParticipants = useMemo(() => eligibleParticipants.filter((p) => matchesFilterCategory(p, filterCategory)), [eligibleParticipants, filterCategory]);
 
   // Active selected participants on the wheel
   const liveMeeting = liveState.snapshot?.meeting;
@@ -370,13 +380,13 @@ export default function WheelOfNamesPage() {
   }, [categoryParticipants, presentationMode, liveMeeting, remoteSpinActive, currentDrawWinner]);
 
   // Participant counts by category
-  const countAll = participants.length;
-  const countAllMembers = participants.filter(
+  const countAll = eligibleParticipants.length;
+  const countAllMembers = eligibleParticipants.filter(
     (p) => p.type === "member_present" || p.type === "member_absent"
   ).length;
-  const countPresent = participants.filter((p) => p.type === "member_present" || p.type === "guest").length;
-  const countAbsent = participants.filter((p) => p.type === "member_absent").length;
-  const countGuests = participants.filter((p) => p.type === "guest").length;
+  const countPresent = eligibleParticipants.filter((p) => p.type === "member_present" || p.type === "guest").length;
+  const countAbsent = eligibleParticipants.filter((p) => p.type === "member_absent").length;
+  const countGuests = eligibleParticipants.filter((p) => p.type === "guest").length;
 
   // 1. Fetch Users & Today's Meeting Check-in status directly from system
   const [requestInputs, setRequestInputs] = useState(() => [authLoading, userProfile]);
@@ -2227,6 +2237,7 @@ export default function WheelOfNamesPage() {
                 </span>
               </button>
             </div>
+            {(presentationMode || resultMeetingId) && <p className="text-[11px] text-slate-500">Vòng quay chỉ hiện người check-in đến hết 07:00.</p>}
 
             {/* Search & Actions Bar */}
             <div className="flex items-center gap-2">
