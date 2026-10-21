@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { MeetingModel, MeetingDeliveryModel } from './meeting.model';
 import { UserModel } from '../../model/user.model';
 import { companyEmailService } from '../../service/company-email.service';
-import { autoEndDueMeetings, autoStartDueMeetings } from './meeting.service';
+import { autoEndMeetingByDeadline, autoStartDueMeetings } from './meeting.service';
 import { advanceDuePresentations } from './meeting-presentation.service';
+import { scheduleMeetingAutoEnd, setMeetingAutoEndHandler, stopMeetingAutoEndTimers } from './meeting-auto-end.scheduler';
 export async function runMeetingReminderScan(now = new Date()) {
   const due = await MeetingModel.find({ status: 'scheduled', reminderAt: { $lte: now }, startsAt: { $gt: now } }).limit(100).lean(); let queued = 0;
   for (const meeting of due) {
@@ -44,14 +45,37 @@ export function startPresentationScheduler() {
   timer.unref();
   return () => clearInterval(timer);
 }
+export async function restoreMeetingAutoEndTimers() {
+  const activeMeetings = await MeetingModel.find({
+    status: { $in: ['scheduled', 'live', 'paused'] },
+  }).select('_id status startsAt endsAt').lean();
+  activeMeetings.forEach(scheduleMeetingAutoEnd);
+  return activeMeetings.length;
+}
+
 export function startMeetingScheduler() {
   const stopPresentation = startPresentationScheduler();
+  setMeetingAutoEndHandler(autoEndMeetingByDeadline);
+  let stopped = false;
+  let restoreRetryTimer: ReturnType<typeof setTimeout> | undefined;
+  const restoreTimers = async () => {
+    try {
+      await restoreMeetingAutoEndTimers();
+    } catch (error) {
+      console.error('[MeetingAutoEnd] Failed to restore meeting timers', error);
+      if (!stopped) {
+        restoreRetryTimer = setTimeout(() => { void restoreTimers(); }, 30_000);
+        restoreRetryTimer.unref();
+      }
+    }
+  };
+  void restoreTimers();
+
   let running = false;
-  const timer = setInterval(async () => {
+  const runMaintenance = async () => {
     if (running) return;
     running = true;
     try {
-      await autoEndDueMeetings();
       await autoStartDueMeetings();
       await runMeetingReminderScan();
       await runMeetingDeliveryScan();
@@ -60,7 +84,17 @@ export function startMeetingScheduler() {
     } finally {
       running = false;
     }
-  }, 15_000);
+  };
+
+  void runMaintenance();
+  const timer = setInterval(() => { void runMaintenance(); }, 15_000);
   timer.unref();
-  return () => { clearInterval(timer); stopPresentation(); };
+  return () => {
+    stopped = true;
+    if (restoreRetryTimer) clearTimeout(restoreRetryTimer);
+    clearInterval(timer);
+    stopPresentation();
+    stopMeetingAutoEndTimers();
+    setMeetingAutoEndHandler(null);
+  };
 }
