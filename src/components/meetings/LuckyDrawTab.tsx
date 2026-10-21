@@ -295,10 +295,10 @@ export function LuckyDrawTab({
       }
     }
 
-    const candidatePool = speakers.filter((s) => !s.deletedAccount && checkedInBeforeSeven(s.checkedInAt) && !previousWinnerIds.has(String(s.id)));
+    const candidatePool = speakers.filter((s) => !s.deletedAccount && !!s.userId && checkedInBeforeSeven(s.checkedInAt) && !previousWinnerIds.has(String(s.id)));
     const eligibleNumbers = speakers.flatMap((speaker, index) =>
       index + 1 >= (luckyConfig.numberMin || 1) && index + 1 <= (luckyConfig.numberMax || 100) &&
-      !speaker.deletedAccount && checkedInBeforeSeven(speaker.checkedInAt) && !previousWinnerIds.has(String(speaker.id))
+      !speaker.deletedAccount && !!speaker.userId && checkedInBeforeSeven(speaker.checkedInAt) && !previousWinnerIds.has(String(speaker.id))
         ? [index + 1] : []);
     if (luckyConfig.drawMode === "attendees" ? !candidatePool.length : !eligibleNumbers.length) {
       toast.error("Không còn người tham gia hợp lệ nào chưa được chọn để quay tiếp!");
@@ -607,7 +607,7 @@ export function LuckyDrawTab({
           {/* Digital Display */}
           <div className="my-4 rounded-xl border border-slate-200 bg-white p-5 text-center">
             <div className="text-[11px] text-slate-400 mb-2">
-              {luckyConfig.drawMode === "attendees" ? "Thành viên & Khách mời" : "Số thứ tự"} · {(meeting.speakers || []).filter(speaker => !speaker.deletedAccount && checkedInBeforeSeven(speaker.checkedInAt)).length} ứng viên check-in đến hết 07:00
+              {luckyConfig.drawMode === "attendees" ? "Thành viên có mặt" : "Số thứ tự"} · {(meeting.speakers || []).filter(speaker => !speaker.deletedAccount && !!speaker.userId && checkedInBeforeSeven(speaker.checkedInAt)).length} ứng viên check-in đến hết 07:00
             </div>
 
             <div

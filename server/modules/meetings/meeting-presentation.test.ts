@@ -13,8 +13,8 @@ function meeting() {
   const item = MeetingModel.hydrate({ _id: "507f1f77bcf86cd799439011", companyCode: "BNI", __v: 0, status: "live", currentIndex: 0,
     presentation: { view: "speaker", autoAdvance: true, autoAdvanceDelay: 3 },
     speakerStartedAt: origin, elapsedSeconds: 0, fallbackSeconds: 30, tiers: [],
-    speakers: [{ id: "first", name: "An", seconds: 30, checkedInAt: new Date("2030-01-01T06:30:00+07:00") },
-      { id: "second", name: "Binh", seconds: 20, checkedInAt: new Date("2030-01-01T06:45:00+07:00") }],
+    speakers: [{ id: "first", userId: "member-first", name: "An", seconds: 30, checkedInAt: new Date("2030-01-01T06:30:00+07:00") },
+      { id: "second", userId: "member-second", name: "Binh", seconds: 20, checkedInAt: new Date("2030-01-01T06:45:00+07:00") }],
   });
   item.save = vi.fn(async () => item) as unknown as typeof item.save;
   return item;
@@ -117,12 +117,24 @@ it("draws only from the participant IDs chosen by the controller", async () => {
 
 it("does not draw absent members without a qualifying check-in", async () => {
   const item = meeting();
+  item.speakers[0].checkedInAt = new Date("2030-01-01T07:01:00+07:00");
+  item.speakers[1].checkedInAt = new Date("2030-01-01T07:02:00+07:00");
   item.set("luckyDraw", { drawMode: "attendees", allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
   vi.spyOn(UserModel, "find").mockReturnValue({ select: () => ({ lean: async () => [
     { _id: "member-present", displayName: "An", email: "an@example.com" },
     { _id: "member-absent", displayName: "Bao", email: "bao@example.com" },
   ] }) } as unknown as ReturnType<typeof UserModel.find>);
   await expect(spinLuckyDraw(item, "prize", "organizer", true, "absent_members")).rejects.toMatchObject({ status: 400 });
+});
+
+it.each(["all", "guests", "absent_members"] as const)("ignores legacy %s filter and draws only checked-in members", async filter => {
+  const item = meeting();
+  item.speakers.push({ id: "guest", name: "Guest", seconds: 20, checkedInAt: new Date("2030-01-01T06:20:00+07:00") });
+  item.speakers[1].checkedInAt = new Date("2030-01-01T07:01:00+07:00");
+  item.set("luckyDraw", { drawMode: "attendees", allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
+  const result = await spinLuckyDraw(item, "prize", "organizer", true, filter);
+  expect(result.winner.winnerId).toBe("first");
+  expect(item.presentation.drawFilter).toBe("present_members");
 });
 
 it("accepts the absent-only presentation filter", () => {

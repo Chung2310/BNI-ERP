@@ -31,7 +31,7 @@ import { useAuth } from "../../context/AuthContext";
 import { tabToPath } from "../../seo/seo-config";
 import { meetingLiveApi, meetingRoomUrl } from "../../services/meetingLiveService";
 import { meetingService } from "../../services/meetingService";
-import { presentationState, type DrawFilter, type MeetingPresentationState, type PresentationView } from "../../utils/meetingPresentation";
+import { presentationState, type MeetingPresentationState, type PresentationView } from "../../utils/meetingPresentation";
 import { isMeetingScheduledForToday } from "../../utils/meetingRecurrence";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { MeetingStage, SpeakerStage } from "./MeetingStage";
@@ -128,7 +128,6 @@ function MeetingRoom({ meetingId, mode }: Props) {
   const [selectedPrize, setSelectedPrize] = useState("");
   const [dismissedDrawWinnerId, setDismissedDrawWinnerId] = useState("");
   const [resultPrizeFilter, setResultPrizeFilter] = useState("");
-  const [showDrawFilter, setShowDrawFilter] = useState(false);
   const [showWinners, setShowWinners] = useState(false);
   const [quickPrizeOpen, setQuickPrizeOpen] = useState(false);
   const [quickPrizeName, setQuickPrizeName] = useState("Chọn người tham gia");
@@ -188,7 +187,6 @@ function MeetingRoom({ meetingId, mode }: Props) {
   const timer = meeting && getSlideTimer(meeting, current?.id, now);
   const drawing = now < Date.parse(state.drawRevealsAt || "");
   const activePrize = meeting?.luckyDraw?.prizes.find(prize => prize.id === selectedPrize);
-  const drawFilter: DrawFilter = state.drawFilter || "all";
   const currentDrawWinner = meeting?.luckyDraw?.prizes.flatMap(prize => prize.winners || [])
     .find(winner => winner.id === state.drawWinnerId);
   const prizeWinners = meeting?.luckyDraw?.prizes.flatMap(prize =>
@@ -594,9 +592,9 @@ function MeetingRoom({ meetingId, mode }: Props) {
                 <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">Quay chọn người trên màn hình lớn</h2>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {meeting.luckyDraw?.drawMode !== "numbers" && <button type="button" aria-expanded={showDrawFilter} onClick={() => setShowDrawFilter(open => !open)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 px-2 text-xs font-bold text-cyan-800 hover:bg-cyan-100">
-                  <SlidersHorizontal className="h-4 w-4" /> Chọn bộ lọc quay
-                </button>}
+                <div className="flex min-h-11 items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50 px-2 text-xs font-bold text-cyan-800">
+                  Thành viên có mặt
+                </div>
                 <button type="button" aria-expanded={showWinners} onClick={() => {
                   const open = !showWinners;
                   setShowWinners(open);
@@ -618,24 +616,6 @@ function MeetingRoom({ meetingId, mode }: Props) {
                   </option>
                 ))}
               </select>
-              {showDrawFilter && meeting.luckyDraw?.drawMode !== "numbers" && (
-                <label className="block space-y-1 text-xs font-semibold text-slate-700">
-                  <span>Chọn người tham gia vòng quay</span>
-                  <select
-                    aria-label="Bộ lọc người quay chọn người"
-                    value={drawFilter}
-                    disabled={disabled || drawing}
-                    onChange={event => void command("/presentation-state", { drawFilter: event.target.value, drawParticipantIds: null }, "PATCH")}
-                    className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs font-medium text-slate-800 disabled:opacity-40"
-                  >
-                    <option value="all">Tất cả thành viên và khách mời</option>
-                    <option value="all_members">Tất cả thành viên, kể cả vắng mặt</option>
-                    <option value="present_members">Người đã check-in</option>
-                    <option value="absent_members">Thành viên vắng mặt</option>
-                    <option value="guests">Khách mời đã check-in</option>
-                  </select>
-                </label>
-              )}
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-slate-500">
                   {meeting.luckyDraw?.prizes.length ? "Có thể tạo thêm lượt chọn ngay tại đây." : "Chưa có lượt chọn để quay."}
@@ -689,7 +669,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
                 type="button"
                 className="w-full flex items-center justify-center gap-2 min-h-11 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold shadow-sm shadow-amber-500/20 transition cursor-pointer disabled:opacity-40"
                 disabled={disabled || drawing || !activePrize || activePrize.winners.length >= activePrize.quantity}
-                onClick={() => void command("/presentation-draw", { prizeId: selectedPrize, drawFilter })}
+                onClick={() => void command("/presentation-draw", { prizeId: selectedPrize, drawFilter: "present_members" })}
               >
                 <Sparkles className="h-4 w-4" />
                 <span>{drawing ? "Đang quay…" : "Bắt đầu quay"}</span>

@@ -157,6 +157,9 @@ export async function recordGameWinner(item: MeetingDocument, input: WinnerInput
   const existing = (item.gameWinners || []).find((winner) => winner.id === input.id);
   if (existing) return existing;
   const attendee = (item.speakers || []).find((speaker) => speaker.id === input.winnerId || speaker.userId === input.winnerId);
+  if (input.source === 'wheel' && (!attendee || attendee.deletedAccount || !attendee.userId || !checkedInBeforeSeven(attendee.checkedInAt))) {
+    throw new MeetingError(400, 'Vòng quay chỉ chọn thành viên có mặt đã check-in đến hết 07:00.');
+  }
   const record = { ...input, prizeId: input.id, drawnBy: actorId,
     reward: "",
     name: attendee?.name || input.name, email: attendee?.email,
@@ -816,7 +819,7 @@ export async function deletePrize(item: MeetingDocument, prizeId: string) {
  * QUAY CHỌN NGƯỜI: Chức năng quay ngẫu nhiên công bằng giống Random.org
  * Quay trên màn hình trình chiếu có thể bắt đầu trước phần phát biểu của cuộc họp.
  */
-export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, actorId: string, broadcast = false, drawFilter: DrawFilter = 'present_members', drawParticipantIds: string[] | null = null) {
+export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, actorId: string, broadcast = false, _drawFilter: DrawFilter = 'present_members', drawParticipantIds: string[] | null = null) {
   assertMeetingEditable(item);
   // Luồng quay trong tab quản lý vẫn yêu cầu cuộc họp đã bắt đầu.
   if (item.status === 'scheduled' && !broadcast) {
@@ -860,50 +863,13 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
   let remainingCount = 0;
 
   if (drawMode === 'attendees') {
-    const attendees = (item.speakers || []).filter((speaker) => !speaker.deletedAccount);
-    const normalize = (value?: string) => (value || '').trim().toLocaleLowerCase('vi');
-    const members = drawFilter === 'present_members' ? [] : await UserModel.find({ companyCode: item.companyCode, isActive: { $ne: false } })
-      .select('_id displayName email photoURL coverImage companyName').lean();
-    const matchedSpeakerIds = new Set<string>();
-    const memberCandidates = members.map(member => {
-      const speaker = attendees.find(attendee =>
-        (attendee.userId && String(attendee.userId) === String(member._id)) ||
-        (member.email && normalize(attendee.email) === normalize(member.email)) ||
-        normalize(attendee.name) === normalize(member.displayName));
-      if (speaker) matchedSpeakerIds.add(String(speaker.id));
-      return {
-        id: speaker?.id || String(member._id), userId: String(member._id),
-        name: member.displayName, email: member.email,
-        photoURL: member.photoURL || speaker?.photoURL,
-        coverImage: member.coverImage || speaker?.coverImage,
-        ticketNumber: speaker ? item.speakers.indexOf(speaker) + 1 : undefined,
-      };
-    });
-    const presentCandidates = attendees.filter(attendee => !matchedSpeakerIds.has(String(attendee.id))).map(attendee => ({
-      id: attendee.id, userId: attendee.userId, name: attendee.name, email: attendee.email,
-      photoURL: attendee.photoURL, coverImage: attendee.coverImage,
-      ticketNumber: item.speakers.indexOf(attendee) + 1,
-    }));
-    const candidates = drawFilter === 'all_members'
-      ? [...memberCandidates, ...presentCandidates.filter(candidate => candidate.userId)]
-      : drawFilter === 'absent_members'
-        ? memberCandidates.filter(candidate => candidate.ticketNumber == null)
-      : drawFilter === 'guests'
-        ? presentCandidates.filter(candidate => !candidate.userId)
-        : drawFilter === 'present_members'
-          ? attendees.map(attendee => ({
-              id: attendee.id, userId: attendee.userId, name: attendee.name, email: attendee.email,
-              photoURL: attendee.photoURL, coverImage: attendee.coverImage,
-              ticketNumber: item.speakers.indexOf(attendee) + 1,
-            }))
-          : [...memberCandidates, ...presentCandidates];
-    const onTimeIds = new Set(attendees.filter(attendee => checkedInBeforeSeven(attendee.checkedInAt)).map(attendee => String(attendee.id)));
-    const selectedCandidates = candidates.filter(candidate => onTimeIds.has(String(candidate.id)) &&
-      (drawParticipantIds == null || drawParticipantIds.includes(String(candidate.id))));
-    const eligibleAttendees = selectedCandidates.filter(candidate =>
-      !previousWinnerIds.has(String(candidate.id)) && (!candidate.userId || !previousWinnerIds.has(String(candidate.userId))));
+    // Legacy clients may send another drawFilter; only checked-in members can win.
+    const eligibleAttendees = (item.speakers || []).filter(attendee =>
+      !attendee.deletedAccount && !!attendee.userId && checkedInBeforeSeven(attendee.checkedInAt) &&
+      (drawParticipantIds == null || drawParticipantIds.includes(String(attendee.id))) &&
+      !previousWinnerIds.has(String(attendee.id)) && !previousWinnerIds.has(String(attendee.userId)));
     if (!eligibleAttendees.length) {
-      throw new MeetingError(400, 'Không còn người phù hợp với bộ lọc để tiếp tục quay.');
+      throw new MeetingError(400, 'Không còn thành viên có mặt hợp lệ để tiếp tục quay.');
     }
 
     const randomIndex = randomInt(0, eligibleAttendees.length);
@@ -916,7 +882,7 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
       email: selected.email,
       photoURL: selected.photoURL,
       coverImage: selected.coverImage,
-      ticketNumber: selected.ticketNumber,
+      ticketNumber: item.speakers.indexOf(selected) + 1,
     };
     remainingCount = eligibleAttendees.length - 1;
   } else {
@@ -925,7 +891,8 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
     const allNumbers: number[] = [];
     for (let i = min; i <= max; i++) {
       const speaker = (item.speakers || [])[i - 1];
-      if (speaker && !speaker.deletedAccount && checkedInBeforeSeven(speaker.checkedInAt) && !previousWinnerIds.has(`num:${i}`)) {
+      if (speaker && !speaker.deletedAccount && speaker.userId && checkedInBeforeSeven(speaker.checkedInAt) &&
+        !previousWinnerIds.has(`num:${i}`) && !previousWinnerIds.has(String(speaker.id)) && !previousWinnerIds.has(String(speaker.userId))) {
         allNumbers.push(i);
       }
     }
@@ -981,7 +948,7 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
   if (broadcast) {
     setMeetingPresentationView(item, 'luckyDraw', now);
     const state = item.toObject().presentation || {};
-    item.set('presentation', { ...state, view: 'luckyDraw', drawFilter, drawParticipantIds, drawPanel: 'participants', drawResultVisible: true, drawWinnerId: winnerRecord.id,
+    item.set('presentation', { ...state, view: 'luckyDraw', drawFilter: 'present_members', drawParticipantIds, drawPanel: 'participants', drawResultVisible: true, drawWinnerId: winnerRecord.id,
       drawStartedAt: now, drawRevealsAt: new Date(now.getTime() + 5000) });
   }
   await saveMeeting(item);
