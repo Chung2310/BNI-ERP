@@ -41,6 +41,14 @@ describe("WheelOfNamesPage participant filtering logic", () => {
     ];
     expect(meetingDrawParticipants(candidates).map(person => person.id)).toEqual(["m-1"]);
   });
+
+  it("uses the configured cutoff when showing the wheel", () => {
+    const candidates = [
+      { ...memberPresent, id: "early", checkedInAt: "2026-10-20T07:15:59+07:00" },
+      { ...memberPresent, id: "late", checkedInAt: "2026-10-20T07:16:00+07:00" },
+    ];
+    expect(meetingDrawParticipants(candidates, "07:15").map(person => person.id)).toEqual(["early"]);
+  });
 });
 
 describe("meeting attendee classification", () => {

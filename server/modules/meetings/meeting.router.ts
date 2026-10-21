@@ -372,6 +372,7 @@ meetingRouter.get('/:id/lucky-draw', read, async (req, res) => {
           drawMode: 'attendees',
           numberMin: 1,
           numberMax: 100,
+          checkInCutoffTime: '07:00',
           prizes: [],
         },
       },

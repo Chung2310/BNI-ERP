@@ -46,6 +46,20 @@ test('wheel result rejects guests and members checked in after 07:00', async () 
   assert.equal(item.gameWinners.length, 0);
 });
 
+test('wheel result follows the meeting-specific cutoff', async () => {
+  const item = new MeetingModel({ companyCode: 'TEST', title: 'Meeting', startsAt: new Date(),
+    luckyDraw: { checkInCutoffTime: '07:15' },
+    speakers: [
+      { id: 'on-time', userId: 'member-1', name: 'On time', checkedInAt: new Date('2030-01-01T07:15:59+07:00'), seconds: 30 },
+      { id: 'late', userId: 'member-2', name: 'Late', checkedInAt: new Date('2030-01-01T07:16:00+07:00'), seconds: 30 },
+    ] });
+  item.save = async () => item;
+  await recordGameWinner(item, { id: 'first', winnerId: 'on-time', name: 'On time', prizeName: 'Prize', source: 'wheel', wonAt: new Date() }, 'operator');
+  await assert.rejects(recordGameWinner(item, { id: 'second', winnerId: 'late', name: 'Late', prizeName: 'Prize', source: 'wheel', wonAt: new Date() }, 'operator'),
+    (error: { status?: number }) => error.status === 400);
+  assert.equal(item.gameWinners.length, 1);
+});
+
 test('result input rejects invalid sources, dates and untrusted audit fields', () => {
   const input = { id: 'result', winnerId: 'guest', name: 'Guest', prizeName: 'Prize', source: 'wheel', wonAt: new Date().toISOString() };
   for (const changes of [{ source: 'draw' }, { source: 'other' }, { wonAt: '14:00' }, { drawnBy: 'other' }, { ticketNumber: -1 }]) {

@@ -31,7 +31,7 @@ import {
 import { toast } from "../../pages/Toast";
 import { playTickSound, playWinFanfare, playSuspenseSound } from "../../utils/soundEffects";
 import { launchConfetti } from "../../utils/confetti";
-import { checkedInBeforeSeven } from "../../utils/earlyCheckIn";
+import { checkedInByCutoff, DEFAULT_DRAW_CUTOFF_TIME } from "../../utils/earlyCheckIn";
 
 interface LuckyDrawTabProps {
   meeting: Meeting;
@@ -56,6 +56,7 @@ export function LuckyDrawTab({
       drawMode: "attendees",
       numberMin: 1,
       numberMax: 100,
+      checkInCutoffTime: DEFAULT_DRAW_CUTOFF_TIME,
       prizes: [],
     }
   );
@@ -295,10 +296,10 @@ export function LuckyDrawTab({
       }
     }
 
-    const candidatePool = speakers.filter((s) => !s.deletedAccount && !!s.userId && checkedInBeforeSeven(s.checkedInAt) && !previousWinnerIds.has(String(s.id)));
+    const candidatePool = speakers.filter((s) => !s.deletedAccount && !!s.userId && checkedInByCutoff(s.checkedInAt, luckyConfig.checkInCutoffTime) && !previousWinnerIds.has(String(s.id)));
     const eligibleNumbers = speakers.flatMap((speaker, index) =>
       index + 1 >= (luckyConfig.numberMin || 1) && index + 1 <= (luckyConfig.numberMax || 100) &&
-      !speaker.deletedAccount && !!speaker.userId && checkedInBeforeSeven(speaker.checkedInAt) && !previousWinnerIds.has(String(speaker.id))
+      !speaker.deletedAccount && !!speaker.userId && checkedInByCutoff(speaker.checkedInAt, luckyConfig.checkInCutoffTime) && !previousWinnerIds.has(String(speaker.id))
         ? [index + 1] : []);
     if (luckyConfig.drawMode === "attendees" ? !candidatePool.length : !eligibleNumbers.length) {
       toast.error("Không còn người tham gia hợp lệ nào chưa được chọn để quay tiếp!");
@@ -607,7 +608,7 @@ export function LuckyDrawTab({
           {/* Digital Display */}
           <div className="my-4 rounded-xl border border-slate-200 bg-white p-5 text-center">
             <div className="text-[11px] text-slate-400 mb-2">
-              {luckyConfig.drawMode === "attendees" ? "Thành viên có mặt" : "Số thứ tự"} · {(meeting.speakers || []).filter(speaker => !speaker.deletedAccount && !!speaker.userId && checkedInBeforeSeven(speaker.checkedInAt)).length} ứng viên check-in đến hết 07:00
+              {luckyConfig.drawMode === "attendees" ? "Thành viên có mặt" : "Số thứ tự"} · {(meeting.speakers || []).filter(speaker => !speaker.deletedAccount && !!speaker.userId && checkedInByCutoff(speaker.checkedInAt, luckyConfig.checkInCutoffTime)).length} ứng viên check-in đến hết {luckyConfig.checkInCutoffTime || DEFAULT_DRAW_CUTOFF_TIME}
             </div>
 
             <div
@@ -717,6 +718,16 @@ export function LuckyDrawTab({
             </h5>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              <label className="space-y-1 block">
+                <span className="font-semibold text-slate-700">Check-in đến hết giờ nào được quay?</span>
+                <input
+                  type="time"
+                  value={luckyConfig.checkInCutoffTime || DEFAULT_DRAW_CUTOFF_TIME}
+                  onChange={(e) => { if (e.target.value) void handleSaveSettings({ checkInCutoffTime: e.target.value }); }}
+                  className="w-full p-2 border border-slate-200 rounded-xl bg-white outline-none"
+                />
+                <span className="block text-[11px] text-slate-500">Giờ Việt Nam · mặc định 07:00. Áp dụng cho thành viên đã check-in.</span>
+              </label>
               <label className="space-y-1 block">
                 <span className="font-semibold text-slate-700">Chế độ quay:</span>
                 <select

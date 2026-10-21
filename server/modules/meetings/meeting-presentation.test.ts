@@ -4,7 +4,7 @@ vi.mock("../../service/notification.service", () => ({ notificationService: { cr
 import { MeetingModel } from "./meeting.model";
 import { UserModel } from "../../model/user.model";
 import { advanceDuePresentations, isAutoAdvanceDue, updatePresentationState } from "./meeting-presentation.service";
-import { startMeetingPresentation, spinLuckyDraw } from "./meeting.service";
+import { startMeetingPresentation, spinLuckyDraw, updateLuckyDrawConfig } from "./meeting.service";
 import { presentationStateInput } from "./meeting.validation";
 
 afterEach(() => vi.restoreAllMocks());
@@ -135,6 +135,24 @@ it.each(["all", "guests", "absent_members"] as const)("ignores legacy %s filter 
   const result = await spinLuckyDraw(item, "prize", "organizer", true, filter);
   expect(result.winner.winnerId).toBe("first");
   expect(item.presentation.drawFilter).toBe("present_members");
+});
+
+it("saves a meeting cutoff and uses it for the draw", async () => {
+  const item = meeting();
+  item.speakers[0].checkedInAt = new Date("2030-01-01T07:15:59+07:00");
+  item.speakers[1].checkedInAt = new Date("2030-01-01T07:16:00+07:00");
+  item.set("luckyDraw", { drawMode: "attendees", allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
+  await updateLuckyDrawConfig(item, { checkInCutoffTime: "07:15" });
+  expect(item.luckyDraw.checkInCutoffTime).toBe("07:15");
+  const result = await spinLuckyDraw(item, "prize", "organizer", true);
+  expect(result.winner.winnerId).toBe("first");
+});
+
+it("rejects invalid draw cutoff times", async () => {
+  const item = meeting();
+  for (const checkInCutoffTime of ["7:00", "24:00", "07:60", "any"]) {
+    await expect(updateLuckyDrawConfig(item, { checkInCutoffTime })).rejects.toMatchObject({ status: 400 });
+  }
 });
 
 it("accepts the absent-only presentation filter", () => {
