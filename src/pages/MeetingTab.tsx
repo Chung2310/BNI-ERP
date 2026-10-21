@@ -339,7 +339,7 @@ function MeetingWorkspace() {
   // Speaker search & filter state inside detail modal
   const [speakerSearch, setSpeakerSearch] = useState("");
   const [speakerTypeFilter, setSpeakerTypeFilter] = useState<"all" | "guest" | "member">("all");
-  const [exportingGuests, setExportingGuests] = useState(false);
+  const [exportingAttendees, setExportingAttendees] = useState(false);
 
   const meetingControlPending = useRef(false);
 
@@ -440,21 +440,21 @@ function MeetingWorkspace() {
     return activeMeeting?.speakers.filter((s) => !s.userId).length || 0;
   }, [activeMeeting]);
 
-  const exportGuestList = async () => {
+  const exportAttendeeList = async () => {
     if (!activeMeeting) return;
-    const guests = activeMeeting.speakers
-      .map((speaker, originalIndex) => ({ speaker, order: originalIndex + 1 }))
-      .filter(({ speaker }) => !speaker.userId);
-    if (!guests.length) {
-      toast.error("Buổi họp chưa có khách mời để xuất.");
+    const attendees = activeMeeting.speakers
+      .map((speaker, originalIndex) => ({ speaker, order: originalIndex + 1 }));
+    if (!attendees.length) {
+      toast.error("Buổi họp chưa có người tham dự để xuất.");
       return;
     }
 
-    setExportingGuests(true);
+    setExportingAttendees(true);
     try {
       const XLSX = await import("xlsx");
-      const rows = guests.map(({ speaker, order }, index) => ({
+      const rows = attendees.map(({ speaker, order }, index) => ({
         "STT": index + 1,
+        "Loại người tham dự": speaker.userId ? "Thành viên" : "Khách mời",
         "Họ tên": speaker.name,
         "Doanh nghiệp": speaker.slideProfile?.company ?? speaker.company ?? "",
         "Ngành nghề": speaker.slideProfile?.industry ?? speaker.industry ?? "",
@@ -468,30 +468,30 @@ function MeetingWorkspace() {
       }));
       const worksheet = XLSX.utils.json_to_sheet(rows);
       worksheet["!cols"] = [
-        { wch: 8 }, { wch: 26 }, { wch: 26 }, { wch: 22 }, { wch: 18 },
-        { wch: 30 }, { wch: 40 }, { wch: 22 }, { wch: 18 },
+        { wch: 8 }, { wch: 22 }, { wch: 26 }, { wch: 26 }, { wch: 22 },
+        { wch: 18 }, { wch: 30 }, { wch: 40 }, { wch: 22 }, { wch: 18 },
       ];
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Khách mời");
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Người tham dự");
       const safeTitle = (activeMeeting.title.replace(/[\\/:*?"<>|]/g, "-").trim() || "Cuoc_hop").slice(0, 80);
       const date = activeMeeting.startsAt.slice(0, 10);
-      XLSX.writeFile(workbook, `Khach_moi_${safeTitle}_${date}.xlsx`);
+      XLSX.writeFile(workbook, "Danh_sach_tham_du_" + safeTitle + "_" + date + ".xlsx");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không thể xuất danh sách khách mời.");
+      toast.error(error instanceof Error ? error.message : "Không thể xuất danh sách người tham dự.");
     } finally {
-      setExportingGuests(false);
+      setExportingAttendees(false);
     }
   };
-  const guestExportButton = canManage && (
+  const attendeeExportButton = canManage && (
     <button
       type="button"
-      aria-label="Xuất danh sách khách mời ra Excel"
-      onClick={() => void exportGuestList()}
-      disabled={exportingGuests}
+      aria-label="Xuất danh sách người tham dự ra Excel"
+      onClick={() => void exportAttendeeList()}
+      disabled={exportingAttendees}
       className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-800 hover:bg-cyan-100 disabled:cursor-wait disabled:opacity-60"
     >
       <Download className="h-3.5 w-3.5" />
-      {exportingGuests ? "Đang xuất…" : "Xuất Excel"}
+      {exportingAttendees ? "Đang xuất…" : "Xuất Excel"}
     </button>
   );
   const memberSpeakerCount = useMemo(() => {
@@ -1555,7 +1555,7 @@ function MeetingWorkspace() {
                       </div>
                     </div>
 
-                    {guestExportButton && <div className="mb-3 flex justify-end">{guestExportButton}</div>}
+                    {attendeeExportButton && <div className="mb-3 flex justify-end">{attendeeExportButton}</div>}
                     {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && checkedSpeakerIds.length > 0 && (
                       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs py-1">
                         <span className="font-medium text-slate-600">Đã chọn {checkedSpeakerIds.length}</span>
@@ -1979,7 +1979,7 @@ function MeetingWorkspace() {
                         </div>
                       </div>
 
-                      {guestExportButton && <div className="mb-3 flex justify-end">{guestExportButton}</div>}
+                      {attendeeExportButton && <div className="mb-3 flex justify-end">{attendeeExportButton}</div>}
                       {canManage && ["scheduled", "live", "paused"].includes(activeMeeting.status) && checkedSpeakerIds.length > 0 && (
                         <div className="mb-3 flex items-center justify-between gap-2 text-xs py-1.5 px-3 bg-amber-50 rounded-xl border border-amber-200">
                           <span className="font-semibold text-amber-900">Đã chọn {checkedSpeakerIds.length}</span>
