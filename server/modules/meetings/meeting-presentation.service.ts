@@ -12,7 +12,7 @@ type AutoAdvanceMeeting = {
 export async function updatePresentationState(item: MeetingDocument, input: Partial<Pick<MeetingPresentationState, "view" | "autoAdvance" | "autoAdvanceDelay" | "drawFilter" | "drawParticipantIds" | "drawPanel" | "drawResultVisible" | "audienceResponsePanel">>, now = new Date()) {
   if (input.view) setMeetingPresentationView(item, input.view, now);
   const current = item.toObject().presentation || {};
-  item.set("presentation", { ...current, ...input });
+  item.set("presentation", { ...current, ...input, drawFilter: "present_members" });
   await saveMeeting(item);
   return item;
 }

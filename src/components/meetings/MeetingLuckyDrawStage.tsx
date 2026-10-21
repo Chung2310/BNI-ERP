@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Meeting, Speaker } from "../../services/meetingService";
 import { presentationState } from "../../utils/meetingPresentation";
 import { meetingLiveApi } from "../../services/meetingLiveService";
+import { checkedInByCutoff } from "../../utils/earlyCheckIn";
 import type { ProfileSlide } from "./slideTypes";
 
 type WheelEntry = { id: string; label: string };
@@ -50,23 +51,20 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
         return { id: "ticket-" + from, label: from === to ? "#" + from : "#" + from + "–" + to };
       });
     }
-    const filter = state.drawFilter || "all";
     const selectedIds = state.drawParticipantIds;
     const excludedIds = new Set(prizes.flatMap(prize => prize.winners ?? []).filter(record =>
       record.repeatEligible !== true && (record.repeatEligible === false || !meeting.luckyDraw?.allowRepeatWinners) &&
       record.id !== winner?.id
     ).map(record => record.winnerId));
     return meeting.speakers.filter(speaker =>
-      !speaker.deletedAccount &&
-      (filter !== "guests" || !speaker.userId) &&
-      (filter !== "all_members" || !!speaker.userId) &&
+      !speaker.deletedAccount && !!speaker.userId && checkedInByCutoff(speaker.checkedInAt, meeting.luckyDraw?.checkInCutoffTime) &&
       (selectedIds == null || selectedIds.includes(speaker.id)) &&
       !excludedIds.has(speaker.id)
     ).map((speaker, index) => ({
       id: speaker.id,
       label: shortLabel(speaker.name || "Người tham gia " + (index + 1)),
     }));
-  }, [numericMode, numberRange, minNumber, meeting.speakers, meeting.luckyDraw?.allowRepeatWinners, prizes, winner, state.drawFilter, state.drawParticipantIds]);
+  }, [numericMode, numberRange, minNumber, meeting.speakers, meeting.luckyDraw?.allowRepeatWinners, meeting.luckyDraw?.checkInCutoffTime, prizes, winner, state.drawParticipantIds]);
 
   const visibleSpeakers = meeting.speakers.filter(speaker => entries.some(entry => entry.id === speaker.id));
 

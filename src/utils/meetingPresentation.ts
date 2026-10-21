@@ -21,7 +21,7 @@ export function presentationState(value?: Partial<MeetingPresentationState> | nu
     autoAdvanceDelay: value?.autoAdvanceDelay ?? 3,
     speakerTimerPausedByView: value?.speakerTimerPausedByView,
     drawWinnerId: value?.drawWinnerId, drawStartedAt: value?.drawStartedAt, drawRevealsAt: value?.drawRevealsAt,
-    drawFilter: value?.drawFilter || "all", drawParticipantIds: value?.drawParticipantIds ?? null,
+    drawFilter: "present_members", drawParticipantIds: value?.drawParticipantIds ?? null,
     drawPanel: value?.drawPanel || "participants",
     drawResultVisible: value?.drawResultVisible ?? true,
     audienceResponsePanel: value?.audienceResponsePanel || "questions" };

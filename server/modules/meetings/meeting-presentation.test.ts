@@ -4,7 +4,7 @@ vi.mock("../../service/notification.service", () => ({ notificationService: { cr
 import { MeetingModel } from "./meeting.model";
 import { UserModel } from "../../model/user.model";
 import { advanceDuePresentations, isAutoAdvanceDue, updatePresentationState } from "./meeting-presentation.service";
-import { startMeetingPresentation, spinLuckyDraw } from "./meeting.service";
+import { startMeetingPresentation, spinLuckyDraw, updateLuckyDrawConfig } from "./meeting.service";
 import { presentationStateInput } from "./meeting.validation";
 
 afterEach(() => vi.restoreAllMocks());
@@ -13,8 +13,8 @@ function meeting() {
   const item = MeetingModel.hydrate({ _id: "507f1f77bcf86cd799439011", companyCode: "BNI", __v: 0, status: "live", currentIndex: 0,
     presentation: { view: "speaker", autoAdvance: true, autoAdvanceDelay: 3 },
     speakerStartedAt: origin, elapsedSeconds: 0, fallbackSeconds: 30, tiers: [],
-    speakers: [{ id: "first", name: "An", seconds: 30, checkedInAt: new Date("2030-01-01T06:30:00+07:00") },
-      { id: "second", name: "Binh", seconds: 20, checkedInAt: new Date("2030-01-01T06:45:00+07:00") }],
+    speakers: [{ id: "first", userId: "member-first", name: "An", seconds: 30, checkedInAt: new Date("2030-01-01T06:30:00+07:00") },
+      { id: "second", userId: "member-second", name: "Binh", seconds: 20, checkedInAt: new Date("2030-01-01T06:45:00+07:00") }],
   });
   item.save = vi.fn(async () => item) as unknown as typeof item.save;
   return item;
@@ -115,38 +115,67 @@ it("draws only from the participant IDs chosen by the controller", async () => {
   expect(item.presentation.drawParticipantIds).toEqual(["second"]);
 });
 
-it("allows the absent-members filter without a check-in", async () => {
+it("does not draw absent members without a qualifying check-in", async () => {
   const item = meeting();
+  item.speakers[0].checkedInAt = new Date("2030-01-01T07:01:00+07:00");
+  item.speakers[1].checkedInAt = new Date("2030-01-01T07:02:00+07:00");
   item.set("luckyDraw", { drawMode: "attendees", allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
   vi.spyOn(UserModel, "find").mockReturnValue({ select: () => ({ lean: async () => [
     { _id: "member-present", displayName: "An", email: "an@example.com" },
     { _id: "member-absent", displayName: "Bao", email: "bao@example.com" },
   ] }) } as unknown as ReturnType<typeof UserModel.find>);
-  const result = await spinLuckyDraw(item, "prize", "organizer", true, "absent_members");
-  expect(result.winner.winnerId).toBe("member-absent");
+  await expect(spinLuckyDraw(item, "prize", "organizer", true, "absent_members")).rejects.toMatchObject({ status: 400 });
+});
+
+it.each(["all", "guests", "absent_members"] as const)("ignores legacy %s filter and draws only checked-in members", async filter => {
+  const item = meeting();
+  item.speakers.push({ id: "guest", name: "Guest", seconds: 20, checkedInAt: new Date("2030-01-01T06:20:00+07:00") });
+  item.speakers[1].checkedInAt = new Date("2030-01-01T07:01:00+07:00");
+  item.set("luckyDraw", { drawMode: "attendees", allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
+  const result = await spinLuckyDraw(item, "prize", "organizer", true, filter);
+  expect(result.winner.winnerId).toBe("first");
+  expect(item.presentation.drawFilter).toBe("present_members");
+});
+
+it("saves a meeting cutoff and uses it for the draw", async () => {
+  const item = meeting();
+  item.speakers[0].checkedInAt = new Date("2030-01-01T07:15:59+07:00");
+  item.speakers[1].checkedInAt = new Date("2030-01-01T07:16:00+07:00");
+  item.set("luckyDraw", { drawMode: "attendees", allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
+  await updateLuckyDrawConfig(item, { checkInCutoffTime: "07:15" });
+  expect(item.luckyDraw.checkInCutoffTime).toBe("07:15");
+  const result = await spinLuckyDraw(item, "prize", "organizer", true);
+  expect(result.winner.winnerId).toBe("first");
+});
+
+it("rejects invalid draw cutoff times", async () => {
+  const item = meeting();
+  for (const checkInCutoffTime of ["7:00", "24:00", "07:60", "any"]) {
+    await expect(updateLuckyDrawConfig(item, { checkInCutoffTime })).rejects.toMatchObject({ status: 400 });
+  }
 });
 
 it("accepts the absent-only presentation filter", () => {
   expect(presentationStateInput.validate({ version: 0, drawFilter: "absent_members" }).error).toBeUndefined();
 });
 
-it("allows late check-ins when selected for the draw", async () => {
+it("excludes late check-ins even when the draw filter is all", async () => {
   const item = meeting();
   item.speakers[0].checkedInAt = new Date("2026-10-20T07:00:59+07:00");
   item.speakers[1].checkedInAt = new Date("2026-10-20T07:01:00+07:00");
   item.set("luckyDraw", { drawMode: "attendees", allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
   vi.spyOn(UserModel, "find").mockReturnValue({ select: () => ({ lean: async () => [] }) } as unknown as ReturnType<typeof UserModel.find>);
-  const result = await spinLuckyDraw(item, "prize", "organizer", true, "all", ["second"]);
-  expect(result.winner.winnerId).toBe("second");
+  const result = await spinLuckyDraw(item, "prize", "organizer", true, "all");
+  expect(result.winner.winnerId).toBe("first");
 });
 
-it("allows late check-ins in numbered draws", async () => {
+it("excludes late and missing check-ins from numbered draws", async () => {
   const item = meeting();
   item.speakers[0].checkedInAt = new Date("2026-10-20T07:00:59+07:00");
   item.speakers[1].checkedInAt = new Date("2026-10-20T07:01:00+07:00");
-  item.set("luckyDraw", { drawMode: "numbers", numberMin: 2, numberMax: 2, allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
+  item.set("luckyDraw", { drawMode: "numbers", numberMin: 1, numberMax: 3, allowRepeatWinners: false, prizes: [{ id: "prize", name: "Gift", quantity: 2, winners: [] }] });
   const result = await spinLuckyDraw(item, "prize", "organizer", true, "all");
-  expect(result.winner.ticketNumber).toBe(2);
+  expect(result.winner.ticketNumber).toBe(1);
 });
 
 it("rejects malformed states and prevents clients from setting draw results", () => {
