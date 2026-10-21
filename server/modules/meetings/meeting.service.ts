@@ -13,6 +13,7 @@ import { allocateSpeakers, elapsedSeconds, membersBeforeGuests, reminderDueAt, s
 import { UserModel } from '../../model/user.model';
 import { notificationService } from '../../service/notification.service';
 import { emitToCompany } from '../../socket';
+import { cancelMeetingAutoEnd, scheduleMeetingAutoEnd } from './meeting-auto-end.scheduler';
 import type { DrawFilter, MeetingPresentationState, PresentationView } from '../../../src/utils/meetingPresentation';
 import { checkedInByCutoff, DEFAULT_DRAW_CUTOFF_TIME, validDrawCutoffTime } from '../../../src/utils/earlyCheckIn';
 
@@ -31,6 +32,37 @@ type WinnerInput = { id: string; winnerId: string; source: 'wheel' | 'bingo'; na
 export class MeetingError extends Error {
   constructor(public status: number, message: string, public code?: string, public activeMeeting?: { id: string; title: string }) {
     super(message);
+  }
+}
+
+export type CheckInFailureMode = 'member' | 'guest' | 'app';
+
+export function emitMeetingCheckInFailure(companyCode: string, meetingId: string, mode: CheckInFailureMode, message: string) {
+  const safeMessage = String(message || 'Không thể check-in. Vui lòng thử lại.').slice(0, 240);
+  emitToCompany(companyCode, 'meeting_checkin_failed', {
+    meetingId: String(meetingId),
+    mode,
+    message: safeMessage,
+    occurredAt: new Date().toISOString(),
+  });
+}
+
+export function emitMeetingCheckInSuccess(companyCode: string, meetingId: string) {
+  emitToCompany(companyCode, 'meeting_checkin_succeeded', { meetingId: String(meetingId) });
+}
+
+export async function reportQrCheckInFailure(token: string, mode: CheckInFailureMode, message: string) {
+  try {
+    const hash = createHash('sha256').update(token).digest('hex');
+    const legacyMeeting = await MeetingModel.findOne({ checkInQrTokenHash: hash });
+    if (legacyMeeting) {
+      emitMeetingCheckInFailure(legacyMeeting.companyCode, String(legacyMeeting._id), mode, message);
+      return;
+    }
+    const { item } = await resolveQrMeeting(token);
+    emitMeetingCheckInFailure(item.companyCode, String(item._id), mode, message);
+  } catch {
+    // Reporting must not change the check-in response when the meeting can no longer be resolved.
   }
 }
 
@@ -101,6 +133,7 @@ export async function saveMeeting(item: MeetingDocument) {
     }
     throw error;
   }
+  scheduleMeetingAutoEnd(item);
   const meeting = typeof item.toObject === 'function' ? item.toObject() : item;
   emitToCompany(item.companyCode, 'meeting_updated', {
     id: String(item._id),
@@ -218,13 +251,15 @@ export async function createMeeting(companyCode: string, actorId: string, input:
     throw new MeetingError(400, 'Giờ kết thúc phải sau giờ bắt đầu cuộc họp.');
   }
   await assertNoMeetingConflicts(companyCode, [{ startsAt: new Date(input.startsAt), endsAt }]);
-  return MeetingModel.create({
+  const item = await MeetingModel.create({
     ...input,
     endsAt,
     companyCode,
     createdBy: actorId,
     reminderAt: reminderDueAt(new Date(input.startsAt), input.reminderDays),
   });
+  scheduleMeetingAutoEnd(item);
+  return item;
 }
 
 export async function createRecurringMeetings(companyCode: string, actorId: string, input: Omit<MeetingInput, 'startsAt'> & { startsAt?: never; recurrence: Parameters<typeof recurringMeetingDates>[0] & { durationMinutes?: number } }) {
@@ -240,6 +275,7 @@ export async function createRecurringMeetings(companyCode: string, actorId: stri
   const rows = dates.map((startsAt, index) => ({ ...details, title: customTitle || `Chapter #${firstNumber + index}`, companyCode, createdBy: actorId, seriesId, startsAt, endsAt: new Date(startsAt.getTime() + durationMs), originalStartsAt: startsAt, reminderAt: reminderDueAt(startsAt, details.reminderDays ?? 1) }));
   try {
     const meetings = await MeetingModel.insertMany(rows, { ordered: true });
+    meetings.forEach(scheduleMeetingAutoEnd);
     emitToCompany(companyCode, 'meeting_updated', { seriesId });
     return meetings;
   } catch (error) {
@@ -369,6 +405,24 @@ export async function bulkUpdateMeetingSeries(companyCode: string, id: string, i
     }), meetingIds);
   }
   const result = await MeetingModel.bulkWrite(updates, { ordered: true });
+  if (changes.startsTime !== undefined || changes.durationMinutes !== undefined) {
+    if (result.matchedCount === selected.length) {
+      selected.forEach((item, index) => {
+        const set = updates[index].updateOne.update.$set as { startsAt?: Date; endsAt?: Date };
+        scheduleMeetingAutoEnd({
+          _id: item._id,
+          status: item.status,
+          startsAt: set.startsAt || item.startsAt,
+          endsAt: set.endsAt || item.endsAt,
+        });
+      });
+    } else {
+      const refreshed = await MeetingModel.find({ companyCode, _id: { $in: meetingIds } }).select('_id status startsAt endsAt').lean();
+      const refreshedIds = new Set(refreshed.map(item => String(item._id)));
+      for (const meetingId of meetingIds) if (!refreshedIds.has(meetingId)) cancelMeetingAutoEnd(meetingId);
+      refreshed.forEach(scheduleMeetingAutoEnd);
+    }
+  }
   if (result.matchedCount !== selected.length) {
     emitToCompany(companyCode, 'meeting_updated', { seriesId: anchor.seriesId });
     throw new MeetingError(409, 'Một buổi họp vừa thay đổi hoặc bắt đầu. Hãy tải lại lịch rồi thử lại.');
@@ -381,6 +435,7 @@ export async function deleteMeeting(companyCode: string, id: string) {
   const item = await getMeeting(companyCode, id);
   const result = await MeetingModel.deleteOne({ _id: item._id, companyCode });
   if (!result.deletedCount) throw new MeetingError(409, 'Cuộc họp đã thay đổi. Vui lòng tải lại trước khi thao tác.');
+  cancelMeetingAutoEnd(String(item._id));
   emitToCompany(companyCode, 'meeting_updated', {
     id: String(item._id),
     deleted: true,
@@ -394,6 +449,7 @@ export async function deleteMeetings(companyCode: string, ids: string[]) {
     throw new MeetingError(409, 'Danh sách cuộc họp đã thay đổi. Vui lòng tải lại trước khi xóa.');
   }
   const result = await MeetingModel.deleteMany(filter);
+  for (const id of ids) cancelMeetingAutoEnd(id);
   emitToCompany(companyCode, 'meeting_updated', { deleted: true });
   if (result.deletedCount !== ids.length) {
     throw new MeetingError(409, 'Một số cuộc họp đã thay đổi trong lúc xóa. Vui lòng tải lại danh sách.');
@@ -433,7 +489,10 @@ export async function checkIn(item: MeetingDocument, input: CheckInInput, actorI
       .select('displayName email photoURL coverImage companyName industry phone')
       .lean();
     if (!person) throw new MeetingError(404, 'Thành viên không thuộc đơn vị hoặc đã ngừng hoạt động.');
-    if (item.speakers.some((p) => p.userId === userId)) return item;
+    if (item.speakers.some((p) => p.userId === userId)) {
+      emitMeetingCheckInSuccess(item.companyCode, String(item._id));
+      return item;
+    }
   } else {
     if (!input.name) throw new MeetingError(400, 'Vui lòng nhập tên khách mời.');
     if (input.email && item.speakers.some((p) => p.email === input.email.toLowerCase())) {
@@ -471,6 +530,7 @@ export async function checkIn(item: MeetingDocument, input: CheckInInput, actorI
     item.elapsedSeconds = 0;
   }
   await saveMeeting(item);
+  emitMeetingCheckInSuccess(item.companyCode, String(item._id));
   return item;
 }
 
@@ -478,6 +538,10 @@ export async function autoStartDueMeetings(now = new Date()) {
   const dueMeetings = await MeetingModel.find({
     status: 'scheduled',
     startsAt: { $lte: now },
+    $or: [
+      { endsAt: { $gt: now } },
+      { endsAt: null, startsAt: { $gt: new Date(now.getTime() - DEFAULT_MEETING_DURATION_MS) } },
+    ],
   });
   let started = 0;
   for (const item of dueMeetings) {
@@ -508,20 +572,17 @@ export async function autoStartDueMeetings(now = new Date()) {
   return started;
 }
 
-const AUTO_END_GRACE_MS = 3 * 60 * 60 * 1000;
-
 export async function autoEndDueMeetings(now = new Date()) {
-  const cutoff = new Date(now.getTime() - AUTO_END_GRACE_MS);
   const dueMeetings = await MeetingModel.find({
     status: { $in: ['scheduled', 'live', 'paused'] },
     $or: [
-      { endsAt: { $lte: cutoff } },
-      { endsAt: null, startsAt: { $lte: new Date(cutoff.getTime() - DEFAULT_MEETING_DURATION_MS) } },
+      { endsAt: { $lte: now } },
+      { endsAt: null, startsAt: { $lte: new Date(now.getTime() - DEFAULT_MEETING_DURATION_MS) } },
     ],
   });
   let ended = 0;
   for (const item of dueMeetings) {
-    const deadline = new Date(meetingEndsAt(item.startsAt, item.endsAt).getTime() + AUTO_END_GRACE_MS);
+    const deadline = meetingEndsAt(item.startsAt, item.endsAt);
     if (deadline > now) continue;
     try {
       if (item.status === 'scheduled') {
@@ -537,6 +598,32 @@ export async function autoEndDueMeetings(now = new Date()) {
     }
   }
   return ended;
+}
+
+export async function autoEndMeetingByDeadline(meetingId: string, expectedEndsAt: Date) {
+  const item = await MeetingModel.findById(meetingId);
+  if (!item || !['scheduled', 'live', 'paused'].includes(item.status)) {
+    cancelMeetingAutoEnd(meetingId);
+    return;
+  }
+
+  const deadline = meetingEndsAt(item.startsAt, item.endsAt);
+  if (deadline.getTime() !== expectedEndsAt.getTime()) {
+    scheduleMeetingAutoEnd(item);
+    return;
+  }
+  if (deadline.getTime() > Date.now()) {
+    scheduleMeetingAutoEnd(item);
+    return;
+  }
+
+  if (item.status === 'scheduled') {
+    item.status = 'ended';
+    item.endedAt = deadline;
+    await saveMeeting(item);
+  } else {
+    await controlMeeting(item, 'finish', deadline);
+  }
 }
 
 export async function notifyNextSpeaker(item: MeetingDocument) {

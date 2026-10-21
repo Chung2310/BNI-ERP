@@ -1,6 +1,5 @@
 import { locate } from "../components/meetings/locateForCheckIn";
-import React, { useEffect, useState } from "react";
-import { toast } from "./Toast";
+import React, { useEffect, useRef, useState } from "react";
 import { CheckCircle2, MapPin, CalendarDays, ArrowRight } from "lucide-react";
 
 type MeetingInfo = { title: string; startsAt: string; location?: string; expiresAt: string | null };
@@ -27,6 +26,7 @@ function MeetingCheckInContent({ token }: { token: string }) {
   const [error, setError] = useState("");
   const [phase, setPhase] = useState<"idle" | "locating" | "submitting">("idle");
   const [now, setNow] = useState(Date.now);
+  const submitLock = useRef(false);
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/v1/meeting-checkin/" + encodeURIComponent(token), { signal: controller.signal })
@@ -41,10 +41,13 @@ function MeetingCheckInContent({ token }: { token: string }) {
   const switchMode = (value: Mode) => { setMode(value); setError(""); setForm(old => ({ ...old, password: "" })); };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (busy || expired || success) return;
+    if (submitLock.current || busy || expired || success) return;
+    submitLock.current = true;
     setError(""); setPhase("locating");
+    let locationResolved = false;
     try {
       const position = await locate();
+      locationResolved = true;
       setPhase("submitting");
       const identity = mode === "member"
         ? { email: form.identifier.trim(), password: form.password }
@@ -64,14 +67,23 @@ function MeetingCheckInContent({ token }: { token: string }) {
       const data = await response.json();
       if (!response.ok) {
         const message = data.message || "Không thể check-in. Vui lòng thử lại.";
-        if (response.status === 401) toast.error(message);
         throw new Error(message);
       }
       setAvatar(null);
       setCheckedInMeeting(data.data?.meetingTitle || meeting?.title || "");
       setSuccess(data.data?.name || (mode === "guest" ? form.name : "Bạn"));
       setForm(old => ({ ...old, password: "" }));
-    } catch (e) { setError(e.message); } finally { setPhase("idle"); }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Không thể check-in. Vui lòng thử lại.";
+      setError(message);
+      if (!locationResolved) {
+        const reason = /chưa cho phép truy cập vị trí/i.test(message) ? "location_denied"
+          : /không hỗ trợ vị trí/i.test(message) ? "location_unsupported" : "location_unavailable";
+        void fetch("/api/v1/meeting-checkin/" + encodeURIComponent(token) + "/failure", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode, reason }),
+        }).catch(() => {});
+      }
+    } finally { submitLock.current = false; setPhase("idle"); }
   };
   return <main className="min-h-dvh overflow-y-auto bg-[#f4f8fb] px-4 py-6 text-slate-900 sm:py-12">
     <section className="mx-auto max-w-xl overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-[0_16px_60px_-24px_rgba(15,60,80,0.22)]">
