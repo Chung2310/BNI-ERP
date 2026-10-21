@@ -25,43 +25,21 @@ describe("WheelOfNamesPage participant filtering logic", () => {
     type: "guest" as const,
   };
 
-  it("filter 'all' includes present members, absent members, and guests", () => {
-    expect(matchesFilterCategory(memberPresent, "all")).toBe(true);
-    expect(matchesFilterCategory(memberAbsent, "all")).toBe(true);
-    expect(matchesFilterCategory(guestAttendee, "all")).toBe(true);
-  });
-
-  it("filter 'all_members' includes only chapter members (present + absent), excludes guests", () => {
-    expect(matchesFilterCategory(memberPresent, "all_members")).toBe(true);
-    expect(matchesFilterCategory(memberAbsent, "all_members")).toBe(true);
-    expect(matchesFilterCategory(guestAttendee, "all_members")).toBe(false);
-  });
-
-  it("filter 'present_members' includes checked-in members and meeting guests", () => {
+  it("only includes present members", () => {
     expect(matchesFilterCategory(memberPresent, "present_members")).toBe(true);
     expect(matchesFilterCategory(memberAbsent, "present_members")).toBe(false);
-    expect(matchesFilterCategory(guestAttendee, "present_members")).toBe(true);
+    expect(matchesFilterCategory(guestAttendee, "present_members")).toBe(false);
   });
 
-  it("filter 'absent_members' includes only absent members", () => {
-    expect(matchesFilterCategory(memberPresent, "absent_members")).toBe(false);
-    expect(matchesFilterCategory(memberAbsent, "absent_members")).toBe(true);
-    expect(matchesFilterCategory(guestAttendee, "absent_members")).toBe(false);
-  });
-
-  it("filter 'guests' includes only guests", () => {
-    expect(matchesFilterCategory(memberPresent, "guests")).toBe(false);
-    expect(matchesFilterCategory(memberAbsent, "guests")).toBe(false);
-    expect(matchesFilterCategory(guestAttendee, "guests")).toBe(true);
-  });
-
-  it("keeps late arrivals off the meeting wheel even with the all filter", () => {
+  it("keeps guests, absent members and late arrivals off the meeting wheel", () => {
     const candidates = [
       { ...memberPresent, checkedInAt: "2026-10-20T07:00:59+07:00" },
       { ...guestAttendee, checkedInAt: "2026-10-20T07:01:00+07:00" },
+      { ...guestAttendee, id: "guest-early", checkedInAt: "2026-10-20T06:30:00+07:00" },
+      { ...memberPresent, id: "member-late", checkedInAt: "2026-10-20T07:01:00+07:00" },
       memberAbsent,
     ];
-    expect(meetingDrawParticipants(candidates).filter(person => matchesFilterCategory(person, "all")).map(person => person.id)).toEqual(["m-1"]);
+    expect(meetingDrawParticipants(candidates).map(person => person.id)).toEqual(["m-1"]);
   });
 });
 

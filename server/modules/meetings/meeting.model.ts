@@ -123,7 +123,7 @@ const meeting = new Schema(
         autoAdvanceDelay: { type: Number, default: 3, min: 0, max: 3600 },
         speakerTimerPausedByView: { type: Boolean, default: false },
         drawWinnerId: String, drawStartedAt: Date, drawRevealsAt: Date,
-        drawFilter: { type: String, enum: ['all', 'all_members', 'present_members', 'absent_members', 'guests'], default: 'all' },
+        drawFilter: { type: String, enum: ['all', 'all_members', 'present_members', 'absent_members', 'guests'], default: 'present_members' },
         drawParticipantIds: { type: [String], default: undefined },
         drawPanel: { type: String, enum: ['participants', 'winners'], default: 'participants' },
         drawResultVisible: { type: Boolean, default: true },
