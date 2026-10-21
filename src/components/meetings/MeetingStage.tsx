@@ -103,7 +103,7 @@ function DrawStage({ meeting }: { meeting: Meeting }) {
   </div>;
 }
 
-export function MeetingStage({ snapshot, now, fill = false }: { snapshot: MeetingLiveSnapshot; now: number; fill?: boolean }) {
+export function MeetingStage({ snapshot, now, fill = false, checkInError = "", onDismissCheckInError }: { snapshot: MeetingLiveSnapshot; now: number; fill?: boolean; checkInError?: string; onDismissCheckInError?: () => void }) {
   const { meeting, slides } = snapshot;
   useEffect(() => {
     const start = Math.max(0, meeting.currentIndex);
@@ -133,5 +133,9 @@ export function MeetingStage({ snapshot, now, fill = false }: { snapshot: Meetin
       <DrawStage meeting={meeting} />
     </div>}
     {view !== "luckyDraw" && <div className="absolute inset-0">{activeStage}</div>}
+    {view === "checkin" && checkInError && <div role="alert" className="absolute inset-x-3 bottom-3 z-10 flex items-start gap-3 rounded-xl border border-rose-300 bg-rose-950/95 px-4 py-3 text-sm font-bold leading-relaxed text-white shadow-xl md:inset-x-8 md:bottom-6 md:px-6 md:py-4 md:text-xl">
+      <span className="flex-1 text-center">Check-in thất bại: {checkInError}</span>
+      {onDismissCheckInError && <button type="button" onClick={onDismissCheckInError} aria-label="Đóng thông báo lỗi check-in" className="shrink-0 rounded-lg px-2 py-1 text-xs text-rose-100 hover:bg-white/10 md:text-sm">Đã rõ</button>}
+    </div>}
   </div>;
 }
