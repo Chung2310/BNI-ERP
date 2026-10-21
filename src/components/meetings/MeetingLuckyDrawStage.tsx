@@ -3,6 +3,7 @@ import type { Meeting, Speaker } from "../../services/meetingService";
 import { presentationState } from "../../utils/meetingPresentation";
 import { meetingLiveApi } from "../../services/meetingLiveService";
 import { checkedInByCutoff } from "../../utils/earlyCheckIn";
+import { wheelDisplayName } from "../../config/wheel-selection-guide";
 import type { ProfileSlide } from "./slideTypes";
 
 type WheelEntry = { id: string; label: string };
@@ -130,7 +131,7 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
       <section className="relative flex min-h-[400px] flex-col items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_center,_#263449_0%,_#101827_70%)] p-4 md:min-h-0 md:p-7">
         <div className="absolute left-5 top-5 z-10">
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-300">{meeting.title}</p>
-          <h2 className="mt-1 text-xl font-black sm:text-3xl">{winner?.prizeName || "Vòng quay chọn người"}</h2>
+          <h2 className="mt-1 text-xl font-black sm:text-3xl">{winner ? wheelDisplayName(winner.prizeName) : "Vòng quay may mắn"}</h2>
           <p className="mt-1 text-sm text-slate-300">{entries.length} người tham gia</p>
         </div>
         <svg
@@ -187,7 +188,7 @@ export function MeetingLuckyDrawStage({ meeting, slides, now }: Props) {
         {!entries.length && <p className="mt-3 text-center text-sm text-amber-200">Chưa có người check-in để tham gia vòng quay.</p>}
         {winner && (
           <div className="absolute inset-x-4 bottom-3 text-center text-sm font-semibold text-amber-200" aria-live="polite">
-            {spinning ? "Đang quay chọn người…" : "Kết quả đã được công bố"}
+            {spinning ? "Đang quay thưởng…" : "Kết quả đã được công bố"}
           </div>
         )}
       </section>

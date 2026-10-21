@@ -150,7 +150,7 @@ it("keeps ended meetings read-only but exposes deletion in calendar, list and de
   expect(screen.queryByRole("button", { name: "Cấu hình địa điểm & thời gian" })).toBeNull();
   fireEvent.click(screen.getByRole("tab", { name: /Thuyết trình/ }));
   expect(screen.queryByRole("button", { name: "Bắt đầu thuyết trình" })).toBeNull();
-  fireEvent.click(screen.getByRole("tab", { name: "Chọn người" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Vòng quay" }));
   expect(screen.queryByRole("link", { name: /Mở vòng quay/ })).toBeNull();
   expect(screen.queryByRole("button", { name: "Cài đặt" })).toBeNull();
   fireEvent.click(screen.getByTitle("Đóng popup"));

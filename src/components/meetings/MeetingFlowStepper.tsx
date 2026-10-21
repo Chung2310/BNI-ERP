@@ -9,7 +9,7 @@ export const MEETING_FLOW_META: Record<MeetingFlowStep, { label: string; icon: R
   checkin: { label: "Check-in", icon: Users },
   presentation: { label: "Thuyết trình", icon: Megaphone },
   interaction: { label: "Tương tác", icon: MessageSquareText },
-  luckyDraw: { label: "Chọn người", icon: RotateCw },
+  luckyDraw: { label: "Vòng quay", icon: RotateCw },
   activeMembers: { label: "Thành viên tích cực", icon: Star },
 };
 

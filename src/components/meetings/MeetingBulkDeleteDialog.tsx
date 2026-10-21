@@ -90,6 +90,6 @@ export function MeetingBulkDeleteDialog({ initialMonth, load, remove, onClose, o
         </div>
       </div>
     </div>}
-    <ConfirmDialog isOpen={confirming} title="Xác nhận xóa hàng loạt" description={`Xóa vĩnh viễn ${selected.size} cuộc họp đã chọn cùng dữ liệu check-in và quay chọn người của từng cuộc họp? Thao tác này không thể hoàn tác.`} tone="danger" confirmLabel={`Xóa ${selected.size} cuộc họp`} cancelLabel="Quay lại" isSubmitting={deleting} onClose={() => setConfirming(false)} onConfirm={confirmDelete} />
+    <ConfirmDialog isOpen={confirming} title="Xác nhận xóa hàng loạt" description={`Xóa vĩnh viễn ${selected.size} cuộc họp đã chọn cùng dữ liệu check-in và quay may mắn của từng cuộc họp? Thao tác này không thể hoàn tác.`} tone="danger" confirmLabel={`Xóa ${selected.size} cuộc họp`} cancelLabel="Quay lại" isSubmitting={deleting} onClose={() => setConfirming(false)} onConfirm={confirmDelete} />
   </>;
 }

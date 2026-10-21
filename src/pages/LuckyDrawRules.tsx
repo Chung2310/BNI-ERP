@@ -9,7 +9,7 @@ export default function LuckyDrawRules() {
     <SEOHead meta={LUCKY_DRAW_RULES_SEO} />
     <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
       <div className="inline-flex items-center gap-2 text-sm font-semibold text-sky-700"><Users className="h-5 w-5" />{BRAND_NAME}</div>
-      <h1 className="text-3xl font-extrabold text-slate-900">Hướng dẫn vòng quay chọn người</h1>
+      <h1 className="text-3xl font-extrabold text-slate-900">Hướng dẫn vòng quay may mắn</h1>
       <p className="text-sm leading-6 text-slate-600">Chọn ngẫu nhiên người phát biểu, trình bày hoặc tham gia hoạt động trong cuộc họp.</p>
       <p className="text-xs text-slate-500">Cập nhật ngày {wheelSelectionGuide.updatedAt}</p>
     </div>
