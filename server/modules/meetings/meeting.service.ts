@@ -14,6 +14,7 @@ import { UserModel } from '../../model/user.model';
 import { notificationService } from '../../service/notification.service';
 import { emitToCompany } from '../../socket';
 import type { DrawFilter, MeetingPresentationState, PresentationView } from '../../../src/utils/meetingPresentation';
+import { checkedInBeforeSeven } from '../../../src/utils/earlyCheckIn';
 
 export type MeetingDocument = ReturnType<typeof MeetingModel.hydrate>;
 export type CheckInInput = {
@@ -896,8 +897,9 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
               ticketNumber: item.speakers.indexOf(attendee) + 1,
             }))
           : [...memberCandidates, ...presentCandidates];
-    const selectedCandidates = candidates.filter(candidate =>
-      drawParticipantIds == null || drawParticipantIds.includes(String(candidate.id)));
+    const onTimeIds = new Set(attendees.filter(attendee => checkedInBeforeSeven(attendee.checkedInAt)).map(attendee => String(attendee.id)));
+    const selectedCandidates = candidates.filter(candidate => onTimeIds.has(String(candidate.id)) &&
+      (drawParticipantIds == null || drawParticipantIds.includes(String(candidate.id))));
     const eligibleAttendees = selectedCandidates.filter(candidate =>
       !previousWinnerIds.has(String(candidate.id)) && (!candidate.userId || !previousWinnerIds.has(String(candidate.userId))));
     if (!eligibleAttendees.length) {
@@ -923,7 +925,7 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
     const allNumbers: number[] = [];
     for (let i = min; i <= max; i++) {
       const speaker = (item.speakers || [])[i - 1];
-      if (speaker && !speaker.deletedAccount && !previousWinnerIds.has(`num:${i}`)) {
+      if (speaker && !speaker.deletedAccount && checkedInBeforeSeven(speaker.checkedInAt) && !previousWinnerIds.has(`num:${i}`)) {
         allNumbers.push(i);
       }
     }
