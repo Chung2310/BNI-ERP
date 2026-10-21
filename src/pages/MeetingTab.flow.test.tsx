@@ -335,7 +335,7 @@ it.each(["scheduled", "live", "paused", "ended", "cancelled"])("remembers the cu
   const openLabel = status === "scheduled" ? "Mở buổi họp & check-in" : ["live", "paused"].includes(status) ? "Tiếp tục điều hành" : "Xem buổi họp";
   fireEvent.click(await screen.findByRole("button", { name: openLabel }));
   expect(screen.getByRole("tab", { name: "Check-in" }).getAttribute("aria-selected")).toBe("true");
-  for (const label of ["Thuyết trình", "Check-in", "Chọn người"]) {
+  for (const label of ["Thuyết trình", "Check-in", "Vòng quay"]) {
     fireEvent.click(screen.getByRole("tab", { name: label }));
     fireEvent.click(screen.getByTitle("Đóng popup"));
     fireEvent.click(screen.getByRole("button", { name: openLabel }));
@@ -345,7 +345,7 @@ it.each(["scheduled", "live", "paused", "ended", "cancelled"])("remembers the cu
   render(<MeetingTab />);
   fireEvent.click(screen.getByRole("button", { name: "Danh sách" }));
   fireEvent.click(await screen.findByRole("button", { name: openLabel }));
-  expect(screen.getByRole("tab", { name: "Chọn người" }).getAttribute("aria-selected")).toBe("true");
+  expect(screen.getByRole("tab", { name: "Vòng quay" }).getAttribute("aria-selected")).toBe("true");
   expect(screen.getByText("Chọn người đang mở")).toBeTruthy();
 });
 

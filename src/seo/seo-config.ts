@@ -65,7 +65,7 @@ export const PRIVACY_SEO: SeoMeta = {
 export const LUCKY_DRAW_RULES_SEO: SeoMeta = {
   title: "Wheel Selection Guide | iGen Connect",
   description: "How iGen Connect randomly selects meeting participants for speaking, presenting, and group activities.",
-  keywords: "iGen Connect, random name picker, meeting participants, vòng quay chọn người, hướng dẫn vòng quay",
+  keywords: "iGen Connect, random name picker, meeting participants, vòng quay may mắn, hướng dẫn vòng quay",
   path: "/lucky-draw-rules",
   image: SEO_DEFAULT_IMAGE,
   robots: "index, follow",

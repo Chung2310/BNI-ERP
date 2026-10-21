@@ -96,7 +96,7 @@ function DrawStage({ meeting }: { meeting: Meeting }) {
   return <div className="aspect-video w-full overflow-hidden bg-slate-950">
     <iframe
       src={`/quay-thuong?${params.toString()}`}
-      title="Màn hình quay chọn người"
+      title="Màn hình quay may mắn"
       className="h-full w-full border-0 pointer-events-none"
       allow="fullscreen"
     />

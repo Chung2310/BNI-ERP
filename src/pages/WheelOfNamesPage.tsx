@@ -28,6 +28,7 @@ import { UserProfile } from "../types";
 import { playTickSound, playWinFanfare, playSuspenseSound } from "../utils/soundEffects";
 import { launchConfetti } from "../utils/confetti";
 import { BRAND_NAME, BRAND_LOGO_PATH } from "../config/brand";
+import { wheelDisplayName } from "../config/wheel-selection-guide";
 import { useMeetingLive } from "../components/meetings/useMeetingLive";
 import type { ProfileSlide } from "../components/meetings/slideTypes";
 import { meetingLiveApi } from "../services/meetingLiveService";
@@ -268,7 +269,7 @@ export default function WheelOfNamesPage() {
     try {
       await meetingService.recordGameWinner(entry.meetingId, entry.winner);
       setUnsavedResults(previous => previous.filter(result => result.winner.id !== entry.winner.id));
-    } catch (error) { console.error("Không thể lưu kết quả quay chọn người:", error); }
+    } catch (error) { console.error("Không thể lưu kết quả quay may mắn:", error); }
   };
   const persistWinner = (record: WinnerRecord, participant: Participant, source: "wheel" | "bingo", ticketNumber?: number) => {
     if (!resultMeetingId) return;
@@ -1770,11 +1771,11 @@ export default function WheelOfNamesPage() {
   // Export winners to CSV
   const handleExportWinners = () => {
     if (winners.length === 0) return;
-    const header = "STT,Tên người được chọn,Lượt chọn,Doanh nghiệp / Vai trò,Thời gian chọn\n";
+    const header = "STT,Tên người được chọn,Lượt quay,Doanh nghiệp / Vai trò,Thời gian chọn\n";
     const rows = winners
       .map(
         (w, idx) =>
-          `${idx + 1},"${w.name}","${w.prizeName}","${w.companyName || ""}","${w.wonAt}"`
+          `${idx + 1},"${w.name}","${wheelDisplayName(w.prizeName)}","${w.companyName || ""}","${w.wonAt}"`
       )
       .join("\n");
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + encodeURIComponent(header + rows);
@@ -1824,7 +1825,7 @@ export default function WheelOfNamesPage() {
               className="h-7 w-7 rounded-md border border-slate-200 object-cover"
             />
 
-            <span className="text-sm font-semibold text-slate-800">Quay chọn người</span>
+            <span className="text-sm font-semibold text-slate-800">Vòng quay may mắn</span>
 
             <span className="rounded bg-[#cf142b] px-1.5 py-0.5 text-[9px] font-semibold text-white uppercase tracking-wide">
               {userProfile?.companyName || userProfile?.companyCode || "BNI"}
@@ -1867,7 +1868,7 @@ export default function WheelOfNamesPage() {
               <div className="flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1 border border-amber-300 shadow-xs">
                 <input
                   type="text"
-                  value={prizeInput}
+                  value={wheelDisplayName(prizeInput)}
                   onChange={(e) => setPrizeInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -1899,7 +1900,7 @@ export default function WheelOfNamesPage() {
                 className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] text-amber-800 transition hover:bg-amber-100 cursor-pointer"
               >
                 <Trophy className="h-3.5 w-3.5 text-amber-500" />
-                <span className="font-medium">{currentPrize}</span>
+                <span className="font-medium">{wheelDisplayName(currentPrize)}</span>
                 <span className="text-[9px] text-amber-500">Đổi</span>
               </button>
             )}
@@ -2260,7 +2261,7 @@ export default function WheelOfNamesPage() {
                       </div>
                       <div className="min-w-0">
                         <h4 className="truncate text-xs font-bold text-slate-900">{w.name}</h4>
-                        <p className="text-[10px] text-amber-700 font-semibold truncate">{w.prizeName}</p>
+                        <p className="text-[10px] text-amber-700 font-semibold truncate">{wheelDisplayName(w.prizeName)}</p>
                         <p className="text-[9px] text-slate-400 font-mono">{new Date(w.wonAt).toLocaleString("vi-VN")}</p>
                       </div>
                     </div>
@@ -2313,7 +2314,7 @@ export default function WheelOfNamesPage() {
 
             {/* Prize Label */}
             <p className="text-sm font-semibold text-slate-600 mb-2">
-              Lượt chọn: <span className="text-[#cf142b] font-bold">{winnerModal.prize}</span>
+              Lượt quay: <span className="text-[#cf142b] font-bold">{wheelDisplayName(winnerModal.prize)}</span>
             </p>
 
             {/* Winner Big Display */}

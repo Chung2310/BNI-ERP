@@ -2128,7 +2128,7 @@ function MeetingWorkspace() {
 
               {flowStep === "interaction" && <MeetingInteractionTab meeting={activeMeeting} canManage={canModifyActiveMeeting} onRefreshMeeting={refresh} />}
 
-              {/* SUBTAB 2: VÒNG QUAY CHỌN NGƯỜI (RANDOM.ORG) */}
+              {/* SUBTAB 2: VÒNG QUAY MAY MẮN (RANDOM.ORG) */}
               {flowStep === "luckyDraw" && (
                 <LuckyDrawTab
                   meeting={activeMeeting}
@@ -2463,7 +2463,7 @@ function MeetingWorkspace() {
       <ConfirmDialog
         isOpen={!!deletingMeeting}
         title="Xác nhận xóa cuộc họp"
-        description={`Bạn có chắc chắn muốn xóa cuộc họp "${deletingMeeting?.title}"? Toàn bộ danh sách diễn giả check-in và dữ liệu quay chọn người của cuộc họp này sẽ bị xóa hoàn toàn.`}
+        description={`Bạn có chắc chắn muốn xóa cuộc họp "${deletingMeeting?.title}"? Toàn bộ danh sách diễn giả check-in và dữ liệu quay may mắn của cuộc họp này sẽ bị xóa hoàn toàn.`}
         tone="danger"
         confirmLabel="Xóa cuộc họp"
         cancelLabel="Hủy"
