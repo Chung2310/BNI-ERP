@@ -65,6 +65,7 @@ export interface LuckyDrawConfig {
   drawMode: "attendees" | "numbers";
   numberMin: number;
   numberMax: number;
+  checkInCutoffTime?: string;
   prizes: LuckyDrawPrize[];
 }
 

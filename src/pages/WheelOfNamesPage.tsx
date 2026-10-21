@@ -31,7 +31,7 @@ import { BRAND_NAME, BRAND_LOGO_PATH } from "../config/brand";
 import { useMeetingLive } from "../components/meetings/useMeetingLive";
 import type { ProfileSlide } from "../components/meetings/slideTypes";
 import { meetingLiveApi } from "../services/meetingLiveService";
-import { checkedInBeforeSeven } from "../utils/earlyCheckIn";
+import { checkedInByCutoff, DEFAULT_DRAW_CUTOFF_TIME } from "../utils/earlyCheckIn";
 
 async function loadChapterUsers(companyCode?: string): Promise<UserProfile[]> {
   if (companyCode) {
@@ -241,8 +241,8 @@ export const matchesFilterCategory = (p: Participant, category: ParticipantFilte
   return category === "present_members" && p.type === "member_present";
 };
 
-export const meetingDrawParticipants = (participants: Participant[]): Participant[] =>
-  participants.filter(participant => participant.type === "member_present" && checkedInBeforeSeven(participant.checkedInAt));
+export const meetingDrawParticipants = (participants: Participant[], cutoffTime = DEFAULT_DRAW_CUTOFF_TIME): Participant[] =>
+  participants.filter(participant => participant.type === "member_present" && checkedInByCutoff(participant.checkedInAt, cutoffTime));
 
 export default function WheelOfNamesPage() {
   const { userProfile, loading: authLoading } = useAuth();
@@ -261,6 +261,7 @@ export default function WheelOfNamesPage() {
     urlGame === "bingo" ? "bingo" : "wheel"
   );
   const [resultMeetingId, setResultMeetingId] = useState<string | null>(urlMeetingId);
+  const [selectedMeetingCutoffTime, setSelectedMeetingCutoffTime] = useState(DEFAULT_DRAW_CUTOFF_TIME);
   type PendingResult = { meetingId: string; winner: Parameters<typeof meetingService.recordGameWinner>[1] };
   const [unsavedResults, setUnsavedResults] = useState<PendingResult[]>([]);
   const saveResult = async (entry: PendingResult) => {
@@ -321,12 +322,13 @@ export default function WheelOfNamesPage() {
     progress: number;
   } | null>(null);
 
+  const liveMeeting = liveState.snapshot?.meeting;
+  const cutoffTime = liveMeeting?.luckyDraw?.checkInCutoffTime || selectedMeetingCutoffTime;
   // Meeting draws use the recorded check-in time for every visible slice.
-  const eligibleParticipants = useMemo(() => meetingDrawParticipants(participants), [participants]);
+  const eligibleParticipants = useMemo(() => meetingDrawParticipants(participants, cutoffTime), [participants, cutoffTime]);
   const categoryParticipants = useMemo(() => eligibleParticipants.filter((p) => matchesFilterCategory(p, "present_members")), [eligibleParticipants]);
 
   // Active selected participants on the wheel
-  const liveMeeting = liveState.snapshot?.meeting;
   const currentDrawWinner = liveMeeting?.luckyDraw?.prizes.flatMap(prize => prize.winners || []).find(winner => winner.id === liveMeeting.presentation?.drawWinnerId);
   const remoteSpinActive = Boolean(currentDrawWinner && liveMeeting?.presentation?.drawRevealsAt && liveState.now < Date.parse(liveMeeting.presentation.drawRevealsAt));
   const activeParticipants = useMemo(() => {
@@ -422,6 +424,7 @@ export default function WheelOfNamesPage() {
 
       if (targetMeeting) {
         setResultMeetingId(targetMeeting._id);
+        setSelectedMeetingCutoffTime(targetMeeting.luckyDraw?.checkInCutoffTime || DEFAULT_DRAW_CUTOFF_TIME);
         setWinners((targetMeeting.gameWinners || []).map((winner): WinnerRecord => ({
           id: winner.id, name: winner.name, prizeName: winner.prizeName,
           avatar: winner.photoURL, wonAt: winner.wonAt, source: (winner.source === "bingo" ? "bingo" : "wheel") as "wheel" | "bingo",
@@ -478,7 +481,10 @@ export default function WheelOfNamesPage() {
     const nextParticipants: Participant[] = luckyDraw?.drawMode === "numbers"
       ? Array.from({ length: Math.min(5000, Math.max(0, (luckyDraw.numberMax || 100) - (luckyDraw.numberMin || 1) + 1)) }, (_, index) => {
           const number = (luckyDraw.numberMin || 1) + index;
-          return { id: "ticket-" + number, name: "#" + number, companyName: "Lucky number", selected: true, type: "guest", checkedInAt: liveMeeting.speakers[number - 1]?.checkedInAt };
+          const speaker = liveMeeting.speakers[number - 1];
+          return { id: "ticket-" + number, name: "#" + number, companyName: "Lucky number", selected: true,
+            type: speaker?.userId && !speaker.deletedAccount ? "member_present" as const : "guest" as const,
+            checkedInAt: speaker?.checkedInAt };
         })
       : buildMeetingParticipants(presentationUsers, liveMeeting.speakers).map(participant => {
           const speaker = liveMeeting.speakers.find(item => item.id === participant.id);
@@ -2050,7 +2056,7 @@ export default function WheelOfNamesPage() {
             <div className="rounded-xl bg-[#cf142b] px-3 py-2 text-center text-xs font-bold text-white">
               Thành viên có mặt ({countPresent})
             </div>
-            {(presentationMode || resultMeetingId) && <p className="text-[11px] text-slate-500">Vòng quay chỉ hiện người check-in đến hết 07:00.</p>}
+            {(presentationMode || resultMeetingId) && <p className="text-[11px] text-slate-500">Vòng quay chỉ hiện thành viên check-in đến hết {cutoffTime}.</p>}
 
             {/* Search & Actions Bar */}
             <div className="flex items-center gap-2">

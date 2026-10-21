@@ -76,6 +76,7 @@ const luckyDrawConfig = new Schema(
     drawMode: { type: String, enum: ['attendees', 'numbers'], default: 'attendees' },
     numberMin: { type: Number, default: 1 },
     numberMax: { type: Number, default: 100 },
+    checkInCutoffTime: { type: String, default: '07:00' },
     prizes: { type: [luckyDrawPrize], default: [] },
   },
   { _id: false }
@@ -146,6 +147,7 @@ const meeting = new Schema(
         drawMode: 'attendees',
         numberMin: 1,
         numberMax: 100,
+        checkInCutoffTime: '07:00',
         prizes: [],
       }),
     },
