@@ -88,6 +88,7 @@ export function assertMeetingEditable(item: { status: string }) {
 }
 
 export async function saveMeeting(item: MeetingDocument) {
+  const meetingJustStarted = item.status === 'live' && item.isModified('status');
   try {
     await item.save();
   } catch (error) {
@@ -150,7 +151,41 @@ export async function saveMeeting(item: MeetingDocument) {
       __v: item.__v,
     },
   });
+  if (meetingJustStarted) void notifyMeetingStarted(item);
   return item;
+}
+
+async function notifyMeetingStarted(item: MeetingDocument) {
+  try {
+    const members = await UserModel.find({ companyCode: item.companyCode, isActive: { $ne: false }, disabledAt: { $in: [null, undefined] } }).select('_id').lean();
+    await Promise.all(members.map(async (member) => {
+      try {
+        await notificationService.createNotification({
+          companyCode: item.companyCode, recipientUid: String(member._id),
+          idempotencyKey: `meeting:${item._id}:started`,
+          title: 'Cuộc họp đã bắt đầu', body: `Cuộc họp “${item.title}” đã bắt đầu. Mở ứng dụng để xem và tham gia.`,
+          type: 'he-thong', action: { tab: 'CUỘC HỌP', meetingId: String(item._id), kind: 'meeting_started' },
+        }, { showDetailsInPush: true, route: `/meeting/${item._id}` });
+      } catch (error) {
+        if (error?.code !== 11000) console.error('[meeting-start-notification]', error);
+      }
+    }));
+  } catch (error) { console.error('[meeting-start-notification]', error); }
+}
+
+async function notifyDrawWinner(item: MeetingDocument, winner: { id: string; userId?: string; prizeName: string }) {
+  if (!winner.userId) return;
+  try {
+    await notificationService.createNotification({
+      companyCode: item.companyCode, recipientUid: winner.userId,
+      idempotencyKey: `meeting:${item._id}:winner:${winner.id}`,
+      title: 'Bạn đã trúng thưởng',
+      body: `Bạn đã trúng “${winner.prizeName}” trong cuộc họp “${item.title}”.`,
+      type: 'he-thong', action: { tab: 'CUỘC HỌP', meetingId: String(item._id), kind: 'draw_winner' },
+    }, { showDetailsInPush: true, route: `/meeting/${item._id}/game-results` });
+  } catch (error) {
+    if (error?.code !== 11000) console.error('[draw-winner-notification]', error);
+  }
 }
 
 export async function recordGameWinner(item: MeetingDocument, input: WinnerInput, actorId: string) {
@@ -169,6 +204,7 @@ export async function recordGameWinner(item: MeetingDocument, input: WinnerInput
   if (!item.gameWinners) item.set('gameWinners', []);
   item.gameWinners.push(record);
   await saveMeeting(item);
+  void notifyDrawWinner(item, record);
   emitToCompany(item.companyCode, 'lucky_draw_spun', { meetingId: String(item._id), winner: record });
   return record;
 }
@@ -960,6 +996,8 @@ export async function spinLuckyDraw(item: MeetingDocument, prizeId: string, acto
       drawStartedAt: now, drawRevealsAt: new Date(now.getTime() + 5000) });
   }
   await saveMeeting(item);
+
+  void notifyDrawWinner(item, winnerRecord);
 
   emitToCompany(item.companyCode, 'lucky_draw_spun', {
     meetingId: String(item._id),

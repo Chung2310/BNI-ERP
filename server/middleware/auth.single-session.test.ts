@@ -15,13 +15,13 @@ function makeResponse() {
   };
 }
 
-function invoke(token: string, activeSessionId: string, userExists = true) {
+function invoke(token: string, activeSessionId: string, userExists = true, path = "/api/v1/auth/me", method = "GET") {
   vi.spyOn(UserModel, "findById").mockReturnValue(({
     select: () => ({
       lean: async () => userExists ? ({ branchId: "branch-1", activeSessionId, displayName: "Nguyễn An" }) : null,
     }),
   } as unknown as Parameters<((value: ReturnType<typeof UserModel.findById>) => void)>[0]));
-  const req = { headers: { authorization: `Bearer ${token}` }, method: "GET", originalUrl: "/api/v1/auth/me" } as Parameters<typeof requireAuth>[0];
+  const req = { headers: { authorization: `Bearer ${token}` }, method, originalUrl: path } as Parameters<typeof requireAuth>[0];
   const res = makeResponse();
   let passed = false;
   return requireAuth((req as unknown as Parameters<typeof requireAuth>[0]), res as unknown as Response, () => { passed = true; }).then(() => ({ req, res, passed }));
@@ -68,5 +68,14 @@ describe("requireAuth concurrent device sessions", () => {
     assert.equal(result.passed, true);
     assert.equal(result.req.user.sessionId, "current-session");
     assert.equal(result.req.user.displayName, "Nguyễn An");
+  });
+
+  it("allows a Chapter applicant to manage personal notifications and push devices only", async () => {
+    const token = jwt.sign({ id: "applicant", email: "applicant@example.com", role: "user" }, getJwtAccessSecret());
+    assert.equal((await invoke(token, "device", true, "/api/v1/notifications")).passed, true);
+    assert.equal((await invoke(token, "device", true, "/api/v1/push/mobile/subscribe", "POST")).passed, true);
+    const blocked = await invoke(token, "device", true, "/api/v1/meetings");
+    assert.equal(blocked.passed, false);
+    assert.equal(blocked.res.statusCode, 403);
   });
 });

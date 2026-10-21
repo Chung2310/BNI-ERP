@@ -10,6 +10,7 @@ import { authService } from "../service/auth.service";
 import { runInTransaction } from "../config/database";
 import { disconnectUserSockets } from "../socket";
 import { MeetingModel } from "../modules/meetings/meeting.model";
+import { notificationService } from "../service/notification.service";
 
 export const chapterRouter = Router();
 
@@ -342,6 +343,20 @@ chapterRouter.post("/admin/applications/:id/decision", async (req, res) => {
         return application.toObject();
     });
     disconnectUserSockets(String((approved as { applicantUserId: unknown }).applicantUserId));
+    try {
+      const chapter = await CompanyModel.findOne({ code }).select("name").lean();
+      await notificationService.createNotification({
+        companyCode: code,
+        recipientUid: String(approved.applicantUserId),
+        idempotencyKey: `chapter-application:${approved._id}:approved`,
+        title: "Đơn gia nhập Chapter đã được duyệt",
+        body: `Bạn đã được gia nhập Chapter ${chapter?.name || code}.`,
+        type: "he-thong",
+        action: { tab: "CHAPTER", kind: "chapter_approved", applicationId: String(approved._id) },
+      }, { showDetailsInPush: true, route: "/notifications" });
+    } catch (notificationError) {
+      if ((notificationError as { code?: number }).code !== 11000) console.error("[chapter-approval-notification]", notificationError);
+    }
     return res.json({ data: approved });
   } catch (e) { return fail(res, e); }
 });
