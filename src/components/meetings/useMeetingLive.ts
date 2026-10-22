@@ -81,9 +81,6 @@ export function useMeetingLive(meetingId: string, readOnly: boolean) {
       if (event?.meetingId !== meetingId) return;
       setCheckInError(event.message || "Check-in thất bại. Vui lòng kiểm tra thông tin và vị trí.");
     });
-    const offCheckInSuccess = socketService.on<{ meetingId?: string }>("meeting_checkin_succeeded", event => {
-      if (event?.meetingId === meetingId) setCheckInError("");
-    });
     const offStatus = socketService.onStatusChange(value => {
       setConnected(value);
       if (value) void refresh();
@@ -103,7 +100,7 @@ export function useMeetingLive(meetingId: string, readOnly: boolean) {
     return () => {
       disposed = true; mounted.current = false; controller.abort();
       offUpdate(); offDraw(); offStatus();
-      offCheckInFailure(); offCheckInSuccess();
+      offCheckInFailure();
       window.clearInterval(poll); window.clearInterval(tick);
       window.removeEventListener("online", wake); window.removeEventListener("pageshow", wake);
       document.removeEventListener("visibilitychange", wake);
