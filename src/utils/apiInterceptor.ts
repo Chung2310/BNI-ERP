@@ -38,10 +38,14 @@ window.fetch = async function (input, init) {
   // 1. Perform the original request
   const scopedInit = withChapterHeader(input, init);
   const response = await originalFetch(input, scopedInit);
+  const requestUrl = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const requestTarget = new URL(requestUrl, window.location.origin);
+  const isPublicQrCheckInRequest = requestTarget.origin === window.location.origin
+    && requestTarget.pathname.startsWith("/api/v1/meeting-checkin/");
 
   // 2. Check if the response indicates unauthorized/token expired (401)
-  if (response.status === 401) {
-    const urlString = typeof input === "string" ? input : (input as Request).url;
+  if (response.status === 401 && !isPublicQrCheckInRequest) {
+    const urlString = requestUrl;
 
     // Avoid infinite loop if the refresh-token or login/register endpoint itself fails with 401
     if (
