@@ -119,3 +119,23 @@ it("does not replay conflicting commands or duplicate a quick double tap", async
   expect(phone.result.current.commandError).toContain("thiết bị khác");
   expect(phone.result.current.snapshot?.meeting.__v).toBe(3);
 });
+
+it("keeps a check-in failure visible through other attendees' success and refresh until dismissed", async () => {
+  const display = renderHook(() => useMeetingLive("meeting", true));
+  await waitFor(() => expect(display.result.current.snapshot).toBeTruthy());
+  act(() => socket.listeners.get("meeting_checkin_failed")?.forEach(callback => callback({
+    meetingId: "other-meeting", message: "Ignore this meeting",
+  })));
+  expect(display.result.current.checkInError).toBe("");
+  act(() => socket.listeners.get("meeting_checkin_failed")?.forEach(callback => callback({
+    meetingId: "meeting", message: "Wrong password",
+  })));
+  expect(display.result.current.checkInError).toBe("Wrong password");
+  await act(async () => {
+    socket.listeners.get("meeting_checkin_succeeded")?.forEach(callback => callback({ meetingId: "meeting" }));
+    await display.result.current.refresh();
+  });
+  expect(display.result.current.checkInError).toBe("Wrong password");
+  act(() => display.result.current.dismissCheckInError());
+  expect(display.result.current.checkInError).toBe("");
+});

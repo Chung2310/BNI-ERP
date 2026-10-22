@@ -8,7 +8,7 @@ export function useMeetingLive(meetingId: string, readOnly: boolean) {
   const [now, setNow] = useState(Date.now);
   const [syncError, setSyncError] = useState("");
   const [commandError, setCommandError] = useState("");
-  const [checkInError, setCheckInError] = useState("");
+  const [checkInFailure, setCheckInFailure] = useState<{ meetingId: string; message: string } | null>(null);
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
@@ -25,7 +25,6 @@ export function useMeetingLive(meetingId: string, readOnly: boolean) {
     let requested = false;
     let inFlight: Promise<void> | null = null;
     const controller = new AbortController();
-    setCheckInError("");
     const refresh = (): Promise<void> => {
       if (disposed) return Promise.resolve();
       requested = true;
@@ -79,7 +78,7 @@ export function useMeetingLive(meetingId: string, readOnly: boolean) {
     const offDraw = socketService.on("lucky_draw_spun", onUpdate);
     const offCheckInFailure = socketService.on<{ meetingId?: string; message?: string }>("meeting_checkin_failed", event => {
       if (event?.meetingId !== meetingId) return;
-      setCheckInError(event.message || "Check-in thất bại. Vui lòng kiểm tra thông tin và vị trí.");
+      setCheckInFailure({ meetingId, message: event.message || "Check-in thất bại. Vui lòng kiểm tra thông tin và vị trí." });
     });
     const offStatus = socketService.onStatusChange(value => {
       setConnected(value);
@@ -145,5 +144,5 @@ export function useMeetingLive(meetingId: string, readOnly: boolean) {
     return success;
   }, [meetingId, readOnly, refresh]);
 
-  return { snapshot: snapshot?.meeting._id === meetingId ? snapshot : null, now, syncError, commandError, checkInError, dismissCheckInError: () => setCheckInError(""), connected: Boolean(meetingId && connected), busy, refresh, command };
+  return { snapshot: snapshot?.meeting._id === meetingId ? snapshot : null, now, syncError, commandError, checkInError: checkInFailure?.meetingId === meetingId ? checkInFailure.message : "", dismissCheckInError: () => setCheckInFailure(null), connected: Boolean(meetingId && connected), busy, refresh, command };
 }

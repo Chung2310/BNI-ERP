@@ -17,7 +17,8 @@ const input = { name: 'Guest', email: '', latitude: 10, longitude: 106 };
 function meeting(id = 'current') {
   return { _id: id, title: id, companyCode: 'ACME', startsAt: new Date('2030-01-31T01:00:00Z'), endsAt: new Date('2030-01-31T03:00:00Z'),
     status: 'scheduled', reminderDays: 1, revision: 1, __v: 0, latitude: 10, longitude: 106, gpsRadiusMeters: 200, speakers: [],
-    tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20, save: async () => {} };
+    tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20, save: async () => {},
+    set(path: string, value: unknown) { this[path] = value; }, isModified: () => false };
 }
 function setup(t: import("node:test").TestContext) {
   t.mock.timers.enable({ apis: ['Date'], now });

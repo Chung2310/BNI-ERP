@@ -10,7 +10,8 @@ const { meetingInput, updateMeetingInput, recurringMeetingInput } = await import
 function setup(t: import("node:test").TestContext) {
   const queries: Array<{ _id?: string; companyCode?: string; isActive?: { $ne?: boolean } }> = [];
   const item = { _id: "meeting", companyCode: "ACME", status: "scheduled", startsAt: new Date(), endsAt: new Date(Date.now() + 2 * 60 * 60 * 1000), latitude: 10, longitude: 106, gpsRadiusMeters: 200, allowDirectCheckIn: undefined as boolean | undefined,
-    speakers: [], tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20, save: async () => {} };
+    speakers: [], tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20, save: async () => {},
+    set(path: string, value: unknown) { this[path] = value; }, isModified: () => false };
   t.mock.method(UserModel, "findOne", (query) => {
     queries.push(query);
     return { select: () => ({ lean: async () => query._id === "member" && query.companyCode === "ACME"
