@@ -79,7 +79,7 @@ it("keeps the QR form after a wrong password and succeeds after the attendee cor
   fireEvent.change(password, { target: { value: "correct-password" } });
   fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
 
-  await screen.findByText("Check-in thành công");
+  await screen.findByRole("heading", { name: /^Check-in thành công, .+!$/ });
   expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
     "/api/v1/meeting-checkin/test-token", memberPath, memberPath,
   ]);
