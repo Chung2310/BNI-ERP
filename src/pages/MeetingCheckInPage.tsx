@@ -106,7 +106,11 @@ function MeetingCheckInContent({ token }: { token: string }) {
       <div className="p-6 sm:p-8">
         {success ? <div role="status" className="pb-4 pt-2 text-center">
           <div className="mx-auto mb-6 grid h-20 w-20 place-items-center rounded-full bg-emerald-50 ring-8 ring-emerald-50/50"><CheckCircle2 aria-hidden="true" className="h-10 w-10 text-emerald-600" strokeWidth={1.75} /></div>
-          <h2 className="break-words text-3xl font-bold tracking-tight text-cyan-600 sm:text-4xl">Check-in thành công, {greeting} {success}!</h2>
+          <h2 className="space-y-3 break-words text-3xl font-bold tracking-tight text-cyan-600 sm:text-4xl">
+            <span className="block">Check-in thành công,</span>{" "}
+            <span className="block">{greeting}</span>{" "}
+            <span className="block text-rose-500">{success}!</span>
+          </h2>
           <p className="mt-1 text-sm leading-relaxed text-slate-500">Thông tin tham dự của bạn đã được ghi nhận{checkedInMeeting ? " cho cuộc họp “" + checkedInMeeting + "”." : "."}</p>
           <div className="mt-7 rounded-2xl bg-cyan-50/70 px-5 py-4 text-sm leading-relaxed text-cyan-900">Bạn có thể đóng trang này và chờ MC mời phát biểu.</div>
         </div> :
