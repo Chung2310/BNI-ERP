@@ -113,7 +113,7 @@ export const qrMemberInput = Joi.object({
   latitude: Joi.number().min(-90).max(90).required(),
   longitude: Joi.number().min(-180).max(180).required()
 }).or("identifier", "email");
-export const qrGuestInput = Joi.object({ name: Joi.string().trim().min(2).max(150).required(), email: Joi.string().email().max(254).allow('').default('').messages({ "string.email": "Vui lòng nhập email hợp lệ" }), phone: Joi.string().trim().max(40).allow('').default(''), company: Joi.string().trim().max(150).allow('').default(''), industry: Joi.string().trim().max(150).allow('').default(''), bio: Joi.string().trim().max(1000).allow('').default(''), latitude: Joi.number().min(-90).max(90).required(), longitude: Joi.number().min(-180).max(180).required() });
+export const qrGuestInput = Joi.object({ name: Joi.string().trim().min(2).max(150).required(), email: Joi.string().email().max(254).allow('').default('').messages({ "string.email": "Vui lòng nhập email hợp lệ" }), phone: Joi.string().trim().max(40).allow('').default(''), company: Joi.string().trim().max(150).allow('').default(''), industry: Joi.string().trim().max(150).allow('').default(''), bio: Joi.string().trim().max(1000).allow('').default(''), representingMemberId: Joi.string().hex().length(24), latitude: Joi.number().min(-90).max(90).required(), longitude: Joi.number().min(-180).max(180).required() });
 
 export const recurringMeetingInput = meetingInput.fork(["startsAt", "endsAt"], () => Joi.forbidden()).keys({
   title: Joi.string().trim().max(200).allow("").optional(),

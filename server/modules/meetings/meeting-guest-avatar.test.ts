@@ -4,10 +4,11 @@ import express from "express";
 import { once } from "node:events";
 import { setRateLimitRedisClientForTesting } from "../../infrastructure/rate-limit-redis";
 setRateLimitRedisClientForTesting({ eval: async () => [1, 1000], decr: async () => 0, del: async () => 0 });
-const { qrCheckInGuest } = await import("./meeting.service");
+const { getPublicQrMembers, qrCheckInGuest } = await import("./meeting.service");
 const { meetingCheckInRouter } = await import("./meeting-checkin.router");
 import { guestAvatarError, MAX_GUEST_AVATAR_BYTES } from "./meeting-guest-avatar";
 import { MeetingModel, MeetingCheckInQrModel } from "./meeting.model";
+import { UserModel } from "../../model/user.model";
 import { cloudinaryService } from "../../service/cloudinary.service";
 const { buildProfileSlide } = await import("./meeting-slides.service");
 
@@ -20,8 +21,9 @@ const asset = { publicId: "meetings/m/guests/avatar", secureUrl: "https://exampl
 function meeting() {
   return { _id: "507f1f77bcf86cd799439011", companyCode: "ACME", __v: 0, status: "scheduled", checkInQrTokenHash: "hash",
     checkInQrExpiresAt: new Date(Date.now() + 60000), latitude: 10, longitude: 106, gpsRadiusMeters: 200,
-    speakers: [], tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20, save: async () => {},
-    set(path: string, value: unknown) { this[path] = value; }, isModified: () => false };
+    speakers: [] as (Parameters<typeof buildProfileSlide>[0] & Record<string, unknown>)[], tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20,
+    set(path: string, value: unknown) { (this as unknown as Record<string, unknown>)[path] = value; },
+    isModified: () => false, save: async () => {} };
 }
 
 test("validates file bytes, MIME type and size before upload", () => {
@@ -129,4 +131,42 @@ test("guest may omit all optional profile fields", async t => {
   assert.equal(slide.bio, "");
   assert.equal(slide.coverImage, "");
   assert.equal(upload.mock.callCount(), 0);
+});
+
+test("representative is stored as a guest with a snapshot of the represented member", async t => {
+  const item = meeting();
+  const memberId = "507f1f77bcf86cd799439012";
+  t.mock.method(MeetingModel, "findOne", async () => item);
+  t.mock.method(UserModel, "findOne", () => ({
+    select: () => ({ lean: async () => ({ _id: memberId, displayName: "Nguyễn Bình", companyName: "Công ty B" }) }),
+  }));
+  await qrCheckInGuest("token", { ...input, representingMemberId: memberId });
+  const persisted = new MeetingModel({ speakers: item.speakers }).speakers[0];
+  assert.equal(persisted.userId, undefined);
+  assert.equal(persisted.representingMemberId, memberId);
+  assert.equal(persisted.representingMemberName, "Nguyễn Bình");
+  assert.equal(persisted.representingMemberCompany, "Công ty B");
+});
+
+test("representative cannot select a member outside the QR company", async t => {
+  const item = meeting();
+  t.mock.method(MeetingModel, "findOne", async () => item);
+  t.mock.method(UserModel, "findOne", () => ({ select: () => ({ lean: async () => null }) }));
+  await assert.rejects(qrCheckInGuest("token", { ...input, representingMemberId: "507f1f77bcf86cd799439012" }), { status: 400 });
+  assert.equal(item.speakers.length, 0);
+});
+
+test("QR member list exposes only names and companies from its own unit", async t => {
+  t.mock.method(MeetingModel, "findOne", async () => meeting());
+  let filter: Record<string, unknown> = {};
+  t.mock.method(UserModel, "find", (query: Record<string, unknown>) => {
+    filter = query;
+    return { select: () => ({ lean: async () => [
+      { _id: "507f1f77bcf86cd799439012", displayName: "Nguyễn Bình", companyName: "Công ty B", email: "private@example.com" },
+    ] }) };
+  });
+  assert.deepEqual(await getPublicQrMembers("token"), [
+    { id: "507f1f77bcf86cd799439012", name: "Nguyễn Bình", company: "Công ty B" },
+  ]);
+  assert.equal(filter.companyCode, "ACME");
 });
