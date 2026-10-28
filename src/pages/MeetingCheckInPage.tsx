@@ -1,10 +1,11 @@
 import { locate } from "../components/meetings/locateForCheckIn";
 import React, { useEffect, useRef, useState } from "react";
 import { CheckCircle2, MapPin, CalendarDays, ArrowRight } from "lucide-react";
+import { SearchableSelect } from "../components/common/SearchableSelect";
 
 type MeetingInfo = { title: string; startsAt: string; location?: string; expiresAt: string | null };
-type Mode = "member" | "guest";
-const greetings = ["Chào mừng", "Kính chào", "Hân hạnh chào đón", "Rất vui được đón tiếp"];
+type MemberOption = { id: string; name: string; company: string };
+type Mode = "member" | "guest" | "representative";
 const fieldClass = "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 disabled:bg-slate-50";
 export default function MeetingCheckInPage() {
   const token = window.location.pathname.split("/").filter(Boolean).pop() || "";
@@ -14,6 +15,10 @@ function MeetingCheckInContent({ token }: { token: string }) {
   const [meeting, setMeeting] = useState<MeetingInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<Mode>("member");
+  const [members, setMembers] = useState<MemberOption[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersError, setMembersError] = useState("");
+  const [representingMemberId, setRepresentingMemberId] = useState("");
   const [form, setForm] = useState({ identifier: "", password: "", name: "", phone: "", company: "", industry: "" });
   const [avatar, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState("");
@@ -23,7 +28,6 @@ function MeetingCheckInContent({ token }: { token: string }) {
   }
   useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); }, [avatarPreview]);
   const [success, setSuccess] = useState("");
-  const [greeting, setGreeting] = useState(greetings[0]);
   const [checkedInMeeting, setCheckedInMeeting] = useState("");
   const [error, setError] = useState("");
   const [phase, setPhase] = useState<"idle" | "locating" | "submitting">("idle");
@@ -38,12 +42,35 @@ function MeetingCheckInContent({ token }: { token: string }) {
     return () => controller.abort();
   }, [token]);
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
+  useEffect(() => {
+    if (mode !== "representative" || !meeting) return;
+    const controller = new AbortController();
+    fetch("/api/v1/meeting-checkin/" + encodeURIComponent(token) + "/members", { signal: controller.signal })
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "Không tải được danh sách thành viên.");
+        setMembers(data.data);
+      })
+      .catch(error => { if (error.name !== "AbortError") setMembersError(error.message); })
+      .finally(() => { if (!controller.signal.aborted) setMembersLoading(false); });
+    return () => controller.abort();
+  }, [mode, meeting, token]);
   const expired = !!meeting?.expiresAt && new Date(meeting.expiresAt).getTime() <= now;
   const busy = phase !== "idle";
-  const switchMode = (value: Mode) => { setMode(value); setError(""); setForm(old => ({ ...old, password: "" })); };
+  const switchMode = (value: Mode) => {
+    setMode(value);
+    setError("");
+    setMembersError("");
+    setMembersLoading(value === "representative");
+    setForm(old => ({ ...old, password: "" }));
+  };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (submitLock.current || busy || expired || success) return;
+    if (mode === "representative" && !representingMemberId) {
+      setError("Vui lòng chọn thành viên bạn đi thay.");
+      return;
+    }
     submitLock.current = true;
     setError(""); setPhase("locating");
     let locationResolved = false;
@@ -53,17 +80,18 @@ function MeetingCheckInContent({ token }: { token: string }) {
       setPhase("submitting");
       const identity = mode === "member"
         ? { email: form.identifier.trim(), password: form.password }
-        : { name: form.name.trim(), phone: form.phone.trim(), company: form.company.trim(), industry: form.industry.trim() };
+        : { name: form.name.trim(), phone: form.phone.trim(), company: form.company.trim(), industry: form.industry.trim(),
+            ...(mode === "representative" ? { representingMemberId } : {}) };
       let body: string | FormData = JSON.stringify({ ...identity, ...position });
       const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (mode === "guest" && avatar) {
+      if (mode !== "member" && avatar) {
         const multipart = new FormData();
         for (const [key, value] of Object.entries({ ...identity, ...position })) multipart.append(key, String(value));
         multipart.append("avatar", avatar);
         body = multipart;
         delete headers["Content-Type"];
       }
-      const response = await fetch("/api/v1/meeting-checkin/" + encodeURIComponent(token) + "/" + mode, {
+      const response = await fetch("/api/v1/meeting-checkin/" + encodeURIComponent(token) + "/" + (mode === "member" ? "member" : "guest"), {
         method: "POST", headers, body
       });
       const data = await response.json();
@@ -72,9 +100,8 @@ function MeetingCheckInContent({ token }: { token: string }) {
         throw new Error(message);
       }
       setAvatar(null);
-      setGreeting(greetings[Math.floor(Math.random() * greetings.length)]);
       setCheckedInMeeting(data.data?.meetingTitle || meeting?.title || "");
-      setSuccess(data.data?.name || (mode === "guest" ? form.name : "Bạn"));
+      setSuccess(data.data?.name || (mode !== "member" ? form.name : "Bạn"));
       setForm(old => ({ ...old, password: "" }));
     } catch (e) {
       const message = e instanceof Error ? e.message : "Không thể check-in. Vui lòng thử lại.";
@@ -83,7 +110,7 @@ function MeetingCheckInContent({ token }: { token: string }) {
         const reason = /chưa cho phép truy cập vị trí/i.test(message) ? "location_denied"
           : /không hỗ trợ vị trí/i.test(message) ? "location_unsupported" : "location_unavailable";
         void fetch("/api/v1/meeting-checkin/" + encodeURIComponent(token) + "/failure", {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode, reason }),
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: mode === "representative" ? "guest" : mode, reason }),
         }).catch(() => {});
       }
     } finally { submitLock.current = false; setPhase("idle"); }
@@ -108,7 +135,7 @@ function MeetingCheckInContent({ token }: { token: string }) {
           <div className="mx-auto mb-6 grid h-20 w-20 place-items-center rounded-full bg-emerald-50 ring-8 ring-emerald-50/50"><CheckCircle2 aria-hidden="true" className="h-10 w-10 text-emerald-600" strokeWidth={1.75} /></div>
           <h2 className="space-y-3 break-words text-3xl font-bold tracking-tight text-cyan-600 sm:text-4xl">
             <span className="block">Check-in thành công,</span>{" "}
-            <span className="block">{greeting}</span>{" "}
+            <span className="block">Chào mừng</span>{" "}
             <span className="block text-rose-500">{success}!</span>
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-slate-500">Thông tin tham dự của bạn đã được ghi nhận{checkedInMeeting ? " cho cuộc họp “" + checkedInMeeting + "”." : "."}</p>
@@ -120,15 +147,32 @@ function MeetingCheckInContent({ token }: { token: string }) {
           <form onSubmit={submit} className="space-y-5">
             <fieldset disabled={busy} className="space-y-4">
               <legend className="mb-3 text-sm font-semibold text-slate-800">1. Bạn tham dự với vai trò nào?</legend>
-              <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
-                <button type="button" aria-pressed={mode === "member"} onClick={() => switchMode("member")} className="rounded-xl px-4 py-3 text-sm font-semibold text-slate-500 transition aria-pressed:bg-white aria-pressed:text-cyan-700 aria-pressed:shadow-sm focus-visible:outline-cyan-500">Thành viên</button>
-                <button type="button" aria-pressed={mode === "guest"} onClick={() => switchMode("guest")} className="rounded-xl px-4 py-3 text-sm font-semibold text-slate-500 transition aria-pressed:bg-white aria-pressed:text-cyan-700 aria-pressed:shadow-sm focus-visible:outline-cyan-500">Khách mời</button>
+              <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1">
+                <button type="button" aria-pressed={mode === "member"} onClick={() => switchMode("member")} className="rounded-xl px-2 py-3 text-xs font-semibold text-slate-500 transition aria-pressed:bg-white aria-pressed:text-cyan-700 aria-pressed:shadow-sm focus-visible:outline-cyan-500 sm:text-sm">Thành viên</button>
+                <button type="button" aria-pressed={mode === "guest"} onClick={() => switchMode("guest")} className="rounded-xl px-2 py-3 text-xs font-semibold text-slate-500 transition aria-pressed:bg-white aria-pressed:text-cyan-700 aria-pressed:shadow-sm focus-visible:outline-cyan-500 sm:text-sm">Khách mời</button>
+                <button type="button" aria-pressed={mode === "representative"} onClick={() => switchMode("representative")} className="rounded-xl px-2 py-3 text-xs font-semibold text-slate-500 transition aria-pressed:bg-white aria-pressed:text-cyan-700 aria-pressed:shadow-sm focus-visible:outline-cyan-500 sm:text-sm">Người đại diện</button>
               </div>
               {mode === "member" ? <>
                 <label className="block text-sm font-medium text-slate-700">Email hoặc số điện thoại<input required type="text" autoComplete="username" placeholder="Số điện thoại hoặc email" aria-label="Email tài khoản" value={form.identifier} onChange={e => setForm({ ...form, identifier: e.target.value })} className={fieldClass} /></label>
                 <label className="block text-sm font-medium text-slate-700">Mật khẩu<input required type="password" autoComplete="current-password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className={fieldClass} /></label>
               </> : <>
                 <p className="text-sm leading-relaxed text-slate-500">Vui lòng nhập đầy đủ thông tin để tăng cơ hội kết nối với các thành viên và khách mời khác.</p>
+                {mode === "representative" && <div className="text-sm font-medium text-slate-700">
+                  <span>Đi thay thành viên *</span>
+                  <SearchableSelect
+                    options={members.map(member => ({ value: member.id, label: `${member.name} - ${member.company || "Chưa có công ty"}` }))}
+                    value={representingMemberId}
+                    onChange={value => { setRepresentingMemberId(value); setError(""); }}
+                    placeholder={membersLoading ? "Đang tải thành viên..." : "Chọn thành viên"}
+                    searchPlaceholder="Tìm tên thành viên hoặc công ty"
+                    ariaLabel="Đi thay thành viên"
+                    disabled={membersLoading || !!membersError}
+                    className="mt-1.5"
+                    subtle
+                  />
+                  {membersError && <p role="alert" className="mt-2 text-sm text-rose-700">{membersError}</p>}
+                  <p className="mt-2 text-xs font-normal text-slate-500">Bạn được ghi nhận là khách mời, có ghi chú đi thay thành viên đã chọn.</p>
+                </div>}
                 <label className="block text-sm font-medium text-slate-700">Họ và tên *<input required minLength={2} maxLength={150} autoComplete="name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={fieldClass} /></label>
                 <label className="block text-sm font-medium text-slate-700">Số điện thoại<input type="tel" maxLength={40} autoComplete="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className={fieldClass} /></label>
                 <label className="block text-sm font-medium text-slate-700">Công ty<input maxLength={150} autoComplete="organization" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} className={fieldClass} /></label>

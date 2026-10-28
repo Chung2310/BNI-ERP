@@ -62,6 +62,9 @@ type Speaker = {
   email?: string;
   phone?: string;
   company?: string;
+  representingMemberId?: string;
+  representingMemberName?: string;
+  representingMemberCompany?: string;
   industry?: string;
   bio?: string;
   slideProfile?: { email?: string; phone?: string; company?: string; industry?: string; bio?: string };
@@ -456,6 +459,9 @@ function MeetingWorkspace() {
         "STT": index + 1,
         "Loại người tham dự": speaker.userId ? "Thành viên" : "Khách mời",
         "Họ tên": speaker.name,
+        "Đi thay thành viên": speaker.representingMemberName
+          ? `${speaker.representingMemberName}${speaker.representingMemberCompany ? ` - ${speaker.representingMemberCompany}` : ""}`
+          : "",
         "Doanh nghiệp": speaker.slideProfile?.company ?? speaker.company ?? "",
         "Ngành nghề": speaker.slideProfile?.industry ?? speaker.industry ?? "",
         "Số điện thoại": speaker.slideProfile?.phone ?? speaker.phone ?? "",
@@ -468,8 +474,8 @@ function MeetingWorkspace() {
       }));
       const worksheet = XLSX.utils.json_to_sheet(rows);
       worksheet["!cols"] = [
-        { wch: 8 }, { wch: 22 }, { wch: 26 }, { wch: 26 }, { wch: 22 },
-        { wch: 18 }, { wch: 30 }, { wch: 40 }, { wch: 22 }, { wch: 18 },
+        { wch: 8 }, { wch: 22 }, { wch: 26 }, { wch: 34 }, { wch: 26 },
+        { wch: 22 }, { wch: 18 }, { wch: 30 }, { wch: 40 }, { wch: 22 }, { wch: 18 },
       ];
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Người tham dự");
@@ -1661,6 +1667,9 @@ function MeetingWorkspace() {
                                 <span className="block truncate text-[11px] text-slate-500">
                                   {p.email || (isGuest ? "Khách mời" : "")} • {p.seconds} giây
                                 </span>
+                                {p.representingMemberName && <span className="block truncate text-[11px] font-medium text-amber-700" title={`Đi thay ${p.representingMemberName}${p.representingMemberCompany ? ` - ${p.representingMemberCompany}` : ""}`}>
+                                  Đi thay: {p.representingMemberName}{p.representingMemberCompany ? ` - ${p.representingMemberCompany}` : ""}
+                                </span>}
                               </div>
 
                               {checkInTime && (
@@ -2087,6 +2096,9 @@ function MeetingWorkspace() {
                                   <span className="text-[11px] text-slate-500 block truncate">
                                     {p.email || (isGuest ? "Khách mời" : "")} • {p.seconds} giây
                                   </span>
+                                  {p.representingMemberName && <span className="block truncate text-[11px] font-medium text-amber-700" title={`Đi thay ${p.representingMemberName}${p.representingMemberCompany ? ` - ${p.representingMemberCompany}` : ""}`}>
+                                    Đi thay: {p.representingMemberName}{p.representingMemberCompany ? ` - ${p.representingMemberCompany}` : ""}
+                                  </span>}
                                 </div>
 
                                 {isSpeaking && (

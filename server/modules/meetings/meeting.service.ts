@@ -21,6 +21,7 @@ export type MeetingDocument = ReturnType<typeof MeetingModel.hydrate>;
 export type CheckInInput = {
   latitude?: number; longitude?: number; userId?: string; name?: string; email?: string;
   phone?: string; company?: string; industry?: string; bio?: string; photoURL?: string; coverImage?: string;
+  representingMemberId?: string; representingMemberName?: string; representingMemberCompany?: string;
 };
 export type MeetingInput = {
   title: string; startsAt: string | Date; endsAt?: string | Date; description?: string; location?: string;
@@ -510,6 +511,9 @@ export async function checkIn(item: MeetingDocument, input: CheckInInput, actorI
     email: (person?.email || input.email || '').toLowerCase(),
     phone: person?.phone || input.phone,
     company: person?.companyName || input.company,
+    representingMemberId: userId ? undefined : input.representingMemberId,
+    representingMemberName: userId ? undefined : input.representingMemberName,
+    representingMemberCompany: userId ? undefined : input.representingMemberCompany,
     industry: person?.industry || input.industry,
     bio: input.bio,
     photoURL: person?.photoURL || input.photoURL,
@@ -1228,6 +1232,20 @@ export async function getPublicQrMeeting(token: string) {
     endsAt: meetingEndsAt(item.startsAt, item.endsAt), location: item.location, expiresAt };
 }
 
+export async function getPublicQrMembers(token: string) {
+  const { item } = await resolveQrMeeting(token);
+  const members = await UserModel.find({
+    companyCode: item.companyCode,
+    isActive: { $ne: false },
+    disabledAt: { $in: [null, undefined] },
+  }).select('displayName companyName').lean();
+  return members.map(member => ({
+    id: String(member._id),
+    name: member.displayName,
+    company: member.companyName || '',
+  })).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+}
+
 export async function qrCheckInMember(token: string, input: CheckInInput & { password: string; identifier?: string }) {
   let { item } = await resolveQrMeeting(token);
   validateCheckInLocation(item, input);
@@ -1276,6 +1294,17 @@ export async function qrCheckInGuest(token: string, input: CheckInInput, avatar?
   if (input.email && item.speakers.some((p) => p.email === input.email.toLowerCase())) {
     throw new MeetingError(409, 'Email này đã check-in.');
   }
+  let representedMember: { id: string; name: string; company: string } | undefined;
+  if (input.representingMemberId) {
+    const member = await UserModel.findOne({
+      _id: input.representingMemberId,
+      companyCode: item.companyCode,
+      isActive: { $ne: false },
+      disabledAt: { $in: [null, undefined] },
+    }).select('displayName companyName').lean();
+    if (!member) throw new MeetingError(400, 'Thành viên được đi thay không hợp lệ hoặc đã ngừng hoạt động.');
+    representedMember = { id: String(member._id), name: member.displayName, company: member.companyName || '' };
+  }
   try {
     for (const [field, file] of [['photoURL', avatar], ['coverImage', coverImage]] as const) {
       if (!file) continue;
@@ -1301,6 +1330,9 @@ export async function qrCheckInGuest(token: string, input: CheckInInput, avatar?
     await checkIn(item, {
       name: input.name, email: input.email, phone: input.phone, company: input.company,
       industry: input.industry, bio: input.bio,
+      representingMemberId: representedMember?.id,
+      representingMemberName: representedMember?.name,
+      representingMemberCompany: representedMember?.company,
       ...Object.fromEntries(uploads.map(({ field, asset }) => [field, asset.secureUrl])),
     }, 'public-qr', true);
     return { success: true, name: input.name, meetingId: String(item._id), meetingTitle: item.title };

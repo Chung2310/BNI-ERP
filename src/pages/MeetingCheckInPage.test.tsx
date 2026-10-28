@@ -24,6 +24,7 @@ it("member check-in submits only fields accepted by the API and shows a complete
   fireEvent.change(screen.getByLabelText("Mật khẩu"), { target: { value: "secret" } });
   fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
   await screen.findByRole("heading", { name: /^Check-in thành công, .+!$/ });
+  expect(screen.getByRole("heading", { name: "Check-in thành công, Chào mừng An!" })).toBeTruthy();
   const [url, options] = fetchMock.mock.calls[1];
   const payload = JSON.parse(options.body);
   expect(url).toBe("/api/v1/meeting-checkin/test-token/member");
@@ -44,6 +45,29 @@ it("guest form does not send a password or lose the company field", async () => 
   expect(qrGuestInput.validate(payload).error).toBeUndefined();
   expect(payload.company).toBe("Công ty A");
   expect(payload).not.toHaveProperty("password");
+});
+it("representative selects a member by name or company and checks in as a guest", async () => {
+  const memberId = "507f1f77bcf86cd799439011";
+  fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: memberId, name: "Nguyễn Bình", company: "Công ty B" }] }) });
+  fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data: { name: "Lan" } }) });
+  render(<MeetingCheckInPage />);
+  await screen.findByLabelText("Email tài khoản");
+  fireEvent.click(screen.getByRole("button", { name: "Người đại diện" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  fireEvent.change(screen.getByLabelText("Họ và tên *"), { target: { value: "Lan" } });
+  fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+  expect(await screen.findByText("Vui lòng chọn thành viên bạn đi thay.")).toBeTruthy();
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  fireEvent.click(screen.getByRole("button", { name: "Đi thay thành viên" }));
+  fireEvent.change(screen.getByLabelText("Tìm tên thành viên hoặc công ty"), { target: { value: "Công ty B" } });
+  fireEvent.click(screen.getByRole("button", { name: "Nguyễn Bình - Công ty B" }));
+  fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+  await screen.findByText("Check-in thành công,");
+  expect(fetchMock.mock.calls[2][0]).toBe("/api/v1/meeting-checkin/test-token/guest");
+  const payload = JSON.parse(fetchMock.mock.calls[2][1].body);
+  expect(qrGuestInput.validate(payload).error).toBeUndefined();
+  expect(payload).toMatchObject({ name: "Lan", representingMemberId: memberId });
+  expect(payload).not.toHaveProperty("userId");
 });
 it("GPS denial blocks submission and allows a retry with a fresh location", async () => {
   gps.mockImplementationOnce((_success, failure) => failure({ code: 1 }));

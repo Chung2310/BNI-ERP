@@ -47,7 +47,7 @@ window.fetch = async function (input, init) {
   if (response.status === 401 && !isPublicQrCheckInRequest) {
     const urlString = requestUrl;
 
-    // Avoid infinite loop if the refresh-token or login/register endpoint itself fails with 401
+    // These endpoints handle their own 401 responses.
     if (
       urlString.includes("/auth/refresh-token") ||
       urlString.includes("/auth/login") ||
