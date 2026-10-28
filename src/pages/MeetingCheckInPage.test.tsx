@@ -24,6 +24,7 @@ it("member check-in submits only fields accepted by the API and shows a complete
   fireEvent.change(screen.getByLabelText("Mật khẩu"), { target: { value: "secret" } });
   fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
   await screen.findByRole("heading", { name: /^Check-in thành công, .+!$/ });
+  expect(screen.getByRole("heading", { name: "Check-in thành công, Chào mừng An!" })).toBeTruthy();
   const [url, options] = fetchMock.mock.calls[1];
   const payload = JSON.parse(options.body);
   expect(url).toBe("/api/v1/meeting-checkin/test-token/member");

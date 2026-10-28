@@ -6,7 +6,6 @@ import { SearchableSelect } from "../components/common/SearchableSelect";
 type MeetingInfo = { title: string; startsAt: string; location?: string; expiresAt: string | null };
 type MemberOption = { id: string; name: string; company: string };
 type Mode = "member" | "guest" | "representative";
-const greetings = ["Chào mừng", "Kính chào", "Hân hạnh chào đón", "Rất vui được đón tiếp"];
 const fieldClass = "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 disabled:bg-slate-50";
 export default function MeetingCheckInPage() {
   const token = window.location.pathname.split("/").filter(Boolean).pop() || "";
@@ -29,7 +28,6 @@ function MeetingCheckInContent({ token }: { token: string }) {
   }
   useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); }, [avatarPreview]);
   const [success, setSuccess] = useState("");
-  const [greeting, setGreeting] = useState(greetings[0]);
   const [checkedInMeeting, setCheckedInMeeting] = useState("");
   const [error, setError] = useState("");
   const [phase, setPhase] = useState<"idle" | "locating" | "submitting">("idle");
@@ -102,7 +100,6 @@ function MeetingCheckInContent({ token }: { token: string }) {
         throw new Error(message);
       }
       setAvatar(null);
-      setGreeting(greetings[Math.floor(Math.random() * greetings.length)]);
       setCheckedInMeeting(data.data?.meetingTitle || meeting?.title || "");
       setSuccess(data.data?.name || (mode !== "member" ? form.name : "Bạn"));
       setForm(old => ({ ...old, password: "" }));
@@ -138,7 +135,7 @@ function MeetingCheckInContent({ token }: { token: string }) {
           <div className="mx-auto mb-6 grid h-20 w-20 place-items-center rounded-full bg-emerald-50 ring-8 ring-emerald-50/50"><CheckCircle2 aria-hidden="true" className="h-10 w-10 text-emerald-600" strokeWidth={1.75} /></div>
           <h2 className="space-y-3 break-words text-3xl font-bold tracking-tight text-cyan-600 sm:text-4xl">
             <span className="block">Check-in thành công,</span>{" "}
-            <span className="block">{greeting}</span>{" "}
+            <span className="block">Chào mừng</span>{" "}
             <span className="block text-rose-500">{success}!</span>
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-slate-500">Thông tin tham dự của bạn đã được ghi nhận{checkedInMeeting ? " cho cuộc họp “" + checkedInMeeting + "”." : "."}</p>
