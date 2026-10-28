@@ -1,10 +1,10 @@
 import { locate } from "../components/meetings/locateForCheckIn";
-import React, { useEffect, useState } from "react";
-import { toast } from "./Toast";
+import React, { useEffect, useRef, useState } from "react";
 import { CheckCircle2, MapPin, CalendarDays, ArrowRight } from "lucide-react";
 
 type MeetingInfo = { title: string; startsAt: string; location?: string; expiresAt: string | null };
 type Mode = "member" | "guest";
+const greetings = ["Chào mừng", "Kính chào", "Hân hạnh chào đón", "Rất vui được đón tiếp"];
 const fieldClass = "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 disabled:bg-slate-50";
 export default function MeetingCheckInPage() {
   const token = window.location.pathname.split("/").filter(Boolean).pop() || "";
@@ -23,10 +23,12 @@ function MeetingCheckInContent({ token }: { token: string }) {
   }
   useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); }, [avatarPreview]);
   const [success, setSuccess] = useState("");
+  const [greeting, setGreeting] = useState(greetings[0]);
   const [checkedInMeeting, setCheckedInMeeting] = useState("");
   const [error, setError] = useState("");
   const [phase, setPhase] = useState<"idle" | "locating" | "submitting">("idle");
   const [now, setNow] = useState(Date.now);
+  const submitLock = useRef(false);
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/v1/meeting-checkin/" + encodeURIComponent(token), { signal: controller.signal })
@@ -41,10 +43,13 @@ function MeetingCheckInContent({ token }: { token: string }) {
   const switchMode = (value: Mode) => { setMode(value); setError(""); setForm(old => ({ ...old, password: "" })); };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (busy || expired || success) return;
+    if (submitLock.current || busy || expired || success) return;
+    submitLock.current = true;
     setError(""); setPhase("locating");
+    let locationResolved = false;
     try {
       const position = await locate();
+      locationResolved = true;
       setPhase("submitting");
       const identity = mode === "member"
         ? { email: form.identifier.trim(), password: form.password }
@@ -64,14 +69,24 @@ function MeetingCheckInContent({ token }: { token: string }) {
       const data = await response.json();
       if (!response.ok) {
         const message = data.message || "Không thể check-in. Vui lòng thử lại.";
-        if (response.status === 401) toast.error(message);
         throw new Error(message);
       }
       setAvatar(null);
+      setGreeting(greetings[Math.floor(Math.random() * greetings.length)]);
       setCheckedInMeeting(data.data?.meetingTitle || meeting?.title || "");
       setSuccess(data.data?.name || (mode === "guest" ? form.name : "Bạn"));
       setForm(old => ({ ...old, password: "" }));
-    } catch (e) { setError(e.message); } finally { setPhase("idle"); }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Không thể check-in. Vui lòng thử lại.";
+      setError(message);
+      if (!locationResolved) {
+        const reason = /chưa cho phép truy cập vị trí/i.test(message) ? "location_denied"
+          : /không hỗ trợ vị trí/i.test(message) ? "location_unsupported" : "location_unavailable";
+        void fetch("/api/v1/meeting-checkin/" + encodeURIComponent(token) + "/failure", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode, reason }),
+        }).catch(() => {});
+      }
+    } finally { submitLock.current = false; setPhase("idle"); }
   };
   return <main className="min-h-dvh overflow-y-auto bg-[#f4f8fb] px-4 py-6 text-slate-900 sm:py-12">
     <section className="mx-auto max-w-xl overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-[0_16px_60px_-24px_rgba(15,60,80,0.22)]">
@@ -91,8 +106,11 @@ function MeetingCheckInContent({ token }: { token: string }) {
       <div className="p-6 sm:p-8">
         {success ? <div role="status" className="pb-4 pt-2 text-center">
           <div className="mx-auto mb-6 grid h-20 w-20 place-items-center rounded-full bg-emerald-50 ring-8 ring-emerald-50/50"><CheckCircle2 aria-hidden="true" className="h-10 w-10 text-emerald-600" strokeWidth={1.75} /></div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Check-in thành công</h2>
-          <p className="mt-3 text-base text-slate-600">Chào mừng <strong className="font-semibold text-slate-900">{success}</strong>!</p>
+          <h2 className="space-y-3 break-words text-3xl font-bold tracking-tight text-cyan-600 sm:text-4xl">
+            <span className="block">Check-in thành công,</span>{" "}
+            <span className="block">{greeting}</span>{" "}
+            <span className="block text-rose-500">{success}!</span>
+          </h2>
           <p className="mt-1 text-sm leading-relaxed text-slate-500">Thông tin tham dự của bạn đã được ghi nhận{checkedInMeeting ? " cho cuộc họp “" + checkedInMeeting + "”." : "."}</p>
           <div className="mt-7 rounded-2xl bg-cyan-50/70 px-5 py-4 text-sm leading-relaxed text-cyan-900">Bạn có thể đóng trang này và chờ MC mời phát biểu.</div>
         </div> :

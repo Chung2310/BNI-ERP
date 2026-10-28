@@ -10,6 +10,7 @@ import {
   assertMeetingEditable,
   saveMeeting,
   checkInFromModule,
+  emitMeetingCheckInFailure,
   controlMeeting,
   startMeetingPresentation,
   reorderMeetingSpeakers,
@@ -298,7 +299,13 @@ meetingRouter.delete('/:id', manage, async (req, res) => {
 
 meetingRouter.post('/:id/checkin', requirePermission(['meetings:read', 'meetings:manage', 'access:read', 'access:manage']), async (req, res) => {
   const { error, value } = checkinInput.validate(req.body);
-  if (error) return res.status(400).json({ message: error.message });
+  if (error) {
+    try {
+      const item = await getMeeting(company(req), req.params.id);
+      emitMeetingCheckInFailure(item.companyCode, String(item._id), 'app', error.message);
+    } catch { /* Ignore failures when the meeting cannot be resolved. */ }
+    return res.status(400).json({ message: error.message });
+  }
   try {
     const item = await getMeeting(company(req), req.params.id);
     const canManage = hasAnyPermission(
@@ -307,6 +314,10 @@ meetingRouter.post('/:id/checkin', requirePermission(['meetings:read', 'meetings
     );
     res.json({ data: await checkInFromModule(item, value, req.user.id, canManage) });
   } catch (e) {
+    try {
+      const item = await getMeeting(company(req), req.params.id);
+      emitMeetingCheckInFailure(item.companyCode, String(item._id), 'app', e instanceof MeetingError ? e.message : 'Không thể check-in. Vui lòng thử lại.');
+    } catch { /* Ignore failures when the meeting cannot be resolved. */ }
     sendError(res, e);
   }
 });

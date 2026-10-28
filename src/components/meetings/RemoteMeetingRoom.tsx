@@ -121,7 +121,7 @@ function AutoAdvanceSettings({ state, disabled, onSave }: {
 
 function MeetingRoom({ meetingId, mode }: Props) {
   const readOnly = mode === "display";
-  const { snapshot, now, syncError, commandError, connected, busy, refresh, command } = useMeetingLive(meetingId, readOnly);
+  const { snapshot, now, syncError, commandError, checkInError, dismissCheckInError, connected, busy, refresh, command } = useMeetingLive(meetingId, readOnly);
   const root = useRef<HTMLDivElement>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [screenError, setScreenError] = useState("");
@@ -338,7 +338,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
       ) : readOnly ? (
         <main className="flex min-h-[80vh] items-center justify-center bg-slate-100" style={fullscreen ? { height: "100dvh" } : {}}>
           <div style={fullscreen && state.view === "speaker" ? { width: "100%", height: "100%" } : { width: "min(100%, 177.7778dvh)" }}>
-            <MeetingStage snapshot={snapshot} now={now} fill={fullscreen && state.view === "speaker"} />
+            <MeetingStage snapshot={snapshot} now={now} fill={fullscreen && state.view === "speaker"} checkInError={checkInError} onDismissCheckInError={dismissCheckInError} />
           </div>
         </main>
       ) : (
@@ -358,7 +358,7 @@ function MeetingRoom({ meetingId, mode }: Props) {
                 <span className="text-[11px] font-semibold text-slate-400">Live Stage</span>
               </div>
               <div className="p-3 bg-slate-950 aspect-video flex items-center justify-center relative overflow-hidden">
-                <MeetingStage snapshot={snapshot} now={now} />
+                <MeetingStage snapshot={snapshot} now={now} checkInError={checkInError} onDismissCheckInError={dismissCheckInError} />
               </div>
             </div>
 

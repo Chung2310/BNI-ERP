@@ -20,7 +20,8 @@ const asset = { publicId: "meetings/m/guests/avatar", secureUrl: "https://exampl
 function meeting() {
   return { _id: "507f1f77bcf86cd799439011", companyCode: "ACME", __v: 0, status: "scheduled", checkInQrTokenHash: "hash",
     checkInQrExpiresAt: new Date(Date.now() + 60000), latitude: 10, longitude: 106, gpsRadiusMeters: 200,
-    speakers: [], tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20, save: async () => {} };
+    speakers: [], tiers: [{ count: 10, seconds: 30 }], fallbackSeconds: 20, save: async () => {},
+    set(path: string, value: unknown) { this[path] = value; }, isModified: () => false };
 }
 
 test("validates file bytes, MIME type and size before upload", () => {
