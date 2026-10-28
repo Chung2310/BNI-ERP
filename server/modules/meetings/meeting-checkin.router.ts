@@ -3,7 +3,7 @@ import multer from 'multer';
 import Joi from 'joi';
 import { MAX_GUEST_AVATAR_BYTES } from './meeting-guest-avatar';
 import { publicApiRateLimiter, authRateLimiter, loginAccountRateLimiter } from '../../middleware/rate-limit';
-import { getPublicQrMeeting, qrCheckInGuest, qrCheckInMember, MeetingError, reportQrCheckInFailure } from './meeting.service';
+import { getPublicQrMeeting, getPublicQrMembers, qrCheckInGuest, qrCheckInMember, MeetingError, reportQrCheckInFailure } from './meeting.service';
 import { qrGuestInput, qrMemberInput } from './meeting.validation';
 
 const guestAvatarUpload = multer({
@@ -35,6 +35,10 @@ meetingCheckInRouter.post('/:token/failure', async (req, res) => {
   } as const;
   await reportQrCheckInFailure(req.params.token, value.mode, messages[value.reason as keyof typeof messages]);
   res.json({ success: true });
+});
+meetingCheckInRouter.get('/:token/members', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try { res.json({ data: await getPublicQrMembers(req.params.token) }); } catch (e) { respondError(res, e); }
 });
 meetingCheckInRouter.post('/:token/member', authRateLimiter, loginAccountRateLimiter, async (req, res) => {
   const { error, value } = qrMemberInput.validate(req.body);
