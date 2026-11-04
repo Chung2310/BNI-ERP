@@ -19,6 +19,14 @@ html:has(.expo-campaign) {
   -webkit-text-fill-color: transparent;
 }
 
+.expo-red-gradient {
+  color: #de1039;
+  background: linear-gradient(105deg, #e10a37 0%, #ff444c 52%, #bd082e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 .expo-hero::after {
   position: absolute;
   right: -8%;
