@@ -7,6 +7,7 @@ vi.mock("./context/AuthContext", () => ({
   useAuth: () => ({ user: null, userProfile: null, loading: false }),
 }));
 vi.mock("./pages/LandingPage", () => ({ default: () => <div>Landing Page Content</div> }));
+vi.mock("./pages/ExpoHomePage", () => ({ default: () => <div>BNI EXPO Home Content</div> }));
 
 import App from "./App";
 
@@ -26,6 +27,15 @@ test.each(["/", "/landing", "/landing.html", "/dang-nhap"])("renders login for g
   expect(screen.getByRole("link", { name: "Terms of Service" }).getAttribute("href")).toBe("/terms-of-service");
   expect(screen.getByRole("link", { name: "Data Deletion" }).getAttribute("href")).toBe("/user-data-deletion");
   expect(screen.getByRole("link", { name: "Wheel Selection Guide" }).getAttribute("href")).toBe("/lucky-draw-rules");
+});
+
+test("opens the campaign home page for guests at /trang-chu", async () => {
+  window.history.replaceState(null, "", "/trang-chu");
+
+  render(<App />);
+
+  expect(await screen.findByText("BNI EXPO Home Content")).not.toBeNull();
+  expect(screen.queryByRole("button", { name: "Đăng nhập hệ thống" })).toBeNull();
 });
 
 test("shows the name selection guide to a visitor without signing in", async () => {

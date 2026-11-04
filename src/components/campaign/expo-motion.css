@@ -1,0 +1,172 @@
+html:has(.expo-campaign) {
+  scroll-behavior: smooth;
+}
+
+.expo-campaign {
+  background:
+    radial-gradient(ellipse 80% 18% at 100% 24%, rgb(0 174 202 / 16%), transparent 75%),
+    radial-gradient(ellipse 75% 19% at 0% 54%, rgb(37 99 235 / 11%), transparent 75%),
+    radial-gradient(ellipse 75% 20% at 100% 83%, rgb(34 211 238 / 14%), transparent 75%),
+    linear-gradient(135deg, #edf8ff 0%, #f8fcff 48%, #eaf7ff 100%);
+}
+
+.expo-price {
+  color: #087ca3;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(110deg, #008bad, #2563eb);
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.expo-hero::after {
+  position: absolute;
+  right: -8%;
+  bottom: -10rem;
+  width: 35rem;
+  height: 35rem;
+  border: 1px solid rgb(180 8 45 / 9%);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+
+.expo-hero > .relative > div:first-child > * {
+  animation: expo-rise-in 750ms both cubic-bezier(.2, .75, .25, 1);
+}
+
+.expo-hero > .relative > div:first-child > :nth-child(2) { animation-delay: 110ms; }
+.expo-hero > .relative > div:first-child > :nth-child(3) { animation-delay: 220ms; }
+.expo-hero > .relative > div:first-child > :nth-child(4) { animation-delay: 330ms; }
+.expo-hero > .relative > div:first-child > :nth-child(5) { animation-delay: 440ms; }
+
+.expo-hero-poster {
+  animation: expo-poster-in 1s 200ms both cubic-bezier(.16, 1, .3, 1);
+  transform-origin: 80% 50%;
+}
+
+.expo-nav {
+  background: rgb(248 252 255 / 97%);
+}
+
+.expo-nav a[aria-current="location"] {
+  color: #075f79;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: #00aeca;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 8px;
+}
+
+#expo-thu-moi {
+  padding-top: 2.5rem;
+}
+
+.expo-section {
+  position: relative;
+}
+
+.expo-motion-ready .expo-section:not(.expo-in-view) > * {
+  opacity: 0;
+  transform: translateY(28px);
+}
+
+.expo-motion-ready .expo-section:nth-of-type(even):not(.expo-in-view) > :first-child {
+  transform: translateX(-30px);
+}
+
+.expo-motion-ready .expo-section:nth-of-type(odd):not(.expo-in-view) > :first-child {
+  transform: translateX(30px);
+}
+
+.expo-motion-ready .expo-section > * {
+  transition: opacity 680ms ease, transform 680ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.expo-motion-ready .expo-section > :nth-child(2) { transition-delay: 90ms; }
+.expo-motion-ready .expo-section > :nth-child(3) { transition-delay: 160ms; }
+.expo-motion-ready .expo-section > :nth-child(4) { transition-delay: 230ms; }
+.expo-motion-ready .expo-section > :nth-child(n+5) { transition-delay: 280ms; }
+
+.expo-hero-poster {
+  transition: scale 450ms cubic-bezier(.16, 1, .3, 1), box-shadow 450ms ease;
+}
+
+.expo-hero-poster:hover {
+  scale: 1.015;
+  box-shadow: 0 24px 60px rgb(24 34 54 / 14%);
+}
+
+@media (min-width: 1280px) and (prefers-reduced-motion: no-preference) {
+  .expo-cards-motion-ready .expo-sponsor-card {
+    position: relative;
+    transition: transform 750ms cubic-bezier(.2, .8, .2, 1), opacity 500ms ease;
+  }
+
+  .expo-cards-motion-ready .expo-sponsor-cards:not(.expo-cards-open) .expo-sponsor-card {
+    opacity: 0;
+    transform: scale(.93);
+  }
+
+  .expo-cards-motion-ready .expo-sponsor-cards:not(.expo-cards-open) .expo-sponsor-card:first-child {
+    opacity: 1;
+    transform: translateX(calc(150% + 1.875rem)) scale(.93);
+    z-index: 4;
+  }
+
+  .expo-cards-motion-ready .expo-sponsor-cards:not(.expo-cards-open) .expo-sponsor-card:nth-child(2) {
+    transform: translateX(calc(50% + .625rem)) scale(.93);
+    z-index: 3;
+  }
+
+  .expo-cards-motion-ready .expo-sponsor-cards:not(.expo-cards-open) .expo-sponsor-card:nth-child(3) {
+    transform: translateX(calc(-50% - .625rem)) scale(.93);
+    z-index: 2;
+  }
+
+  .expo-cards-motion-ready .expo-sponsor-cards:not(.expo-cards-open) .expo-sponsor-card:nth-child(4) {
+    transform: translateX(calc(-150% - 1.875rem)) scale(.93);
+    z-index: 1;
+  }
+
+  .expo-cards-motion-ready .expo-sponsor-cards.expo-cards-open .expo-sponsor-card:nth-child(2) { transition-delay: 90ms; }
+  .expo-cards-motion-ready .expo-sponsor-cards.expo-cards-open .expo-sponsor-card:nth-child(3) { transition-delay: 180ms; }
+  .expo-cards-motion-ready .expo-sponsor-cards.expo-cards-open .expo-sponsor-card:nth-child(4) { transition-delay: 270ms; }
+}
+
+@keyframes expo-rise-in {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes expo-poster-in {
+  from { opacity: 0; transform: translateX(40px) rotate(3deg) scale(.96); }
+  to { opacity: 1; transform: translateX(0) rotate(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.expo-campaign) { scroll-behavior: auto; }
+  .expo-hero > .relative > div:first-child > *,
+  .expo-hero-poster { animation: none; }
+  .expo-motion-ready .expo-section > * { opacity: 1; transform: none; transition: none; }
+  .expo-hero-poster { transition: none; }
+}
+
+@media (max-width: 767px) {
+  html:has(.expo-campaign) { scroll-behavior: auto; }
+  .expo-campaign *,
+  .expo-campaign *::before,
+  .expo-campaign *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .expo-motion-ready .expo-section:not(.expo-in-view) > * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .expo-cards-motion-ready .expo-sponsor-card {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .expo-hero-poster:hover { scale: 1; }
+}
