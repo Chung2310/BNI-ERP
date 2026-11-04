@@ -32,6 +32,7 @@ const MeetingCheckInPage = lazy(() => import("./pages/MeetingCheckInPage"));
 const MeetingInteractionPage = lazy(() => import("./pages/MeetingInteractionPage"));
 const ChapterRegistrationPage = lazy(() => import("./pages/ChapterRegistrationPage"));
 const ChapterPortal = lazy(() => import("./pages/ChapterPortal"));
+const ExpoHomePage = lazy(() => import("./pages/ExpoHomePage"));
 
 function AppContent() {
   const { user, userProfile, loading } = useAuth();
@@ -56,6 +57,7 @@ function AppContent() {
   const isMeetingInteractionPage = currentPath.startsWith("/meeting-interaction/");
   const isChapterRegistrationPage = currentPath === "/dang-ky-thanh-vien";
   const isChapterPage = currentPath === "/chapter";
+  const isExpoHomePage = currentPath === "/trang-chu";
   const isWheelPage =
     currentPath === "/wheel-of-names" ||
     currentPath === "/wheel-of-names.html" ||
@@ -72,6 +74,7 @@ function AppContent() {
     isMeetingCheckInPage ||
     isMeetingInteractionPage ||
     isChapterRegistrationPage ||
+    isExpoHomePage ||
     isWheelPage;
 
   const { activeTab, setActiveTab } = useTabRouter({
@@ -153,6 +156,10 @@ function AppContent() {
         <SubmitProofPage />
       </Suspense>
     );
+  }
+
+  if (isExpoHomePage) {
+    return (<Suspense fallback={<AuthLoader />}><ExpoHomePage /></Suspense>);
   }
 
   if (isMeetingCheckInPage) {

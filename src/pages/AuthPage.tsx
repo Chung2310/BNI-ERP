@@ -80,7 +80,7 @@ export default function AuthPage() {
       <div className="z-10 flex w-full max-w-md flex-col gap-5 rounded-3xl border border-slate-100/90 bg-white/85 p-5 text-left shadow-[0_22px_70px_rgba(15,23,42,0.06)] backdrop-blur-2xl animate-fade-in-up sm:gap-6 sm:p-9">
         <div>
           <a
-            href="/"
+            href="/trang-chu"
             className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-blue-200 hover:text-blue-700"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
