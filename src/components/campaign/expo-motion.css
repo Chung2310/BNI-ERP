@@ -20,9 +20,8 @@ html:has(.expo-campaign) {
 }
 
 .expo-red-gradient {
-  color: #de1039;
-  font-weight: 300;
-  background: linear-gradient(105deg, #e10a37 0%, #ff444c 52%, #bd082e 100%);
+  color: #a6082a;
+  background: linear-gradient(105deg, #a6082a 0%, #c91639 52%, #920522 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
